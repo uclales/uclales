@@ -1,0 +1,345 @@
+Makefile:105: depend: No such file or directory
+makedepf90 advf.f90 advl.f90 defs.f90 forc.f90 grid.f90 init.f90 LES.f90 mcrp.f90 mpi_interface.f90 ncio.f90 prss.f90 rad_cldwtr.f90 rad_corkds.f90 rad_d4strm.f90 rad_driver.f90 rad_rndnmb.f90 rad_solver.f90 rfft.f90 sgsm.f90 srfc.f90 stat.f90 step.f90 thrm.f90 util.f90 > depend
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c mpi_interface.f90
+mpi_interface.f90:644.19:
+
+    integer:: mpiop,ierror
+                  1
+Warning: Unused variable 'mpiop' declared at (1)
+mpi_interface.f90:631.19:
+
+    integer:: mpiop,ierror
+                  1
+Warning: Unused variable 'mpiop' declared at (1)
+mpi_interface.f90:618.19:
+
+    integer:: mpiop,ierror
+                  1
+Warning: Unused variable 'mpiop' declared at (1)
+mpi_interface.f90:504.33:
+
+  subroutine cyclicc(n1,n2,n3,var,req)
+                                1
+Warning: Unused dummy argument 'var' at (1)
+mpi_interface.f90:437.48:
+
+    integer :: ierror, stats(MPI_STATUS_SIZE,16), pxfwd, pxback, pyfwd, pyback
+                                               1
+Warning: Unused variable 'stats' declared at (1)
+mpi_interface.f90:325.49:
+
+    integer :: nx, ny, i, j, k, ii, jj, ierr, cnt, typesize,nynzg, nxnzg
+                                                1
+Warning: Unused variable 'cnt' declared at (1)
+mpi_interface.f90:325.27:
+
+    integer :: nx, ny, i, j, k, ii, jj, ierr, cnt, typesize,nynzg, nxnzg
+                          1
+Warning: Unused variable 'j' declared at (1)
+mpi_interface.f90:325.30:
+
+    integer :: nx, ny, i, j, k, ii, jj, ierr, cnt, typesize,nynzg, nxnzg
+                             1
+Warning: Unused variable 'k' declared at (1)
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c util.f90
+util.f90: In function ‘sclrset’:
+util.f90:43: warning: ‘dzf2’ may be used uninitialized in this function
+util.f90:43: warning: ‘dzf1’ may be used uninitialized in this function
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c defs.f90
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c ncio.f90
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c grid.f90
+grid.f90: In function ‘define_grid’:
+grid.f90:205: warning: ‘dzmin’ may be used uninitialized in this function
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c stat.f90
+stat.f90:37.41:
+
+  character (len=7), save :: s1(nvar1)=(/                           & 
+                                        1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:38.17:
+
+       'time   ','cfl    ','maxdiv ','zi1_bar','zi2_bar','zi3_bar', & ! 1
+                1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:38.27:
+
+       'time   ','cfl    ','maxdiv ','zi1_bar','zi2_bar','zi3_bar', & ! 1
+                          1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:38.37:
+
+       'time   ','cfl    ','maxdiv ','zi1_bar','zi2_bar','zi3_bar', & ! 1
+                                    1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:38.47:
+
+       'time   ','cfl    ','maxdiv ','zi1_bar','zi2_bar','zi3_bar', & ! 1
+                                              1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:38.57:
+
+       'time   ','cfl    ','maxdiv ','zi1_bar','zi2_bar','zi3_bar', & ! 1
+                                                        1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:38.67:
+
+       'time   ','cfl    ','maxdiv ','zi1_bar','zi2_bar','zi3_bar', & ! 1
+                                                                  1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:39.17:
+
+       'vtke   ','sfcbflx','wmax   ','tsrf   ','ustar  ','shf_bar', & ! 7
+                1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:39.27:
+
+       'vtke   ','sfcbflx','wmax   ','tsrf   ','ustar  ','shf_bar', & ! 7
+                          1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:39.37:
+
+       'vtke   ','sfcbflx','wmax   ','tsrf   ','ustar  ','shf_bar', & ! 7
+                                    1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:39.47:
+
+       'vtke   ','sfcbflx','wmax   ','tsrf   ','ustar  ','shf_bar', & ! 7
+                                              1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:39.57:
+
+       'vtke   ','sfcbflx','wmax   ','tsrf   ','ustar  ','shf_bar', & ! 7
+                                                        1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:39.67:
+
+       'vtke   ','sfcbflx','wmax   ','tsrf   ','ustar  ','shf_bar', & ! 7
+                                                                  1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:40.17:
+
+       'lhf_bar','zi_bar ','lwp_bar','lwp_var','zc     ','zb     ', & !13
+                1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:40.27:
+
+       'lhf_bar','zi_bar ','lwp_bar','lwp_var','zc     ','zb     ', & !13
+                          1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:40.37:
+
+       'lhf_bar','zi_bar ','lwp_bar','lwp_var','zc     ','zb     ', & !13
+                                    1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:40.47:
+
+       'lhf_bar','zi_bar ','lwp_bar','lwp_var','zc     ','zb     ', & !13
+                                              1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:40.57:
+
+       'lhf_bar','zi_bar ','lwp_bar','lwp_var','zc     ','zb     ', & !13
+                                                        1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:40.67:
+
+       'lhf_bar','zi_bar ','lwp_bar','lwp_var','zc     ','zb     ', & !13
+                                                                  1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:41.17:
+
+       'cfrac  ','lmax   ','albedo ','rwp_bar','prcp   ','pfrac  ', & !19
+                1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:41.27:
+
+       'cfrac  ','lmax   ','albedo ','rwp_bar','prcp   ','pfrac  ', & !19
+                          1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:41.37:
+
+       'cfrac  ','lmax   ','albedo ','rwp_bar','prcp   ','pfrac  ', & !19
+                                    1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:41.47:
+
+       'cfrac  ','lmax   ','albedo ','rwp_bar','prcp   ','pfrac  ', & !19
+                                              1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:41.57:
+
+       'cfrac  ','lmax   ','albedo ','rwp_bar','prcp   ','pfrac  ', & !19
+                                                        1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:41.67:
+
+       'cfrac  ','lmax   ','albedo ','rwp_bar','prcp   ','pfrac  ', & !19
+                                                                  1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:42.17:
+
+       'CCN    ','nrain  ','nrcnt  ','dissum','discnt  ','dissum2', & !25
+                1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:42.27:
+
+       'CCN    ','nrain  ','nrcnt  ','dissum','discnt  ','dissum2', & !25
+                          1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:42.37:
+
+       'CCN    ','nrain  ','nrcnt  ','dissum','discnt  ','dissum2', & !25
+                                    1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:42.46:
+
+       'CCN    ','nrain  ','nrcnt  ','dissum','discnt  ','dissum2', & !25
+                                             1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:42.57:
+
+       'CCN    ','nrain  ','nrcnt  ','dissum','discnt  ','dissum2', & !25
+                                                        1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90:42.67:
+
+       'CCN    ','nrain  ','nrcnt  ','dissum','discnt  ','dissum2', & !25
+                                                                  1
+Warning: CHARACTER expression at (1) is being truncated (8/7)
+stat.f90: In function ‘sgsflxs’:
+stat.f90:965: warning: ‘fctt’ may be used uninitialized in this function
+stat.f90:965: warning: ‘fctl’ may be used uninitialized in this function
+stat.f90: In function ‘acc_tend’:
+stat.f90:1045: warning: ‘ii’ may be used uninitialized in this function
+stat.f90: In function ‘updtst’:
+stat.f90:1154: warning: ‘nn’ may be used uninitialized in this function
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c advf.f90
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c advl.f90
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c rad_corkds.f90
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c rad_rndnmb.f90
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c rad_solver.f90
+rad_solver.f90: In function ‘qcfel’:
+rad_solver.f90:433: warning: ‘i0’ may be used uninitialized in this function
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c rad_cldwtr.f90
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c rad_d4strm.f90
+rad_d4strm.f90:229.27:
+
+       plwc, pre, piwc, pde, prwc, pgwc, useMcICA  )
+                          1
+Warning: Unused dummy argument 'pde' at (1)
+rad_d4strm.f90:229.39:
+
+       plwc, pre, piwc, pde, prwc, pgwc, useMcICA  )
+                                      1
+Warning: Unused dummy argument 'pgwc' at (1)
+rad_d4strm.f90:229.22:
+
+       plwc, pre, piwc, pde, prwc, pgwc, useMcICA  )
+                     1
+Warning: Unused dummy argument 'piwc' at (1)
+rad_d4strm.f90:229.33:
+
+       plwc, pre, piwc, pde, prwc, pgwc, useMcICA  )
+                                1
+Warning: Unused dummy argument 'prwc' at (1)
+rad_d4strm.f90:104.27:
+
+       plwc, pre, piwc, pde, prwc, pgwc, useMcICA  )
+                          1
+Warning: Unused dummy argument 'pde' at (1)
+rad_d4strm.f90:104.39:
+
+       plwc, pre, piwc, pde, prwc, pgwc, useMcICA  )
+                                      1
+Warning: Unused dummy argument 'pgwc' at (1)
+rad_d4strm.f90:104.22:
+
+       plwc, pre, piwc, pde, prwc, pgwc, useMcICA  )
+                     1
+Warning: Unused dummy argument 'piwc' at (1)
+rad_d4strm.f90:104.33:
+
+       plwc, pre, piwc, pde, prwc, pgwc, useMcICA  )
+                                1
+Warning: Unused dummy argument 'prwc' at (1)
+rad_d4strm.f90: In function ‘computesolarbandweights’:
+rad_d4strm.f90:601: warning: ‘i’ may be used uninitialized in this function
+rad_d4strm.f90:590: note: ‘i’ was declared here
+rad_d4strm.f90: In function ‘rad_ir’:
+rad_d4strm.f90:138: warning: ‘ib’ may be used uninitialized in this function
+rad_d4strm.f90:138: warning: ‘ig2’ may be used uninitialized in this function
+rad_d4strm.f90: In function ‘rad_vis’:
+rad_d4strm.f90:266: warning: ‘ig2’ may be used uninitialized in this function
+rad_d4strm.f90:266: note: ‘ig2’ was declared here
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c rad_driver.f90
+rad_driver.f90: In function ‘setup’:
+rad_driver.f90:141: warning: ‘norig’ may be used uninitialized in this function
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c forc.f90
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c thrm.f90
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c prss.f90
+prss.f90:107.44:
+
+  subroutine get_diverg(n1,n2,n3,ix,iy,s1,ut,vt,wt,u,v,w,dn0,dz,dx,dy,dt,mxdiv)
+                                           1
+Warning: Unused dummy argument 'ut' at (1)
+prss.f90:107.47:
+
+  subroutine get_diverg(n1,n2,n3,ix,iy,s1,ut,vt,wt,u,v,w,dn0,dz,dx,dy,dt,mxdiv)
+                                              1
+Warning: Unused dummy argument 'vt' at (1)
+prss.f90:107.50:
+
+  subroutine get_diverg(n1,n2,n3,ix,iy,s1,ut,vt,wt,u,v,w,dn0,dz,dx,dy,dt,mxdiv)
+                                                 1
+Warning: Unused dummy argument 'wt' at (1)
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c mcrp.f90
+mcrp.f90:317.26:
+
+    real, parameter :: Cac = 67.     ! accretion coefficient in KK param.
+                         1
+Warning: Unused parameter 'cac' declared at (1)
+mcrp.f90:318.26:
+
+    real, parameter :: Eac = 1.15    ! accretion exponent in KK param.
+                         1
+Warning: Unused parameter 'eac' declared at (1)
+mcrp.f90:192.55:
+
+  subroutine auto_SB(n1,n2,n3,dn0,rc,rp,rpt,npt,diss,up)
+                                                      1
+Warning: Unused dummy argument 'up' at (1)
+mcrp.f90:84.32:
+
+       rtt,tlt,rpt,npt,up,dissip)
+                               1
+Warning: Unused dummy argument 'dissip' at (1)
+mcrp.f90:84.25:
+
+       rtt,tlt,rpt,npt,up,dissip)
+                        1
+Warning: Unused dummy argument 'up' at (1)
+mcrp.f90: In function ‘wtr_dff_sb’:
+mcrp.f90:145: warning: ‘xnpts’ may be used uninitialized in this function
+mcrp.f90: In function ‘sedim_rd’:
+mcrp.f90:388: warning: ‘xnpts’ may be used uninitialized in this function
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c srfc.f90
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c sgsm.f90
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c step.f90
+step.f90:138.34:
+
+    character (len=11)    :: fname = 'debugXX.dat'
+                                 1
+Warning: Unused variable 'fname' declared at (1)
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c init.f90
+init.f90:321.3:
+
+604 format('    input sounding needs to go higher ! !', /,                &
+  1
+Warning: Label 604 at (1) defined but not used
+init.f90: In function ‘arrsnd’:
+init.f90:210: warning: ‘zold2’ may be used uninitialized in this function
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c LES.f90
+mpif90 -W -Wall -fdefault-real-8 -ffree-line-length-none  -O3 -pg  -c rfft.f90
+rfft.f90: In function ‘cffti1’:
+rfft.f90:326: warning: ‘ntry’ may be used uninitialized in this function
+mpif90 -O3 -pg  -o uclales3 advf.o advl.o defs.o forc.o grid.o init.o LES.o mcrp.o mpi_interface.o ncio.o prss.o rad_cldwtr.o rad_corkds.o rad_d4strm.o rad_driver.o rad_rndnmb.o rad_solver.o rfft.o sgsm.o srfc.o stat.o step.o thrm.o util.o   -lnetcdf

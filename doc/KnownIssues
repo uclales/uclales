@@ -1,0 +1,8 @@
+12.6.2007:  Hydrostatic pressures associated with the deviation of the mean state from the basic state (fixed Theta_00) are not included in the thermodynamic evaluations.  This can cause significant differences in the model pressure for deep layers
+15.6.2007:  The code was modified to allow for a more consistent definition of 
+the pressure in the thermodynamics.  It remains unclear of the impact of such a
+change on the energetics, i.e., the full change was not explored in an asympototic
+sense.
+21.8.2007:  Tests with the new version of the code showed that the changes to 
+the pressure had negligble impact on simulations of shallow convection (RICO)
+

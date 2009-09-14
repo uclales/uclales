@@ -1,0 +1,15 @@
+#!/bin/ksh
+
+# @ shell = /usr/bin/ksh
+# @ job_type = serial
+# @ job_name = LES2.0_RICO
+# @ output   = $(job_name).$(jobid).out
+# @ error    = $(job_name).$(jobid).err
+# @ notification = complete
+# @ notify_user = louise.nuijens@zmaw.de
+# @ wall_clock_limit = 01:00:00
+# @ network.MPI = sn_all,not_shared,us
+# @ resources = ConsumableCpus(1) ConsumableMemory(1000mb)
+# @ queue
+
+./les.seq

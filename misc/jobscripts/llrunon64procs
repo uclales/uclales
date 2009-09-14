@@ -1,0 +1,21 @@
+#!/bin/ksh
+
+# @ shell = /usr/bin/ksh
+# @ class = cluster
+# @ startdate = 07/22/2009 11:00
+# @ job_type = parallel
+# @ job_name = les3.2.1L2G
+# @ output   = $(job_name).$(jobid).out
+# @ error    = $(job_name).$(jobid).err
+# @ notification = complete
+# @ notify_user = louise.nuijens@zmaw.de
+# @ wall_clock_limit = 08:00:00
+# @ node_usage = not_shared
+# @ network.MPI = sn_all,not_shared,us
+# @ tasks_per_node = 32
+# @ node = 2
+# @ resources = ConsumableMemory(0.75gb)
+# @ task_affinity = core(1)		
+# @ queue
+
+timex poe ./les.mpi

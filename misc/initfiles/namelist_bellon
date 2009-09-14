@@ -1,0 +1,34 @@
+ &model
+  nzp =   121
+  nxp =   132
+  nyp =   132
+  deltax = 75.
+  deltay = 75.
+  deltaz =  10.
+  dtlong = 1.0
+  dzrat  =  1.02
+  dzmax  = 5.
+  distim = 600.
+  timmax = 200000.
+  runtype = "INITIAL"
+  level = 2
+  filprf = 'bellon.75.25.1000'
+  hfilin = 'bellon.75.25.1000.rst'
+  savg_intvl =  1800.
+  ssam_intvl =   30.
+  corflg = .true.
+  isfctyp = 2
+  iradtyp = 4
+  th00 = 300.
+  sst  = 300.
+  zrough  = -0.1
+  ps =    1020.0, 1000.,  1600.,  2011.,  2500.,  3000.,  4000.,  6500.,
+  ts =     298.,  298.,  304.34, 305.73, 307.94, 310.05,  314.0, 323.65,
+  rts=     13.0,  13.0,     4.0,    4.0,    4.0,    4.0,    4.0,    4.0,
+  us =   10.,   10.,   10.,  10.,  10.0,   10.0,   10.0,   10.0,   10.0,
+  vs =  -0.0,  -0.0,  -0.0, -0.0,  -0.0,   -0.0,   -0.0,   -0.0,   -0.0,
+  umean = 10.0
+  vmean =-0.0
+ /
+
+

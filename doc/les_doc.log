@@ -1,0 +1,328 @@
+This is pdfeTeX, Version 3.141592-1.21a-2.2 (Web2C 7.5.4) (format=pdflatex 2006.9.15)  22 AUG 2007 17:35
+entering extended mode
+**les_doc
+(./les_doc.tex
+LaTeX2e <2003/12/01>
+Babel <v3.8d> and hyphenation patterns for american, french, german, ngerman, b
+ahasa, basque, bulgarian, catalan, croatian, czech, danish, dutch, esperanto, e
+stonian, finnish, greek, icelandic, irish, italian, latin, magyar, norsk, polis
+h, portuges, romanian, russian, serbian, slovak, slovene, spanish, swedish, tur
+kish, ukrainian, nohyphenation, loaded.
+(/sw/share/texmf-dist/tex/latex/base/article.cls
+Document Class: article 2004/02/16 v1.4f Standard LaTeX document class
+(/sw/share/texmf-dist/tex/latex/base/size11.clo
+File: size11.clo 2004/02/16 v1.4f Standard LaTeX file (size option)
+)
+\c@part=\count79
+\c@section=\count80
+\c@subsection=\count81
+\c@subsubsection=\count82
+\c@paragraph=\count83
+\c@subparagraph=\count84
+\c@figure=\count85
+\c@table=\count86
+\abovecaptionskip=\skip41
+\belowcaptionskip=\skip42
+\bibindent=\dimen102
+)
+(/sw/share/texmf-dist/tex/latex/preprint/fullpage.sty
+Package: fullpage 1999/02/23 1.1 (PWD)
+\FP@margin=\skip43
+)
+(/sw/share/texmf-dist/tex/latex/psnfss/times.sty
+Package: times 2004/09/15 PSNFSS-v9.2 (SPQR) 
+)
+(/sw/share/texmf-dist/tex/latex/amsmath/amsmath.sty
+Package: amsmath 2000/07/18 v2.13 AMS math features
+\@mathmargin=\skip44
+
+For additional information on amsmath, use the `?' option.
+(/sw/share/texmf-dist/tex/latex/amsmath/amstext.sty
+Package: amstext 2000/06/29 v2.01
+
+(/sw/share/texmf-dist/tex/latex/amsmath/amsgen.sty
+File: amsgen.sty 1999/11/30 v2.0
+\@emptytoks=\toks14
+\ex@=\dimen103
+))
+(/sw/share/texmf-dist/tex/latex/amsmath/amsbsy.sty
+Package: amsbsy 1999/11/29 v1.2d
+\pmbraise@=\dimen104
+)
+(/sw/share/texmf-dist/tex/latex/amsmath/amsopn.sty
+Package: amsopn 1999/12/14 v2.01 operator names
+)
+\inf@bad=\count87
+LaTeX Info: Redefining \frac on input line 211.
+\uproot@=\count88
+\leftroot@=\count89
+LaTeX Info: Redefining \overline on input line 307.
+\classnum@=\count90
+\DOTSCASE@=\count91
+LaTeX Info: Redefining \ldots on input line 379.
+LaTeX Info: Redefining \dots on input line 382.
+LaTeX Info: Redefining \cdots on input line 467.
+\Mathstrutbox@=\box26
+\strutbox@=\box27
+\big@size=\dimen105
+LaTeX Font Info:    Redeclaring font encoding OML on input line 567.
+LaTeX Font Info:    Redeclaring font encoding OMS on input line 568.
+\macc@depth=\count92
+\c@MaxMatrixCols=\count93
+\dotsspace@=\muskip10
+\c@parentequation=\count94
+\dspbrk@lvl=\count95
+\tag@help=\toks15
+\row@=\count96
+\column@=\count97
+\maxfields@=\count98
+\andhelp@=\toks16
+\eqnshift@=\dimen106
+\alignsep@=\dimen107
+\tagshift@=\dimen108
+\tagwidth@=\dimen109
+\totwidth@=\dimen110
+\lineht@=\dimen111
+\@envbody=\toks17
+\multlinegap=\skip45
+\multlinetaggap=\skip46
+\mathdisplay@stack=\toks18
+LaTeX Info: Redefining \[ on input line 2666.
+LaTeX Info: Redefining \] on input line 2667.
+)
+(/sw/share/texmf-dist/tex/latex/graphics/graphicx.sty
+Package: graphicx 1999/02/16 v1.0f Enhanced LaTeX Graphics (DPC,SPQR)
+
+(/sw/share/texmf-dist/tex/latex/graphics/keyval.sty
+Package: keyval 1999/03/16 v1.13 key=value parser (DPC)
+\KV@toks@=\toks19
+)
+(/sw/share/texmf-dist/tex/latex/graphics/graphics.sty
+Package: graphics 2001/07/07 v1.0n Standard LaTeX Graphics (DPC,SPQR)
+
+(/sw/share/texmf-dist/tex/latex/graphics/trig.sty
+Package: trig 1999/03/16 v1.09 sin cos tan (DPC)
+)
+(/sw/share/texmf-dist/tex/latex/graphics/graphics.cfg
+File: graphics.cfg 2005/02/03 v1.3 graphics configuration of teTeX/TeXLive
+)
+Package graphics Info: Driver file: pdftex.def on input line 80.
+
+(/sw/share/texmf-dist/tex/latex/graphics/pdftex.def
+File: pdftex.def 2002/06/19 v0.03k graphics/color for pdftex
+\Gread@gobject=\count99
+))
+\Gin@req@height=\dimen112
+\Gin@req@width=\dimen113
+)
+(/sw/share/texmf-dist/tex/latex/tools/longtable.sty
+Package: longtable 2004/02/01 v4.11 Multi-page Table package (DPC)
+\LTleft=\skip47
+\LTright=\skip48
+\LTpre=\skip49
+\LTpost=\skip50
+\LTchunksize=\count100
+\LTcapwidth=\dimen114
+\LT@head=\box28
+\LT@firsthead=\box29
+\LT@foot=\box30
+\LT@lastfoot=\box31
+\LT@cols=\count101
+\LT@rows=\count102
+\c@LT@tables=\count103
+\c@LT@chunks=\count104
+\LT@p@ftn=\toks20
+)
+(/Users/bstevens/Documents/Latex/ametsoc.sty
+
+LaTeX Warning: You have requested package `/Users/bstevens/Documents/Latex/amet
+soc',
+               but the package provides `ametsoc'.
+
+Package: ametsoc 
+(/sw/share/texmf-dist/tex/latex/natbib/natbib.sty
+Package: natbib 2003/06/06 7.1 (PWD)
+\bibhang=\skip51
+\bibsep=\skip52
+LaTeX Info: Redefining \cite on input line 518.
+\c@NAT@ctr=\count105
+)
+(/sw/share/texmf-dist/tex/latex/base/ifthen.sty
+Package: ifthen 2001/05/26 v1.1c Standard LaTeX ifthen package (DPC)
+)) (./les_doc.aux
+
+LaTeX Warning: Label `tbl:namelist' multiply defined.
+
+
+LaTeX Warning: Label `tbl:variables' multiply defined.
+
+
+LaTeX Warning: Label `fig:rico' multiply defined.
+
+)
+\openout1 = `les_doc.aux'.
+
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 7.
+LaTeX Font Info:    ... okay on input line 7.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 7.
+LaTeX Font Info:    ... okay on input line 7.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 7.
+LaTeX Font Info:    ... okay on input line 7.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 7.
+LaTeX Font Info:    ... okay on input line 7.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 7.
+LaTeX Font Info:    ... okay on input line 7.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 7.
+LaTeX Font Info:    ... okay on input line 7.
+LaTeX Font Info:    Try loading font information for OT1+ptm on input line 7.
+ (/sw/share/texmf-dist/tex/latex/psnfss/ot1ptm.fd
+File: ot1ptm.fd 2001/06/04 font definitions for OT1/ptm.
+)
+(/sw/share/texmf-dist/tex/context/base/supp-pdf.tex
+(/sw/share/texmf-dist/tex/context/base/supp-mis.tex
+loading : Context Support Macros / Miscellaneous (2004.10.26)
+\protectiondepth=\count106
+\scratchcounter=\count107
+\scratchtoks=\toks21
+\scratchdimen=\dimen115
+\scratchskip=\skip53
+\scratchmuskip=\muskip11
+\scratchbox=\box32
+\scratchread=\read1
+\scratchwrite=\write3
+\zeropoint=\dimen116
+\onepoint=\dimen117
+\onebasepoint=\dimen118
+\minusone=\count108
+\thousandpoint=\dimen119
+\onerealpoint=\dimen120
+\emptytoks=\toks22
+\nextbox=\box33
+\nextdepth=\dimen121
+\everyline=\toks23
+\!!counta=\count109
+\!!countb=\count110
+\recursecounter=\count111
+)
+loading : Context Support Macros / PDF (2004.03.26)
+\nofMPsegments=\count112
+\nofMParguments=\count113
+\MPscratchCnt=\count114
+\MPscratchDim=\dimen122
+\MPnumerator=\count115
+\everyMPtoPDFconversion=\toks24
+) [1
+
+{/sw/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}]
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <14.4> not available
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 57.
+ (./les_doc.toc
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <10.95> not available
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 1.
+)
+\tf@toc=\write4
+\openout4 = `les_doc.toc'.
+
+
+[2] [3] [4] [5] [6] [7] [8] <timestep.pdf, id=72, 325.215pt x 90.3375pt>
+File: timestep.pdf Graphic file (type pdf)
+
+<use timestep.pdf> [9 <./timestep.pdf>]
+<grid.pdf, id=152, 440.17615pt x 233.83563pt>
+File: grid.pdf Graphic file (type pdf)
+ <use grid.pdf> [10 <./grid.pdf>]
+[11]
+Overfull \hbox (23.99998pt too wide) in paragraph at lines 621--660
+ [] 
+ []
+
+[12] [13] [14]
+Underfull \hbox (badness 10000) in paragraph at lines 734--734
+[]|\OT1/ptm/m/n/10.95 Default
+ []
+
+
+Underfull \hbox (badness 5245) in paragraph at lines 751--752
+[]|\OT1/ptm/m/n/10.95 Control pa-ram-e-ter for se-lect-ing mi-cro-phys-i-cal
+ []
+
+
+Underfull \hbox (badness 3148) in paragraph at lines 764--766
+[]|\OT1/ptm/m/n/10.95 input merid-ional wind soud-ing (max nns=150
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 791--791
+[]|\OT1/ptm/m/n/10.95 100
+ []
+
+
+Overfull \hbox (0.62396pt too wide) in paragraph at lines 799--799
+[]|\OT1/ptm/m/n/10.95 ssam[]intvl| 
+ []
+
+[15] [16]
+Overfull \hbox (8.2729pt too wide) in paragraph at lines 864--871
+ \OT1/ptm/b/n/10.95 Tem-po-ral Statis-tics:[] \OT1/ptm/m/n/10.95 This is a netC
+DF file called $(fil-prf).ts.nc for a se-quen-tial run or $(fil-prf).ts.####.nc
+
+ []
+
+[17]
+Underfull \hbox (badness 10000) in paragraph at lines 935--935
+[]|\OT1/ptm/m/n/10.95 a[]press,
+ []
+
+[18] <rico.pdf, id=194, 721.3008pt x 469.35039pt>
+File: rico.pdf Graphic file (type pdf)
+ <use rico.pdf>
+Overfull \hbox (6.99289pt too wide) in paragraph at lines 991--997
+ \OT1/ptm/b/n/10.95 Dry CBL:[] \OT1/ptm/m/n/10.95 To run this case we re-vert t
+o the orig-i-nal or de-fault code by copy-ing the \OT1/ptm/m/it/10.95 misc/vari
+ants/original
+ []
+
+[19] <cbl.pdf, id=199, 569.76064pt x 542.4275pt>
+File: cbl.pdf Graphic file (type pdf)
+ <use cbl.pdf>
+
+LaTeX Warning: Reference `fig:cbl' on page 20 undefined on input line 1009.
+
+<smoke.pdf, id=200, 721.86087pt x 334.0229pt>
+File: smoke.pdf Graphic file (type pdf)
+ <use smoke.pdf> [20 <./rico.pdf, page is rotated 270 degrees> <./cbl.pdf, page
+ is rotated 270 degrees>]
+(./les_doc.bbl [21 <./smoke.pdf, page is rotated 270 degrees>]) [22]
+(./les_doc.aux)
+
+LaTeX Warning: There were undefined references.
+
+
+LaTeX Warning: There were multiply-defined labels.
+
+ ) 
+Here is how much of TeX's memory you used:
+ 2071 strings out of 94500
+ 24362 string characters out of 1176114
+ 93706 words of memory out of 1000000
+ 5213 multiletter control sequences out of 10000+50000
+ 29322 words of font info for 63 fonts, out of 500000 for 2000
+ 580 hyphenation exceptions out of 1000
+ 27i,12n,24p,373b,268s stack positions out of 1500i,500n,5000p,200000b,5000s
+PDF statistics:
+ 251 PDF objects out of 300000
+ 0 named destinations out of 131072
+ 26 words of extra memory for PDF output out of 65536
+</sw/share/texmf-dist/fonts/type1/bluesky/cm/cmr6.pfb></sw/share/texmf-dist/f
+onts/type1/public/tt2001/fmex8.pfb></sw/share/texmf-dist/fonts/type1/bluesky/cm
+/cmsy6.pfb></sw/share/texmf-dist/fonts/type1/bluesky/cm/cmbx10.pfb></sw/share/t
+exmf-dist/fonts/type1/bluesky/cm/cmex10.pfb></sw/share/texmf-dist/fonts/type1/b
+luesky/cm/cmmi6.pfb></sw/share/texmf-dist/fonts/type1/bluesky/cm/cmsy8.pfb></sw
+/share/texmf-dist/fonts/type1/bluesky/cm/cmr8.pfb></sw/share/texmf-dist/fonts/t
+ype1/bluesky/cm/cmr10.pfb></sw/share/texmf-dist/fonts/type1/bluesky/cm/cmsy10.p
+fb></sw/share/texmf-dist/fonts/type1/bluesky/cm/cmmi8.pfb></sw/share/texmf-dist
+/fonts/type1/bluesky/cm/cmmi10.pfb>{/sw/share/texmf-dist/fonts/enc/dvips/psnfss
+/8r.enc}</sw/share/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></sw/share/texmf
+-dist/fonts/type1/urw/times/utmri8a.pfb></sw/share/texmf-dist/fonts/type1/urw/t
+imes/utmr8a.pfb>
+Output written on les_doc.pdf (22 pages, 994710 bytes).

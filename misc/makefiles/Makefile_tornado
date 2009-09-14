@@ -1,0 +1,103 @@
+cd L###############################################################
+#
+# Type of code to build $CNFG, location of code (in $ROOT) and 
+# location where model is to be built $BIN
+#
+ROOT      = ..
+BIN       = $(ROOT)/bin
+ARCH      := $(shell uname)
+#
+# Note that so far I have only been able to use the Intel compiler on
+# tornado. You need the netcdf libraries installed with the intel compiler
+# using the f90 interface.
+#
+# Generic Variables
+#
+SRC     =$(ROOT)/src
+
+ECHO    = /bin/echo
+RM      = /bin/rm -f
+
+ifeq ($(ARCH),Linux)
+  COMPILER  := 'IFORT'
+  ARCHIVE   = ar rs
+  RANLIB    =: 
+  ifeq ($(COMPILER),'NAG')
+     F90      = f95
+     NCDF     = /sw/nag/netcdf
+     DEBUG    = -C=all -gline -nan
+     FFLAGS   = $(DEBUG) -O4 -r8 -kind=byte $(NCDFINC) -Oassumed=always_contig
+     SEQFFLAGS = -I$(SRC)/seq -mdir $(SRC)/seq 
+     MPIFFLAGS = -I$(SRC)/mpi -mdir $(SRC)/mpi
+     F77FLAGS = -fixed -dusty
+  endif
+  ifeq ($(COMPILER),'G95')
+     F90      = g95
+     NCDF     = /sw/g95/netcdf
+     FFLAGS   = -O3 -r8   $(NCDFINC) 
+     SEQFFLAGS = -I$(SRC)/seq -fmod=$(SRC)/seq 
+     MPIFFLAGS = -I$(SRC)/mpi -fmod=$(SRC)/mpi 
+     F77FLAGS = -ffixed-form
+  endif
+  ifeq ($(COMPILER),'IFORT')
+     F90      = ifort
+     MPIF90    = /sw/sles10-x64/ofed/openmpi-1.3.2-intel11/bin/mpif90
+     NCDF     = /sw/sles9-x64/netcdf-3.6.2-intel/
+     SEQFFLAGS = -I$(SRC)/seq -module $(SRC)/seq
+     MPIFFLAGS = -I$(SRC)/mpi -module $(SRC)/mpi
+     FFLAGS   = -O3 -r8 -diag-disable remark $(NCDFINC) 
+     F77FLAGS = -fixed
+  endif
+  NCDFLIB   = -L$(NCDF)/lib  -lnetcdf
+  NCDFINC   = -I$(NCDF)/include
+  LIBS      = $(NCDFLIB)
+  MPILIBS   = $(LIBS)
+endif
+
+
+LES_ARC_MPI=$(BIN)/libles_mpi.a
+LES_OUT_MPI=$(BIN)/les.mpi
+
+LES_ARC_SEQ=$(BIN)/libles_seq.a
+LES_OUT_SEQ=$(BIN)/les.seq
+
+default: mpi
+
+all:  mpi seq
+
+seq: $(LES_OUT_SEQ)
+
+mpi: $(LES_OUT_MPI)
+
+$(LES_OUT_SEQ): $(SRC)/LES.f90 $(LES_ARC_SEQ)  
+	$(F90) $(FFLAGS) $(SEQFFLAGS) -o $@ $< $(LES_ARC_SEQ) $(LIBS)
+
+$(LES_OUT_MPI): $(SRC)/LES.f90 $(LES_ARC_MPI)  
+	$(MPIF90) $(FFLAGS) $(MPIFFLAGS) -o $@ $< $(LES_ARC_MPI) $(MPILIBS)
+
+$(LES_ARC_SEQ): FORCE
+	cd $(SRC) ; $(MAKE) LES_ARC=$(LES_ARC_SEQ) \
+        FFLAGS='$(FFLAGS) $(SEQFFLAGS)' F90=$(F90) ARCHIVE='$(ARCHIVE)' \
+	RANLIB=$(RANLIB) F77FLAGS='$(F77FLAGS)'
+
+$(LES_ARC_MPI): FORCE
+	cd $(SRC) ; $(MAKE) LES_ARC=$(LES_ARC_MPI) \
+        FFLAGS='$(FFLAGS) $(MPIFFLAGS)' F90='$(MPIF90)' ARCHIVE='$(ARCHIVE)' \
+	RANLIB='$(RANLIB)' F77FLAGS='$(F77FLAGS)'
+#
+# cleaning
+# --------------------
+#
+clean: cleanmpi cleanseq 
+	$(RM) $(SRC)/*mod $(SRC)/*.o
+
+cleanmpi:
+	$(ECHO) "cleaning mpi model"
+	$(RM) core $(LES_OUT_MPI) $(SRC)/mpi/*mod $(LES_ARC_MPI)
+
+cleanseq:
+	$(ECHO) "clean sequential model"
+	$(RM) core $(LES_OUT_SEQ) $(SRC)/seq/*mod $(LES_ARC_SEQ)
+
+FORCE: 
+.PRECIOUS: $(LIBS)

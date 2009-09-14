@@ -1,0 +1,51 @@
+\begin{thebibliography}{8}
+\expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
+\expandafter\ifx\csname url\endcsname\relax
+  \def\url#1{{\tt #1}}\fi
+\expandafter\ifx\csname urlprefix\endcsname\relax\def\urlprefix{URL }\fi
+\expandafter\ifx\csname doiprefix\endcsname\relax\def\doiprefix{doi:}\fi
+
+\bibitem[{Cotton(1972)}]{Cotto:1972}
+Cotton, W.~R., 1972: Numerical simulation of precipitation development in
+  supercooled cumuli-part {I}. {\it Mon. Wea. Rev.\/}, {\bf 100}, 757--763.
+
+\bibitem[{Long(1974)}]{Long:1974}
+Long, A.~B., 1974: Solutions to the droplet coalescence equation for polynomial
+  kernels. {\it J. Atmos. Sci.\/}, {\bf 31}, 1040.
+
+\bibitem[{L\"upkes et~al.(1989)L\"upkes, Beheng, and Doms}]{Lupke:1989}
+L\"upkes, C., K.~D. Beheng, and G.~Doms, 1989: A paraemeterization scheme
+  simulating warm rain formation due to collision/coalescence of water drops.
+  {\it Contributions to Atmospheric Physics\/}, {\bf 62}, 289--306.
+
+\bibitem[{Milbrandt and Yau(2005)}]{Milbr:2005}
+Milbrandt, J.~A. and M.~Yau, 2005: A multimoment bulk microphysics
+  parameterization. part {I}: analysis of the role of the spectral shape
+  parameter. {\it J. Atmos. Sci.\/}, {\bf 62}, 3051--3064.
+
+\bibitem[{Seifert and Beheng(2001)}]{Seife:2001}
+Seifert, A. and K.~D. Beheng, 2001: A double-moment parameterization for
+  simulating autoconversion, accretion and self collection. {\it Atmos Res\/},
+  {\bf 59-60}, 265--281.
+
+\bibitem[{Stevens et~al.(2005)Stevens, Moeng, Ackerman, Bretherton, Chlond,
+  de~Roode, Edwards, Golaz, Jiang, Khairoutdinov, Kirkpatrick, Lewellen, Lock,
+  M\"uller, Stevens, Whelan, and Zhu}]{Me:2005b}
+Stevens, B., C.-H. Moeng, A.~S. Ackerman, C.~S. Bretherton, A.~Chlond,
+  S.~de~Roode, J.~Edwards, J.-C. Golaz, H.~Jiang, M.~Khairoutdinov, M.~P.
+  Kirkpatrick, D.~C. Lewellen, A.~Lock, F.~M\"uller, D.~E. Stevens, E.~Whelan,
+  and P.~Zhu, 2005: Evaluation of large-eddy simulations via observations of
+  nocturnal marine stratocumulus. {\it Mon. Wea. Rev.\/}, {\bf 133},
+  1443--1462.
+
+\bibitem[{Stevens et~al.(1999)Stevens, Moeng, and Sullivan}]{Me:1999a}
+Stevens, B., C.-H. Moeng, and P.~P. Sullivan, 1999: Large-eddy simulations of
+  radiatively driven convection: sensitivities to the representation of small
+  scales. {\it J. Atmos. Sci.\/}, {\bf 56}, 3963--3984.
+
+\bibitem[{Stevens and Seifert(2008)}]{Me:2008}
+Stevens, B. and A.~Seifert, 2008: On the sensitivity of simulations of shallow
+  cumulus convection to their microphysical representation. {\it J. Meteorol.
+  Soc. Japan\/}.
+
+\end{thebibliography}

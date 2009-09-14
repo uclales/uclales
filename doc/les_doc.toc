@@ -1,0 +1,35 @@
+\contentsline {section}{\numberline {1}Overview}{3}
+\contentsline {subsection}{\numberline {a}Model Equations}{3}
+\contentsline {subsection}{\numberline {b}Parameterizations and Models}{5}
+\contentsline {subsubsection}{\numberline {i}Turbulence}{5}
+\contentsline {subsubsection}{\numberline {ii}Microphysics}{5}
+\contentsline {subsubsection}{\numberline {iii}Surface Fluxes}{8}
+\contentsline {subsection}{\numberline {c}Numerical Algorithms}{9}
+\contentsline {subsubsection}{\numberline {i}Time-stepping}{9}
+\contentsline {subsubsection}{\numberline {ii}Computational Grid}{10}
+\contentsline {subsubsection}{\numberline {iii}Pressure Solver}{10}
+\contentsline {subsection}{\numberline {d}Parallelization Strategy}{11}
+\contentsline {subsubsection}{\numberline {i}Decomposition}{11}
+\contentsline {subsubsection}{\numberline {ii}Parallel I/O}{11}
+\contentsline {subsubsection}{\numberline {iii}Communication}{11}
+\contentsline {subsubsection}{\numberline {iv}Strategies for the Future}{12}
+\contentsline {section}{\numberline {2}The Code}{12}
+\contentsline {subsection}{\numberline {a}Organization}{12}
+\contentsline {subsection}{\numberline {b}Compilation:}{14}
+\contentsline {subsection}{\numberline {c}Specialized model configurations}{14}
+\contentsline {section}{\numberline {3}Running the model}{14}
+\contentsline {subsection}{\numberline {a}The NAMELIST}{15}
+\contentsline {subsection}{\numberline {b}Output}{16}
+\contentsline {paragraph}{History files:}{16}
+\contentsline {paragraph}{Analysis file:}{17}
+\contentsline {paragraph}{Slice file:}{17}
+\contentsline {paragraph}{Profile statistics:}{17}
+\contentsline {paragraph}{Temporal Statistics:}{17}
+\contentsline {paragraph}{Standard output:}{17}
+\contentsline {subsection}{\numberline {c}Post-processing:}{18}
+\contentsline {paragraph}{Other Useful Scripts:}{18}
+\contentsline {subsection}{\numberline {d}Debugging:}{18}
+\contentsline {section}{\numberline {4}Getting started}{19}
+\contentsline {paragraph}{RICO:}{19}
+\contentsline {paragraph}{Dry CBL:}{19}
+\contentsline {paragraph}{Smoke:}{20}

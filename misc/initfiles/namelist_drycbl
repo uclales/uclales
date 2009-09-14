@@ -1,0 +1,19 @@
+ &model
+  nxp = 132
+  nyp =   5
+  nzp = 107
+  nxpart = .true.
+  dtlong  = 4.
+  timmax = 18000.
+  runtype= 'INITIAL'
+  hfilin = 'dcbl.rst'
+  filprf = 'dcbl_x'
+  level  = 1
+  th00 = 300.
+  zrand = 20.
+  ps = 1020.0, 5000.,
+  ts = 300.,  320.,
+  rts=   10.,   10.,
+  us =   0.,    0.,
+  vs =  -0.,   -0.,
+ /

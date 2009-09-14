@@ -1,0 +1,20 @@
+#!/bin/ksh
+#
+#BSUB -J les
+#BSUB -q regular
+#BSUB -P 35681083
+#BSUB -o out.%J
+#BSUB -e err.%J
+#BSUB -a poe
+#BSUB -x
+#BSUB -n 144
+#BSUB -R "span[ptile=16]"
+#BSUB -W 6:00
+##BSUB -b 14:00
+#BSUB -B
+#BSUB -N
+
+gmake
+mpirun.lsf ./les.mpi
+
+./resubmit.csh

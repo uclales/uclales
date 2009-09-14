@@ -1,0 +1,27 @@
+ &model
+  nxp = 132
+  nyp = 132
+  nzp = 139
+  nxpart = .true.
+  deltax  = 25.
+  deltay  = 25.
+  deltaz  = 12.5
+  dzmax   = 775.
+  dzrat   = -5.025
+  dtlong  =  5.0
+  timmax =  14400.
+  runtype= 'INITIAL'
+  filprf = 'smoke'
+  hfilin = 'smoke.rst'
+  ssam_intvl = 15.
+  level  = 1
+  th00   = 291.5
+  iradtyp=2
+  dthcon = 0.
+  drtcon = 0.
+  ps =    1000., 687.5, 712.5, 1500.
+  ts =     288., 288.0, 295.0, 295.1787
+  rts=   1., 1., 0., 0.,
+  us =   0., 0., 0., 0.,
+  vs =  -0., 0., 0., 0.,
+ /

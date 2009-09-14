@@ -1,0 +1,1739 @@
+%!PS-Adobe-3.0
+%%BoundingBox: 24 24 588 768
+%%Title: Enscript Output
+%%For: bjorn stevens
+%%Creator: GNU enscript 1.6.1
+%%CreationDate: Thu Apr 24 14:23:37 2008
+%%Orientation: Landscape
+%%Pages: (atend)
+%%DocumentMedia: Letter 612 792 0 () ()
+%%DocumentNeededResources: (atend)
+%%EndComments
+%%BeginProlog
+%%BeginResource: procset Enscript-Prolog 1.6 1
+%
+% Procedures.
+%
+
+/_S {	% save current state
+  /_s save def
+} def
+/_R {	% restore from saved state
+  _s restore
+} def
+
+/S {	% showpage protecting gstate
+  gsave
+  showpage
+  grestore
+} bind def
+
+/MF {	% fontname newfontname -> -	make a new encoded font
+  /newfontname exch def
+  /fontname exch def
+
+  /fontdict fontname findfont def
+  /newfont fontdict maxlength dict def
+
+  fontdict {
+    exch
+    dup /FID eq {
+      % skip FID pair
+      pop pop
+    } {
+      % copy to the new font dictionary
+      exch newfont 3 1 roll put
+    } ifelse
+  } forall
+
+  newfont /FontName newfontname put
+
+  % insert only valid encoding vectors
+  encoding_vector length 256 eq {
+    newfont /Encoding encoding_vector put
+  } if
+
+  newfontname newfont definefont pop
+} def
+
+/SF { % fontname width height -> -	set a new font
+  /height exch def
+  /width exch def
+
+  findfont
+  [width 0 0 height 0 0] makefont setfont
+} def
+
+/SUF { % fontname width height -> -	set a new user font
+  /height exch def
+  /width exch def
+
+  /F-gs-user-font MF
+  /F-gs-user-font width height SF
+} def
+
+/M {moveto} bind def
+/s {show} bind def
+
+/Box {	% x y w h -> -			define box path
+  /d_h exch def /d_w exch def /d_y exch def /d_x exch def
+  d_x d_y  moveto
+  d_w 0 rlineto
+  0 d_h rlineto
+  d_w neg 0 rlineto
+  closepath
+} def
+
+/bgs {	% x y height blskip gray str -> -	show string with bg color
+  /str exch def
+  /gray exch def
+  /blskip exch def
+  /height exch def
+  /y exch def
+  /x exch def
+
+  gsave
+    x y blskip sub str stringwidth pop height Box
+    gray setgray
+    fill
+  grestore
+  x y M str s
+} def
+
+% Highlight bars.
+/highlight_bars {	% nlines lineheight output_y_margin gray -> -
+  gsave
+    setgray
+    /ymarg exch def
+    /lineheight exch def
+    /nlines exch def
+
+    % This 2 is just a magic number to sync highlight lines to text.
+    0 d_header_y ymarg sub 2 sub translate
+
+    /cw d_output_w cols div def
+    /nrows d_output_h ymarg 2 mul sub lineheight div cvi def
+
+    % for each column
+    0 1 cols 1 sub {
+      cw mul /xp exch def
+
+      % for each rows
+      0 1 nrows 1 sub {
+        /rn exch def
+        rn lineheight mul neg /yp exch def
+        rn nlines idiv 2 mod 0 eq {
+	  % Draw highlight bar.  4 is just a magic indentation.
+	  xp 4 add yp cw 8 sub lineheight neg Box fill
+	} if
+      } for
+    } for
+
+  grestore
+} def
+
+% Line highlight bar.
+/line_highlight {	% x y width height gray -> -
+  gsave
+    /gray exch def
+    Box gray setgray fill
+  grestore
+} def
+
+% Column separator lines.
+/column_lines {
+  gsave
+    .1 setlinewidth
+    0 d_footer_h translate
+    /cw d_output_w cols div def
+    1 1 cols 1 sub {
+      cw mul 0 moveto
+      0 d_output_h rlineto stroke
+    } for
+  grestore
+} def
+
+% Column borders.
+/column_borders {
+  gsave
+    .1 setlinewidth
+    0 d_footer_h moveto
+    0 d_output_h rlineto
+    d_output_w 0 rlineto
+    0 d_output_h neg rlineto
+    closepath stroke
+  grestore
+} def
+
+% Do the actual underlay drawing
+/draw_underlay {
+  ul_style 0 eq {
+    ul_str true charpath stroke
+  } {
+    ul_str show
+  } ifelse
+} def
+
+% Underlay
+/underlay {	% - -> -
+  gsave
+    0 d_page_h translate
+    d_page_h neg d_page_w atan rotate
+
+    ul_gray setgray
+    ul_font setfont
+    /dw d_page_h dup mul d_page_w dup mul add sqrt def
+    ul_str stringwidth pop dw exch sub 2 div ul_h_ptsize -2 div moveto
+    draw_underlay
+  grestore
+} def
+
+/user_underlay {	% - -> -
+  gsave
+    ul_x ul_y translate
+    ul_angle rotate
+    ul_gray setgray
+    ul_font setfont
+    0 0 ul_h_ptsize 2 div sub moveto
+    draw_underlay
+  grestore
+} def
+
+% Page prefeed
+/page_prefeed {		% bool -> -
+  statusdict /prefeed known {
+    statusdict exch /prefeed exch put
+  } {
+    pop
+  } ifelse
+} def
+
+% Wrapped line markers
+/wrapped_line_mark {	% x y charwith charheight type -> -
+  /type exch def
+  /h exch def
+  /w exch def
+  /y exch def
+  /x exch def
+
+  type 2 eq {
+    % Black boxes (like TeX does)
+    gsave
+      0 setlinewidth
+      x w 4 div add y M
+      0 h rlineto w 2 div 0 rlineto 0 h neg rlineto
+      closepath fill
+    grestore
+  } {
+    type 3 eq {
+      % Small arrows
+      gsave
+        .2 setlinewidth
+        x w 2 div add y h 2 div add M
+        w 4 div 0 rlineto
+        x w 4 div add y lineto stroke
+
+        x w 4 div add w 8 div add y h 4 div add M
+        x w 4 div add y lineto
+	w 4 div h 8 div rlineto stroke
+      grestore
+    } {
+      % do nothing
+    } ifelse
+  } ifelse
+} def
+
+% EPSF import.
+
+/BeginEPSF {
+  /b4_Inc_state save def    		% Save state for cleanup
+  /dict_count countdictstack def	% Count objects on dict stack
+  /op_count count 1 sub def		% Count objects on operand stack
+  userdict begin
+  /showpage { } def
+  0 setgray 0 setlinecap
+  1 setlinewidth 0 setlinejoin
+  10 setmiterlimit [ ] 0 setdash newpath
+  /languagelevel where {
+    pop languagelevel
+    1 ne {
+      false setstrokeadjust false setoverprint
+    } if
+  } if
+} bind def
+
+/EndEPSF {
+  count op_count sub { pos } repeat	% Clean up stacks
+  countdictstack dict_count sub { end } repeat
+  b4_Inc_state restore
+} bind def
+
+% Check PostScript language level.
+/languagelevel where {
+  pop /gs_languagelevel languagelevel def
+} {
+  /gs_languagelevel 1 def
+} ifelse
+%%EndResource
+%%BeginResource: procset Enscript-Encoding-88591 1.6 1
+/encoding_vector [
+/.notdef      	/.notdef      	/.notdef      	/.notdef      	
+/.notdef      	/.notdef      	/.notdef      	/.notdef      	
+/.notdef      	/.notdef      	/.notdef      	/.notdef      	
+/.notdef      	/.notdef      	/.notdef      	/.notdef      	
+/.notdef      	/.notdef      	/.notdef      	/.notdef      	
+/.notdef      	/.notdef      	/.notdef      	/.notdef      	
+/.notdef      	/.notdef      	/.notdef      	/.notdef      	
+/.notdef      	/.notdef      	/.notdef      	/.notdef      	
+/space        	/exclam       	/quotedbl     	/numbersign   	
+/dollar       	/percent      	/ampersand    	/quoteright   	
+/parenleft    	/parenright   	/asterisk     	/plus         	
+/comma        	/hyphen       	/period       	/slash        	
+/zero         	/one          	/two          	/three        	
+/four         	/five         	/six          	/seven        	
+/eight        	/nine         	/colon        	/semicolon    	
+/less         	/equal        	/greater      	/question     	
+/at           	/A            	/B            	/C            	
+/D            	/E            	/F            	/G            	
+/H            	/I            	/J            	/K            	
+/L            	/M            	/N            	/O            	
+/P            	/Q            	/R            	/S            	
+/T            	/U            	/V            	/W            	
+/X            	/Y            	/Z            	/bracketleft  	
+/backslash    	/bracketright 	/asciicircum  	/underscore   	
+/quoteleft    	/a            	/b            	/c            	
+/d            	/e            	/f            	/g            	
+/h            	/i            	/j            	/k            	
+/l            	/m            	/n            	/o            	
+/p            	/q            	/r            	/s            	
+/t            	/u            	/v            	/w            	
+/x            	/y            	/z            	/braceleft    	
+/bar          	/braceright   	/tilde        	/.notdef      	
+/.notdef      	/.notdef      	/.notdef      	/.notdef      	
+/.notdef      	/.notdef      	/.notdef      	/.notdef      	
+/.notdef      	/.notdef      	/.notdef      	/.notdef      	
+/.notdef      	/.notdef      	/.notdef      	/.notdef      	
+/.notdef      	/.notdef      	/.notdef      	/.notdef      	
+/.notdef      	/.notdef      	/.notdef      	/.notdef      	
+/.notdef      	/.notdef      	/.notdef      	/.notdef      	
+/.notdef      	/.notdef      	/.notdef      	/.notdef      	
+/space        	/exclamdown   	/cent         	/sterling     	
+/currency     	/yen          	/brokenbar    	/section      	
+/dieresis     	/copyright    	/ordfeminine  	/guillemotleft	
+/logicalnot   	/hyphen       	/registered   	/macron       	
+/degree       	/plusminus    	/twosuperior  	/threesuperior	
+/acute        	/mu           	/paragraph    	/bullet       	
+/cedilla      	/onesuperior  	/ordmasculine 	/guillemotright	
+/onequarter   	/onehalf      	/threequarters	/questiondown 	
+/Agrave       	/Aacute       	/Acircumflex  	/Atilde       	
+/Adieresis    	/Aring        	/AE           	/Ccedilla     	
+/Egrave       	/Eacute       	/Ecircumflex  	/Edieresis    	
+/Igrave       	/Iacute       	/Icircumflex  	/Idieresis    	
+/Eth          	/Ntilde       	/Ograve       	/Oacute       	
+/Ocircumflex  	/Otilde       	/Odieresis    	/multiply     	
+/Oslash       	/Ugrave       	/Uacute       	/Ucircumflex  	
+/Udieresis    	/Yacute       	/Thorn        	/germandbls   	
+/agrave       	/aacute       	/acircumflex  	/atilde       	
+/adieresis    	/aring        	/ae           	/ccedilla     	
+/egrave       	/eacute       	/ecircumflex  	/edieresis    	
+/igrave       	/iacute       	/icircumflex  	/idieresis    	
+/eth          	/ntilde       	/ograve       	/oacute       	
+/ocircumflex  	/otilde       	/odieresis    	/divide       	
+/oslash       	/ugrave       	/uacute       	/ucircumflex  	
+/udieresis    	/yacute       	/thorn        	/ydieresis    	
+] def
+%%EndResource
+%%EndProlog
+%%BeginSetup
+%%IncludeResource: font Courier-Bold
+%%IncludeResource: font Courier
+/HFpt_w 10 def
+/HFpt_h 10 def
+/Courier-Bold /HF-gs-font MF
+/HF /HF-gs-font findfont [HFpt_w 0 0 HFpt_h 0 0] makefont def
+/Courier /F-gs-font MF
+/F-gs-font 7 7 SF
+/#copies 1 def
+% Pagedevice definitions:
+gs_languagelevel 1 gt {
+  <<
+    /PageSize [612 792] 
+  >> setpagedevice
+} if
+%%BeginResource: procset Enscript-Header-enscript 1.6 1
+%%IncludeResource: font Times-Bold
+%%IncludeResource: font Times-Roman
+
+% Fonts.
+/Times-Bold /HeaderFont-Bold MF
+/HeaderDateF /HeaderFont-Bold findfont 12 scalefont def
+
+/Times-Roman /HeaderFont-Times MF
+/HeaderHDRF /HeaderFont-Times findfont 14 scalefont def
+
+/HeaderPageNumF /Helvetica-Bold findfont 28.8 scalefont def
+
+/do_header {	% print enscript header
+  gsave
+    d_header_x d_header_y translate
+
+    % light bar
+    0 0 d_header_w d_header_h 2 div Box
+    .95 setgray fill
+
+    % dark gray boxes
+    /dbw d_header_h 2 mul def	% dark box width
+    /dbc .7 def			% dark box color
+
+    % left dark box.
+    0 0 dbw d_header_h Box
+    dbc setgray fill
+
+    0 setgray 
+    HeaderDateF setfont
+    moddatestr dup stringwidth pop dbw exch sub 2 div 
+    d_header_h 2 div 2 add moveto show
+    modtimestr dup stringwidth pop dbw exch sub 2 div 
+    d_header_h 5 div moveto show
+
+    % right dark box
+    d_header_w dbw sub 0 dbw d_header_h Box
+    dbc setgray fill
+
+    HeaderPageNumF setfont
+    1 setgray
+    pagenumstr dup
+    stringwidth pop dbw exch sub 2 div d_header_w dbw sub add
+    d_header_h .2 mul moveto show
+
+    % filename
+    0 setgray 
+    HeaderHDRF setfont
+    d_header_w fname stringwidth pop sub 2 div d_header_h 8 div moveto
+    fname show
+
+    % user supplied header string.
+    user_header_p {
+      /h d_header_h 8 div 5 mul def
+
+      % Implement strict enscript compatibility.
+      user_header_center_str () eq user_header_right_str () eq and {
+        d_header_w user_header_left_str stringwidth pop sub 2 div 
+        h moveto user_header_left_str show
+      } {
+        dbw 5 add h moveto user_header_left_str show
+
+        d_header_w user_header_center_str stringwidth pop sub 2 div 
+        h moveto user_header_center_str show
+
+	d_header_w dbw sub 5 sub user_header_right_str stringwidth pop
+	sub h moveto user_header_right_str show
+      } ifelse
+    } if
+
+  grestore
+} def
+%%EndResource
+/d_page_w 744 def
+/d_page_h 564 def
+/d_header_x 0 def
+/d_header_y 528 def
+/d_header_w 744 def
+/d_header_h 36 def
+/d_footer_x 0 def
+/d_footer_y 0 def
+/d_footer_w 744 def
+/d_footer_h 0 def
+/d_output_w 744 def
+/d_output_h 528 def
+/cols 2 def
+%%EndSetup
+%%Page: (1) 1
+%%BeginPageSetup
+_S
+90 rotate
+24 -588 translate
+/pagenum 1 def
+/fname (sgsm.f90) def
+/fdir () def
+/ftail (sgsm.f90) def
+% User defined strings:
+/pagenumstr (1) def
+/moddatestr (04/14/08) def
+/modtimestr (23:12:47) def
+/user_header_p false def
+%%EndPageSetup
+column_lines
+do_header
+5 518 M
+(!----------------------------------------------------------------------------) s
+5 510 M
+(! This file is part of UCLALES.) s
+5 502 M
+(!) s
+5 494 M
+(! UCLALES is free software; you can redistribute it and/or modify) s
+5 486 M
+(! it under the terms of the GNU General Public License as published by) s
+5 478 M
+(! the Free Software Foundation; either version 3 of the License, or) s
+5 470 M
+(! \(at your option\) any later version.) s
+5 462 M
+(!) s
+5 454 M
+(! UCLALES is distributed in the hope that it will be useful,) s
+5 446 M
+(! but WITHOUT ANY WARRANTY; without even the implied warranty of) s
+5 438 M
+(! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the) s
+5 430 M
+(! GNU General Public License for more details.) s
+5 422 M
+(!) s
+5 414 M
+(! You should have received a copy of the GNU General Public License) s
+5 406 M
+(! along with this program.  If not, see <http://www.gnu.org/licenses/>.) s
+5 398 M
+(!) s
+5 390 M
+(! Copyright 1999-2007, Bjorn B. Stevens, Dep't Atmos and Ocean Sci, UCLA) s
+5 382 M
+(!----------------------------------------------------------------------------) s
+5 374 M
+(!) s
+5 366 M
+(module sgsm) s
+5 350 M
+(  use stat, only : sflg, updtst, acc_tend, sgsflxs, sgs_vel) s
+5 342 M
+(  use util, only : tridiff) s
+5 334 M
+(  implicit none) s
+5 326 M
+(!) s
+5 318 M
+(! setting the prandtl number to a value less than zero enforces an exponential) s
+5 310 M
+(! decay in its value as a function of height from the surface with a scale) s
+5 302 M
+(! height of 100m.  This is the default) s
+5 294 M
+(!) s
+5 278 M
+(  real, parameter     :: tkemin=1.e-20) s
+5 270 M
+(  real :: csx = 0.23) s
+5 262 M
+(  real :: prndtl = 0.3333333333) s
+5 246 M
+(  real, allocatable, dimension \(:,:\) :: sxy1, sxy2, sxy3, sxz1, sxz2, sxz3    &) s
+5 238 M
+(       , sxz4, sxz5, sxz6  ,szx1, szx2, szx3, szx4, szx5) s
+5 230 M
+(  real, allocatable, dimension \(:\)   :: sz1, sz2, sz3, sz4, sz5, sz6, sz7, sz8) s
+5 214 M
+(  integer :: k, i, j, indh, req\(16\)) s
+5 206 M
+(  real    :: dti, dfact) s
+5 198 M
+(  logical, save :: Initialized = .false.) s
+5 182 M
+(contains ) s
+5 166 M
+(  subroutine diffuse_init\(n1,n2,n3\)) s
+5 150 M
+(    integer, intent \(in\) :: n1, n2, n3) s
+5 134 M
+(    allocate\(sxy1\(n2,n3\), sxy2\(n2,n3\), sxy3\(n2,n3\), sxz1\(n2,n1\), sxz2\(n2,n1\)\)) s
+5 126 M
+(    allocate\(sxz3\(n2,n1\), sxz4\(n2,n1\), sxz5\(n2,n1\), sxz6\(n2,n1\)\)) s
+5 118 M
+(    allocate\(szx1\(n1,n2\), szx2\(n1,n2\), szx3\(n1,n2\), szx4\(n1,n2\), szx5\(n1,n2\)\)) s
+5 110 M
+(    allocate\(sz1\(n1\),sz2\(n1\),sz3\(n1\),sz4\(n1\),sz5\(n1\),sz6\(n1\),sz7\(n1\),sz8\(n1\)\)) s
+5 94 M
+(    initialized = .true.) s
+5 86 M
+(  end subroutine) s
+5 70 M
+(  !) s
+5 62 M
+(  ! ---------------------------------------------------------------------) s
+5 54 M
+(  ! SUBROUTINE DIFFUSE: Driver for calculating sub-grid fluxes \(thus it) s
+5 46 M
+(  ! includes call to surface routines\) ) s
+5 38 M
+(  !) s
+5 30 M
+(  subroutine diffuse) s
+5 14 M
+(    use grid, only : newvar, nstep, a_up, a_ut, a_vp, a_vt, a_wp, a_wt       &) s
+5 6 M
+(         ,a_rp, a_tp, a_sp, a_st, vapor, a_pexnr, a_theta                    &) s
+377 518 M
+(         , a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, nscl, nxp, nyp    &) s
+377 510 M
+(         , nzp, nxyp, nxyzp, zm, dxi, dyi, dzt, dzm, dt, th00, dn0           &) s
+377 502 M
+(         , pi0, pi1, level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc) s
+377 486 M
+(    use util, only         : atob, azero, get_avg3) s
+377 478 M
+(    use mpi_interface, only: cyclics, cyclicc) s
+377 470 M
+(    use thrm, only         : bruvais, fll_tkrs) s
+377 454 M
+(    integer :: n) s
+377 438 M
+(    if \(.not.Initialized\) call diffuse_init\(nzp, nxp, nyp\)) s
+377 430 M
+(    !) s
+377 422 M
+(    ! ----------) s
+377 414 M
+(    ! Calculate Deformation and stability for SGS calculations) s
+377 406 M
+(    !) s
+377 398 M
+(    call fll_tkrs\(nzp,nxp,nyp,a_theta,a_pexnr,pi0,pi1,dn0,th00,a_scr1,      &) s
+377 390 M
+(         rs=a_scr2\)) s
+377 374 M
+(    call bruvais\(nzp,nxp,nyp,level,a_theta,a_tp,a_rp,a_scr2,a_scr3,dzm,th00\)) s
+377 366 M
+(    !) s
+377 358 M
+(    !) s
+377 350 M
+(    call deform\(nzp,nxp,nyp,dzm,dzt,dxi,dyi,a_up,a_vp,a_wp,a_scr5,a_scr6     &) s
+377 342 M
+(         ,a_scr4,a_scr2\)) s
+377 326 M
+(    ! ----------) s
+377 318 M
+(    ! Calculate Eddy Viscosity/Diffusivity ) s
+377 310 M
+(    !) s
+377 302 M
+(    call smagor\(nzp,nxp,nyp,sflg,dxi,dn0,a_scr3,a_scr2,a_scr1,zm\)) s
+377 294 M
+(    !) s
+377 286 M
+(    ! Diffuse momentum) s
+377 278 M
+(    !) s
+377 270 M
+(    if \(sflg\) call acc_tend\(nzp,nxp,nyp,a_up,a_vp,a_wp,a_ut,a_vt,a_wt         &) s
+377 262 M
+(         ,sz4,sz5,sz6,1,'sgs'\)) s
+377 246 M
+(    call diff_prep\(nzp,nxp,nyp,a_scr5,a_scr6,a_scr4,a_scr1\)) s
+377 238 M
+(    call azero\(nxyp,sxy1,a2=sxy2\)) s
+377 222 M
+(    call diff_vpt\(nzp,nxp,nyp,dn0,dzm,dzt,dyi,dt,vw_sfc,sxy2,a_scr6         &) s
+377 214 M
+(         ,a_scr5,a_scr1,a_vp,a_wp,a_vt,sz2\)) s
+377 198 M
+(    call diff_upt\(nzp,nxp,nyp,dn0,dzm,dzt,dxi,dt,uw_sfc,sxy1,a_scr5         &) s
+377 190 M
+(         ,a_scr1,a_up,a_wp,a_ut,sz1\)) s
+377 174 M
+(    call diff_wpt\(nzp,nxp,nyp,dn0,dzm,dzt,dyi,dxi,dt,ww_sfc,sxy1,a_scr4     &) s
+377 166 M
+(         ,a_scr1,a_wp,a_up,a_wt,sz3\)) s
+377 150 M
+(    call cyclics\(nzp,nxp,nyp,a_wt,req\)) s
+377 142 M
+(    call cyclicc\(nzp,nxp,nyp,a_wt,req\)) s
+377 134 M
+(    call cyclics\(nzp,nxp,nyp,a_vt,req\)) s
+377 126 M
+(    call cyclicc\(nzp,nxp,nyp,a_vt,req\)) s
+377 118 M
+(    call cyclics\(nzp,nxp,nyp,a_ut,req\)) s
+377 110 M
+(    call cyclicc\(nzp,nxp,nyp,a_ut,req\)) s
+377 94 M
+(    if \(sflg\) then) s
+377 86 M
+(       call sgs_vel\(nzp,nxp,nyp,sz1,sz2,sz3\)) s
+377 78 M
+(       call acc_tend\(nzp,nxp,nyp,a_up,a_vp,a_wp,a_ut,a_vt,a_wt,sz4,sz5,sz6    &) s
+377 70 M
+(            ,2,'sgs'\)) s
+377 62 M
+(    end if) s
+377 54 M
+(    !) s
+377 46 M
+(    ! Diffuse scalars) s
+377 38 M
+(    !) s
+377 30 M
+(    do n=4,nscl) s
+377 22 M
+(       call newvar\(n,istep=nstep\)) s
+377 14 M
+(       call azero\(nxyp,sxy1\)) s
+377 6 M
+(       call azero\(nxyp,sxy2\)) s
+_R
+S
+%%Page: (2) 2
+%%BeginPageSetup
+_S
+90 rotate
+24 -588 translate
+/pagenum 2 def
+/fname (sgsm.f90) def
+/fdir () def
+/ftail (sgsm.f90) def
+% User defined strings:
+/pagenumstr (2) def
+/moddatestr (04/14/08) def
+/modtimestr (23:12:47) def
+/user_header_p false def
+%%EndPageSetup
+column_lines
+do_header
+5 518 M
+(       if \( associated\(a_tp,a_sp\) \) call atob\(nxyp,wt_sfc,sxy1\)) s
+5 510 M
+(       if \( associated\(a_rp,a_sp\) \) call atob\(nxyp,wq_sfc,sxy1\)) s
+5 494 M
+(       if \(sflg\) call azero\(nxyzp,a_scr1\)) s
+5 486 M
+(       call diffsclr\(nzp,nxp,nyp,dt,dxi,dyi,dzm,dzt,dn0,sxy1,sxy2   &) s
+5 478 M
+(            ,a_sp,a_scr2,a_st,a_scr1\)) s
+5 470 M
+(       if \(sflg\) then) s
+5 462 M
+(          call get_avg3\(nzp,nxp,nyp,a_scr1,sz1\)) s
+5 454 M
+(          call updtst\(nzp,'sgs',n,sz1,1\)) s
+5 446 M
+(          if \(associated\(a_sp,a_tp\)\)                                          &) s
+5 438 M
+(             call sgsflxs\(nzp,nxp,nyp,level,a_scr3,vapor,a_theta,a_scr1,'tl'\)) s
+5 430 M
+(          if \(associated\(a_sp,a_rp\)\)                                          &) s
+5 422 M
+(             call sgsflxs\(nzp,nxp,nyp,level,a_scr3,vapor,a_theta,a_scr1,'rt'\)) s
+5 414 M
+(       endif) s
+5 406 M
+(       call cyclics\(nzp,nxp,nyp,a_st,req\)) s
+5 398 M
+(       call cyclicc\(nzp,nxp,nyp,a_st,req\)) s
+5 390 M
+(    enddo) s
+5 374 M
+(  end subroutine diffuse) s
+5 366 M
+(  !) s
+5 358 M
+(  ! ---------------------------------------------------------------------) s
+5 350 M
+(  ! subroutine deform: computes the components of the deviatoric strain) s
+5 342 M
+(  ! tensor, then computes s = du_i/dx_j\(du_i/dx_j + du_j/dx_i\) at a ) s
+5 334 M
+(  ! thermo point, the dummy arrays are respectively:) s
+5 326 M
+(  !) s
+5 318 M
+(  ! sxz1 -> div; ) s
+5 310 M
+(  ! szx2 -> s11;) s
+5 302 M
+(  ! szx3 -> s33, ) s
+5 294 M
+(  ! szx4 -> s13) s
+5 286 M
+(  !) s
+5 278 M
+(  subroutine deform\(n1,n2,n3,dzm,dzt,dx,dy,u,v,w,s12,s22,s23,s\)) s
+5 262 M
+(    integer, intent\(in\) :: n1,n2,n3) s
+5 254 M
+(    real, intent\(in\)    :: u\(n1,n2,n3\),v\(n1,n2,n3\),w\(n1,n2,n3\)) s
+5 246 M
+(    real, intent\(in\)    :: dzm\(n1\),dzt\(n1\),dx,dy) s
+5 230 M
+(    real, intent\(out\)   :: s\(n1,n2,n3\), s22\(n1,n2,n3\)) s
+5 222 M
+(    real, intent\(out\)   :: s12\(n1,n2,n3\),s23\(n1,n2,n3\)) s
+5 206 M
+(    integer :: ip,im,jp,jm,kp) s
+5 198 M
+(    real    :: y1a,y2a,y3a,y1b,y2b,y3b) s
+5 190 M
+(    real    :: s11_wpt,s22_wpt,s33_wpt,s12_wpt,s13_wpt,s23_wpt) s
+5 182 M
+(    !) s
+5 174 M
+(    ! calculate components of the stress tensor at their natural locations) s
+5 166 M
+(    !) s
+5 158 M
+(    do j=1,n3) s
+5 150 M
+(       jm=max\(j-1,1\)) s
+5 142 M
+(       jp=min\(j+1,n3\)) s
+5 134 M
+(       do i=1,n2) s
+5 126 M
+(          im=max\(i-1,1\)) s
+5 118 M
+(          ip=min\(i+1,n2\)) s
+5 110 M
+(          do k=1,n1) s
+5 102 M
+(             szx2\(k,i\) = 2.*\(u\(k,i,j\)-u\(k,im,j\)\)*dx) s
+5 94 M
+(             s22\(k,i,j\)= 2.*\(v\(k,i,j\)-v\(k,i,jm\)\)*dy) s
+5 86 M
+(             szx3\(k,i\) = 2.*\(w\(k,i,j\)-w\(max\(1,k-1\),i,j\)\)*dzt\(k\)) s
+5 78 M
+(             s12\(k,i,j\)= \(u\(k,i,jp\)-u\(k,i,j\)\)*dy + \(v\(k,ip,j\)-v\(k,i,j\)\)*dx) s
+5 70 M
+(             szx1\(k,i\) = 0.333333*\(szx2\(k,i\)+s22\(k,i,j\)+szx3\(k,i\)\)) s
+5 62 M
+(          enddo) s
+5 46 M
+(          do k=1,n1-1) s
+5 38 M
+(             szx4\(k,i\) =\(u\(k+1,i,j\)-u\(k,i,j\)\)*dzm\(k\)+\(w\(k,ip,j\)-w\(k,i,j\)\)*dx) s
+5 30 M
+(             s23\(k,i,j\)=\(v\(k+1,i,j\)-v\(k,i,j\)\)*dzm\(k\)+\(w\(k,i,jp\)-w\(k,i,j\)\)*dy) s
+5 22 M
+(          end do) s
+5 14 M
+(       end do) s
+5 6 M
+(       !) s
+377 518 M
+(       ! average to a w-point) s
+377 510 M
+(       !) s
+377 502 M
+(       do i=1,n2) s
+377 494 M
+(          im=max\(i-1,1\)) s
+377 486 M
+(          do k=1,n1-1) s
+377 478 M
+(             kp=k+1) s
+377 470 M
+(             y1a=\(szx2\(k,i\)-szx1\(k,i\)\)) s
+377 462 M
+(             y2a=\(s22\(k,i,j\)-szx1\(k,i\)\)) s
+377 454 M
+(             y3a=\(szx3\(k,i\)-szx1\(k,i\)\)) s
+377 446 M
+(             y1b=\(szx2\(kp,i\)-szx1\(kp,i\)\)) s
+377 438 M
+(             y2b=\(s22\(kp,i,j\)-szx1\(kp,i\)\)) s
+377 430 M
+(             y3b=\(szx3\(kp,i\)-szx1\(kp,i\)\)) s
+377 414 M
+(             s11_wpt=0.5*\(y1a*y1a+y1b*y1b\)) s
+377 406 M
+(             s22_wpt=0.5*\(y2a*y2a+y2b*y2b\)) s
+377 398 M
+(             s33_wpt=0.5*\(y3a*y3a+y3b*y3b\)) s
+377 390 M
+(             s12_wpt=0.125*\(s12\(k,i,j\)*s12\(k,i,j\) + s12\(kp,i,j\)*s12\(kp,i,j\) &) s
+377 382 M
+(                  +s12\(k,im,j\)*s12\(k,im,j\) + s12\(k,i,jm\)*s12\(k,i,jm\)        &) s
+377 374 M
+(                  +s12\(kp,im,j\)*s12\(kp,im,j\)+s12\(k,im,jm\)*s12\(k,im,jm\)      &) s
+377 366 M
+(                  +s12\(kp,i,jm\)*s12\(kp,i,jm\)+s12\(kp,im,jm\)*s12\(kp,im,jm\)\)) s
+377 358 M
+(             s13_wpt=0.5*\(szx4\(k,i\)*szx4\(k,i\)+szx4\(k,im\)*szx4\(k,im\)\)) s
+377 350 M
+(             s23_wpt=0.5*\(s23\(k,i,j\)*s23\(k,i,j\)+s23\(k,i,jm\)*s23\(k,i,jm\)\)) s
+377 342 M
+(             s\(k,i,j\)= 0.5*\(s11_wpt+s22_wpt+s33_wpt\)                        &) s
+377 334 M
+(                  + s12_wpt + s13_wpt + s23_wpt) s
+377 326 M
+(          end do) s
+377 318 M
+(       end do) s
+377 310 M
+(    end do) s
+377 294 M
+(  end subroutine deform) s
+377 286 M
+(  !) s
+377 278 M
+(  ! ----------------------------------------------------------------------) s
+377 270 M
+(  ! Subroutine smagor:  computes visc/diff, upon entering the routine) s
+377 262 M
+(  ! kh is filled with s2 and ri is filled with N^2.  On statistical ) s
+377 254 M
+(  ! timsteps, SGS energy, dissipation, viscosity, diffusivity and ) s
+377 246 M
+(  ! lengthscales are stored.) s
+377 238 M
+(  !) s
+377 230 M
+(  subroutine smagor\(n1,n2,n3,sflg,dxi,dn0,ri,kh,km,zm\)) s
+377 222 M
+(      ) s
+377 214 M
+(    use defs, only          : pi, vonk) s
+377 206 M
+(    use stat, only          : tke_sgs) s
+377 198 M
+(    use util, only          : get_avg3, get_cor3) s
+377 190 M
+(    use mpi_interface, only : cyclics, cyclicc) s
+377 174 M
+(    implicit none) s
+377 158 M
+(    logical, intent\(in\) :: sflg) s
+377 150 M
+(    integer, intent\(in\) :: n1,n2,n3) s
+377 142 M
+(    real, intent\(in\)    :: dxi,zm\(n1\),dn0\(n1\)) s
+377 134 M
+(    real, intent\(inout\) :: ri\(n1,n2,n3\),kh\(n1,n2,n3\)) s
+377 126 M
+(    real, intent\(out\)   :: km\(n1,n2,n3\)) s
+377 110 M
+(    real    :: delta,pr) s
+377 94 M
+(    pr    = abs\(prndtl\)) s
+377 86 M
+(    ) s
+377 78 M
+(    delta = 1./dxi) s
+377 70 M
+(    delta = \(zm\(2\)/dxi/dxi\)**0.333333333) s
+377 54 M
+(    do j=3,n3-2) s
+377 46 M
+(       do i=3,n2-2) s
+377 38 M
+(          do k=2,n1-2) s
+377 30 M
+(             ri\(k,i,j\) = max\( -1., ri\(k,i,j\)/\(kh\(k,i,j\) + 1.e-12\) \)) s
+377 22 M
+(             km\(k,i,j\) = sqrt\(max\(0.,kh\(k,i,j\)*\(1.-ri\(k,i,j\)/pr\)\)\) &) s
+377 14 M
+(                  *0.5*\(dn0\(k\)+dn0\(k+1\)\)/\(1./\(delta*csx\)**2+1./\(zm\(k\)*vonk\)**2\)) s
+377 6 M
+(          enddo) s
+_R
+S
+%%Page: (3) 3
+%%BeginPageSetup
+_S
+90 rotate
+24 -588 translate
+/pagenum 3 def
+/fname (sgsm.f90) def
+/fdir () def
+/ftail (sgsm.f90) def
+% User defined strings:
+/pagenumstr (3) def
+/moddatestr (04/14/08) def
+/modtimestr (23:12:47) def
+/user_header_p false def
+%%EndPageSetup
+column_lines
+do_header
+5 518 M
+(          kh\(1,i,j\)    = kh\(2,i,j\)) s
+5 510 M
+(          kh\(n1,i,j\)   = kh\(n1-2,i,j\)) s
+5 502 M
+(          km\(1,i,j\)    = km\(2,i,j\)) s
+5 494 M
+(          km\(n1,i,j\)   = km\(n1-2,i,j\)) s
+5 486 M
+(          km\(n1-1,i,j\) = km\(n1-2,i,j\)) s
+5 478 M
+(       enddo) s
+5 470 M
+(    enddo) s
+5 454 M
+(    call cyclics\(n1,n2,n3,km,req\)) s
+5 446 M
+(    call cyclicc\(n1,n2,n3,km,req\)) s
+5 422 M
+(    if \(sflg\) then) s
+5 414 M
+(       call get_cor3\(n1,n2,n3,km,km,sz1\)) s
+5 406 M
+(       call get_cor3\(n1,n2,n3,km,kh,sz2\)) s
+5 398 M
+(       call updtst\(n1,'sgs',-2,sz2,1\)      ! dissipation) s
+5 390 M
+(       do k=1,n1) s
+5 382 M
+(          tke_sgs\(k\) = sz1\(k\)/\(delta*pi*\(csx*0.18\)\)**2) s
+5 374 M
+(          sz1\(k\) = 1./sqrt\(1./\(delta*csx\)**2+1./\(zm\(k\)*vonk+0.001\)**2\)) s
+5 366 M
+(       end do) s
+5 358 M
+(       call updtst\(n1,'sgs',-1,tke_sgs,1\) ! sgs tke) s
+5 350 M
+(       call updtst\(n1,'sgs',-5,sz1,1\)      ! mixing length) s
+5 342 M
+(       call updtst\(n1,'sgs',-6,sz1,1\)      ! dissipation lengthscale) s
+5 334 M
+(    end if) s
+5 318 M
+(    do j=3,n3-2) s
+5 310 M
+(       do i=3,n2-2) s
+5 302 M
+(          do k=1,n1) s
+5 294 M
+(            kh\(k,i,j\) = km\(k,i,j\)/pr) s
+5 286 M
+(            if \(prndtl < 0.\) then) s
+5 278 M
+(               kh\(k,i,j\) = kh\(k,i,j\) * exp\(zm\(k\)/\(-100.\)\)) s
+5 270 M
+(            end if) s
+5 262 M
+(          enddo) s
+5 254 M
+(       enddo) s
+5 246 M
+(    enddo) s
+5 238 M
+(    call cyclics\(n1,n2,n3,kh,req\)) s
+5 230 M
+(    call cyclicc\(n1,n2,n3,kh,req\)) s
+5 214 M
+(    if \(sflg\) then) s
+5 206 M
+(       call get_avg3\(n1,n2,n3,km,sz3\)) s
+5 198 M
+(       call updtst\(n1,'sgs',-3,sz3,1\)  ! eddy viscosity) s
+5 190 M
+(       call get_avg3\(n1,n2,n3,kh,sz2\)) s
+5 182 M
+(       call updtst\(n1,'sgs',-4,sz2,1\)  ! eddy diffusivity) s
+5 174 M
+(    end if) s
+5 158 M
+(  end subroutine smagor) s
+5 150 M
+(  !) s
+5 142 M
+(  ! ----------------------------------------------------------------------) s
+5 134 M
+(  ! subroutine diff_prep: multiplies the strain components computed in ) s
+5 126 M
+(  ! "deform" by the appropriately averaged value of km, in preperation) s
+5 118 M
+(  ! for use by the diffusion routines) s
+5 110 M
+(  !) s
+5 102 M
+(  subroutine  diff_prep\(n1,n2,n3,s12,s22,s23,km\)) s
+5 86 M
+(    integer, intent\(in\) :: n1,n2,n3) s
+5 78 M
+(    real, intent\(inout\) :: s22\(n1,n2,n3\)) s
+5 70 M
+(    real, intent\(inout\) :: s12\(n1,n2,n3\),s23\(n1,n2,n3\)) s
+5 62 M
+(    real, intent\(inout\) :: km\(n1,n2,n3\)) s
+5 46 M
+(    integer :: ip,jp) s
+5 30 M
+(    do j=2,n3-1) s
+5 22 M
+(       jp=min\(j+1,n3\)) s
+5 14 M
+(       do i=2,n2-1) s
+5 6 M
+(          ip=min\(i+1,n2\)) s
+377 518 M
+(          do k=2,n1-1) s
+377 510 M
+(             s22\(k,i,j\)=-s22\(k,i,j\)*0.5*\(km\(k,i,j\)+km\(k-1,i,j\)\)) s
+377 502 M
+(             s12\(k,i,j\)= -s12\(k,i,j\)*0.125*\(km\(k,i,j\)+km\(k,ip,j\)+km\(k,i,jp\) &) s
+377 494 M
+(                  +km\(k,ip,jp\)+km\(k-1,i,j\)+km\(k-1,ip,j\)+km\(k-1,i,jp\)        &) s
+377 486 M
+(                  +km\(k-1,ip,jp\)\)) s
+377 478 M
+(          enddo) s
+377 462 M
+(          do k=1,n1-1) s
+377 454 M
+(             s23\(k,i,j\)=-s23\(k,i,j\)*0.5*\(km\(k,i,j\)+km\(k,i,jp\)\)) s
+377 446 M
+(          enddo) s
+377 438 M
+(       enddo) s
+377 430 M
+(    enddo) s
+377 414 M
+(  end subroutine diff_prep) s
+377 406 M
+(  !) s
+377 398 M
+(  ! ----------------------------------------------------------------------) s
+377 390 M
+(  ! subroutine diff_upt: computes the diffusivity of velocities using) s
+377 382 M
+(  ! a tri-diagnonal solver in the vertical at a u point, the deformation) s
+377 374 M
+(  ! tensor component d31 is passed in via the tendency array) s
+377 366 M
+(  !) s
+377 358 M
+(  subroutine  diff_upt\(n1,n2,n3,dn0,dzm,dzt,dxi,dt,sflx,tflx,sij,km,   &) s
+377 350 M
+(       u,w,tnd,flx\)) s
+377 334 M
+(    logical, parameter  :: noslip = .false.) s
+377 326 M
+(    integer, intent\(in\) :: n1,n2,n3) s
+377 318 M
+(    real, intent\(in\)    :: sij\(n1,n2,n3\)) s
+377 310 M
+(    real, intent\(in\)    :: km\(n1,n2,n3\),u\(n1,n2,n3\),w\(n1,n2,n3\)) s
+377 302 M
+(    real, intent\(in\)    :: sflx\(n2,n3\),tflx\(n2,n3\)) s
+377 294 M
+(    real, intent\(in\)    :: dn0\(n1\),dzm\(n1\),dzt\(n1\),dxi,dt) s
+377 278 M
+(    real, intent\(inout\) :: flx\(n1\), tnd\(n1,n2,n3\)) s
+377 262 M
+(    dti   = 1.0/dt) s
+377 254 M
+(    do k=1,n1) s
+377 246 M
+(       sz7\(k\) = 0.) s
+377 238 M
+(       sz8\(k\) = 0.) s
+377 230 M
+(       flx\(k\) = 0.) s
+377 222 M
+(       szx5\(k,n2\) = 0.) s
+377 214 M
+(    end do) s
+377 198 M
+(    do j=3,n3-2) s
+377 190 M
+(       indh=0) s
+377 182 M
+(       do i=3,n2-2) s
+377 174 M
+(          indh=indh+1) s
+377 166 M
+(          sz8\(1\)=dzm\(1\)*\(km\(1,i,j\)+km\(1,i+1,j\)\)) s
+377 158 M
+(          sz7\(n1-1\)  =.5*tflx\(i,j\)*\(dn0\(n1\)+dn0\(n1-1\)\)) s
+377 150 M
+(          sz7\(1\)     =.5*sflx\(i,j\)*\(dn0\(1\)+dn0\(2\)\)) s
+377 142 M
+(          do k=2,n1-1) s
+377 134 M
+(             sz8\(k\)=dzm\(k\)*\(km\(k,i,j\)+km\(k,i+1,j\)\)) s
+377 126 M
+(             sz7\(k\)= \(-\(w\(k,i+1,j\)-w\(k,i,j\)\)*dxi\)*0.5*\(km\(k,i,j\)+km\(k,i+1,j\)\)) s
+377 118 M
+(             sxz4\(indh,k\)=u\(k,i,j\)*dn0\(k\) + dt*dzt\(k\)*\(sz7\(k-1\)-sz7\(k\)\)) s
+377 110 M
+(             sxz3\(indh,k\)=-0.5*dt*dzt\(k\)*sz8\(k\)) s
+377 102 M
+(             sxz2\(indh,k\)=-0.5*dt*dzt\(k\)*sz8\(k-1\)) s
+377 94 M
+(             sxz1\(indh,k\)=dn0\(k\)-sxz2\(indh,k\)-sxz3\(indh,k\)) s
+377 86 M
+(          end do) s
+377 78 M
+(          !) s
+377 70 M
+(          ! Boundary conditions) s
+377 62 M
+(          !) s
+377 54 M
+(          if \(noslip\) then) s
+377 46 M
+(             sxz1\(indh,2\)    = dn0\(2\)-2.*sxz2\(indh,2\)-sxz3\(indh,2\)) s
+377 38 M
+(             sxz1\(indh,n1-1\) = dn0\(n1-1\)-sxz2\(indh,n1-1\)-2.*sxz3\(indh,n1-1\)) s
+377 30 M
+(          else) s
+377 22 M
+(             sxz1\(indh,2\)    = dn0\(2\)-sxz3\(indh,2\)) s
+377 14 M
+(             sxz1\(indh,n1-1\) = dn0\(n1-1\)-sxz2\(indh,n1-1\)) s
+377 6 M
+(          end if) s
+_R
+S
+%%Page: (4) 4
+%%BeginPageSetup
+_S
+90 rotate
+24 -588 translate
+/pagenum 4 def
+/fname (sgsm.f90) def
+/fdir () def
+/ftail (sgsm.f90) def
+% User defined strings:
+/pagenumstr (4) def
+/moddatestr (04/14/08) def
+/modtimestr (23:12:47) def
+/user_header_p false def
+%%EndPageSetup
+column_lines
+do_header
+5 510 M
+(          sxz3\(indh,n1-1\) = 0.) s
+5 502 M
+(          sxz2\(indh,2\)    = 0.) s
+5 494 M
+(          flx\(1\)=flx\(1\)+sz7\(1\)) s
+5 486 M
+(          flx\(n1-1\)=flx\(n1-1\)+sz7\(n1-1\)) s
+5 470 M
+(          do k=2,n1-1) s
+5 462 M
+(             szx5\(k,i\) = \(-2.*\(u\(k,i,j\)-u\(k,i-1,j\)\)*dxi\)*0.5*                 &) s
+5 454 M
+(                  \(km\(k,i,j\)+km\(k-1,i,j\)\)) s
+5 446 M
+(          end do) s
+5 438 M
+(       enddo) s
+5 422 M
+(       do k=2,n1) s
+5 414 M
+(          szx5\(k,n2-1\) = \(-2.*\(u\(k,n2-1,j\)-u\(k,n2-2,j\)\)*dxi\)*0.5*             &) s
+5 406 M
+(                  \(km\(k,n2-1,j\)+km\(k-1,n2-1,j\)\)) s
+5 398 M
+(       end do) s
+5 382 M
+(       call tridiff\(n2,n1-1,indh,sxz2,sxz1,sxz3,sxz4,sxz1,sxz3\)) s
+5 374 M
+(       !) s
+5 366 M
+(       ! Back out diffusive tendencies from vertical implicit solution and ) s
+5 358 M
+(       ! solve for horizontal tendencies.  Accumulate vertical flux array) s
+5 350 M
+(       !   ) s
+5 342 M
+(       indh=0) s
+5 334 M
+(       do i=3,n2-2) s
+5 326 M
+(          indh=indh+1) s
+5 318 M
+(          do k=2,n1-1) s
+5 310 M
+(             dfact = 1./dn0\(k\)) s
+5 302 M
+(             tnd\(k,i,j\)=tnd\(k,i,j\) + dti*\(sxz1\(indh,k\)-u\(k,i,j\)\) - dfact *    &) s
+5 294 M
+(                  \(\(szx5\(k,i+1\)-szx5\(k,i\)\)*dxi + \(sij\(k,i,j\)-sij\(k,i,j-1\)\)*dxi\)) s
+5 278 M
+(             if \(k < n1-1\) flx\(k\)= flx\(k\)-dzm\(k\)*\(km\(k,i,j\)+km\(k,i+1,j\)\)      &) s
+5 270 M
+(                  *\(sxz1\(indh,k+1\)-sxz1\(indh,k\)\)*.5) s
+5 262 M
+(          enddo) s
+5 254 M
+(          tnd\(n1,i,j\) = 0.) s
+5 246 M
+(       enddo) s
+5 238 M
+(    enddo) s
+5 230 M
+(   ) s
+5 222 M
+(  end subroutine diff_upt) s
+5 214 M
+(  !) s
+5 206 M
+(  ! ----------------------------------------------------------------------) s
+5 198 M
+(  ! subroutine diff_vpt: computes the diffusivity of velocities using) s
+5 190 M
+(  ! a tri-diagnonal solver in the vertical at u or v pts depending on) s
+5 182 M
+(  ! the values of ip and jp and the input arguments) s
+5 174 M
+(  !) s
+5 166 M
+(  subroutine  diff_vpt\(n1,n2,n3,dn0,dzm,dzt,dyi,dt,sflx,tflx,sii,sij,  &) s
+5 158 M
+(       km,v,w,tnd,flx\)) s
+5 142 M
+(    logical, parameter  :: noslip = .false.) s
+5 134 M
+(    integer, intent\(in\) :: n1,n2,n3) s
+5 126 M
+(    real, intent\(in\)    :: dn0\(n1\),dzm\(n1\),dzt\(n1\),dyi,dt) s
+5 118 M
+(    real, intent\(in\)    :: sflx\(n2,n3\),tflx\(n2,n3\)) s
+5 110 M
+(    real, intent\(in\)    :: sii\(n1,n2,n3\),sij\(n1,n2,n3\)) s
+5 102 M
+(    real, intent\(in\)    :: km\(n1,n2,n3\),v\(n1,n2,n3\),w\(n1,n2,n3\)) s
+5 86 M
+(    real, intent\(inout\) :: flx\(n1\)) s
+5 78 M
+(    real, intent\(inout\) :: tnd\(n1,n2,n3\)) s
+5 62 M
+(    dti = 1.0/dt) s
+5 54 M
+(    do k=1,n1) s
+5 46 M
+(       sz7\(k\)  = 0.) s
+5 38 M
+(       sz8\(k\)  = 0.) s
+5 30 M
+(       flx\(k\)  = 0.) s
+5 22 M
+(    end do) s
+5 6 M
+(    do j=3,n3-2) s
+377 518 M
+(       indh  = 0) s
+377 510 M
+(       do i=3,n2-2) s
+377 502 M
+(          indh=indh+1) s
+377 494 M
+(          sz8\(1\)=dzm\(1\)*\(km\(1,i,j\)+km\(1,i,j+1\)\)) s
+377 486 M
+(          sz7\(n1-1\)  =.5*\(tflx\(i,j\)\)*\(dn0\(n1\)+dn0\(n1-1\)\)) s
+377 478 M
+(          sz7\(1\)     =.5*\(sflx\(i,j\)\)*\(dn0\(1\)+dn0\(2\)\)) s
+377 470 M
+(          do k=2,n1-1) s
+377 462 M
+(             sz8\(k\)=dzm\(k\)*\(km\(k,i,j\)+km\(k,i,j+1\)\)) s
+377 454 M
+(             sz7\(k\)= \(-\(w\(k,i,j+1\)-w\(k,i,j\)\)*dyi\)*0.5*\(km\(k,i,j\)+km\(k,i,j+1\)\)) s
+377 446 M
+(             sxz4\(indh,k\)=v\(k,i,j\)*dn0\(k\) + dt*dzt\(k\)*\(sz7\(k-1\)-sz7\(k\)\)) s
+377 438 M
+(             sxz3\(indh,k\)=-0.5*dt*dzt\(k\)*sz8\(k\)) s
+377 430 M
+(             sxz2\(indh,k\)=-0.5*dt*dzt\(k\)*sz8\(k-1\)) s
+377 422 M
+(             sxz1\(indh,k\)=dn0\(k\)-sxz2\(indh,k\)-sxz3\(indh,k\)) s
+377 414 M
+(          end do) s
+377 406 M
+(          !) s
+377 398 M
+(          ! Boundary conditions) s
+377 390 M
+(          !) s
+377 382 M
+(          if \(noslip\) then) s
+377 374 M
+(             sxz1\(indh,2\)    = dn0\(2\)-2.*sxz2\(indh,2\)-sxz3\(indh,2\)) s
+377 366 M
+(             sxz1\(indh,n1-1\) = dn0\(n1-1\)-sxz2\(indh,n1-1\)-2.*sxz3\(indh,n1-1\)) s
+377 358 M
+(          else) s
+377 350 M
+(             sxz1\(indh,2\)    = dn0\(2\)-sxz3\(indh,2\)) s
+377 342 M
+(             sxz1\(indh,n1-1\) = dn0\(n1-1\)-sxz2\(indh,n1-1\)) s
+377 334 M
+(          end if) s
+377 318 M
+(          sxz3\(indh,n1-1\) = 0.) s
+377 310 M
+(          sxz2\(indh,2\)    = 0.) s
+377 302 M
+(          flx\(1\)=flx\(1\)+sz7\(1\)) s
+377 294 M
+(          flx\(n1-1\)=flx\(n1-1\)+sz7\(n1-1\)) s
+377 286 M
+(       enddo) s
+377 270 M
+(       call tridiff\(n2,n1-1,indh,sxz2,sxz1,sxz3,sxz4,sxz1,sxz3\)) s
+377 262 M
+(       !) s
+377 254 M
+(       ! Back out diffusive tendencies from vertical implicit solution and ) s
+377 246 M
+(       ! solve for horizontal tendencies.  Accumulate vertical flux array) s
+377 238 M
+(       !) s
+377 230 M
+(       indh=0) s
+377 222 M
+(       do i=3,n2-2) s
+377 214 M
+(          indh=indh+1) s
+377 206 M
+(          do k=2,n1-1) s
+377 198 M
+(             dfact = 1./dn0\(k\) ) s
+377 190 M
+(             tnd\(k,i,j\)=tnd\(k,i,j\) + dti*\(sxz1\(indh,k\)-v\(k,i,j\)\) - dfact *    &) s
+377 182 M
+(                 \(\(sii\(k,i,j+1\)-sii\(k,i,j\)\)*dyi+\(sij\(k,i,j\)-sij\(k,i-1,j\)\)*dyi\)) s
+377 174 M
+(             if \(k < n1-1\) flx\(k\)= flx\(k\)-dzm\(k\)*\(km\(k,i,j\)+km\(k,i,j+1\)\)      &) s
+377 166 M
+(                  *\(sxz1\(indh,k+1\)-sxz1\(indh,k\)\)*.5) s
+377 158 M
+(          enddo) s
+377 150 M
+(       enddo) s
+377 142 M
+(    enddo) s
+377 126 M
+(  end subroutine diff_vpt) s
+377 118 M
+(  !) s
+377 110 M
+(  ! ----------------------------------------------------------------------) s
+377 102 M
+(  ! subroutine diff_wpt: computes the diffusivity of velocities at a) s
+377 94 M
+(  ! wpt) s
+377 86 M
+(  !) s
+377 78 M
+(  subroutine  diff_wpt\(n1,n2,n3,dn0,dzm,dzt,dxi,dyi,dt,sflx,tflx,s23,km,w,u   &) s
+377 70 M
+(       ,tnd,flx\)) s
+377 54 M
+(    integer, intent\(in\) :: n1,n2,n3) s
+377 46 M
+(    real, intent\(in\)    :: s23\(n1,n2,n3\)) s
+377 38 M
+(    real, intent\(in\)    :: km\(n1,n2,n3\),w\(n1,n2,n3\),u\(n1,n2,n3\)) s
+377 30 M
+(    real, intent\(in\)    :: sflx\(n2,n3\),tflx\(n2,n3\)) s
+377 22 M
+(    real, intent\(in\)    :: dn0\(n1\),dzm\(n1\),dzt\(n1\),dxi,dyi,dt) s
+377 6 M
+(    real, intent\(inout\) :: flx\(n1\), tnd\(n1,n2,n3\)) s
+_R
+S
+%%Page: (5) 5
+%%BeginPageSetup
+_S
+90 rotate
+24 -588 translate
+/pagenum 5 def
+/fname (sgsm.f90) def
+/fdir () def
+/ftail (sgsm.f90) def
+% User defined strings:
+/pagenumstr (5) def
+/moddatestr (04/14/08) def
+/modtimestr (23:12:47) def
+/user_header_p false def
+%%EndPageSetup
+column_lines
+do_header
+5 510 M
+(    integer :: kp1,im1,jm1) s
+5 494 M
+(    dti = 1.0/dt) s
+5 486 M
+(    do k=1,n1) s
+5 478 M
+(       sz8\(k\)  = 0.) s
+5 470 M
+(       flx\(k\)  = 0.) s
+5 462 M
+(    end do) s
+5 446 M
+(    do k=1,n1) s
+5 438 M
+(       do i=1,n2) s
+5 430 M
+(          sxz1\(i,k\) = 0.0) s
+5 422 M
+(       end do) s
+5 414 M
+(    end do) s
+5 398 M
+(    do j=3,n3-2) s
+5 390 M
+(       indh=0) s
+5 382 M
+(       do i=3,n2-2) s
+5 374 M
+(          indh=indh+1) s
+5 358 M
+(          sz8\(1\)=dzt\(2\)*.5*\(km\(1,i,j\)+km\(2,i,j\)\)) s
+5 350 M
+(          do k=2,n1-2) s
+5 342 M
+(             kp1 = k+1) s
+5 334 M
+(             sz8\(k\)=dzt\(kp1\)*.5*\(km\(k,i,j\)+km\(kp1,i,j\)\)) s
+5 326 M
+(             sxz4\(indh,k\)=w\(k,i,j\)*\(dn0\(k\)+dn0\(kp1\)\)*.5) s
+5 318 M
+(             sxz3\(indh,k\)=-dt*dzm\(k\)*sz8\(k\)) s
+5 310 M
+(             sxz2\(indh,k\)=-dt*dzm\(k\)*sz8\(k-1\)) s
+5 302 M
+(             sxz1\(indh,k\)=\(dn0\(k\)+dn0\(kp1\)\)*0.5 - sxz2\(indh,k\) - sxz3\(indh,k\)) s
+5 294 M
+(          end do) s
+5 286 M
+(          sxz2\(indh,2\)    = 0.) s
+5 278 M
+(          sxz3\(indh,n1-2\) = 0.) s
+5 262 M
+(          flx\(1\)=flx\(1\)+sflx\(i,j\)*dn0\(2\)) s
+5 254 M
+(          flx\(n1-1\)=flx\(n1-1\)+tflx\(i,j\)*dn0\(n1-1\)) s
+5 238 M
+(          do k=2,n1-1) s
+5 230 M
+(             szx5\(k,i\) = \(\(u\(k+1,i,j\)-u\(k,i,j\)\)*dzm\(k\)+\(w\(k,i+1,j\)-w\(k,i,j\)\)  &) s
+5 222 M
+(                  *dxi\)*\(-0.5\)*\(km\(k,i,j\)+km\(k,i+1,j\)\)) s
+5 214 M
+(          end do) s
+5 206 M
+(          sxz4\(indh,2\)   =sxz4\(indh,2\) + dt*dzm\(2\)*sflx\(i,j\)*dn0\(2\)) s
+5 198 M
+(          sxz4\(indh,n1-2\)=sxz4\(indh,n1-2\)-dt*dzm\(n1-2\)*tflx\(i,j\)*dn0\(n1-1\)) s
+5 190 M
+(       end do) s
+5 174 M
+(       do k=2,n1-1) s
+5 166 M
+(          szx5\(k,2\) =  \(\(u\(k+1,2,j\)-u\(k,2,j\)\)*dzm\(k\) + \(w\(k,3,j\)-w\(k,2,j\)\)    &) s
+5 158 M
+(               *dxi\)*\(-0.5\)*\(km\(k,2,j\)+km\(k,3,j\)\)) s
+5 150 M
+(       end do) s
+5 134 M
+(       call tridiff\(n2,n1-2,indh,sxz2,sxz1,sxz3,sxz4,sxz1,sxz3\)) s
+5 126 M
+(       !) s
+5 118 M
+(       ! Back out diffusive tendencies from vertical implicit solution and ) s
+5 110 M
+(       ! solve for horizontal tendencies.  Accumulate vertical flux array) s
+5 102 M
+(       !) s
+5 94 M
+(       indh= 0) s
+5 86 M
+(       do i=3,n2-2) s
+5 78 M
+(          indh=indh+1) s
+5 70 M
+(          im1 = max\(i-1,2\)) s
+5 62 M
+(          jm1 = max\(j-1,2\)) s
+5 54 M
+(          do k=2,n1-2) s
+5 46 M
+(             dfact = 1./\(\(dn0\(k\)+dn0\(k+1\)\)*.5\)) s
+5 38 M
+(             tnd\(k,i,j\)=tnd\(k,i,j\) + dti*\(sxz1\(indh,k\)-w\(k,i,j\)\)- dfact *     &) s
+5 30 M
+(                  \(\(szx5\(k,i\)-szx5\(k,im1\)\)*dxi + \(s23\(k,i,j\)-s23\(k,i,jm1\)\)*dyi\)) s
+5 22 M
+(             flx\(k\) = flx\(k\)-dzt\(k\)*\(km\(k,i,j\)+km\(k+1,i,j\)\)*0.5               &) s
+5 14 M
+(                  *\(sxz1\(indh,k\)-sxz1\(indh,k-1\)\)) s
+5 6 M
+(          enddo) s
+377 518 M
+(       enddo) s
+377 510 M
+(    enddo) s
+377 494 M
+(  end subroutine diff_wpt) s
+377 486 M
+(  !) s
+377 478 M
+(  ! -----------------------------------------------------------------------) s
+377 470 M
+(  ! subroutine diffsclr: computes the diffusivity of a scalar using) s
+377 462 M
+(  ! a tri-diagnonal solver in the vertical) s
+377 454 M
+(  !) s
+377 446 M
+(  subroutine diffsclr\(n1,n2,n3,dt,dxi,dyi,dzm,dzt,dn0,sflx,tflx,scp,xkh,sct &) s
+377 438 M
+(       ,flx\)) s
+377 422 M
+(    integer, intent\(in\) :: n1,n2,n3) s
+377 414 M
+(    real, intent\(in\)    :: xkh\(n1,n2,n3\),scp\(n1,n2,n3\)) s
+377 406 M
+(    real, intent\(in\)    :: sflx\(n2,n3\),tflx\(n2,n3\),dn0\(n1\)) s
+377 398 M
+(    real, intent\(in\)    :: dxi,dyi,dzm\(n1\),dzt\(n1\),dt) s
+377 382 M
+(    real, intent\(inout\) :: flx\(n1,n2,n3\),sct\(n1,n2,n3\)) s
+377 374 M
+(    !) s
+377 366 M
+(    ! compute vertical diffusion matrix coefficients for scalars,) s
+377 358 M
+(    ! Coefficients need only be calculated once and can be used repeatedly) s
+377 350 M
+(    ! for other scalars) s
+377 342 M
+(    !) s
+377 334 M
+(    dti       = 1.0/dt) s
+377 326 M
+(    do k=1,n1) s
+377 318 M
+(       sz7\(k\)   = 0.) s
+377 310 M
+(    end do) s
+377 294 M
+(    do j=3,n3-2) s
+377 286 M
+(       do i=2,n2-2) s
+377 278 M
+(          do k=2,n1-1) s
+377 270 M
+(             szx1\(k,i\)=-\(scp\(k,i+1,j\)-scp\(k,i,j\)\)*dxi*.25*\(xkh\(k,i,j\)  +     &) s
+377 262 M
+(                  xkh\(k,i+1,j\)+xkh\(k-1,i,j\)+xkh\(k-1,i+1,j\)\) ) s
+377 254 M
+(          enddo) s
+377 246 M
+(       enddo) s
+377 238 M
+(       !) s
+377 230 M
+(       ! Set up Tri-diagonal Matrix) s
+377 222 M
+(       !) s
+377 214 M
+(       indh=0) s
+377 206 M
+(       do i=3,n2-2) s
+377 198 M
+(          indh=indh+1) s
+377 190 M
+(          do k=2,n1-1) s
+377 182 M
+(             if \(k < n1-1\) sz7\(k\)=dt*dzm\(k\)*xkh\(k,i,j\)) s
+377 174 M
+(             sxz1\(indh,k\)=-dzt\(k\)*sz7\(k-1\)) s
+377 166 M
+(             sxz2\(indh,k\)=-dzt\(k\)*sz7\(k\)) s
+377 158 M
+(             sxz3\(indh,k\)=dn0\(k\)-sxz1\(indh,k\)-sxz2\(indh,k\)) s
+377 150 M
+(             sxz4\(indh,k\)=scp\(k,i,j\)*dn0\(k\)) s
+377 142 M
+(          enddo) s
+377 134 M
+(          sxz4\(indh,2\)=scp\(2,i,j\)*dn0\(2\)                                     &) s
+377 126 M
+(               + sflx\(i,j\)*\(dn0\(1\)+dn0\(2\)\)     *.5 *dt*dzt\(2\)) s
+377 118 M
+(          sxz4\(indh,n1-1\)=scp\(n1-1,i,j\)*dn0\(n1-1\)                            &) s
+377 110 M
+(               - tflx\(i,j\)*\(dn0\(n1-1\)+dn0\(n1\)\) *.5 *dt*dzt\(n1-1\)) s
+377 102 M
+(       enddo) s
+377 86 M
+(       call tridiff\(n2,n1-1,indh,sxz1,sxz3,sxz2,sxz4,sxz5,sxz6\)) s
+377 78 M
+(       !) s
+377 70 M
+(       ! compute scalar tendency in addition to vertical flux) s
+377 62 M
+(       !) s
+377 54 M
+(       indh=0) s
+377 46 M
+(       do i=3,n2-2) s
+377 38 M
+(          flx\(1,i,j\)   =sflx\(i,j\)*\(dn0\(1\)+dn0\(2\)\)*.5) s
+377 30 M
+(          flx\(n1-1,i,j\)=tflx\(i,j\)*\(dn0\(n1\)+dn0\(n1-1\)\)*.5) s
+377 22 M
+(          flx\(n1,i,j\)  =0.) s
+377 14 M
+(          indh=indh+1) s
+377 6 M
+(          do k=2,n1-1) s
+_R
+S
+%%Page: (6) 6
+%%BeginPageSetup
+_S
+90 rotate
+24 -588 translate
+/pagenum 6 def
+/fname (sgsm.f90) def
+/fdir () def
+/ftail (sgsm.f90) def
+% User defined strings:
+/pagenumstr (6) def
+/moddatestr (04/14/08) def
+/modtimestr (23:12:47) def
+/user_header_p false def
+%%EndPageSetup
+column_lines
+do_header
+5 518 M
+(             sct\(k,i,j\)= sct\(k,i,j\) + dti*\(sxz5\(indh,k\)-scp\(k,i,j\)\)           &) s
+5 510 M
+(                  -\(\(szx1\(k,i\)-szx1\(k,i-1\)\)                                   &) s
+5 502 M
+(                  *dxi + \(-\(scp\(k,i,j+1\)-scp\(k,i,j\)\)*dyi*0.25*\(xkh\(k,i,j\)     &) s
+5 494 M
+(                  +xkh\(k,i,j+1\)+xkh\(k-1,i,j\)+xkh\(k-1,i,j+1\)\)+\(scp\(k,i,j\)      &) s
+5 486 M
+(                  -scp\(k,i,j-1\)\)*dyi*0.25*\(xkh\(k,i,j-1\)+xkh\(k,i,j\)            &) s
+5 478 M
+(                  +xkh\(k-1,i,j-1\)+xkh\(k-1,i,j\)\)\)*dyi\) /dn0\(k\)) s
+5 470 M
+(             if \(k<n1-1\) flx\(k,i,j\)=-xkh\(k,i,j\)*\(sxz5\(indh,k+1\)-sxz5\(indh,k\)\) &) s
+5 462 M
+(                  *dzm\(k\)) s
+5 454 M
+(          end do) s
+5 446 M
+(       enddo) s
+5 438 M
+(    enddo) s
+5 422 M
+(  end subroutine diffsclr) s
+5 406 M
+(end module sgsm) s
+_R
+S
+%%Trailer
+%%Pages: 6
+%%DocumentNeededResources: font Times-Roman Courier-Bold Courier 
+%%+ font Times-Bold 
+%%EOF

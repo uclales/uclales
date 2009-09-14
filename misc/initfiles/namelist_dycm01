@@ -1,0 +1,33 @@
+ &model
+  nxp =   100
+  nyp =   100
+  nzp =   131
+  deltax = 35.
+  deltay = 35.
+  deltaz = 10.
+  nxpart = .true.
+  dzmax  = 925.
+  dzrat  = -5.10
+  dtlong = 2.
+  distim = 100.
+  timmax = 21600.
+  runtype = "INITIAL"
+  level = 2
+  CCN = 55.e6
+  prndtl = -0.3333333
+  filprf = 'rf01'
+  hfilin = 'rf01.h.rst'
+  ssam_intvl = 15.
+  savg_intvl = 900.
+  corflg = .true.
+  strtim = 0.0
+  iradtyp = 2
+  dthcon = 16.
+  drtcon = 93.
+  ubmin  = -0.25
+  th00 = 289.
+  umean =  5.
+  vmean = -5.
+ /
+
+

@@ -1,0 +1,9 @@
+12.06.2007:  Changed grid.F90 to include rwp, and properly include yt and ym
+15.06.2007:  Changed code to allow for a pi1, i.e., a contribution to the total
+             exner function which accounts for the deviation of the mean state
+             from a constant potential temperature th00.  The pressure so implied
+             is updated dynamically based on the mean tendency in the w equation.
+15.06.2007:  Changed the initial conditions to allow for an initial state with
+             liquid water potential temperature.  This has not yet been tested,
+             but it replaces a previous version where this clearly was not being
+             done, regardless of the itsflg setting

@@ -1,0 +1,26 @@
+ &model
+  nxp = 260
+  nyp = 260
+  nzp = 161
+  nxpart = True
+  deltax  = 40.
+  deltay  = 40.
+  deltaz  = 10.
+  dzmax   = 10.
+  dzrat   = 1.010
+  dtlong  = 10.0
+  timmax = 86400.
+  runtype= 'INITIAL'
+  filprf = 'ccbl'
+  hfilin = 'ccbl.h.rst'
+  savg_intvl=900.
+  frqhis = 10800.
+  frqanl = 1800.
+  level  = 2
+  imcrtyp= 0
+  th00   = 296.
+  sst    = 289.
+  zrough = 0.0005
+  isfctyp=3
+  dthcon = 25.
+ /

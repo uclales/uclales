@@ -1,0 +1,21 @@
+This directory contains namelist, and other initialization files used
+to run different cases.  Files to use for some standard cases are
+listed below.
+
+namelist_cumulus: Namelist to reproduce the idealized cumulus cases
+reported in Stevens, JAS (2007).  Requires the generation of a
+sound_in file with bstate.f95.
+
+namelist_drycbl: Idealized dry CBL consisting of a layer with
+initially uniform stratification and constant forcing.
+
+namelist_dycm01: The DYCOMS GCSS RF01 case, requires the generation of
+a sound_in file with bstate.f95
+
+namelist_dycm02: The DYCOMS GCSS RF02 case, requires the generation of
+a sound_in file with bstate.f95, as well as the generation of
+zm_grid_in and zt_grid_in files uzing zgrid.gcss9.f
+
+namelist_rico: The RICO GCSS composite case.
+
+namelist_smoke: The RICO GCSS smoke case.

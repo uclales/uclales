@@ -1,0 +1,25 @@
+ &model
+  nxp = 132
+  nyp = 132
+  nzp = 107
+  nxpart = .true.
+  deltax  = 30.5 
+  deltay  = 30.5
+  deltaz  = 12.25
+  dtlong  = 4.
+  timmax = 18000.
+  runtype= 'INITIAL'
+  hfilin = 'dcbl.rst'
+  ssam_intvl = 8.
+  frqhis = 9000
+  frqanl = 900
+  filprf = 'dcbl'
+  level  = 1
+  th00 = 300.
+  zrand = 20.
+  ps = 1020.0, 5000.,
+  ts = 300.,  320.,
+  rts=   10.,   10.,
+  us =   0.,    0.,
+  vs =  -0.,   -0.,
+ /
