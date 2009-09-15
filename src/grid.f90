@@ -403,8 +403,6 @@ contains
     allocate (sanal(nvar0))
     sanal(1:nbase) = sbase(1:nbase)
 
-!irina
-   print *,sanal
 
     nvar0 = nbase
     !
@@ -438,9 +436,6 @@ contains
        sanal(nvar0) = sbase(nbase+6)
     end if
 
-!irina
-!2nd print sanal
-print *,sanal
 
     nbeg = nvar0+1
     nend = nvar0+naddsc
@@ -553,13 +548,7 @@ print *,sanal
             count=icnt)
     end if
 
-    !irina
-    print *, 'nn nvar0',nn, nvar0
-    !
     if (nn /= nvar0) then
-    !irina
-    print *, 'nn nvar0',nn, nvar0
-    !
        if (myid == 0) print *, 'ABORTING:  Anal write error'
        call appl_abort(0)
     end if
