@@ -54,7 +54,7 @@ module grid
   character (len=7) :: runtype = 'INITIAL'! Run Type Selection
 
 
-  character (len=7),  private :: v_snm='sxx    '
+  character (len=7),  private :: v_snm='sxx    ' 
   character (len=80), private :: fname
 
   integer, private, save  ::  nrec0, nvar0, nbase=15
@@ -69,16 +69,16 @@ module grid
   real, dimension (:,:), allocatable :: albedo, a_ustar, a_tstar, a_rstar,    &
        uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc
   !
-  ! 3D Arrays
+  ! 3D Arrays 
   !
   real, dimension (:,:,:), allocatable ::                                     &
        a_theta, a_pexnr, press, vapor, liquid, a_rflx, a_sflx, precip,        &
        a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7
   !
-  ! Named pointers (to 3D arrays)
+  ! Named pointers (to 3D arrays) 
   !
   real, dimension (:,:,:), pointer :: a_up, a_ut, a_vp, a_vt, a_wp, a_wt,     &
-       a_sp, a_st, a_tp, a_tt, a_rp, a_rt, a_rpp, a_rpt, a_npp, a_npt
+       a_sp, a_st, a_tp, a_tt, a_rp, a_rt, a_rpp, a_rpt, a_npp, a_npt 
   !
   ! Memory for prognostic variables
   !
@@ -147,7 +147,7 @@ contains
     if (level   > 2) nscl = nscl+2
 
     allocate (a_xp(nzp,nxp,nyp,nscl), a_xt1(nzp,nxp,nyp,nscl),        &
-         a_xt2(nzp,nxp,nyp,nscl))
+         a_xt2(nzp,nxp,nyp,nscl))         
 
     a_xp(:,:,:,:) = 0.
     a_xt1(:,:,:,:) = 0.
@@ -222,14 +222,14 @@ contains
 
     !
     ! define xm array for grid 1 from deltax
-    !
+    !                                      
     allocate (xm(nxp))
     xm(1)=-float(max(nxpg-2,1))*.5*deltax+xoffset(wrxid)*deltax
     do i=2,nxp-1
        xm(i)=xm(i-1)+deltax
     end do
     xm(nxp)=2*xm(nxp-1)-xm(nxp-2)
-    !
+    !    
     ! define ym array for grid 1 from deltay
     !
     allocate (ym(nyp))
@@ -239,14 +239,14 @@ contains
     end do
     ym(nyp)=2*ym(nyp-1)-ym(nyp-2)
 
-    !
+    !      
     !      define where the momentum points will lie in vertical
-    !
+    !      
   allocate (zm(nzp))
   select case (abs(igrdtyp))
      !
      ! Read in grid spacings from a file
-     !
+     !     
   case(3)
      open (1,file='zm_grid_in',status='old',form='formatted')
      do k=1,nzp
@@ -260,7 +260,7 @@ contains
      !
      ! Tschebyschev Grid with vertical size given by dzmax
      !
-  case(2)
+  case(2) 
      zm(1) = 0.
      nchby = nzp-3
      do k=1,nzp-2
@@ -269,10 +269,10 @@ contains
      end do
      zm(nzp-1) = dzmax
      zm(nzp) = dzmax + (zm(nzp-1)-zm(nzp-2))
-     !
+     !    
      ! define zm array for grid 1 from deltaz and dzrat, if dzrat is
      ! negative compress grid so that dzmin is the grid spacing in a 100m
-     ! interval below dzmax.  In both cases stretcvh grid uniformly by the
+     ! interval below dzmax.  In both cases stretcvh grid uniformly by the 
      ! ration |dzrat| above dzmax
      !
   case(1)
@@ -288,7 +288,7 @@ contains
            zb=zb-dzmin*abs(dzrat)**k
         end do
      end if
-
+     
      dz=deltaz
      do k=3,nzp
         if(zm(k-1) > zb .and. zm(k-1) < dzmax)then
@@ -305,25 +305,25 @@ contains
      end do
   end select
   !
-  ! Grid Points for Thermal Points (T-Grid):
-  !
+  ! Grid Points for Thermal Points (T-Grid): 
+  !    
   allocate (xt(nxp))
   do i=2,nxp
      xt(i)=.5*(xm(i)+xm(i-1))
   end do
   xt(1)=1.5*xm(1)-.5*xm(2)
-  !
+  !    
   allocate (yt(nyp))
   do j=2,nyp
      yt(j)=.5*(ym(j)+ym(j-1))
   end do
   yt(1)=1.5*ym(1)-.5*ym(2)
-  !
+  !      
   allocate (zt(nzp))
   if (igrdtyp .lt. 0) then
      !
      ! Read in grid spacings from a file
-     !
+     !     
      open (2,file='zt_grid_in',status='old',form='formatted')
      do k=1,nzp
         read (2,*) zt(k)
@@ -332,8 +332,8 @@ contains
    else
      !
      ! calculate where the thermo points will lie based on geometric
-     ! interpolation from the momentum points
-     !
+     ! interpolation from the momentum points 
+     !    
      do k=1,nzp
         zmnvc(k)=zm(k)
      end do
@@ -347,7 +347,7 @@ contains
        zt(k)=zmnvc(k-1)+(zmnvc(k)-zmnvc(k-1))/(1.+dzrfm)
      end do
   end if
-  !
+  !    
   ! compute other arrays based on the vertical grid.
   !   dzm: inverse of distance between thermal points k+1 and k
   !   dzt: inverse of distance between momentum points k and k-1
@@ -357,7 +357,7 @@ contains
      dzm(k)=1./(zt(k+1)-zt(k))
   end do
   dzm(nzp)=dzm(nzp-1)*dzm(nzp-1)/dzm(nzp-2)
-
+  
   allocate (dzt(nzp))
   do k=2,nzp
      dzt(k)=1./(zm(k)-zm(k-1))
@@ -387,14 +387,14 @@ contains
     integer, parameter :: nnames = 21
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,&
-         'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,&
+         'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,&  
          'w      ','t      ','p      ','q      ','l      ','r      '   ,&
          'n      ','stke   ','rflx   '/)
 
     real, intent (in) :: time
     integer           :: nbeg, nend
 
-    nvar0 = nbase + naddsc
+    nvar0 = nbase + naddsc    
     if (level  >= 1) nvar0 = nvar0+1
     if (level  >= 2) nvar0 = nvar0+1
     if (level  >= 3) nvar0 = nvar0+2
@@ -402,6 +402,9 @@ contains
 
     allocate (sanal(nvar0))
     sanal(1:nbase) = sbase(1:nbase)
+
+!irina
+   print *,sanal
 
     nvar0 = nbase
     !
@@ -427,10 +430,17 @@ contains
        sanal(nvar0) = sbase(nbase+4)
     end if
 
+    !old
+    !if (iradtyp > 2) then
+    !irina
     if (iradtyp > 1) then
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(nbase+6)
     end if
+
+!irina
+!2nd print sanal
+print *,sanal
 
     nbeg = nvar0+1
     nend = nvar0+naddsc
@@ -473,7 +483,7 @@ contains
     integer :: iret, VarID, nn, n
     integer :: ibeg(4), icnt(4), i1, i2, j1, j2
 
-    !return
+    !return 
     icnt = (/nzp,nxp-4,nyp-4,1   /)
     ibeg = (/1  ,1  ,1  ,nrec0/)
     i1 = 3
@@ -543,21 +553,27 @@ contains
             count=icnt)
     end if
 
+    !irina
+    print *, 'nn nvar0',nn, nvar0
+    !
     if (nn /= nvar0) then
+    !irina
+    print *, 'nn nvar0',nn, nvar0
+    !
        if (myid == 0) print *, 'ABORTING:  Anal write error'
        call appl_abort(0)
     end if
 
     if (myid==0) print "(//' ',12('-'),'   Record ',I3,' to: ',A60)",    &
-         nrec0,fname
+         nrec0,fname 
 
     iret  = nf90_sync(ncid0)
     nrec0 = nrec0+1
 
   end subroutine write_anal
-  !
+  ! 
   ! ----------------------------------------------------------------------
-  ! Subroutine write_hist:  This subroutine writes a binary history file
+  ! Subroutine write_hist:  This subroutine writes a binary history file 
   !
   subroutine write_hist(htype, time)
 
@@ -581,9 +597,9 @@ contains
        hname = trim(hname)//'.iflg'
     case(0)
        hname = trim(hname)//'.R'
-    case(1)
+    case(1) 
        hname = trim(hname)//'.rst'
-    case(2)
+    case(2) 
        iblank=index(hname,' ')
        write (hname(iblank:iblank+7),'(a1,i6.6,a1)') '.', int(time), 's'
     end select
@@ -613,9 +629,9 @@ contains
 
     return
   end subroutine write_hist
-  !
+  ! 
   ! ----------------------------------------------------------------------
-  ! Subroutine read_hist:  This subroutine reads a binary history file
+  ! Subroutine read_hist:  This subroutine reads a binary history file 
   !
   subroutine read_hist(time, hfilin)
 

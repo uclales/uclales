@@ -256,7 +256,8 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('q')
        if (itype==0) ncinfo = 'Total water mixing ratio'
-       if (itype==1) ncinfo = 'kg/kg'
+!irina
+       if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
     case('l')
        if (itype==0) ncinfo = 'Liquid water mixing ratio'
@@ -328,11 +329,15 @@ contains
        if (itype==2) ncinfo = 'time'
     case('lwp_bar')
        if (itype==0) ncinfo = 'Liquid-water path'
-       if (itype==1) ncinfo = 'kg/m^2'
+       !irina
+       if (itype==1) ncinfo = 'g/m^2'
+       !if (itype==1) ncinfo = 'kg/m^2'
        if (itype==2) ncinfo = 'time'
     case('lwp_var')
        if (itype==0) ncinfo = 'Liquid-water path variance'
-       if (itype==1) ncinfo = 'kg/m^2'
+       !irina
+       if (itype==1) ncinfo = 'g/m^2'
+       !if (itype==1) ncinfo = 'kg/m^2'
        if (itype==2) ncinfo = 'time'
     case('zc')
        if (itype==0) ncinfo = 'Cloud-top height'
@@ -356,7 +361,9 @@ contains
        if (itype==2) ncinfo = 'time'
     case('rwp_bar')
        if (itype==0) ncinfo = 'Rain-water path'
-       if (itype==1) ncinfo = 'kg/m^2'
+     !  if (itype==1) ncinfo = 'kg/m^2'
+       !irina
+       if (itype==1) ncinfo = 'g/m^2'
        if (itype==2) ncinfo = 'time'
     case('prcp')
        if (itype==0) ncinfo = 'Surface precipitation rate'

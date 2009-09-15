@@ -28,7 +28,8 @@ module mcrp
   use util, only : get_avg3, azero
   implicit none
 
-  logical, parameter :: droplet_sedim = .False., khairoutdinov = .False., turbulence = .False.
+  logical, parameter :: droplet_sedim = .false., khairoutdinov = .false., turbulence = .False.
+  !logical, parameter :: droplet_sedim = .False., khairoutdinov = .False., turbulence = .False.
   ! 
   ! drop sizes definition is based on vanZanten (2005)
   ! cloud droplets' diameter: 2-50 e-6 m
@@ -330,7 +331,9 @@ contains
                 !
                 ! Khairoutdinov and Kogan
                 !
-                !ac = Cac * (rc(k,i,j) * rp(k,i,j))**Eac
+                if (khairoutdinov) then
+                ac = Cac * (rc(k,i,j) * rp(k,i,j))**Eac
+                end if
                 !
                 rpt(k,i,j) = rpt(k,i,j) + ac
                 
@@ -404,9 +407,14 @@ contains
               !
               ! Set fall speeds following Khairoutdinov and Kogan
 
+!              if (khairoutdinov) then
+!                 vn(k) = max(0.,an * Dp + bn)
+!                 vr(k) = max(0.,aq * Dp + bq)
+!              end if
+!irina-olivier
               if (khairoutdinov) then
-                 vn(k) = max(0.,an * Dp + bn)
-                 vr(k) = max(0.,aq * Dp + bq)
+                 vn(k) = max(0.,an * Dm + bn)
+                 vr(k) = max(0.,aq * Dm + bq)
               end if
 
            end do

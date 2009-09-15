@@ -64,7 +64,12 @@ contains
        case(2)
           call gcss_rad(nzp, nxp, nyp, xka, fr0, fr1, div, liquid, dn0,   &
                a_rflx, zt, zm, dzt, a_tt, a_tp, a_rt, a_rp)
+!irina add case 3
+       case(3)
+          call gcss_rad(nzp, nxp, nyp, xka, fr0, fr1, div, liquid, dn0,   &
+               a_rflx, zt, zm, dzt, a_tt, a_tp, a_rt, a_rp)
        end select
+!
        if (trim(case_name) == 'atex') call case_forcing(nzp, nxp, nyp,    &
             zt, dzt, dzm, a_tp, a_rp, a_tt, a_rt)
     case (3)

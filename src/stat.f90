@@ -593,6 +593,8 @@ contains
           do k=1,n1
              km1=max(1,k-1)
              xrain = max(0.,rr(k,i,j))
+             !irina
+             !xaqua = max(0.,rc(k,i,j))
              xaqua = max(xrain,rc(k,i,j))
              scr1(i,j)=scr1(i,j)+xaqua*dn0(k)*(zm(k)-zm(km1))*1000.
              scr2(i,j)=scr2(i,j)+xrain*dn0(k)*(zm(k)-zm(km1))*1000.
