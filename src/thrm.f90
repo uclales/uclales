@@ -48,7 +48,8 @@ contains
        call satadjst3(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0, &
             pi1,th00,a_rp,vapor,liquid,a_scr2,a_rpp)
     case (4) 
-       stop 'level not supported'
+       call satadjst3(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0, &
+            pi1,th00,a_rp,vapor,liquid,a_scr2,a_rpp)
     end select
 
   end subroutine thermo
@@ -341,7 +342,7 @@ contains
               end if
               en2(k,i,j)=g*dzm(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
                    + bb*(rt(k+1,i,j)-rt(k,i,j)))
-           case (3)
+           case (3,4)
               rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
               rsbar=0.5*(rs(k,i,j)+rs(k+1,i,j))
               kp1=min(n1-1,k+2)

@@ -41,10 +41,10 @@ ifeq ($(ARCH),Linux)
   ifeq ($(COMPILER),'GFORTRAN')
      F90      = gfortran
      MPIF90   = mpif90
-     NCDF     = /home/thijs
-     FFLAGS   = -W -Wall -fdefault-real-8 -ffree-line-length-none -O3   $(NCDFINC)
+     NCDF     = /usr
+     FFLAGS   = -W -Wall -fdefault-real-8 -ffree-line-length-none -O3  $(NCDFINC)
 #      SEQFFLAGS = -I$(SRC)/seq -fmod=$(SRC)/seq
-#      MPIFFLAGS = -I$(SRC)/mpi -fmod=$(SRC)/mpi
+#      MPIFFLAGS = 
      F77FLAGS = -ffixed-form
   endif
   ifeq ($(COMPILER),'IFORT')
@@ -56,7 +56,7 @@ ifeq ($(ARCH),Linux)
      FFLAGS   = -O3 -r8 -diag-disable remark $(NCDFINC)
      F77FLAGS = -fixed
   endif
-  NCDFLIB   = -L$(NCDF)/lib  -lnetcdff -lnetcdf 
+  NCDFLIB   = -L$(NCDF)/lib64  -lnetcdff -lnetcdf 
   NCDFINC   = -I$(NCDF)/include 
   LIBS      = $(NCDFLIB)
   MPILIBS   = $(LIBS)
@@ -69,7 +69,7 @@ LES_OUT_MPI=$(BIN)/les.mpi
 LES_ARC_SEQ=$(BIN)/libles_seq.a
 LES_OUT_SEQ=$(BIN)/les.seq
 
-default: mpi
+default: mpi seq
 
 all:  mpi seq
 
