@@ -20,6 +20,8 @@
 module grid
 
   use ncio, only : open_nc, define_nc
+!irina  
+!  use step, only : case_name
   implicit none
   !
   integer           :: nxp = 132           ! number of x points
@@ -70,10 +72,11 @@ module grid
        uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc
   !
   ! 3D Arrays 
-  !
+  !irina
   real, dimension (:,:,:), allocatable ::                                     &
        a_theta, a_pexnr, press, vapor, liquid, a_rflx, a_sflx, precip,        &
-       a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7
+       a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7,                &
+       a_lflxu, a_lflxd, a_sflxu, a_sflxd
   !
   ! Named pointers (to 3D arrays) 
   !
@@ -123,14 +126,42 @@ contains
        allocate (a_rflx(nzp,nxp,nyp))
        a_rflx(:,:,:) = 0.
        memsize = memsize + nxyzp
+       !irina
+       allocate (a_lflxu(nzp,nxp,nyp))
+       a_lflxu(:,:,:) = 0.
+       memsize = memsize + nxyzp
+       allocate (a_lflxd(nzp,nxp,nyp))
+       a_lflxd(:,:,:) = 0.
+       memsize = memsize + nxyzp
     end if
-    if (iradtyp >= 3) then
+    !irina
+    if (iradtyp == 2 .and. level > 1) then
        allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp))
        a_sflx(:,:,:) = 0.
        albedo(:,:) = 0.
        memsize = memsize + nxyzp + nxyp
+       !irina
+       allocate (a_sflxu(nzp,nxp,nyp))
+       a_sflxu(:,:,:) = 0.
+       memsize = memsize + nxyzp 
+       allocate (a_sflxd(nzp,nxp,nyp))
+       a_sflxd(:,:,:) = 0.
+       memsize = memsize + nxyzp 
     end if
-
+    if (iradtyp > 2) then
+       allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp))
+       a_sflx(:,:,:) = 0.
+       albedo(:,:) = 0.
+       memsize = memsize + nxyzp + nxyp
+        !irina
+       allocate (a_sflxu(nzp,nxp,nyp))
+       a_sflxu(:,:,:) = 0.
+       memsize = memsize + nxyzp 
+       allocate (a_sflxd(nzp,nxp,nyp))
+       a_sflxd(:,:,:) = 0.
+       memsize = memsize + nxyzp 
+    end if
+ !
     allocate (a_scr1(nzp,nxp,nyp),a_scr2(nzp,nxp,nyp),a_scr3(nzp,nxp,nyp))
     allocate (a_scr4(nzp,nxp,nyp),a_scr5(nzp,nxp,nyp),a_scr6(nzp,nxp,nyp),a_scr7(nzp,nxp,nyp))
     a_scr1(:,:,:) = 0.
@@ -384,12 +415,13 @@ contains
 
     use mpi_interface, only :myid
 
-    integer, parameter :: nnames = 21
+!irina
+    integer, parameter :: nnames = 23
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,&
          'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,&  
          'w      ','t      ','p      ','q      ','l      ','r      '   ,&
-         'n      ','stke   ','rflx   '/)
+         'n      ','stke   ','rflx   ', 'lflxu  ','lflxd  '/)
 
     real, intent (in) :: time
     integer           :: nbeg, nend
@@ -398,7 +430,8 @@ contains
     if (level  >= 1) nvar0 = nvar0+1
     if (level  >= 2) nvar0 = nvar0+1
     if (level  >= 3) nvar0 = nvar0+2
-    if (iradtyp > 1) nvar0 = nvar0+1
+    !irina
+    if (iradtyp > 1) nvar0 = nvar0+3
 
     allocate (sanal(nvar0))
     sanal(1:nbase) = sbase(1:nbase)
@@ -428,12 +461,15 @@ contains
        sanal(nvar0) = sbase(nbase+4)
     end if
 
-    !old
-    !if (iradtyp > 2) then
     !irina
     if (iradtyp > 1) then
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(nbase+6)
+    !irina
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+7)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+8)
     end if
 
 
@@ -545,6 +581,15 @@ contains
        nn = nn+1
        iret = nf90_inq_varid(ncid0, 'rflx', VarID)
        iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+  !irina          
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, 'lflxu', VarID)
+       iret = nf90_put_var(ncid0, VarID, a_lflxu(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, 'lflxd', VarID)
+       iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
             count=icnt)
     end if
 

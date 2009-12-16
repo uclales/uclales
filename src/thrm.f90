@@ -288,7 +288,6 @@ contains
   do j=3,n3-2
     do i=3,n2-2
       do k=1,n1
-        !print *, pi0(k), pi1(k), pp(k,i,j), k, i, j
         exner=(pi0(k)+pi1(k)+pp(k,i,j))/cp
         tk(k,i,j)=th(k,i,j)*exner
         if (present(rs)) rs(k,i,j)=rslf(R*exner*th00*dn0(k),tk(k,i,j))

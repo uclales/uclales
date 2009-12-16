@@ -21,140 +21,113 @@ module forc
 
   use defs, only      : cp
   use radiation, only : d4stream
+  !irina
+  use rad_gcss, only : gcss_rad
   implicit none
 
-  character (len=5), parameter :: case_name = 'xxxx'
+   !character (len=5), parameter :: case_name = 'xxxx'
+   !irina
+   !initializes the large scale forcing
+   integer, parameter    :: nls = 500
+   real, dimension(nls)  :: t_ls=0.
+   real, dimension(nls)  :: div_ls=0.
+   real, dimension(nls)  :: sst_ls=0.
+   real, dimension(nls)  :: ugeo_ls=0.
+   real, dimension(nls)  :: vgeo_ls=0.
+
     
 contains
   !
   ! -------------------------------------------------------------------
   ! subroutine forcings:  calls the appropriate large-scale forcings
-  !
-  subroutine forcings(time_in, cntlat, sst)
+  !irina
+  subroutine forcings(time_in, cntlat, sst,div, case_name)
 
+!irina
     use grid, only: nxp, nyp, nzp, zm, zt, dzt, dzm, dn0, iradtyp, liquid  &
          , a_rflx, a_sflx, albedo, a_tt, a_tp, a_rt, a_rp, a_pexnr, a_scr1 &
-         , vapor, a_rpp, CCN, pi0, pi1, level, a_ut, a_up, a_vt, a_vp,a_theta
+         , vapor, a_rpp, CCN, pi0, pi1, level, a_ut, a_up, a_vt, a_vp,a_theta,&
+          a_lflxu, a_lflxd, a_sflxu, a_sflxd
 
     use mpi_interface, only : myid, appl_abort
 
-    real, optional, intent (in) :: time_in, cntlat, sst
+!irina
+    real, optional, intent (in) :: time_in, cntlat, sst,div
 
-    real :: xka, fr0, fr1, div, xref1, xref2
+    character (len=5), intent (in) :: case_name
+!irina
+    real :: xref1, xref2
+    integer :: i, j, k, kp1
 
-    if (trim(case_name) == 'atex') then
-       xka = 130.
-       fr0 = 74.
-       fr1 = 0.
-       div = 0.
-    else
-       xka = 85.
-       fr0 = 70.
-       fr1 = 22.
-       div = 3.75e-6
-    end if
 
+!irina
     select case(iradtyp)
     case (1)
-        call case_forcing(nzp,nxp,nyp,zt,dzt,dzm,a_tp,a_rp,a_tt,a_rt)
+        call case_forcing(nzp,nxp,nyp,case_name,zt,dzt,dzm,a_tp,a_rp,a_tt,a_rt)
     case (2)
        select case(level)
        case(1) 
           call smoke_rad(nzp, nxp, nyp, dn0, a_rflx, zm, dzt,a_tt,a_rp)
        case(2)
-          call gcss_rad(nzp, nxp, nyp, xka, fr0, fr1, div, liquid, dn0,   &
-               a_rflx, zt, zm, dzt, a_tt, a_tp, a_rt, a_rp)
-!irina add case 3
+          call gcss_rad(nzp, nxp, nyp, cntlat, time_in, case_name, div, sst, liquid, dn0,   &
+              a_rflx, a_sflx, zt, zm, dzt, a_tt, a_tp, a_rt, a_rp)
        case(3)
-          call gcss_rad(nzp, nxp, nyp, xka, fr0, fr1, div, liquid, dn0,   &
-               a_rflx, zt, zm, dzt, a_tt, a_tp, a_rt, a_rp)
+          call gcss_rad(nzp, nxp, nyp, cntlat, time_in, case_name, div, sst, liquid, dn0,   &
+              a_rflx, a_sflx, zt, zm, dzt, a_tt, a_tp, a_rt, a_rp)
        end select
-!
-       if (trim(case_name) == 'atex') call case_forcing(nzp, nxp, nyp,    &
-            zt, dzt, dzm, a_tp, a_rp, a_tt, a_rt)
     case (3)
+       call bellon(nzp, nxp, nyp, a_rflx, a_sflx, zt, dzt, dzm, a_tt, a_tp&
+            ,a_rt, a_rp, a_ut, a_up, a_vt, a_vp)
+    case (4)
        if (present(time_in) .and. present(cntlat) .and. present(sst)) then
-          a_scr1 = a_theta/a_pexnr 
+          !irina 
+          !a_scr1 = a_theta/a_pexnr 
           if (level == 3) then
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
-                  dn0, pi0, pi1, dzt, a_pexnr, a_scr1, vapor, liquid, a_tt,&
-                  a_rflx, a_sflx, albedo, rr=a_rpp)
+                  dn0, pi0, pi1, dzt, a_pexnr, a_theta, vapor, liquid, a_tt,&
+                  a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, rr=a_rpp)
+            !old      
+            ! call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
+            !      dn0, pi0, pi1, dzt, a_pexnr, a_scr1, vapor, liquid, a_tt,&
+            !      a_rflx, a_sflx, albedo, rr=a_rpp)
           else
              xref1 = 0.
              xref2 = 0.
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,    &
-                  dn0, pi0, pi1, dzt, a_pexnr, a_scr1, vapor, liquid, a_tt, &
-                  a_rflx, a_sflx, albedo)
+                  dn0, pi0, pi1, dzt, a_pexnr, a_theta, vapor, liquid, a_tt, &
+                  a_rflx, a_sflx,a_lflxu, a_lflxd,a_sflxu,a_sflxd,albedo)
+             !call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,    &
+             !     dn0, pi0, pi1, dzt, a_pexnr, a_scr1, vapor, liquid, a_tt, &
+             !     a_rflx, a_sflx, albedo)
              xref1 = xref1 + a_sflx(nzp,3,3)/albedo(3,3)
              xref2 = xref2 + a_sflx(nzp,3,3)
              albedo(3,3) = xref2/xref1
           end if
+!irina 
+          !
+          ! subsidence
+          !
+       do j=3,nyp-2
+          do i=3,nxp-2
+           if (div /= 0.) then
+             do k=2,nzp-2
+                kp1 = k+1
+                a_tt(k,i,j) = a_tt(k,i,j) + &
+                        div*zt(k)*(a_tp(kp1,i,j)-a_tp(k,i,j))*dzt(k)
+                a_rt(k,i,j)=a_rt(k,i,j) + &
+                        div*zt(k)*(a_rp(kp1,i,j)-a_rp(k,i,j))*dzt(k)
+             end do
+           end if
+          enddo
+       enddo
        else
           if (myid == 0) print *, '  ABORTING: inproper call to radiation'
           call appl_abort(0)
        end if
-    case (4)
-       call bellon(nzp, nxp, nyp, a_rflx, a_sflx, zt, dzt, dzm, a_tt, a_tp&
-            ,a_rt, a_rp, a_ut, a_up, a_vt, a_vp)
+
     end select 
 
   end subroutine forcings
-  !
-  ! -------------------------------------------------------------------
-  ! subroutine gcss_rad:  call simple radiative parameterization and 
-  ! simultaneously update fields due to vertical motion as given by div
-  !
-  subroutine gcss_rad(n1,n2,n3,xka,fr0,fr1,div,rc,dn0,flx,zt,zm,dzt,   &
-       tt,tl,rtt,rt)
-
-    integer, intent (in):: n1,n2, n3
-    real, intent (in)   :: xka, fr0, fr1, div
-    real, intent (in)   :: zt(n1),zm(n1),dzt(n1),dn0(n1),rc(n1,n2,n3),   &
-         tl(n1,n2,n3),rt(n1,n2,n3)
-    real, intent (inout):: tt(n1,n2,n3),rtt(n1,n2,n3)
-    real, intent (out)  :: flx(n1,n2,n3)
-
-    integer :: i, j, k, km1, kp1, ki
-    real    :: lwp(n2,n3), fact
-
-    lwp=0.
-    do j=3,n3-2
-       do i=3,n2-2
-          ki = n1
-          do k=1,n1
-             km1=max(1,k-1)
-             lwp(i,j)=lwp(i,j)+max(0.,rc(k,i,j)*dn0(k)*(zm(k)-zm(km1)))
-             flx(k,i,j)=fr1*exp(-1.*xka*lwp(i,j))
-             if ( (rc(k,i,j) > 0.01e-3) .and. (rt(k,i,j) >= 0.008) ) ki=k
-          enddo
-
-          fact = div*cp*dn0(ki)
-          do k=2,n1
-             km1=max(2,k-1)
-             lwp(i,j)=lwp(i,j)-max(0.,rc(k,i,j)*dn0(k)*(zm(k)-zm(k-1)))
-             flx(k,i,j)=flx(k,i,j)+fr0*exp(-1.*xka*lwp(i,j))
-             if (zm(k) > zm(ki) .and. ki > 1 .and. fact > 0.) then
-                flx(k,i,j)=flx(k,i,j) + fact*(0.25*(zm(k)-zm(ki))**1.333 + &
-                  zm(ki)*(zm(k)-zm(ki))**0.333333)
-             end if
-             tt(k,i,j) =tt(k,i,j)-(flx(k,i,j)-flx(km1,i,j))*dzt(k)/(dn0(k)*cp)
-          enddo
-          !
-          ! subsidence
-          !
-          if (div /= 0.) then
-             do k=2,n1-2
-                kp1 = k+1
-                tt(k,i,j) = tt(k,i,j) + &
-                        div*zt(k)*(tl(kp1,i,j)-tl(k,i,j))*dzt(k)
-                rtt(k,i,j)=rtt(k,i,j) + &
-                        div*zt(k)*(rt(kp1,i,j)-rt(k,i,j))*dzt(k)
-             end do
-          end if
-       enddo
-    enddo
-
-  end subroutine gcss_rad
   !
   ! -------------------------------------------------------------------
   ! subroutine smoke_rad:  call simple radiative parameterization for 
@@ -195,7 +168,7 @@ contains
   ! subroutine case_forcing: adjusts tendencies according to a specified
   ! large scale forcing.  Normally case (run) specific.
   !
-  subroutine case_forcing(n1,n2,n3,zt,dzt,dzm,tl,rt,tt,rtt)
+  subroutine case_forcing(n1,n2,n3,case_name,zt,dzt,dzm,tl,rt,tt,rtt)
 
     use mpi_interface, only : pecount, double_scalar_par_sum,myid, appl_abort
     use stat, only : get_zi
@@ -204,6 +177,7 @@ contains
     real, dimension (n1), intent (in)          :: zt, dzt, dzm
     real, dimension (n1,n2,n3), intent (in)    :: tl, rt
     real, dimension (n1,n2,n3), intent (inout) :: tt, rtt
+    character (len=5), intent (in) :: case_name
 
     integer :: i,j,k,kp1
     real, dimension (n1) :: sf
@@ -381,5 +355,6 @@ contains
     enddo
 
   end subroutine bellon
- 
+  
+
 end module forc

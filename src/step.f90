@@ -36,6 +36,11 @@ module step
   real    :: cntlat =  31.5 ! 30.0
   logical :: outflg = .true.
   logical :: statflg = .false.
+!irina  
+  real    :: sst=292.
+  real    :: div = 3.75e-6
+  logical :: lsvarflg = .true.
+  character (len=5) :: case_name = 'astex'
 
 contains
   ! 
@@ -66,9 +71,12 @@ contains
     !
     begtime = time
     istp = 0
-    timrsm = timrsm + begtime
-    
-    timmax = min(timmax,timrsm)
+  !irina  
+  !  timrsm = timrsm + begtime
+   
+  ! print *, 'time timrsm',time, timrsm
+  !  timmax = min(timmax,timrsm)
+  ! print *, 'timmax',timmax
 
     do while (time + 0.1*dt < timmax)
 
@@ -94,8 +102,38 @@ contains
 
        if ((mod(tplsdt,frqhis) < dt .or. time >= timmax) .and. outflg)   &
             call write_hist(2, time)
-       if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time>=timrsm .or. time==dt)   &
+       !irina     
+       !if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time>=timrsm .or. time==dt)   &
+       if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt)   &
             call write_hist(1, time)
+
+!irina more frequent outputs for certain hours in astex
+
+!       frqanl=3600.
+
+!       if (time>=7200 .and. time<=10800) then
+!       frqanl=300.
+!       end if
+ 
+!       if (time>=25200 .and. time<=28800) then
+!       frqanl=300.
+!       end if
+
+!       if (time>=39600 .and. time<=43200) then
+!       frqanl=300.
+!       end if
+
+!       if (time>=68400 .and. time<=72000) then
+!       frqanl=300.
+!       end if
+
+!       if (time>=82800 .and. time<=86400) then
+!       frqanl=300.
+!       end if
+
+!       if (time>=126000 .and. time<=129600) then
+!       frqanl=300.
+!       end if
 
        if ((mod(tplsdt,frqanl) < dt .or. time >= timmax) .and. outflg) then
           call thermo(level)
@@ -128,13 +166,16 @@ contains
          nxp, nyp, nzp, dn0,a_scr1, u0, v0, a_ut, a_vt, a_wt, zt
     use stat, only : sflg, statistics
     use sgsm, only : diffuse
-    use srfc, only : surface,sst
+    !irina
+    use srfc, only : surface
+    !use srfc, only : surface,sst
     use thrm, only : thermo
     use mcrp, only : micro
     use prss, only : poisson
     use advf, only : fadvect
     use advl, only : ladvect
     use forc, only : forcings
+    use lsvar, only : varlscale
     use util, only : velset,get_avg
 
     integer :: k
@@ -155,13 +196,23 @@ contains
 
        call tendencies(nstep)
        call thermo(level)
-       call surface      
+!irina : should I called only at nstep=3 ?
+       if (lsvarflg) then
+      ! print *, 'step', lsvarflg
+       call varlscale(time,case_name,sst,div,u0,v0)
+       end if
+       call surface(sst)      
+!       
        call diffuse
        call fadvect
        call ladvect
        if (level >= 1) then
           call thermo(level)
-          call forcings(xtime,cntlat,sst)
+!irina   
+        ! print *, 'sst bef forcing',sst     
+         !print *, "tt",a_tt(:,5,5)
+          call forcings(xtime,cntlat,sst,div,case_name)
+         !print *, "tt",a_tt(:,5,5)
           call micro(level)
        end if
        call corlos 
@@ -172,7 +223,7 @@ contains
        call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
 
     end do
-       
+ 
     if (statflg) then 
        call thermo (level)
        call statistics (time+dt)

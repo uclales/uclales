@@ -20,7 +20,8 @@
 module srfc
 
   integer :: isfctyp = 0
-  real    :: sst = 292.
+ !irina 
+ ! real    :: sst = 292.
   real    :: zrough =  0.1
   real    :: ubmin  =  0.20
   real    :: dthcon = 100.0
@@ -36,8 +37,8 @@ contains
   !     isfclyr=1: specified surface layer gradients (drtcon, dthcon)
   !     isfclyr=2: fixed lower boundary of water at certain sst
   !     isfclyr=3: bulk aerodynamic law with coefficeints (drtcon, dthcon)
-  !
-  subroutine surface
+  !irina
+  subroutine surface(sst)
 
     use defs, only: vonk, p00, rcp, g, cp, alvl, ep2
     use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, zt, psrf,   &
@@ -48,13 +49,17 @@ contains
     use mpi_interface, only : nypg, nxpg, double_array_par_sum
 
     implicit none
-
+ 
+ !irina
+    real, optional, intent (inout) :: sst
+ !   
     real :: dtdz(nxp,nyp), drdz(nxp,nyp), usfc(nxp,nyp), vsfc(nxp,nyp)       &
          ,wspd(nxp,nyp), bfct(nxp,nyp)
 
     integer :: i, j, iterate
     real    :: zs, bflx, ffact, sst1, bflx1, Vbulk, Vzt, usum
     real (kind=8) :: bfl(2), bfg(2)
+
 
     select case(isfctyp)
 

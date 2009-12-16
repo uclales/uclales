@@ -22,10 +22,13 @@ module stat
   use ncio, only : open_nc, define_nc
   use grid, only : level
   use util, only : get_avg, get_cor, get_avg3, get_cor3, get_var3, get_csum
+!irina
+!  use step, only: case_name
   implicit none
   private
 
-  integer, parameter :: nvar1 = 27, nvar2 = 92
+!irina
+  integer, parameter :: nvar1 = 30, nvar2 = 97
 
   integer, save      :: nrec1, nrec2, ncid1, ncid2, nv1=nvar1, nv2=nvar2
   real, save         :: fsttm, lsttm, nsmp = 0
@@ -34,12 +37,13 @@ module stat
   real               :: ssam_intvl = 30.   ! statistical sampling interval
   real               :: savg_intvl = 1800. ! statistical averaging interval
 
+!irina
   character (len=7), save :: s1(nvar1)=(/                           & 
        'time   ','cfl    ','maxdiv ','zi1_bar','zi2_bar','zi3_bar', & ! 1
        'vtke   ','sfcbflx','wmax   ','tsrf   ','ustar  ','shf_bar', & ! 7
        'lhf_bar','zi_bar ','lwp_bar','lwp_var','zc     ','zb     ', & !13
        'cfrac  ','lmax   ','albedo ','rwp_bar','prcp   ','pfrac  ', & !19
-       'CCN    ','nrain  ','nrcnt  '/),                             &
+       'CCN    ','nrain  ','nrcnt  ','zcmn   ','zbmn   ','tkeint '/),                             &
        s2(nvar2)=(/                                                 &
        'time   ','zt     ','zm     ','dn0    ','u0     ','v0     ', & ! 1
        'fsttm  ','lsttm  ','nsmp   ','u      ','v      ','t      ', & ! 7
@@ -56,7 +60,7 @@ module stat
        'wr_cs1 ','cs2    ','cnt_cs2','w_cs2  ','tl_cs2 ','tv_cs2 ', & !73
        'rt_cs2 ','rl_cs2 ','wt_cs2 ','wv_cs2 ','wr_cs2 ','Nc     ', & !79  
        'Nr     ','rr     ','precip ','evap   ','frc_prc','prc_prc', & !85
-       'frc_ran','hst_srf' /)
+       'frc_ran','hst_srf', 'lflxu  ','lflxd  ','sflxu  ','sflxd  ','cdsed  ' /)
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:), svctr(:,:), ssclr(:)
@@ -108,7 +112,8 @@ contains
     case (2)
        nv1 = 20
        nv2 = 83
-       if (iradtyp == 3) nv1=21
+       !irina
+       if (iradtyp == 4) nv1=21
     case default
        nv1 = nvar1
        nv2 = nvar2
@@ -138,10 +143,11 @@ contains
   !
   subroutine statistics(time)
 
+!irina
     use grid, only : a_up, a_vp, a_wp, liquid, a_theta, a_scr1, a_scr2       &
          , a_rp, a_tp, press, nxp, nyp, nzp, dzm, dzt, zm, zt, th00, umean &
          , vmean, dn0, precip, a_rpp, a_npp, albedo, CCN, iradtyp, a_rflx    &
-         , a_sflx, albedo
+         , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd
 
     real, intent (in) :: time
 
@@ -153,10 +159,16 @@ contains
     !
     call accum_stat(nzp, nxp, nyp, a_up, a_vp, a_wp, a_tp, press, umean    &
          ,vmean,th00)
-    if (iradtyp == 3) then
-       call accum_rad(nzp, nxp, nyp, a_rflx, sflx=a_sflx, alb=albedo)
-    elseif (iradtyp > 0) then
+    !irina     
+    if (iradtyp == 2 .and. level == 1) then
        call accum_rad(nzp, nxp, nyp, a_rflx)
+    end if 
+    if (iradtyp == 2 .and. level >1) then
+       call accum_rad(nzp, nxp, nyp, a_rflx, sflx=a_sflx, alb=albedo)
+    end if
+    if (iradtyp >2) then
+       call accum_rad(nzp, nxp, nyp, a_rflx, sflx=a_sflx, alb=albedo,lflxu=a_lflxu,&
+       lflxd=a_lflxd,sflxu=a_sflxu, sflxd=a_sflxd)
     end if
     if (level >=1) call accum_lvl1(nzp, nxp, nyp, a_rp)
     if (level >=2) call accum_lvl2(nzp, nxp, nyp, th00, dn0, zm, a_wp,       &
@@ -195,9 +207,13 @@ contains
     ! buoyancy flux statistics
     ! 
     ssclr(7) = 0.
+  !irina
+    ssclr(30) = 0.
     do k = 2,n1-2
        bf(k) = wtv_res(k) + wtv_sgs(k)
        ssclr(7) = ssclr(7) + (tke_res(k)+tke_sgs(k))*dn0(k)/dzt(k)
+  !irina
+       ssclr(30) = ssclr(30) + (tke_res(k)+tke_sgs(k))/dzt(k)
        svctr(k,33) = svctr(k,33) + wtv_sgs(k)*9.8/th00
     end do
     ssclr(6) = get_zi(n1, n2, n3, 4, th, bf, zm, 1.) ! minimum buoyancy flux
@@ -240,6 +256,9 @@ contains
     ssclr(18)  = zt(n1)
     ssclr(19)  = 0.
     ssclr(20)  = 0.
+!irina    
+    ssclr(28)  = 0.
+    ssclr(29)  = 0.
 
     unit = 1./real((n2-4)*(n3-4))
     do j=3,n3-2
@@ -255,8 +274,18 @@ contains
              end if
           end do
           ssclr(19) = ssclr(19) + cpnt
+!irina
+        if (cpnt.ne.0) then
+        ssclr(28) = ssclr(28)+ssclr(17)
+        ssclr(29) = ssclr(29)+ssclr(18)
+  !      print *,i,j,ssclr(28),ssclr(29)
+        end if
        end do
     end do
+!irina
+  !  print *,'mean',ssclr(28),ssclr(19),unit
+     ssclr(28) =ssclr(28)/ssclr(19)*unit
+     ssclr(29) =ssclr(29)/ssclr(19)*unit
 
     if (ssclr(18) == zt(n1)) ssclr(18) = -999.
 
@@ -288,7 +317,9 @@ contains
        do i=3,n2-2
           do k=1,n1
              a3(k)=a3(k) + w(k,i,j)**3
-             b3(k)=b3(k) + (t(k,i,j)-a1(k))**3
+!irina             
+             !b3(k)=b3(k) + (t(k,i,j)-a1(k))**3
+             b3(k)=b3(k) + (t(k,i,j)-c1(k))**3
           end do
        end do
     end do
@@ -309,11 +340,13 @@ contains
   ! SUBROUTINE ACCUM_STAT: Accumulates various statistics over an 
   ! averaging period for radiation variables
   !
-  subroutine accum_rad(n1,n2,n3,rflx,sflx,alb)
+  subroutine accum_rad(n1,n2,n3,rflx,sflx,alb,lflxu,lflxd,sflxu,sflxd)
 
     integer, intent (in) :: n1,n2,n3
     real, intent (in)    :: rflx(n1,n2,n3)
-    real, optional, intent (in) :: sflx(n1,n2,n3), alb(n2,n3)
+ !irina   
+    real, optional, intent (in) :: sflx(n1,n2,n3), alb(n2,n3), lflxu(n1,n2,n3),&
+                                   lflxd(n1,n2,n3),sflxu(n1,n2,n3),sflxd(n1,n2,n3) 
 
     integer :: k
     real    :: a1(n1),a2(n1)
@@ -334,7 +367,33 @@ contains
        end do
        ssclr(21) = get_avg(1,n2,n3,1,alb)
     end if
-    
+!irina
+    if (present(lflxu)) then
+    call get_avg3(n1,n2,n3,lflxu,a1)
+    do k=1,n1
+          svctr(k,93)=svctr(k,93) + a1(k)
+    end do
+    end if
+  if (present(lflxd)) then
+    call get_avg3(n1,n2,n3,lflxd,a1)
+    do k=1,n1
+          svctr(k,94)=svctr(k,94) + a1(k)
+    end do
+    end if
+  if (present(sflxu)) then
+    call get_avg3(n1,n2,n3,sflxu,a1)
+    do k=1,n1
+          svctr(k,95)=svctr(k,95) + a1(k)
+    end do
+  end if
+  if (present(sflxd)) then
+    call get_avg3(n1,n2,n3,sflxd,a1)
+    do k=1,n1
+          svctr(k,96)=svctr(k,96) + a1(k)
+    end do
+  end if
+
+
   end subroutine accum_rad
   !
   !---------------------------------------------------------------------
@@ -595,6 +654,7 @@ contains
              xrain = max(0.,rr(k,i,j))
              !irina
              !xaqua = max(0.,rc(k,i,j))
+             !old
              xaqua = max(xrain,rc(k,i,j))
              scr1(i,j)=scr1(i,j)+xaqua*dn0(k)*(zm(k)-zm(km1))*1000.
              scr2(i,j)=scr2(i,j)+xrain*dn0(k)*(zm(k)-zm(km1))*1000.
@@ -1093,6 +1153,9 @@ contains
           nn = 88
        case (3)
           nn = 63
+       !irina   
+       case (5)
+          nn = 97  !cloud droplet sed flux
        case default
           nn = 0
        end select

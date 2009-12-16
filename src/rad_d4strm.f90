@@ -155,7 +155,6 @@ contains
     if(present(useMcICA)) McICA = useMcICA
     
     fdir(:) = 0.0; fuir(:) = 0.0
-    
     call thicks(pp, pt, ph, dz) 
 
     if (McICA) then
@@ -208,7 +207,7 @@ contains
          else
             xir_norm = gPointWeight(ir_bands(ib), ig)
          end if
-         
+        
          fdir(:) = fdir(:) + fd1(:) * xir_norm
          fuir(:) = fuir(:) + fu1(:) * xir_norm
       end do gPointLoop

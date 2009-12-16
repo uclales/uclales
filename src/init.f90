@@ -26,7 +26,7 @@ module init
   integer               :: iseed = 0
   integer               :: ipsflg = 1
   integer               :: itsflg = 1
-  integer, dimension(1) :: seed
+!  integer, dimension(1) :: seed
   real, dimension(nns)  :: us,vs,ts,thds,ps,hs,rts,rss,tks,xs
   real                  :: zrand = 200.
   character  (len=80)   :: hfilin = 'test.'  
@@ -38,11 +38,12 @@ contains
   ! ation routines.  it initializes the model according to runtype
   !
   subroutine initialize
-
-    use step, only : time, outflg
+!irina use lsvarflg
+    use step, only : time, outflg,lsvarflg
     use stat, only : init_stat
     use mpi_interface, only : appl_abort, myid
     use thrm, only : thermo
+!
 
     implicit none
 
@@ -60,6 +61,11 @@ contains
     end if
     call sponge_init
     call init_stat(time+dt,filprf,expnme,nzp)
+    !
+    !irina
+       if (lsvarflg) then
+       call lsvar_init
+       end if
     !    
     ! write analysis and history files from restart if appropriate
     ! 
@@ -375,7 +381,7 @@ contains
     do k=2,nzp
        pi1(k) = pi1(k-1)-g/(dzm(k-1)*0.5*(v1dc(k)+v1dc(k-1)))
     end do
-    ! 
+    !
     ! calculate hydrostatic exner function associated with th00 constant along
     ! with associated basic state density
     !
@@ -471,6 +477,7 @@ contains
 
     use util, only : sclrset
     implicit none
+    integer, allocatable :: seed(:)
 
     integer, intent(in) :: n1,n2,n3,kmx
     real, intent(inout) :: fld(n1,n2,n3)
@@ -478,13 +485,19 @@ contains
 
     real (kind=8) :: rand(3:n2-2,3:n3-2),  xx, xxl
     real (kind=8), allocatable :: rand_temp(:,:)
-    integer :: i,j,k,n2g,n3g
+    integer :: i,j,k,n,n2g,n3g
 
     rand=0.0
+
+    call random_seed(size=n)
+    allocate (seed(n))
+    seed = iseed * (/ (i, i = 1, n) /)
+    call random_seed(put=seed)
+    deallocate (seed)
     ! seed must be a double precision odd whole number greater than 
     ! or equal to 1.0 and less than 2**48.
-    seed(1) = iseed
-    call random_seed(put=seed)
+    !seed(1) = iseed        
+    !call random_seed(put=seed)
     n2g = nxpg
     n3g = nypg
 
@@ -524,5 +537,36 @@ contains
          /3x,'with test value of: ',E12.5,                     &
          /3x,'and a magnitude of: ',E12.5)
   end subroutine random_pert
+
+!irina
+  !----------------------------------------------------------------------
+  ! Lsvar_init if lsvarflg is true reads the lsvar forcing from the respective
+  ! file lscale_in
+  ! 
+  subroutine lsvar_init
+
+   use forc,only   : t_ls,div_ls,sst_ls,ugeo_ls,vgeo_ls
+
+    implicit none
+    
+    ! reads the time varying lscale forcings
+    !
+    if (t_ls(2) == 0.) then
+       open (1,file='lscale_in',status='old',form='formatted')
+         ! print *, 'lsvar_init read'                 
+       do ns=1,nns
+          read (1,*,end=100) t_ls(ns),div_ls(ns),sst_ls(ns),&
+                             ugeo_ls(ns),vgeo_ls(ns)
+          !print *, t_ls(ns),div_ls(ns),sst_ls(ns), ugeo_ls(ns),vgeo_ls(ns)                 
+       end do
+       close (1)
+    end if
+100 continue
+ 
+    return
+  end subroutine lsvar_init
+
+  !
+
 
 end module init

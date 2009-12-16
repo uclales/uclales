@@ -78,9 +78,12 @@ contains
 
     use util, only : fftinix,fftiniy
     use sgsm, only : csx, prndtl
-    use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon, sst
+    !irina
+    use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon
+    !use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon, sst
     use step, only : timmax, timrsm, istpfl, corflg, outflg, frqanl, frqhis,          &
-         strtim, radfrq, cntlat
+         strtim, radfrq, cntlat,& 
+         case_name,lsvarflg, sst, div                                   !irina
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
          filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype, CCN
@@ -114,7 +117,10 @@ contains
          ipsflg , itsflg ,          & ! sounding flags
          hs     , ps     , ts    ,  & ! sounding heights, pressure, temperature
          us     , vs     , rts   ,  & ! sounding E/W winds, water vapor
-         umean  , vmean  , th00       ! gallilean E/W wind, basic state
+         umean  , vmean  , th00  ,  & ! gallilean E/W wind, basic state
+         case_name,                 & !irina:name of the case, i.e. astex, rico, etc  
+         lsvarflg,                  & !irina:flag for time bvarying large scale forcing  
+         div                          !irina: divergence  
 
     ps       = 0.
     ts       = th00
