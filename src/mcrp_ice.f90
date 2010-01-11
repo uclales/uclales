@@ -133,6 +133,7 @@ contains
     real, dimension(n1,n2,n3), intent (inout),optional :: ninuct,micet,nicet,msnowt,nsnowt,mgrt,ngrt,&
                                                           ninucp,micep,nicep,msnowp,nsnowp,mgrp,ngrp
     integer :: i, j, k
+    real    :: s_i   !Ice saturation mixing ratio
     logical :: do_icemicro = .false.
     if (present(ninucp)) do_icemicro = .true.
     !
@@ -150,6 +151,14 @@ contains
           end do
        end do
     end do 
+    do j=3,n3-2
+      do i=3,n2-2 
+        do k=1,n1
+          rtt = rtt + rpt
+          tlt = tlt - alvl/(cp*a_pexnr(k,i,j)) * rpt
+          end do
+       end do
+    end do 
 
     call wtr_dff_SB(n1,n2,n3,dn0,rp,np,rc,rs,rv,tk,rpt,npt)
 
@@ -160,6 +169,15 @@ contains
     call sedim_rd(n1,n2,n3,dt,dn0,rp,np,tk,th,rrate,rtt,tlt,rpt,npt)
    
     if (droplet_sedim) call sedim_cd(n1,n2,n3,dt,th,tk,rc,rrate,rtt,tlt)
+    
+    do j=3,n3-2
+      do i=3,n2-2 
+        do k=1,n1
+          rtt(k,i,j) = rtt(k,i,j) - rpt(k,i,j)
+          tlt(k,i,j) = tlt(k,i,j) + alvl/(cp*a_pexnr(k,i,j)) * rpt(k,i,j)
+          end do
+       end do
+    end do 
     
     if (do_icemicro) then   !ice microphysics
       tlt    = tlt    - thl/dt
@@ -177,17 +195,20 @@ contains
       do j=3,n3-2
         do i=3,n2-2 
             do k=1,n1
+              s_i = (rv(k,i,j)-rs(k,i,j))/rv(k,i,j)
+              call ice_nucleation(tk(k,i,j),s_i,nicep(k,i,j),micep(k,i,j),rpt(k,i,j))
               
-              call ice_nucleation(tk(k,i,j),(rv(k,i,j)-rs(k,i,j))/rv(k,i,j),nicep(k,i,j),micep(k,i,j),rpt(k,i,j))
-              call melting
-              call freezing
-              call sublimation
-              call riming
-              call immersion
-              call autoconversion
-              call accretion
-              call sed_snow
-              call sed_graupel
+!               call melting
+!               call freezing
+!               call sublimation
+!               call riming
+!               call immersion
+!               call autoconversion
+!               call accretion
+!               call sed_snow
+!               call sed_graupel
+!               call ...
+!               call ...
             end do
         end do
       end do 
@@ -204,93 +225,6 @@ contains
       ngrt   = ngrt   + ngrp/dt 
     end if
   end subroutine mcrph
- 
-!     !*******************************************************************************
-!     !                                                                              *
-!     !       berechnung der nukleation der wolkeneispartikel                        *
-!     !                                                                              *
-!     !*******************************************************************************
-! 
-!     use globale_variablen,  only: loc_ix, loc_iy, loc_iz, t, p, q,                &
-!          &                        q_cloud,q_ice,q_rain,q_snow,q_graupel,          &
-!          &                        n_ice, n_snow, p_g, t_g, rho_g,w,rho,dz3d,dt,   &
-!          &                        s_i,s_w,dsidz,dt0dz,                            &
-!          &                        dqdt,speichere_umwandlungsraten,                &
-!          &                        cond_neu_sb, evap_neu_sb, speichere_precipstat
-!     use konstanten,         only: r,cv,cp,wolke_typ 
-!     use parallele_umgebung, only: isio,abortparallel
-!     use initialisierung,    only: t_0,p_0,rho_0,dichte
-!     use geometrie,          only: x3_x3
-! 
-!     implicit none
-! 
-!     ! locale variablen 
-!     double precision            :: q_si            !..wasserdampfdichte bei eissaettigung
-!     double precision            :: e_si            !..wasserpartialdruck bei eissaettigung
-!     double precision            :: p_a,rho_a,q_d,e_d,dtdz_w,dsdz_w
-!     double precision            :: nuc_n, nuc_q
-!     double precision            :: ld,dl
-!     integer                     :: i,j,k,nuc_typ,stat_var
-! 
-!     double precision, parameter :: md = -0.639
-!     double precision, parameter :: b_md = 12.960
-!     double precision, parameter :: n_m0 = 1.0d+3
-!     double precision, parameter :: eps  = 1.d-20
-! 
-!     dl = r_d/r_l
-!     ld = 1.0/dl
-! 
-!     nuc_typ = nuc_i_typ
-! 
-!     if(isio() .and. isdebug)then
-!       if (nuc_typ == 1) then
-!         write (6, *) "cloud ice_nucleation: fletcher-formel"
-!       elseif (nuc_typ == 2) then
-!         write (6, *) "cloud ice_nucleation: meyers-formel" 
-!       elseif (nuc_typ == 3) then
-!         write (6, *) "cloud ice_nucleation: cooper-formel" 
-!       else
-!         write (6, *) "cloud ice_nucleation: nuc_typ = ",nuc_typ
-!       endif
-!       write (6,*) "cloud ice_nucleation: max s_i    = ", maxval(s_i(:,1,1))
-!     end if
-  subroutine ice_nucleation(t_0,s_i,n_ice,q_ice,q)
-    real, intent(in) :: t_0, s_i
-    real, intent(inout) :: n_ice, q_ice, q
-    real :: nuc_n, nuc_q
-    
-    if (t_0 < t_nuc .and. s_i > 0.0) then
-      nuc_n = 0d0
-      nuc_n = max(n_ice_meyers_contact(t_0,min(s_i,0.25d0)) - (n_ice),0.d0)
-
-      nuc_q = min(nuc_n * ice%x_min, q)
-      !nuc_n = nuc_q / ice%x_min                !axel 20040416
-
-      n_ice = n_ice + nuc_n
-      q_ice = q_ice + nuc_q
-      q     = q     - nuc_q
-
-    endif
-
-  end subroutine ice_nucleation
-  
-  real function n_ice_meyers_contact(t_a,s)
-    ! diagnostische beziehung fuer anzahldichte der eisteilchen nach meyers (1992) 
-! 
-    real, intent(in):: s,t_a
-    real, parameter :: n_0 = 1.0d+3 
-    real, parameter :: n_m = 1.0d+3 
-    real, parameter :: a_d = -0.639
-    real, parameter :: b_d = 12.960
-    real, parameter :: c_d = -2.8
-    real, parameter :: d_d = 0.262
-    real, parameter :: t_3  = 2.732d+2     !..tripelpunkt wasser
-
-    n_ice_meyers_contact = n_0 * exp( a_d + b_d * s )         &
-          &               + n_m * exp( c_d + d_d * (t_a - t_3) )
-
-!     return
-  end function n_ice_meyers_contact
 
   subroutine melting
   end subroutine melting
@@ -739,5 +673,43 @@ contains
     end do
 
   end subroutine sedim_cd
+ 
+  subroutine ice_nucleation(t_0,s_i,n_ice,q_ice,q)
+    real, intent(in) :: t_0, s_i
+    real, intent(inout) :: n_ice, q_ice, q
+    real :: nuc_n, nuc_q
+    
+    if (t_0 < t_nuc .and. s_i > 0.0) then
+      nuc_n = 0d0
+      nuc_n = max(n_ice_meyers_contact(t_0,min(s_i,0.25d0)) - (n_ice),0.d0)
+
+      nuc_q = min(nuc_n * ice%x_min, q)
+      !nuc_n = nuc_q / ice%x_min                !axel 20040416
+
+      n_ice = n_ice + nuc_n
+      q_ice = q_ice + nuc_q
+      q     = q     - nuc_q
+
+    endif
+
+  end subroutine ice_nucleation
+  
+  real function n_ice_meyers_contact(t_a,s)
+    ! diagnostische beziehung fuer anzahldichte der eisteilchen nach meyers (1992) 
+! 
+    real, intent(in):: s,t_a
+    real, parameter :: n_0 = 1.0d+3 
+    real, parameter :: n_m = 1.0d+3 
+    real, parameter :: a_d = -0.639
+    real, parameter :: b_d = 12.960
+    real, parameter :: c_d = -2.8
+    real, parameter :: d_d = 0.262
+    real, parameter :: t_3  = 2.732d+2     !..tripelpunkt wasser
+
+    n_ice_meyers_contact = n_0 * exp( a_d + b_d * s )         &
+          &               + n_m * exp( c_d + d_d * (t_a - t_3) )
+
+!     return
+  end function n_ice_meyers_contact
  
 end module mcrp
