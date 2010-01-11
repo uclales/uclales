@@ -1,0 +1,24 @@
+#!/bin/ksh
+
+# @ shell = /usr/bin/ksh
+# @ class = cluster
+# @ job_type = parallel
+# @ job_name = les3.2.1RF02
+# @ output   = $(job_name).$(jobid).out
+# @ error    = $(job_name).$(jobid).err
+# @ notification = complete
+# @ notify_user = irina.sandu@zmaw.de
+# @ wall_clock_limit = 08:00:00
+# @ node_usage = not_shared
+# @ network.MPI = sn_all,not_shared,us
+# @ tasks_per_node = 32
+# @ node = 2
+# @ resources = ConsumableMemory(0.75gb)
+# @ task_affinity = core(1)		
+# @ queue
+
+filepath=`pwd`
+cd /scratch/m/m300022/TRANS
+
+
+timex poe /pf/m/m300022/UCLA_LES3.2.1a/bin/les.mpi
