@@ -256,7 +256,8 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('q')
        if (itype==0) ncinfo = 'Total water mixing ratio'
-       if (itype==1) ncinfo = 'kg/kg'
+!irina
+       if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
     case('l')
        if (itype==0) ncinfo = 'Liquid water mixing ratio'
@@ -298,6 +299,11 @@ contains
        if (itype==0) ncinfo = 'Vertical integral of total TKE'
        if (itype==1) ncinfo = 'kg/s'
        if (itype==2) ncinfo = 'time'
+!irina       
+    case('tkeint')
+       if (itype==0) ncinfo = 'Vertical integral of total TKE non-weighted'
+       if (itype==1) ncinfo = 'm3/s2'
+       if (itype==2) ncinfo = 'time'
     case('sfcbflx')
        if (itype==0) ncinfo = 'Surface Buoyancy Flux'
        if (itype==1) ncinfo = 'm/s^2'
@@ -328,11 +334,15 @@ contains
        if (itype==2) ncinfo = 'time'
     case('lwp_bar')
        if (itype==0) ncinfo = 'Liquid-water path'
-       if (itype==1) ncinfo = 'kg/m^2'
+       !irina
+       if (itype==1) ncinfo = 'g/m^2'
+       !if (itype==1) ncinfo = 'kg/m^2'
        if (itype==2) ncinfo = 'time'
     case('lwp_var')
        if (itype==0) ncinfo = 'Liquid-water path variance'
-       if (itype==1) ncinfo = 'kg/m^2'
+       !irina
+       if (itype==1) ncinfo = 'g/m^2'
+       !if (itype==1) ncinfo = 'kg/m^2'
        if (itype==2) ncinfo = 'time'
     case('zc')
        if (itype==0) ncinfo = 'Cloud-top height'
@@ -340,6 +350,15 @@ contains
        if (itype==2) ncinfo = 'time'
     case('zb')
        if (itype==0) ncinfo = 'Cloud-base height'
+       if (itype==1) ncinfo = 'm'
+       if (itype==2) ncinfo = 'time'
+!irina       
+    case('zcmn')
+       if (itype==0) ncinfo = 'Mean Cloud-top height'
+       if (itype==1) ncinfo = 'm'
+       if (itype==2) ncinfo = 'time'
+    case('zbmn')
+       if (itype==0) ncinfo = 'Mean Cloud-base height'
        if (itype==1) ncinfo = 'm'
        if (itype==2) ncinfo = 'time'
     case('cfrac')
@@ -356,11 +375,15 @@ contains
        if (itype==2) ncinfo = 'time'
     case('rwp_bar')
        if (itype==0) ncinfo = 'Rain-water path'
-       if (itype==1) ncinfo = 'kg/m^2'
+     !  if (itype==1) ncinfo = 'kg/m^2'
+       !irina
+       if (itype==1) ncinfo = 'g/m^2'
        if (itype==2) ncinfo = 'time'
     case('prcp')
        if (itype==0) ncinfo = 'Surface precipitation rate'
-       if (itype==1) ncinfo = 'W/m^2'
+    !irina   
+       if (itype==1) ncinfo = 'kg/kg m/s'
+      ! if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
     case('pfrac')
        if (itype==0) ncinfo = 'Precipitation fraction'
@@ -554,12 +577,30 @@ contains
        if (itype==0) ncinfo =  'Total Radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
+       !irina
+    case('lflxu')  
+       if (itype==0) ncinfo =  'Longwave Radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'ttmt'
+    case('lflxd')  
+       if (itype==0) ncinfo =  'Longwave Radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'ttmt'
     case('rflx2')  
        if (itype==0) ncinfo = 'Variance of total radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
     case('sflx')   
        if (itype==0) ncinfo = 'Shortwave radiative flux'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'ttmt'
+    !irina   
+    case('sflxu')   
+       if (itype==0) ncinfo = 'Shortwave radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'ttmt'
+    case('sflxd')   
+       if (itype==0) ncinfo = 'Shortwave radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
     case('sflx2')  
@@ -676,7 +717,8 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('precip') 
        if (itype==0) ncinfo = 'Precipitation Flux (positive downward'
-       if (itype==1) ncinfo = 'm/s'
+       !irina
+       if (itype==1) ncinfo = 'kg/kg m/s'
        if (itype==2) ncinfo = 'ttmt'
     case('evap')   
        if (itype==0) ncinfo = 'Net evap  of rain-water'
@@ -698,6 +740,12 @@ contains
        if (itype==0) ncinfo = 'Histogram of surface rain rates'
        if (itype==1) ncinfo = '-'
        if (itype==2) ncinfo = 'tttt'
+       !irina
+    case('cdsed') 
+       if (itype==0) ncinfo = 'Sedimentation Flux (positive downward)'
+       if (itype==1) ncinfo = 'kg/kg m/s'
+       if (itype==2) ncinfo = 'ttmt'
+
     case default
        if (myid==0) print *, 'ABORTING: variable not found '
        call appl_abort(0)

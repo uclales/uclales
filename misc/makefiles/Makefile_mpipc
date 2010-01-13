@@ -21,8 +21,8 @@ ifeq ($(ARCH),Linux)
   COMPILER  := 'IFORT'
   ARCHIVE   = ar rs
   RANLIB    =:
-  ifeq ($(COMPILER),'NAG')
-     F90      = /sw/etch-ia32/NAG/NAGWare-5.1.365/bin/nagf95
+  ifeq ($(COMPILER),'nagfor')
+     F90      = nagfor
      NCDF     = /sw/etch-ia32/netcdf-3.6.2-nag
      DEBUG    = -C=all -gline -nan
      FFLAGS   = $(DEBUG) -O3 -kind=byte $(NCDFINC) -Oassumed=always_contig
@@ -45,10 +45,11 @@ ifeq ($(ARCH),Linux)
      SEQFFLAGS = -I$(SRC)/seq -module $(SRC)/seq
      MPIFFLAGS = -I$(SRC)/mpi -module $(SRC)/mpi
      FFLAGS   = -O3 -r8 -diag-disable remark $(NCDFINC)
+     FFLAGS   = -g -r8 -diag-disable remark $(NCDFINC)
      F77FLAGS = -fixed
   endif
-  NCDFLIB   = -L$(NCDF)/lib  -lnetcdf -lnetcdff
-  NCDFINC   = -I$(NCDF)/include
+  NCDFLIB   = -L$(NCDF)/lib -static -lnetcdff -lnetcdf 
+  NCDFINC   = -I$(NCDF)/include 
   LIBS      = $(NCDFLIB)
   MPILIBS   = $(LIBS)
 endif

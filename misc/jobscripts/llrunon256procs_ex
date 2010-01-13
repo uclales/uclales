@@ -1,0 +1,44 @@
+#!/bin/ksh
+
+# @ shell = /usr/bin/ksh
+# @ class = cluster
+# @ job_type = parallel
+# @ job_name = les3.2.1Dct
+# @ output   = $(job_name).$(jobid).out
+# @ error    = $(job_name).$(jobid).err
+# @ notification = complete
+# @ notify_user = irina.sandu@zmaw.de
+# @ wall_clock_limit = 08:00:00
+# @ node_usage = not_shared
+# @ network.MPI = sn_all,not_shared,us
+# @ tasks_per_node = 32
+# @ node = 8
+# @ resources = ConsumableMemory(0.75gb)
+# @ task_affinity = core(1)		
+# @ queue
+
+filepath=`pwd`
+cd /scratch/m/m300022/TRANS
+
+
+timex poe /pf/m/m300022/UCLA_LES3.2.1a/bin/les.mpi
+
+echo $filepath
+n_submit=`cat ${filepath}/nsubmit.dat`
+n_maxsubmit=`cat ${filepath}/nmaxsubmit.dat`
+n_time=`cat ${filepath}/ntime.dat`
+nmaxsubmit=$(( n_maxsubmit - 1 ))
+echo $n_submit
+if [ n_submit -lt ${n_maxsubmit} ]; then
+n_time_ini=$n_time
+n_time=$(( n_time + 3600 ))
+n_submit=$(( n_submit + 1 ))
+echo 'llsubmit llrunon256procs'
+echo $n_submit > ${filepath}/nsubmit.dat
+echo $n_time > ${filepath}/ntime.dat
+ sed -e 's/'${n_time_ini}'/'${n_time}'/g' NAMELIST_test > NAMELIST${n_submit}
+cp NAMELIST${n_submit}  NAMELIST_test
+cp NAMELIST${n_submit}  NAMELIST
+cd $filepath
+llsubmit llrunon256procs
+fi

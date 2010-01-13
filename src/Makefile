@@ -22,7 +22,9 @@ $(LES_ARC)(util.o)   \
 $(LES_ARC)(grid.o)   \
 $(LES_ARC)(stat.o)   \
 $(LES_ARC)(thrm.o)   \
+$(LES_ARC)(rad_gcss.o)   \
 $(LES_ARC)(forc.o)   \
+$(LES_ARC)(lsvar.o)   \
 $(LES_ARC)(advf.o)   \
 $(LES_ARC)(advl.o)   \
 $(LES_ARC)(srfc.o)   \
@@ -69,3 +71,4 @@ rad_cldwtr.o: rad_cldwtr.f90 defs.f90 rad_corkds.f90
 rad_d4strm.o: rad_d4strm.f90 defs.f90 rad_solver.f90 rad_rndnmb.f90
 	rad_corkds.f90 rad_cldwtr.f90
 rad_driver.o: rad_driver.f90 defs.f90 rad_d4strm.f90
+forc.o: forc.f90 rad_gcss.f90 

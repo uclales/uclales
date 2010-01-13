@@ -28,7 +28,8 @@ module mcrp
   use util, only : get_avg3, azero
   implicit none
 
-  logical, parameter :: droplet_sedim = .False., khairoutdinov = .False., turbulence = .False.
+  logical, parameter :: droplet_sedim = .true., khairoutdinov = .false., turbulence = .false.
+  !logical, parameter :: droplet_sedim = .False., khairoutdinov = .False., turbulence = .False.
   ! 
   ! drop sizes definition is based on vanZanten (2005)
   ! cloud droplets' diameter: 2-50 e-6 m
@@ -61,7 +62,7 @@ contains
 
     select case (level) 
     case(2)
-       if (droplet_sedim) call sedim_cd(nzp,nxp,nyp,dt,a_theta,a_scr1,      &
+       if (droplet_sedim) call sedim_cd(nzp,nxp,nyp,dn0,dt,a_theta,a_scr1,      &
             liquid,precip,a_rt,a_tt)     
     case(3)
        call mcrph(nzp,nxp,nyp,dn0,a_theta,a_scr1,vapor,a_scr2,liquid,a_rpp, &
@@ -109,7 +110,7 @@ contains
   
     call sedim_rd(n1,n2,n3,dt,dn0,rp,np,tk,th,rrate,rtt,tlt,rpt,npt)
    
-    if (droplet_sedim) call sedim_cd(n1,n2,n3,dt,th,tk,rc,rrate,rtt,tlt)
+    if (droplet_sedim) call sedim_cd(n1,n2,n3,dn0,dt,th,tk,rc,rrate,rtt,tlt)
 
   end subroutine mcrph
   ! 
@@ -330,7 +331,9 @@ contains
                 !
                 ! Khairoutdinov and Kogan
                 !
-                !ac = Cac * (rc(k,i,j) * rp(k,i,j))**Eac
+                if (khairoutdinov) then
+                ac = Cac * (rc(k,i,j) * rp(k,i,j))**Eac
+                end if
                 !
                 rpt(k,i,j) = rpt(k,i,j) + ac
                 
@@ -404,9 +407,14 @@ contains
               !
               ! Set fall speeds following Khairoutdinov and Kogan
 
+!              if (khairoutdinov) then
+!                 vn(k) = max(0.,an * Dp + bn)
+!                 vr(k) = max(0.,aq * Dp + bq)
+!              end if
+!irina-olivier
               if (khairoutdinov) then
-                 vn(k) = max(0.,an * Dp + bn)
-                 vr(k) = max(0.,aq * Dp + bq)
+                 vn(k) = max(0.,an * Dm + bn)
+                 vr(k) = max(0.,aq * Dm + bq)
               end if
 
            end do
@@ -478,7 +486,10 @@ contains
 
               npt(k,i,j) = npt(k,i,j)-(nfl(kp1)-nfl(k))*dzt(k)/dn0(k)
 
-              rrate(k,i,j)    = -rfl(k) * alvl*0.5*(dn0(k)+dn0(kp1))
+!irina sends out the rrate in kg/hg m/s, in order to avoid double multiplication
+!by Lv dn0, as this is done also in stat.f90
+              rrate(k,i,j)    = -rfl(k) 
+              !rrate(k,i,j)    = -rfl(k) * alvl*0.5*(dn0(k)+dn0(kp1))
               if (sflg) v1(k) = v1(k) + rrate(k,i,j)*xnpts
 
            end do
@@ -494,21 +505,34 @@ contains
   ! SEDIM_CD: calculates the cloud-droplet sedimentation flux and its effect
   ! on the evolution of r_t and theta_l assuming a log-normal distribution
   ! 
- 
-  subroutine sedim_cd(n1,n2,n3,dt,th,tk,rc,rrate,rtt,tlt)
+!irina:add dn0, v1 
+  subroutine sedim_cd(n1,n2,n3,dn0,dt,th,tk,rc,rrate,rtt,tlt)
 
     integer, intent (in):: n1,n2,n3
     real, intent (in)                        :: dt
+    !irina
+    real, intent (in),    dimension(n1)       :: dn0
     real, intent (in),   dimension(n1,n2,n3) :: th,tk,rc
-    real, intent (out),  dimension(n1,n2,n3) :: rrate
+    !irina
+    real, intent (inout),  dimension(n1,n2,n3) :: rrate
+    !real, intent (out),  dimension(n1,n2,n3) :: rrate
+    !
     real, intent (inout),dimension(n1,n2,n3) :: rtt,tlt
 
     real, parameter :: c = 1.19e8 ! Stokes fall velocity coef [m^-1 s^-1]
     real, parameter :: sgg = 1.2  ! geometric standard dev of cloud droplets
 
     integer :: i, j, k, kp1
-    real    :: Dc, Xc, vc, flxdiv
-    real    :: rfl(n1)
+    real    :: Dc, Xc, vc, flxdiv,xnpts
+    real    :: rfl(n1),v1(n1)
+
+     if(sflg) then
+       xnpts = 1./((n3-4)*(n2-4))
+       do k=1,n1
+          v1(k) = 0.
+       end do
+    end if
+
 
     !
     ! calculate the precipitation flux and its effect on r_t and theta_l
@@ -527,10 +551,18 @@ contains
              flxdiv = (rfl(kp1)-rfl(k))*dzt(k)
              rtt(k,i,j) = rtt(k,i,j)-flxdiv
              tlt(k,i,j) = tlt(k,i,j)+flxdiv*(alvl/cp)*th(k,i,j)/tk(k,i,j)
-             rrate(k,i,j) = -rfl(k)  
+             !irina , stores the sedimentation flux in kg/kg m/s
+             !rrate(k,i,j) = rrate(k,i,j)-rfl(k)*alvl*0.5*(dn0(k)+dn0(kp1)) 
+              if (sflg) v1(k) = v1(k) + (-rfl(k))*xnpts
+             !old 
+             !rrate(k,i,j) = -rfl(k)  
+             !
           end do
        end do
     end do
+
+!irina
+     if (sflg) call updtst(n1,'prc',5,v1,1)
 
   end subroutine sedim_cd
  

@@ -1,0 +1,37 @@
+ &model
+  nzp =   160
+  nxp =   68 
+  nyp =   68
+  nxpart = .True.
+  deltax = 50.
+  deltay = 50.
+  deltaz = 20.
+  dzrat = 1.
+  dzmax = 2000.
+  dtlong = 2.
+  distim = 100.
+  timmax = 144400.
+  runtype = "INITIAL"
+  igrdtyp = 1
+  level = 3
+  CCN = 100.e6
+  filprf = 'astx40'
+  hfilin = 'astx40.rst'
+  savg_intvl = 3600.
+  ssam_intvl = 60.
+  corflg = .true.
+  prndtl = -0.3333333
+  iradtyp = 4
+  strtim= 165. 
+  th00 = 289.  
+  umean = -2.
+  vmean = -7.
+  cntlat=34.
+  isfctyp=2  
+  zrough = 0.001229
+  dthcon = 0.001094
+  drtcon = 0.001133
+  case_name='astex'
+  lsvarflg=.true.
+  div=0.000005
+ /

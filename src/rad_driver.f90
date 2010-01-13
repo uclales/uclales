@@ -23,7 +23,9 @@ module radiation
   use fuliou, only     : rad
   implicit none
 
-  character (len=19), parameter :: background = 'datafiles/dsrt.lay'
+  character (len=19), parameter :: background = 'datafiles/kmls.lay'
+ ! character (len=19), parameter :: background = 'datafiles/astx.lay'
+ !  character (len=19), parameter :: background = 'datafiles/dsrt.lay'
 
   logical, save     :: first_time = .True.
   real, allocatable, save ::  pp(:), pt(:), ph(:), po(:), pre(:), pde(:), &
@@ -35,15 +37,15 @@ module radiation
   contains
 
     subroutine d4stream(n1, n2, n3, alat, time, sknt, sfc_albedo, CCN, dn0, &
-         pi0, pi1, dzm, pip, tk, rv, rc, tt, rflx, sflx, albedo, rr)
+         pi0, pi1, dzm, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,sflxd, albedo, rr)
 
 
       integer, intent (in) :: n1, n2, n3
       real, intent (in)    :: alat, time, sknt, sfc_albedo, CCN
       real, dimension (n1), intent (in)                 :: dn0, pi0, pi1, dzm
-      real, dimension (n1,n2,n3), intent (in)           :: pip, tk, rv, rc
+      real, dimension (n1,n2,n3), intent (in)           :: pip, th, rv, rc
       real, optional, dimension (n1,n2,n3), intent (in) :: rr
-      real, dimension (n1,n2,n3), intent (inout)        :: tt, rflx, sflx
+      real, dimension (n1,n2,n3), intent (inout)        :: tt, rflx, sflx, lflxu, lflxd, sflxu, sflxd 
       real, intent (out)                                :: albedo(n2,n3)
 
       integer :: kk
@@ -83,7 +85,10 @@ module radiation
             pp(nv1) = 0.5*(pres(1)+pres(2)) / 100.
             do k=2,n1
                kk = nv-(k-2)
-               pt(kk) = tk(k,i,j)
+               !irina
+               pt(kk) = th(k,i,j)*exner(k)
+               !old
+             !  pt(kk) = tk(k,i,j)
                ph(kk) = rv(k,i,j)
                if (present(rr)) then
                   plwc(kk) = 1000.*dn0(k)*max(0.,(rc(k,i,j)-rr(k,i,j)))
@@ -98,13 +103,28 @@ module radiation
             end do
             pp(nv-n1+2) = pres(n1)/100. - 0.5*(pres(n1-1)-pres(n1)) / 100.
 
+            !print *, "pp",pp(:)
+            !print *, "pt",pt(:)
+            !print *, "ph",ph(:)
+            !print *, "po",po(:)
+            !print *, "plwc",plwc(:)
+            !print *, "pre",pre(:)
+            !print *, "u0",u0
             call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
                  fds, fus, fdir, fuir, plwc=plwc, pre=pre, useMcICA=.True.)
 
             do k=1,n1
                kk = nv1 - (k-1)
                sflx(k,i,j) = fus(kk)  - fds(kk) 
+               !irina
+               sflxu(k,i,j)=fus(kk)
+               sflxd(k,i,j)=fds(kk)
+               lflxu(k,i,j)=fuir(kk)
+               lflxd(k,i,j)=fdir(kk)
+               !
                rflx(k,i,j) = sflx(k,i,j) + fuir(kk) - fdir(kk)
+               !irina
+             !  print *,k, fuir(kk),fdir(kk),sflx(k,i,j), rflx(k,i,j)
             end do
 
             if (u0 > 0.) then
@@ -116,6 +136,7 @@ module radiation
             do k=2,n1-3
                xfact  = exner(k)*dzm(k)/(cp*dn0(k))
                tt(k,i,j) = tt(k,i,j) - (rflx(k,i,j) - rflx(k-1,i,j))*xfact
+             !  print *, 'dt', k, rc(k,i,j),(rflx(k,i,j) - rflx(k-1,i,j))*xfact*3600.
             end do
 
          end do
