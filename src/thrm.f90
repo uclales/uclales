@@ -21,9 +21,9 @@
 module thrm
 
   implicit none
+  logical, parameter :: thetal_noprecip = .true.
 
 contains
-
 !
 ! -------------------------------------------------------------------------
 ! THERMO: calculates thermodynamics quantities according to level.  Level
@@ -34,7 +34,6 @@ contains
 
     use grid, only : liquid, vapor, a_theta, a_pexnr, press, a_scr1,  &
          a_scr2, a_rp, a_tp, nxp, nyp, nzp, th00, pi0, pi1,a_rpp
-
     integer, intent (in) :: level
 
     select case (level) 
@@ -44,12 +43,14 @@ contains
     case (2)
        call satadjst(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
             pi1,th00,a_rp,vapor,liquid,a_scr2)
-    case (3) 
-       call satadjst3(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0, &
+    case (3,4)
+       if (thetal_noprecip) then
+          call satadjst(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
+            pi1,th00,a_rp,vapor,liquid,a_scr2)
+       else
+          call satadjst3(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0, &
             pi1,th00,a_rp,vapor,liquid,a_scr2,a_rpp)
-    case (4) 
-       call satadjst3(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0, &
-            pi1,th00,a_rp,vapor,liquid,a_scr2,a_rpp)
+       end if
     end select
 
   end subroutine thermo
@@ -224,153 +225,7 @@ contains
     enddo
 
   end subroutine satadjst3
-! 
-! -------------------------------------------------------------------------
-! SATADJST3:  this routine calculates theta, and pressure and diagnoses
-! liquid water using a saturation adjustment for warm-phase systems; in 
-! addition, takes in the account the precipitable water when present
-! 
-  subroutine satadjst3(n1,n2,n3,pp,p,tl,th,tk,pi0,pi1,th00,rt,rv,rc,rs,rp)
-
-    use defs, only : cp, cpr, alvl, ep, Rm, p00
-    use mpi_interface, only : myid, appl_abort
-
-    integer, intent (in) ::  n1,n2,n3
-
-    real, intent (in), dimension (n1,n2,n3)  :: pp, tl, rt, rp
-    real, intent (in), dimension (n1)        :: pi0, pi1
-    real, intent (in)                        :: th00
-    real, intent (out), dimension (n1,n2,n3) :: rc, rv, rs, th, tk, p
-
-    integer :: k, i, j, iterate
-    real    :: exner, tli, tx, txi, rsx, rcx, rpc, tx1, dtx
-    real, parameter :: epsln = 1.e-4
-
-    do j=3,n3-2
-       do i=3,n2-2
-          do k=1,n1
-             exner=(pi0(k)+pi1(k)+pp(k,i,j))/cp
-             p(k,i,j) = p00 * (exner)**cpr
-             tli=(tl(k,i,j)+th00)*exner
-             tx=tli
-             rsx=rslf(p(k,i,j),tx)
-             rcx=max(rt(k,i,j)-rsx,0.)
-             rpc = rp(k,i,j)
-             if (rcx > 0. .or. rpc > 0.) then
-                iterate = 1
-                dtx = 1.
-                if (rcx < rpc) then
-                   do while (dtx > epsln .and. iterate < 10)
-                      txi = alvl*rpc/(cp*tx)
-                      tx1 = tx - (tx - tli*(1+txi)) / (1+txi*tli/tx)
-                      dtx = abs(tx1-tx)
-                      tx  = tx1
-                      iterate = iterate+1
-                   end do
-                   rsx=rslf(p(k,i,j),tx)
-                   rcx=max(rt(k,i,j)-rsx,0.)
-                else
-                   do while(dtx > epsln .and. iterate < 10)
-                      txi=alvl/(cp*tx)
-                      tx1=tx - (tx - tli*(1.+txi*rcx))/(1. + txi*tli         &
-                           *(rcx/tx+(1.+rsx*ep)*rsx*alvl/(Rm*tx*tx)))
-                      dtx = abs(tx1-tx)
-                      tx  = tx1
-                      rsx=rslf(p(k,i,j),tx)
-                      rcx=max(rt(k,i,j)-rsx,0.)
-                      iterate = iterate+1
-                   enddo
-                endif
-
-                if (dtx > epsln) then
-                   if (myid == 0) print *, '  ABORTING: thrm', dtx, epsln
-                   call appl_abort(0)
-                endif
-             endif
-             rc(k,i,j)=rcx
-             rv(k,i,j)=rt(k,i,j)-rc(k,i,j)
-             rs(k,i,j)=rsx
-             tk(k,i,j)=tx
-             th(k,i,j)=tk(k,i,j)/exner
-          enddo
-       enddo
-    enddo
-
-  end subroutine satadjst3
-! 
-! -------------------------------------------------------------------------
-! SATADJST3:  this routine calculates theta, and pressure and diagnoses
-! liquid water using a saturation adjustment for warm-phase systems; in 
-! addition, takes in the account the precipitable water when present
-! 
-  subroutine satadjst4(n1,n2,n3,pp,p,tl,th,tk,pi0,pi1,th00,rt,rv,rc,rs,rp)
-
-    use defs, only : cp, cpr, alvl, ep, Rm, p00
-    use mpi_interface, only : myid, appl_abort
-
-    integer, intent (in) ::  n1,n2,n3
-
-    real, intent (in), dimension (n1,n2,n3)  :: pp, tl, rt, rp
-    real, intent (in), dimension (n1)        :: pi0, pi1
-    real, intent (in)                        :: th00
-    real, intent (out), dimension (n1,n2,n3) :: rc, rv, rs, th, tk, p
-
-    integer :: k, i, j, iterate
-    real    :: exner, tli, tx, txi, rsx, rcx, rpc, tx1, dtx
-    real, parameter :: epsln = 1.e-4
-
-    do j=3,n3-2
-       do i=3,n2-2
-          do k=1,n1
-             exner=(pi0(k)+pi1(k)+pp(k,i,j))/cp
-             p(k,i,j) = p00 * (exner)**cpr
-             tli=(tl(k,i,j)+th00)*exner
-             tx=tli
-             rsx=rslf(p(k,i,j),tx)
-             rcx=max(rt(k,i,j)-rsx,0.)
-             rpc = rp(k,i,j)
-             if (rcx > 0. .or. rpc > 0.) then
-                iterate = 1
-                dtx = 1.
-                if (rcx < rpc) then
-                   do while (dtx > epsln .and. iterate < 10)
-                      txi = alvl*rpc/(cp*tx)
-                      tx1 = tx - (tx - tli*(1+txi)) / (1+txi*tli/tx)
-                      dtx = abs(tx1-tx)
-                      tx  = tx1
-                      iterate = iterate+1
-                   end do
-                   rsx=rslf(p(k,i,j),tx)
-                   rcx=max(rt(k,i,j)-rsx,0.)
-                else
-                   do while(dtx > epsln .and. iterate < 10)
-                      txi=alvl/(cp*tx)
-                      tx1=tx - (tx - tli*(1.+txi*rcx))/(1. + txi*tli         &
-                           *(rcx/tx+(1.+rsx*ep)*rsx*alvl/(Rm*tx*tx)))
-                      dtx = abs(tx1-tx)
-                      tx  = tx1
-                      rsx=rslf(p(k,i,j),tx)
-                      rcx=max(rt(k,i,j)-rsx,0.)
-                      iterate = iterate+1
-                   enddo
-                endif
-
-                if (dtx > epsln) then
-                   if (myid == 0) print *, '  ABORTING: thrm', dtx, epsln
-                   call appl_abort(0)
-                endif
-             endif
-             rc(k,i,j)=rcx
-             rv(k,i,j)=rt(k,i,j)-rc(k,i,j)
-             rs(k,i,j)=rsx
-             tk(k,i,j)=tx
-             th(k,i,j)=tk(k,i,j)/exner
-          enddo
-       enddo
-    enddo
-
-  end subroutine satadjst4
-! 
+!
 ! ---------------------------------------------------------------------
 ! This function calculates the liquid saturation vapor mixing ratio as
 ! a function of temperature and pressure

@@ -17,19 +17,32 @@
 ! Copyright 1999-2007, Bjorn B. Stevens, Dep't Atmos and Ocean Sci, UCLA
 !----------------------------------------------------------------------------
 !
+!!!!!!!!!!!!!!!!
+! TODOLIST ICEMICRO
+! *Include irina - alterations
+! *Remove irreversible water frm q_t
+! *Work do-loops outward
+! *Include Oliviers modifications
+! *Do serialization of warmmicrophysics
+! *Include partitioning function between ice and water
+! *Include icemicro processess one by one
+
+
+
 module mcrp
 
   use defs, only : alvl, rowt, pi, Rm, cp
   use grid, only : dt, dxi, dyi ,dzt, nxp, nyp, nzp, a_pexnr, a_rp, a_tp, th00, CCN,    &
-       dn0, pi0,pi1, a_rt, a_tt,a_up, a_rpp, a_rpt, a_npp, a_npt, vapor, liquid,       &
-       a_theta, a_scr1, a_scr2, a_scr7, precip
-  use thrm, only : thermo, fll_tkrs
+       dn0, pi0,pi1, a_rt, a_tt, a_rpp, a_rpt, a_npp, a_npt, vapor, liquid,       &
+       a_theta, a_scr1, a_scr2, a_scr7, precip, &
+       a_ninuct,a_micet,a_nicet,a_msnowt,a_nsnowt,a_mgrt,a_ngrt,&
+       a_ninucp,a_micep,a_nicep,a_msnowp,a_nsnowp,a_mgrp,a_ngrp
+  use thrm, only : thermo, fll_tkrs, thetal_noprecip
   use stat, only : sflg, updtst
   use util, only : get_avg3, azero
   implicit none
 
-  logical, parameter :: droplet_sedim = .true., khairoutdinov = .false., turbulence = .false.
-  !logical, parameter :: droplet_sedim = .False., khairoutdinov = .False., turbulence = .False.
+  logical, parameter :: droplet_sedim = .False., khairoutdinov = .False., turbulence = .False.
   ! 
   ! drop sizes definition is based on vanZanten (2005)
   ! cloud droplets' diameter: 2-50 e-6 m
@@ -48,6 +61,38 @@ module mcrp
   real, parameter :: X_max = (D_max**3)*rowt*pi/6. ! max prcp mass
 
   real, parameter :: prw = pi * rowt / 6.
+  
+  real, parameter :: t_nuc     = 273.2d+0 ! maximum temperature for ice nucleation
+  real, parameter :: t_freeze  = 273.2d+0 ! maximum temperature for freezing
+
+  TYPE PARTICLE
+    CHARACTER(20)    :: name  !..Bezeichnung der Partikelklasse
+    DOUBLE PRECISION :: nu    !..Breiteparameter der Verteil.
+    DOUBLE PRECISION :: mu    !..Exp.-parameter der Verteil.
+    DOUBLE PRECISION :: x_max !..maximale Teilchenmasse
+    DOUBLE PRECISION :: x_min !..minimale Teilchenmasse
+    DOUBLE PRECISION :: a_geo !..Koeff. Geometrie
+    DOUBLE PRECISION :: b_geo !..Koeff. Geometrie = 1/3
+    DOUBLE PRECISION :: a_vel !..Koeff. Fallgesetz
+    DOUBLE PRECISION :: b_vel !..Koeff. Fallgesetz
+    DOUBLE PRECISION :: a_ven !..Koeff. Ventilationsparam.
+    DOUBLE PRECISION :: b_ven !..Koeff. Ventilationsparam.
+    DOUBLE PRECISION :: cap   !..Koeff. Kapazitaet
+  END TYPE PARTICLE
+  TYPE(PARTICLE), PARAMETER :: ice=  PARTICLE( & ! nach Andy Heymsfield (CRYSTAL-FACE)
+       &                              'iceCRY2test', & !.name...Bezeichnung der Partikelklasse
+       &                              0.000000, & !.nu.....Breiteparameter der Verteil.
+       &                              0.333333, & !.mu.....Exp.-parameter der Verteil.
+       &                              1.00d-07, & !.x_max..maximale Teilchenmasse D=???e-2m
+       &                              1.00d-12, & !.x_min..minimale Teilchenmasse D=200e-6m
+       &                              3.303633, & !.a_geo..Koeff. Geometrie
+       &                              0.476191, & !.b_geo..Koeff. Geometrie = 1/2.1
+       &                              2.77d+01, & !.a_vel..Koeff. Fallgesetz 
+       &                              0.215790, & !.b_vel..Koeff. Fallgesetz = 0.41/1.9
+       &                              0.780000, & !.a_ven..Koeff. Ventilation (PK, S.541)
+       &                              0.308000, & !.b_ven..Koeff. Ventilation (PK, S.541)
+       &                              2.0)        !.cap....Koeff. Kapazitaet
+
 
 contains
 
@@ -62,11 +107,16 @@ contains
 
     select case (level) 
     case(2)
-       if (droplet_sedim) call sedim_cd(nzp,nxp,nyp,dn0,dt,a_theta,a_scr1,      &
+       if (droplet_sedim) call sedim_cd(nzp,nxp,nyp,dt,a_theta,a_scr1,      &
             liquid,precip,a_rt,a_tt)     
     case(3)
-       call mcrph(nzp,nxp,nyp,dn0,a_theta,a_scr1,vapor,a_scr2,liquid,a_rpp, &
-            a_npp,precip,a_rt,a_tt,a_rpt,a_npt,a_up,a_scr7)
+       call mcrph(nzp,nxp,nyp,dn0,a_tt,a_theta,a_scr1,vapor,a_scr2,liquid,a_rpp, &
+              a_npp,precip,a_rt,a_tt,a_rpt,a_npt,a_scr7)
+    case(4)
+       call mcrph(nzp,nxp,nyp,dn0,a_tt,a_theta,a_scr1,vapor,a_scr2,liquid,a_rpp, &
+              a_npp,precip,a_rt,a_tt,a_rpt,a_npt,a_scr7,&
+              a_ninuct,a_micet,a_nicet,a_msnowt,a_nsnowt,a_mgrt,a_ngrt,&
+              a_ninucp,a_micep,a_nicep,a_msnowp,a_nsnowp,a_mgrp,a_ngrp)
     end select
 
   end subroutine micro
@@ -75,17 +125,31 @@ contains
   ! MCRPH: calls microphysical parameterization 
   !
 
-  subroutine mcrph(n1,n2,n3,dn0,th,tk,rv,rs,rc,rp,np,rrate,         &
-       rtt,tlt,rpt,npt,up,dissip)
+      subroutine mcrph(n1,n2,n3,dn0,thl,th,tk,rv,rs,rc,rp,np,rrate,         &
+       rtt,tlt,rpt,npt,dissip,    &
+       ninuct,micet,nicet,msnowt,nsnowt,mgrt,ngrt,ninucp,micep,nicep,msnowp,nsnowp,mgrp,ngrp)
 
     integer, intent (in) :: n1,n2,n3
-    real, dimension(n1,n2,n3), intent (in)    :: th, tk, rv, rs, up, dissip
-    real, dimension(n1)      , intent (in)    :: dn0
-    real, dimension(n1,n2,n3), intent (inout) :: rc, rtt, tlt, rpt, npt, np, rp
-    real, intent (out)                        :: rrate(n1,n2,n3)
-
+    real, dimension(n1,n2,n3), intent (inout)          :: th, tk, rv, rs, dissip
+    real, dimension(n1)      , intent (in)             :: dn0
+    real, dimension(n1,n2,n3), intent (inout)          :: thl,& !Theta_l
+                                                          rc,& !Condensate/cloud water
+                                                          rtt,& !Total water tendency
+                                                          tlt,&! theta_l tendency
+                                                          rpt,&!rain water tendency
+                                                          npt,&!rain droplet number tendency
+                                                          np,&!rain droplet number
+                                                          rp!rain water
+                                                         
+    real, intent (out)                                 :: rrate(n1,n2,n3)
+    real, dimension(n1,n2,n3), intent (inout),optional :: ninuct,micet,nicet,msnowt,nsnowt,mgrt,ngrt,&
+                                                          ninucp,micep,nicep,msnowp,nsnowp,mgrp,ngrp
+    real, dimension(n1,n2,n3) :: rt_irrev,rp_irrev
+    
     integer :: i, j, k
-
+    real    :: factor, s_i   !Ice saturation mixing ratio
+    logical :: do_icemicro = .false.
+    if (present(ninucp)) do_icemicro = .true.
     !
     ! Microphysics following Seifert Beheng (2001, 2005)       
     ! note that the order below is important as the rc array is 
@@ -100,20 +164,107 @@ contains
              np(k,i,j) = max(min(rp(k,i,j)/X_bnd,np(k,i,j)),rp(k,i,j)/X_max)
           end do
        end do
-    end do 
-
+    end do
+    rt_irrev = - rpt
     call wtr_dff_SB(n1,n2,n3,dn0,rp,np,rc,rs,rv,tk,rpt,npt)
 
-    call auto_SB(n1,n2,n3,dn0,rc,rp,rpt,npt,dissip,a_up)
+    call auto_SB(n1,n2,n3,dn0,rc,rp,rpt,npt,dissip)
     
     call accr_SB(n1,n2,n3,dn0,rc,rp,np,rpt,npt,dissip)
   
     call sedim_rd(n1,n2,n3,dt,dn0,rp,np,tk,th,rrate,rtt,tlt,rpt,npt)
    
-    if (droplet_sedim) call sedim_cd(n1,n2,n3,dn0,dt,th,tk,rc,rrate,rtt,tlt)
-
+    if (droplet_sedim) call sedim_cd(n1,n2,n3,dt,th,tk,rc,rrate,rtt,tlt)
+    if (thetal_noprecip) then
+      rt_irrev = rt_irrev + rpt
+      do j=3,n3-2
+        do i=3,n2-2
+          do k=1,n1
+            rp_irrev(k,i,j) = rp(k,i,j)
+            factor = alvl*a_pexnr(k,i,j)/(cp*a_theta(k,i,j))
+            rtt(k,i,j) = rtt(k,i,j) - rt_irrev(k,i,j)
+            tlt(k,i,j) = tlt(k,i,j) + a_theta(k,i,j)*exp(-factor*rp_irrev(k,i,j))*factor*rt_irrev(k,i,j)
+            end do
+        end do
+      end do
+    end if
+    
+    if (do_icemicro) then   !ice microphysics
+      tlt    = tlt    - thl/dt
+      rtt    = rtt    - (rv+rc)/dt
+      rpt    = rpt    - rp/dt
+      npt    = npt    - np/dt
+      ninuct = ninuct - ninucp/dt   
+      micet  = micet  - micep/dt  
+      nicet  = nicet  - nicep/dt  
+      msnowt = msnowt - msnowp/dt 
+      nsnowt = nsnowt - nsnowp/dt 
+      mgrt   = mgrt   - mgrp/dt 
+      ngrt   = ngrt   - ngrp/dt 
+      
+      do j=3,n3-2
+        do i=3,n2-2 
+            do k=1,n1
+              s_i = (rv(k,i,j)-rs(k,i,j))/rv(k,i,j)
+              call ice_nucleation(tk(k,i,j),s_i,nicep(k,i,j),micep(k,i,j),rpt(k,i,j))
+              
+!               call melting
+!               call freezing
+!               call sublimation
+!               call riming
+!               call immersion
+!               call autoconversion
+!               call accretion
+!               call sed_snow
+!               call sed_graupel
+!               call ...
+!               call ...
+            end do
+        end do
+      end do 
+      tlt    = tlt    + thl/dt
+      rtt    = rtt    + (rv+rc)/dt
+      rpt    = rpt    + rp/dt
+      npt    = npt    + np/dt
+      ninuct = ninuct + ninucp/dt   
+      micet  = micet  + micep/dt  
+      nicet  = nicet  + nicep/dt  
+      msnowt = msnowt + msnowp/dt 
+      nsnowt = nsnowt + nsnowp/dt 
+      mgrt   = mgrt   + mgrp/dt 
+      ngrt   = ngrt   + ngrp/dt 
+    end if
   end subroutine mcrph
-  ! 
+
+  subroutine melting
+  end subroutine melting
+  
+  subroutine freezing
+  end subroutine freezing
+  
+  subroutine sublimation
+  end subroutine sublimation
+  
+  subroutine riming
+  end subroutine riming
+  
+  subroutine immersion
+  end subroutine immersion
+  
+  subroutine autoconversion
+  end subroutine autoconversion
+  
+  subroutine accretion
+  end subroutine accretion
+  
+  subroutine sed_snow
+  end subroutine sed_snow
+  
+  subroutine sed_graupel
+  end subroutine sed_graupel
+ 
+ 
+ ! 
   ! ---------------------------------------------------------------------
   ! WTR_DFF_SB: calculates the evolution of the both number- and
   ! mass mixing ratio large drops due to evaporation in the absence of 
@@ -131,7 +282,7 @@ contains
     real, parameter    :: Dv = 3.e-5     ! diffusivity of water vapor [m2/s]
 
     integer             :: i, j, k
-    real                :: Xp, Dp, G, S, cerpt, cenpt, xnpts
+    real                :: Xp, Dp, G, S, cerpt, cenpt, xnpts=0.
     real, dimension(n1) :: v1
 
     if(sflg) then
@@ -178,10 +329,10 @@ contains
   ! be reformulated for f(x)=A*x**(nu_c)*exp(-Bx**(mu)), where formu=1/3
   ! one would get a gamma dist in drop diam -> faster rain formation.
   !
-  subroutine auto_SB(n1,n2,n3,dn0,rc,rp,rpt,npt,diss,up)
+  subroutine auto_SB(n1,n2,n3,dn0,rc,rp,rpt,npt,diss)
 
     integer, intent (in) :: n1,n2,n3
-    real, intent (in)    :: dn0(n1), rc(n1,n2,n3), rp(n1,n2,n3), diss(n1,n2,n3), up(n1,n2,n3)
+    real, intent (in)    :: dn0(n1), rc(n1,n2,n3), rp(n1,n2,n3), diss(n1,n2,n3)
     real, intent (inout) :: rpt(n1,n2,n3), npt(n1,n2,n3)
 
     real, parameter :: nu_c  = 0.           ! width parameter of cloud DSD 
@@ -303,8 +454,6 @@ contains
 
     real, parameter :: k_r0 = 4.33  
     real, parameter :: k_1 = 5.e-4 
-    real, parameter :: Cac = 67.     ! accretion coefficient in KK param.
-    real, parameter :: Eac = 1.15    ! accretion exponent in KK param.
 
     integer :: i, j, k
     real    :: tau, phi, ac, sc, k_r, epsilon
@@ -331,9 +480,7 @@ contains
                 !
                 ! Khairoutdinov and Kogan
                 !
-                if (khairoutdinov) then
-                ac = Cac * (rc(k,i,j) * rp(k,i,j))**Eac
-                end if
+                !ac = Cac * (rc(k,i,j) * rp(k,i,j))**Eac
                 !
                 rpt(k,i,j) = rpt(k,i,j) + ac
                 
@@ -375,7 +522,7 @@ contains
 
 
      integer :: i, j, k, kp1, kk, km1
-     real    :: b2, Xp, Dp, Dm, mu, flxdiv, tot,sk, mini, maxi, cc, zz, xnpts
+     real    :: b2, Xp, Dp, Dm, mu, flxdiv, tot,sk, mini, maxi, cc, zz, xnpts=0.
      real, dimension(n1) :: nslope,rslope,dn,dr, rfl, nfl, vn, vr, cn, cr, v1
 
     if(sflg) then
@@ -407,14 +554,9 @@ contains
               !
               ! Set fall speeds following Khairoutdinov and Kogan
 
-!              if (khairoutdinov) then
-!                 vn(k) = max(0.,an * Dp + bn)
-!                 vr(k) = max(0.,aq * Dp + bq)
-!              end if
-!irina-olivier
               if (khairoutdinov) then
-                 vn(k) = max(0.,an * Dm + bn)
-                 vr(k) = max(0.,aq * Dm + bq)
+                 vn(k) = max(0.,an * Dp + bn)
+                 vr(k) = max(0.,aq * Dp + bq)
               end if
 
            end do
@@ -486,10 +628,7 @@ contains
 
               npt(k,i,j) = npt(k,i,j)-(nfl(kp1)-nfl(k))*dzt(k)/dn0(k)
 
-!irina sends out the rrate in kg/hg m/s, in order to avoid double multiplication
-!by Lv dn0, as this is done also in stat.f90
-              rrate(k,i,j)    = -rfl(k) 
-              !rrate(k,i,j)    = -rfl(k) * alvl*0.5*(dn0(k)+dn0(kp1))
+              rrate(k,i,j)    = -rfl(k) * alvl*0.5*(dn0(k)+dn0(kp1))
               if (sflg) v1(k) = v1(k) + rrate(k,i,j)*xnpts
 
            end do
@@ -505,34 +644,21 @@ contains
   ! SEDIM_CD: calculates the cloud-droplet sedimentation flux and its effect
   ! on the evolution of r_t and theta_l assuming a log-normal distribution
   ! 
-!irina:add dn0, v1 
-  subroutine sedim_cd(n1,n2,n3,dn0,dt,th,tk,rc,rrate,rtt,tlt)
+ 
+  subroutine sedim_cd(n1,n2,n3,dt,th,tk,rc,rrate,rtt,tlt)
 
     integer, intent (in):: n1,n2,n3
     real, intent (in)                        :: dt
-    !irina
-    real, intent (in),    dimension(n1)       :: dn0
     real, intent (in),   dimension(n1,n2,n3) :: th,tk,rc
-    !irina
-    real, intent (inout),  dimension(n1,n2,n3) :: rrate
-    !real, intent (out),  dimension(n1,n2,n3) :: rrate
-    !
+    real, intent (out),  dimension(n1,n2,n3) :: rrate
     real, intent (inout),dimension(n1,n2,n3) :: rtt,tlt
 
     real, parameter :: c = 1.19e8 ! Stokes fall velocity coef [m^-1 s^-1]
     real, parameter :: sgg = 1.2  ! geometric standard dev of cloud droplets
 
     integer :: i, j, k, kp1
-    real    :: Dc, Xc, vc, flxdiv,xnpts
-    real    :: rfl(n1),v1(n1)
-
-     if(sflg) then
-       xnpts = 1./((n3-4)*(n2-4))
-       do k=1,n1
-          v1(k) = 0.
-       end do
-    end if
-
+    real    :: Dc, Xc, vc, flxdiv
+    real    :: rfl(n1)
 
     !
     ! calculate the precipitation flux and its effect on r_t and theta_l
@@ -551,19 +677,49 @@ contains
              flxdiv = (rfl(kp1)-rfl(k))*dzt(k)
              rtt(k,i,j) = rtt(k,i,j)-flxdiv
              tlt(k,i,j) = tlt(k,i,j)+flxdiv*(alvl/cp)*th(k,i,j)/tk(k,i,j)
-             !irina , stores the sedimentation flux in kg/kg m/s
-             !rrate(k,i,j) = rrate(k,i,j)-rfl(k)*alvl*0.5*(dn0(k)+dn0(kp1)) 
-              if (sflg) v1(k) = v1(k) + (-rfl(k))*xnpts
-             !old 
-             !rrate(k,i,j) = -rfl(k)  
-             !
+             rrate(k,i,j) = -rfl(k)  
           end do
        end do
     end do
 
-!irina
-     if (sflg) call updtst(n1,'prc',5,v1,1)
-
   end subroutine sedim_cd
+ 
+  subroutine ice_nucleation(t_0,s_i,n_ice,q_ice,q)
+    real, intent(in) :: t_0, s_i
+    real, intent(inout) :: n_ice, q_ice, q
+    real :: nuc_n, nuc_q
+    
+    if (t_0 < t_nuc .and. s_i > 0.0) then
+      nuc_n = 0d0
+      nuc_n = max(n_ice_meyers_contact(t_0,min(s_i,0.25d0)) - (n_ice),0.d0)
+
+      nuc_q = min(nuc_n * ice%x_min, q)
+      !nuc_n = nuc_q / ice%x_min                !axel 20040416
+
+      n_ice = n_ice + nuc_n
+      q_ice = q_ice + nuc_q
+      q     = q     - nuc_q
+
+    endif
+
+  end subroutine ice_nucleation
+  
+  real function n_ice_meyers_contact(t_a,s)
+    ! diagnostische beziehung fuer anzahldichte der eisteilchen nach meyers (1992) 
+! 
+    real, intent(in):: s,t_a
+    real, parameter :: n_0 = 1.0d+3 
+    real, parameter :: n_m = 1.0d+3 
+    real, parameter :: a_d = -0.639
+    real, parameter :: b_d = 12.960
+    real, parameter :: c_d = -2.8
+    real, parameter :: d_d = 0.262
+    real, parameter :: t_3  = 2.732d+2     !..tripelpunkt wasser
+
+    n_ice_meyers_contact = n_0 * exp( a_d + b_d * s )         &
+          &               + n_m * exp( c_d + d_d * (t_a - t_3) )
+
+!     return
+  end function n_ice_meyers_contact
  
 end module mcrp

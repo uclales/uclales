@@ -30,7 +30,7 @@ $(LES_ARC)(advl.o)   \
 $(LES_ARC)(srfc.o)   \
 $(LES_ARC)(prss.o)   \
 $(LES_ARC)(sgsm.o)   \
-$(LES_ARC)(mcrp_ice.o)   \
+$(LES_ARC)(mcrp.o)   \
 $(LES_ARC)(step.o)   \
 $(LES_ARC)(init.o)   \
 $(LES_ARC)(rfft.o)   

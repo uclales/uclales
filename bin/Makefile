@@ -69,7 +69,7 @@ LES_OUT_MPI=$(BIN)/les.mpi
 LES_ARC_SEQ=$(BIN)/libles_seq.a
 LES_OUT_SEQ=$(BIN)/les.seq
 
-default: mpi seq
+default: seq
 
 all:  mpi seq
 
