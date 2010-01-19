@@ -140,7 +140,8 @@ contains
     ! write file variable control to standard output
     !
     if (myid == 0) then
-       write (*,*) model
+       write(6 ,model)
+
        if (runtype == 'HISTORY') then
           write (*,601) expnme, hfilin, timmax
        else
