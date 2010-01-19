@@ -39,7 +39,7 @@ module step
 !irina  
   real    :: sst=292.
   real    :: div = 3.75e-6
-  logical :: lsvarflg = .true.
+  logical :: lsvarflg = .false.
   character (len=5) :: case_name = 'astex'
 
 contains
