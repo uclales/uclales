@@ -33,7 +33,7 @@ module mcrp
 
   use defs, only : alvl, rowt, pi, Rm, cp
   use grid, only : dt, dxi, dyi ,dzt, nxp, nyp, nzp, a_pexnr, a_rp, a_tp, th00, CCN,    &
-       dn0, pi0,pi1, a_rt, a_tt, a_rpp, a_rpt, a_npp, a_npt, vapor, liquid,       &
+       dn0, pi0,pi1, a_rt, a_tt, a_up,a_rpp, a_rpt, a_npp, a_npt, vapor, liquid,       &
        a_theta, a_scr1, a_scr2, a_scr7, precip, &
        a_ninuct,a_micet,a_nicet,a_msnowt,a_nsnowt,a_mgrt,a_ngrt,&
        a_ninucp,a_micep,a_nicep,a_msnowp,a_nsnowp,a_mgrp,a_ngrp
@@ -107,14 +107,14 @@ contains
 
     select case (level) 
     case(2)
-       if (droplet_sedim) call sedim_cd(nzp,nxp,nyp,dt,a_theta,a_scr1,      &
+       if (droplet_sedim) call sedim_cd(nzp,nxp,nyp,dn0,dt,a_theta,a_scr1,      &
             liquid,precip,a_rt,a_tt)     
     case(3)
-       call mcrph(nzp,nxp,nyp,dn0,a_tt,a_theta,a_scr1,vapor,a_scr2,liquid,a_rpp, &
-              a_npp,precip,a_rt,a_tt,a_rpt,a_npt,a_scr7)
+       call mcrph(nzp,nxp,nyp,dn0,a_tp,a_theta,a_scr1,vapor,a_scr2,liquid,a_rpp, &
+              a_npp,precip,a_rt,a_tt,a_rpt,a_npt,a_up,a_scr7)
     case(4)
-       call mcrph(nzp,nxp,nyp,dn0,a_tt,a_theta,a_scr1,vapor,a_scr2,liquid,a_rpp, &
-              a_npp,precip,a_rt,a_tt,a_rpt,a_npt,a_scr7,&
+       call mcrph(nzp,nxp,nyp,dn0,a_tp,a_theta,a_scr1,vapor,a_scr2,liquid,a_rpp, &
+              a_npp,precip,a_rt,a_tt,a_rpt,a_npt,a_up,a_scr7,&
               a_ninuct,a_micet,a_nicet,a_msnowt,a_nsnowt,a_mgrt,a_ngrt,&
               a_ninucp,a_micep,a_nicep,a_msnowp,a_nsnowp,a_mgrp,a_ngrp)
     end select
@@ -126,11 +126,11 @@ contains
   !
 
       subroutine mcrph(n1,n2,n3,dn0,thl,th,tk,rv,rs,rc,rp,np,rrate,         &
-       rtt,tlt,rpt,npt,dissip,    &
+       rtt,tlt,rpt,npt,up,dissip,    &
        ninuct,micet,nicet,msnowt,nsnowt,mgrt,ngrt,ninucp,micep,nicep,msnowp,nsnowp,mgrp,ngrp)
 
     integer, intent (in) :: n1,n2,n3
-    real, dimension(n1,n2,n3), intent (inout)          :: th, tk, rv, rs, dissip
+    real, dimension(n1,n2,n3), intent (inout)          :: th, tk, rv, rs,up, dissip
     real, dimension(n1)      , intent (in)             :: dn0
     real, dimension(n1,n2,n3), intent (inout)          :: thl,& !Theta_l
                                                           rc,& !Condensate/cloud water
@@ -168,13 +168,13 @@ contains
     rt_irrev = - rpt
     call wtr_dff_SB(n1,n2,n3,dn0,rp,np,rc,rs,rv,tk,rpt,npt)
 
-    call auto_SB(n1,n2,n3,dn0,rc,rp,rpt,npt,dissip)
+    call auto_SB(n1,n2,n3,dn0,rc,rp,rpt,npt,dissip,a_up)
     
     call accr_SB(n1,n2,n3,dn0,rc,rp,np,rpt,npt,dissip)
   
     call sedim_rd(n1,n2,n3,dt,dn0,rp,np,tk,th,rrate,rtt,tlt,rpt,npt)
    
-    if (droplet_sedim) call sedim_cd(n1,n2,n3,dt,th,tk,rc,rrate,rtt,tlt)
+    if (droplet_sedim) call sedim_cd(n1,n2,n3,dn0,dt,th,tk,rc,rrate,rtt,tlt)
     if (thetal_noprecip) then
       rt_irrev = rt_irrev + rpt
       do j=3,n3-2
