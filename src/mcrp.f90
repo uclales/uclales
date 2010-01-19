@@ -262,15 +262,15 @@ contains
   
   subroutine sed_graupel
   end subroutine sed_graupel
- 
- 
- ! 
-  ! ---------------------------------------------------------------------
-  ! WTR_DFF_SB: calculates the evolution of the both number- and
-  ! mass mixing ratio large drops due to evaporation in the absence of 
-  ! cloud water.  
-  !
 
+
+
+ !
+ ! ---------------------------------------------------------------------
+ ! WTR_DFF_SB: calculates the evolution of the both number- and
+ ! mass mixing ratio large drops due to evaporation in the absence of
+ ! cloud water.
+ !
   subroutine wtr_dff_SB(n1,n2,n3,dn0,rp,np,rl,rs,rv,tk,rpt,npt)
 
     integer, intent (in) :: n1,n2,n3
@@ -282,7 +282,7 @@ contains
     real, parameter    :: Dv = 3.e-5     ! diffusivity of water vapor [m2/s]
 
     integer             :: i, j, k
-    real                :: Xp, Dp, G, S, cerpt, cenpt, xnpts=0.
+    real                :: Xp, Dp, G, S, cerpt, cenpt, xnpts
     real, dimension(n1) :: v1
 
     if(sflg) then
@@ -293,7 +293,7 @@ contains
     end if
 
     do j=3,n3-2
-       do i=3,n2-2 
+       do i=3,n2-2
           do k=2,n1
              if (rp(k,i,j) > rl(k,i,j)) then
                 Xp = rp(k,i,j)/ (np(k,i,j)+eps0)
@@ -319,23 +319,23 @@ contains
 
     if (sflg) call updtst(n1,'prc',2,v1,1)
 
-  end subroutine wtr_dff_SB 
- 
+  end subroutine wtr_dff_SB
+
   !
   ! ---------------------------------------------------------------------
-  ! AUTO_SB:  calculates the evolution of mass- and number mxg-ratio for 
+  ! AUTO_SB:  calculates the evolution of mass- and number mxg-ratio for
   ! drizzle drops due to autoconversion. The autoconversion rate assumes
-  ! f(x)=A*x**(nu_c)*exp(-Bx), an exponential in drop MASS x. It can 
+  ! f(x)=A*x**(nu_c)*exp(-Bx), an exponential in drop MASS x. It can
   ! be reformulated for f(x)=A*x**(nu_c)*exp(-Bx**(mu)), where formu=1/3
   ! one would get a gamma dist in drop diam -> faster rain formation.
   !
-  subroutine auto_SB(n1,n2,n3,dn0,rc,rp,rpt,npt,diss)
+  subroutine auto_SB(n1,n2,n3,dn0,rc,rp,rpt,npt,diss,up)
 
     integer, intent (in) :: n1,n2,n3
-    real, intent (in)    :: dn0(n1), rc(n1,n2,n3), rp(n1,n2,n3), diss(n1,n2,n3)
+    real, intent (in)    :: dn0(n1), rc(n1,n2,n3), rp(n1,n2,n3), diss(n1,n2,n3), up(n1,n2,n3)
     real, intent (inout) :: rpt(n1,n2,n3), npt(n1,n2,n3)
 
-    real, parameter :: nu_c  = 0.           ! width parameter of cloud DSD 
+    real, parameter :: nu_c  = 0.           ! width parameter of cloud DSD
     real, parameter :: kc_0  = 9.44e+9      ! Long-Kernel
     real, parameter :: k_1  = 6.e+2        ! Parameter for phi function
     real, parameter :: k_2  = 0.68         ! Parameter for phi function
@@ -356,52 +356,52 @@ contains
     real, parameter :: kc_bet = 0.00174
     real, parameter :: csx = 0.23
     real, parameter :: ce = 0.93
-   
+
     integer :: i, j, k
-    real    :: k_au, Xc, Dc, au, tau, phi, kc_alf, kc_rad, kc_sig, k_c, Re, epsilon, l   
-    real, dimension(n1) :: Resum, Recnt       
+    real    :: k_au, Xc, Dc, au, tau, phi, kc_alf, kc_rad, kc_sig, k_c, Re, epsilon, l
+    real, dimension(n1) :: Resum, Recnt
 
     !
     ! Calculate the effect of turbulence on the autoconversion/
-    ! accretion rate using equation (6) in Seifert et al. (2009) 
-    ! 
-    
+    ! accretion rate using equation (6) in Seifert et al. (2009)
+    !
+
     if (turbulence) then
        kc_alf = ( kc_a1 + kc_a2 * nu_c )/ ( 1. + kc_a3 * nu_c )
        kc_rad = ( kc_b1 + kc_b2 * nu_c )/ ( 1. + kc_b3 * nu_c )
        kc_sig = ( kc_c1 + kc_c2 * nu_c )/ ( 1. + kc_c3 * nu_c )
        call azero(n1,Recnt,Resum)
-    end if   
+    end if
 
     do j=3,n3-2
-       do i=3,n2-2 
+       do i=3,n2-2
           do k=2,n1-1
              Xc = rc(k,i,j)/(CCN+eps0)
-             if (Xc > 0.) then 
-                Xc = MIN(MAX(Xc,X_min),X_bnd) 
+             if (Xc > 0.) then
+                Xc = MIN(MAX(Xc,X_min),X_bnd)
                 k_c = kc_0
 
                 if (turbulence) then
-                   Dc = ( Xc / prw )**(1./3.)  ! mass mean diameter cloud droplets in m              
-                   ! 
+                   Dc = ( Xc / prw )**(1./3.)  ! mass mean diameter cloud droplets in m
+                   !
                    ! Calculate the mixing length, dissipation rate and Taylor-Reynolds number
                    !
                    l = csx*((1/dxi)*(1/dyi)*(1/dzt(k)))**(1./3.)
                    epsilon = min(diss(k,i,j),0.06)
-                   Re = (6./11.)*((l/ce)**(2./3))*((15./(1.5e-5))**0.5)*(epsilon**(1./6) )                   
+                   Re = (6./11.)*((l/ce)**(2./3))*((15./(1.5e-5))**0.5)*(epsilon**(1./6) )
                    !
                    ! Dissipation needs to be converted to cm^2/s^3, which explains the factor
                    ! 1.e4 with which diss(k,i,j) is multiplied
                    !
-                   k_c = k_c * (1. + epsilon *1.e4* (Re*1.e-3)**(0.25) & 
-                         * (kc_bet + kc_alf * exp( -1.* ((((Dc/2.)*1.e+6-kc_rad)/kc_sig)**2) )))  
+                   k_c = k_c * (1. + epsilon *1.e4* (Re*1.e-3)**(0.25) &
+                         * (kc_bet + kc_alf * exp( -1.* ((((Dc/2.)*1.e+6-kc_rad)/kc_sig)**2) )))
                    !print *,'enhancement factor = ', k_c/(9.44e+9)
                    !
                    ! Calculate conditional average of Re i.e., conditioned on cloud/rain water
                    !
                    Resum(k) = Resum(k)+ Re
                    Recnt(k) = Recnt(k)+ 1
-                end if   
+                end if
 
                 k_au  = k_c / (20.*X_bnd) * (nu_c+2.)*(nu_c+4.)/(nu_c+1.)**2
                 au = k_au * dn0(k) * rc(k,i,j)**2 * Xc**2
@@ -410,7 +410,7 @@ contains
                 !
                 if (rc(k,i,j) > 1.e-6) then
                    tau = 1.0-rc(k,i,j)/(rc(k,i,j)+rp(k,i,j)+eps0)
-                   tau = MIN(MAX(tau,eps0),0.9)      
+                   tau = MIN(MAX(tau,eps0),0.9)
                    phi = k_1 * tau**k_2 * (1.0 - tau**k_2)**3
                    au  = au * (1.0 + phi/(1.0 - tau)**2)
                 endif
@@ -429,20 +429,20 @@ contains
           end do
        end do
     end do
-    
+
     if (turbulence) then
        do k=1,n1-1
           Resum(k) = Resum(k)/max(1.,Recnt(k))
        end do
        if (sflg) call updtst(n1,'prc',4,Resum,1)
-    end if   
+    end if
 
   end subroutine auto_SB
   !
   ! ---------------------------------------------------------------------
   ! ACCR_SB calculates the evolution of mass mxng-ratio due to accretion
-  ! and self collection following Seifert & Beheng (2001).  Included is 
-  ! an alternative formulation for accretion only, following 
+  ! and self collection following Seifert & Beheng (2001).  Included is
+  ! an alternative formulation for accretion only, following
   ! Khairoutdinov and Kogan
   !
   subroutine accr_SB(n1,n2,n3,dn0,rc,rp,np,rpt,npt,diss)
@@ -452,38 +452,42 @@ contains
     real, intent (in)    :: diss(n1,n2,n3)
     real, intent (inout) :: rpt(n1,n2,n3),npt(n1,n2,n3)
 
-    real, parameter :: k_r0 = 4.33  
-    real, parameter :: k_1 = 5.e-4 
+    real, parameter :: k_r0 = 4.33
+    real, parameter :: k_1 = 5.e-4
+    real, parameter :: Cac = 67.     ! accretion coefficient in KK param.
+    real, parameter :: Eac = 1.15    ! accretion exponent in KK param.
 
     integer :: i, j, k
     real    :: tau, phi, ac, sc, k_r, epsilon
 
     do j=3,n3-2
-       do i=3,n2-2 
+       do i=3,n2-2
           do k=2,n1-1
              if (rc(k,i,j) > 0. .and. rp(k,i,j) > 0.) then
                 tau = 1.0-rc(k,i,j)/(rc(k,i,j)+rp(k,i,j)+eps0)
                 tau = MIN(MAX(tau,eps0),1.)
                 phi = (tau/(tau+k_1))**4
 
-                k_r = k_r0      
+                k_r = k_r0
                 !
                 ! Simulate the effect of turbulence on the collision kernel
-                ! (dissipation needs to be converted to cm^2/s^3) 
+                ! (dissipation needs to be converted to cm^2/s^3)
                 !
                 if (turbulence) then
                    epsilon = min(600.,diss(k,i,j)*1.e4)   ! put an upper limit to the dissipation rate used
                    k_r = k_r*(1+(0.05*epsilon**0.25))
-                end if   
+                end if
 
                 ac  = k_r * rc(k,i,j) * rp(k,i,j) * phi * sqrt(rho_0*dn0(k))
                 !
                 ! Khairoutdinov and Kogan
                 !
-                !ac = Cac * (rc(k,i,j) * rp(k,i,j))**Eac
+                if (khairoutdinov) then
+                ac = Cac * (rc(k,i,j) * rp(k,i,j))**Eac
+                end if
                 !
                 rpt(k,i,j) = rpt(k,i,j) + ac
-                
+
              end if
              sc = k_r * np(k,i,j) * rp(k,i,j) * sqrt(rho_0*dn0(k))
              npt(k,i,j) = npt(k,i,j) - sc
@@ -522,7 +526,7 @@ contains
 
 
      integer :: i, j, k, kp1, kk, km1
-     real    :: b2, Xp, Dp, Dm, mu, flxdiv, tot,sk, mini, maxi, cc, zz, xnpts=0.
+     real    :: b2, Xp, Dp, Dm, mu, flxdiv, tot,sk, mini, maxi, cc, zz, xnpts
      real, dimension(n1) :: nslope,rslope,dn,dr, rfl, nfl, vn, vr, cn, cr, v1
 
     if(sflg) then
@@ -542,21 +546,26 @@ contains
            do k=n1-1,2,-1
               Xp = rp(k,i,j) / (np(k,i,j)+eps0)
               Xp = MIN(MAX(Xp,X_bnd),X_max)
-              ! 
+              !
               ! Adjust Dm and mu-Dm and Dp=1/lambda following Milbrandt & Yau
               !
-              Dm = ( 6. / (rowt*pi) * Xp )**(1./3.)     
+              Dm = ( 6. / (rowt*pi) * Xp )**(1./3.)
               mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))
-              Dp = (Dm**3/((mu+3.)*(mu+2.)*(mu+1.)))**(1./3.) 
+              Dp = (Dm**3/((mu+3.)*(mu+2.)*(mu+1.)))**(1./3.)
 
               vn(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
               vr(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
               !
               ! Set fall speeds following Khairoutdinov and Kogan
 
+!              if (khairoutdinov) then
+!                 vn(k) = max(0.,an * Dp + bn)
+!                 vr(k) = max(0.,aq * Dp + bq)
+!              end if
+!irina-olivier
               if (khairoutdinov) then
-                 vn(k) = max(0.,an * Dp + bn)
-                 vr(k) = max(0.,aq * Dp + bq)
+                 vn(k) = max(0.,an * Dm + bn)
+                 vr(k) = max(0.,aq * Dm + bq)
               end if
 
            end do
@@ -623,12 +632,17 @@ contains
               kp1=k+1
               flxdiv = (rfl(kp1)-rfl(k))*dzt(k)/dn0(k)
               rpt(k,i,j) =rpt(k,i,j)-flxdiv
-              rtt(k,i,j) =rtt(k,i,j)-flxdiv
-              tlt(k,i,j) =tlt(k,i,j)+flxdiv*(alvl/cp)*th(k,i,j)/tk(k,i,j)
+              if (.not. thetal_noprecip) then
+                rtt(k,i,j) =rtt(k,i,j)-flxdiv
+                tlt(k,i,j) =tlt(k,i,j)+flxdiv*(alvl/cp)*th(k,i,j)/tk(k,i,j)
+              end if
 
               npt(k,i,j) = npt(k,i,j)-(nfl(kp1)-nfl(k))*dzt(k)/dn0(k)
 
-              rrate(k,i,j)    = -rfl(k) * alvl*0.5*(dn0(k)+dn0(kp1))
+!irina sends out the rrate in kg/hg m/s, in order to avoid double multiplication
+!by Lv dn0, as this is done also in stat.f90
+              rrate(k,i,j)    = -rfl(k)
+              !rrate(k,i,j)    = -rfl(k) * alvl*0.5*(dn0(k)+dn0(kp1))
               if (sflg) v1(k) = v1(k) + rrate(k,i,j)*xnpts
 
            end do
@@ -638,33 +652,46 @@ contains
 
    end subroutine sedim_rd
 
-   
+
   !
   ! ---------------------------------------------------------------------
   ! SEDIM_CD: calculates the cloud-droplet sedimentation flux and its effect
   ! on the evolution of r_t and theta_l assuming a log-normal distribution
-  ! 
- 
-  subroutine sedim_cd(n1,n2,n3,dt,th,tk,rc,rrate,rtt,tlt)
+  !
+!irina:add dn0, v1
+  subroutine sedim_cd(n1,n2,n3,dn0,dt,th,tk,rc,rrate,rtt,tlt)
 
     integer, intent (in):: n1,n2,n3
     real, intent (in)                        :: dt
+    !irina
+    real, intent (in),    dimension(n1)       :: dn0
     real, intent (in),   dimension(n1,n2,n3) :: th,tk,rc
-    real, intent (out),  dimension(n1,n2,n3) :: rrate
+    !irina
+    real, intent (inout),  dimension(n1,n2,n3) :: rrate
+    !real, intent (out),  dimension(n1,n2,n3) :: rrate
+    !
     real, intent (inout),dimension(n1,n2,n3) :: rtt,tlt
 
     real, parameter :: c = 1.19e8 ! Stokes fall velocity coef [m^-1 s^-1]
     real, parameter :: sgg = 1.2  ! geometric standard dev of cloud droplets
 
     integer :: i, j, k, kp1
-    real    :: Dc, Xc, vc, flxdiv
-    real    :: rfl(n1)
+    real    :: Dc, Xc, vc, flxdiv,xnpts
+    real    :: rfl(n1),v1(n1)
+
+     if(sflg) then
+       xnpts = 1./((n3-4)*(n2-4))
+       do k=1,n1
+          v1(k) = 0.
+       end do
+    end if
+
 
     !
     ! calculate the precipitation flux and its effect on r_t and theta_l
     !
     do j=3,n3-2
-       do i=3,n2-2 
+       do i=3,n2-2
           rfl(n1) = 0.
           do k=n1-1,2,-1
              Xc = rc(k,i,j) / (CCN+eps0)
@@ -677,10 +704,18 @@ contains
              flxdiv = (rfl(kp1)-rfl(k))*dzt(k)
              rtt(k,i,j) = rtt(k,i,j)-flxdiv
              tlt(k,i,j) = tlt(k,i,j)+flxdiv*(alvl/cp)*th(k,i,j)/tk(k,i,j)
-             rrate(k,i,j) = -rfl(k)  
+             !irina , stores the sedimentation flux in kg/kg m/s
+             !rrate(k,i,j) = rrate(k,i,j)-rfl(k)*alvl*0.5*(dn0(k)+dn0(kp1))
+              if (sflg) v1(k) = v1(k) + (-rfl(k))*xnpts
+             !old
+             !rrate(k,i,j) = -rfl(k)
+             !
           end do
        end do
     end do
+
+!irina
+     if (sflg) call updtst(n1,'prc',5,v1,1)
 
   end subroutine sedim_cd
  
