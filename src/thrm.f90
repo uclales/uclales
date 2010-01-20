@@ -21,7 +21,7 @@
 module thrm
 
   implicit none
-  logical, parameter :: thetal_noprecip = .true.
+  logical :: thetal_noprecip = .false.
 
 contains
 !

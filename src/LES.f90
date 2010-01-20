@@ -89,6 +89,7 @@ contains
          filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype, CCN
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,iseed, hfilin,   &
          zrand
+    use thrm, only : thetal_noprecip
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
 
@@ -120,7 +121,8 @@ contains
          umean  , vmean  , th00  ,  & ! gallilean E/W wind, basic state
          case_name,                 & !irina:name of the case, i.e. astex, rico, etc  
          lsvarflg,                  & !irina:flag for time bvarying large scale forcing  
-         div                          !irina: divergence  
+         div,                       & !irina: divergence
+         thetal_noprecip              !thijs: include precipitative water into total water and theta_l
 
     ps       = 0.
     ts       = th00
