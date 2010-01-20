@@ -725,15 +725,15 @@ contains
     real :: nuc_n, nuc_q
     
     if (t_0 < t_nuc .and. s_i > 0.0) then
-!       nuc_n = 0d0
-!       nuc_n = max(n_ice_meyers_contact(t_0,min(s_i,0.25)) - (n_ice),0.)
-! 
-!       nuc_q = min(nuc_n * ice%x_min, q)
-!       !nuc_n = nuc_q / ice%x_min                !axel 20040416
-! 
-!       n_ice = n_ice + nuc_n
-!       q_ice = q_ice + nuc_q
-!       q     = q     - nuc_q
+      nuc_n = 0d0
+      nuc_n = max(n_ice_meyers_contact(t_0,min(s_i,0.25d0)) - (n_ice),0.d0)
+
+      nuc_q = min(nuc_n * ice%x_min, q)
+      !nuc_n = nuc_q / ice%x_min                !axel 20040416
+
+      n_ice = n_ice + nuc_n
+      q_ice = q_ice + nuc_q
+      q     = q     - nuc_q
 
     endif
 
