@@ -67,17 +67,17 @@ module mcrp
 
   TYPE PARTICLE
     CHARACTER(20)    :: name  !..Bezeichnung der Partikelklasse
-    DOUBLE PRECISION :: nu    !..Breiteparameter der Verteil.
-    DOUBLE PRECISION :: mu    !..Exp.-parameter der Verteil.
-    DOUBLE PRECISION :: x_max !..maximale Teilchenmasse
-    DOUBLE PRECISION :: x_min !..minimale Teilchenmasse
-    DOUBLE PRECISION :: a_geo !..Koeff. Geometrie
-    DOUBLE PRECISION :: b_geo !..Koeff. Geometrie = 1/3
-    DOUBLE PRECISION :: a_vel !..Koeff. Fallgesetz
-    DOUBLE PRECISION :: b_vel !..Koeff. Fallgesetz
-    DOUBLE PRECISION :: a_ven !..Koeff. Ventilationsparam.
-    DOUBLE PRECISION :: b_ven !..Koeff. Ventilationsparam.
-    DOUBLE PRECISION :: cap   !..Koeff. Kapazitaet
+    real             :: nu    !..Breiteparameter der Verteil.
+    real :: mu    !..Exp.-parameter der Verteil.
+    real :: x_max !..maximale Teilchenmasse
+    real :: x_min !..minimale Teilchenmasse
+    real :: a_geo !..Koeff. Geometrie
+    real :: b_geo !..Koeff. Geometrie = 1/3
+    real :: a_vel !..Koeff. Fallgesetz
+    real :: b_vel !..Koeff. Fallgesetz
+    real :: a_ven !..Koeff. Ventilationsparam.
+    real :: b_ven !..Koeff. Ventilationsparam.
+    real :: cap   !..Koeff. Kapazitaet
   END TYPE PARTICLE
   TYPE(PARTICLE), PARAMETER :: ice=  PARTICLE( & ! nach Andy Heymsfield (CRYSTAL-FACE)
        &                              'iceCRY2test', & !.name...Bezeichnung der Partikelklasse
@@ -726,7 +726,7 @@ contains
     
     if (t_0 < t_nuc .and. s_i > 0.0) then
       nuc_n = 0d0
-      nuc_n = max(n_ice_meyers_contact(t_0,min(s_i,0.25d0)) - (n_ice),0.d0)
+      nuc_n = max(n_ice_meyers_contact(t_0,min(s_i,0.25)) - (n_ice),0.)
 
       nuc_q = min(nuc_n * ice%x_min, q)
       !nuc_n = nuc_q / ice%x_min                !axel 20040416
