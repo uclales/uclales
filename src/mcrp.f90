@@ -284,7 +284,7 @@ contains
     integer             :: i, j, k
     real                :: Xp, Dp, G, S, cerpt, cenpt, xnpts
     real, dimension(n1) :: v1
-
+    logical :: evaporation
     if(sflg) then
        xnpts = 1./((n3-4)*(n2-4))
        do k=1,n1
@@ -295,6 +295,12 @@ contains
     do j=3,n3-2
        do i=3,n2-2
           do k=2,n1
+            evaporation = .false.
+            if(thetal_noprecip) then
+              if (rp(k,i,j) > 0 .and. rl(k,i,j)<=0.) evaporation = .true.
+            else
+              if (rp(k,i,j) > rl(k,i,j)) evaporation = .true.
+            end if
              if (rp(k,i,j) > rl(k,i,j)) then
                 Xp = rp(k,i,j)/ (np(k,i,j)+eps0)
                 Xp = MIN(MAX(Xp,X_bnd),X_max)
@@ -312,7 +318,7 @@ contains
                    if (sflg) v1(k) = v1(k) + cerpt * xnpts
                 end if
              end if
-             rl(k,i,j) = max(0.,rl(k,i,j) - rp(k,i,j))
+              if(.not. thetal_noprecip) rl(k,i,j) = max(0.,rl(k,i,j) - rp(k,i,j))
           end do
        end do
     end do
