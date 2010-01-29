@@ -152,6 +152,7 @@ contains
              call appl_abort(0)
           end select
           iret=nf90_put_att(ncID,VarID,'longname',ncinfo(0,sx(n)))
+          iret=nf90_put_att(ncID,VarID,'_FillValue',-999)
           iret=nf90_put_att(ncID,VarID,'units'   ,ncinfo(1,sx(n)))
        end do
        iret  = nf90_enddef(ncID)
