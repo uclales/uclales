@@ -45,7 +45,7 @@ contains
        iret = nf90_put_att(ncid,NF90_GLOBAL,'history','Created on '//date)
        iret = nf90_put_att(ncid, NF90_GLOBAL, 'Source','UCLA-LES Version 2.0')
        iret = nf90_put_att(ncid, NF90_GLOBAL, 'Author','Bjorn Stevens')
-       iret = nf90_put_att(ncid, NF90_GLOBAL, '_FillValue',-999.)
+ !      iret = nf90_put_att(ncid, NF90_GLOBAL, '_FillValue',-999.)
        iret = nf90_put_att(ncid, NF90_GLOBAL, 'NPTS',npts)
        iret = nf90_put_att(ncid, NF90_GLOBAL, 'NPROCS',pecount)
        iret = nf90_put_att(ncid, NF90_GLOBAL, 'PROCID',myid)
@@ -152,10 +152,11 @@ contains
              call appl_abort(0)
           end select
           iret=nf90_put_att(ncID,VarID,'longname',ncinfo(0,sx(n)))
-          iret=nf90_put_att(ncID,VarID,'_FillValue',-999)
+          iret=nf90_put_att(ncID,VarID,'_FillValue',-999._4)
           iret=nf90_put_att(ncID,VarID,'units'   ,ncinfo(1,sx(n)))
        end do
        iret  = nf90_enddef(ncID)
+
        iret  = nf90_sync(ncID)
        nRec = 1
     else
