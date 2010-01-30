@@ -153,7 +153,7 @@ contains
 
     if (nsmp == 0.) fsttm = time
     nsmp=nsmp+1.
-    ssclr(14:nvar1) = -999.
+    ssclr(14:nvar1) = -999
     !
     ! profile statistics
     !
