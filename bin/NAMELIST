@@ -6,7 +6,7 @@
   dtlong  = 4.
    ssam_intvl=  30.
    savg_intvl=60.
-timmax = 18000.
+timmax = 1800.
   runtype= 'INITIAL'
   hfilin = 'dcbl.rst'
   filprf = 'dcbl_x'

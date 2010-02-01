@@ -19,10 +19,10 @@
 !
 !!!!!!!!!!!!!!!!
 ! TODOLIST ICEMICRO
-! *Include irina - alterations
-! *Remove irreversible water frm q_t
-! *Work do-loops outward
-! *Include Oliviers modifications
+! *Include irina - alterations !DONE
+! *Remove irreversible water frm q_t !DONE
+! *Work do-loops outward   !WONT
+! *Include Oliviers modifications  
 ! *Do serialization of warmmicrophysics
 ! *Include partitioning function between ice and water
 ! *Include icemicro processess one by one
@@ -280,7 +280,7 @@ contains
 
     real, parameter    :: Kt = 2.5e-2    ! conductivity of heat [J/(sKm)]
     real, parameter    :: Dv = 3.e-5     ! diffusivity of water vapor [m2/s]
-
+    real, parameter     :: c_Nevap = 0.7
     integer             :: i, j, k
     real                :: Xp, Dp, G, S, cerpt, cenpt, xnpts
     real, dimension(n1) :: v1
@@ -312,7 +312,7 @@ contains
 
                 if (S < 0) then
                    cerpt = 2. * pi * Dp * G * S * np(k,i,j)
-                   cenpt = cerpt * np(k,i,j) / rp(k,i,j)
+                   cenpt = c_Nevap*cerpt * np(k,i,j) / rp(k,i,j)
                    rpt(k,i,j)=rpt(k,i,j) + cerpt
                    npt(k,i,j)=npt(k,i,j) + cenpt
                    if (sflg) v1(k) = v1(k) + cerpt * xnpts
