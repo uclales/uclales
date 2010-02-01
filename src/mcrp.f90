@@ -460,7 +460,7 @@ contains
     real, intent (inout) :: rpt(n1,n2,n3),npt(n1,n2,n3)
 
     real, parameter :: k_r0 = 4.33
-    real, parameter :: k_1 = 5.e-4
+    real, parameter :: k_1 = 5.e-5
     real, parameter :: Cac = 67.     ! accretion coefficient in KK param.
     real, parameter :: Eac = 1.15    ! accretion exponent in KK param.
 
