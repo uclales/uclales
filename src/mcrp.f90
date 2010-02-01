@@ -704,7 +704,8 @@ contains
              Xc = rc(k,i,j) / (CCN+eps0)
              Dc = ( Xc / prw )**(1./3.)
              Dc = MIN(MAX(Dc,D_min),D_bnd)
-             vc = min(c*(Dc*0.5)**2 * exp(4.5*(log(sgg))**2),1./(dzt(k)*dt))
+!              vc = min(c*(Dc*0.5)**2 * exp(4.5*(log(sgg))**2),1./(dzt(k)*dt))
+             vc = min(c*(Dc*0.5)**2 * exp(5*(log(1.3))**2),1./(dzt(k)*dt))
              rfl(k) = - rc(k,i,j) * vc
              !
              kp1=k+1
