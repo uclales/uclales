@@ -341,7 +341,9 @@ contains
     real, intent (in)    :: dn0(n1), rc(n1,n2,n3), rp(n1,n2,n3), diss(n1,n2,n3), up(n1,n2,n3)
     real, intent (inout) :: rpt(n1,n2,n3), npt(n1,n2,n3)
 
-    real, parameter :: nu_c  = 0.           ! width parameter of cloud DSD
+    real            :: nu_c  = 0.           ! width parameter of cloud DSD
+    real, parameter :: nu_c1 = 1580           ! width parameter of cloud DSD
+    real, parameter :: nu_c2 = -0.28           ! width parameter of cloud DSD
     real, parameter :: kc_0  = 9.44e+9      ! Long-Kernel
     real, parameter :: k_1  = 6.e+2        ! Parameter for phi function
     real, parameter :: k_2  = 0.68         ! Parameter for phi function
@@ -372,12 +374,6 @@ contains
     ! accretion rate using equation (6) in Seifert et al. (2009)
     !
 
-    if (turbulence) then
-       kc_alf = ( kc_a1 + kc_a2 * nu_c )/ ( 1. + kc_a3 * nu_c )
-       kc_rad = ( kc_b1 + kc_b2 * nu_c )/ ( 1. + kc_b3 * nu_c )
-       kc_sig = ( kc_c1 + kc_c2 * nu_c )/ ( 1. + kc_c3 * nu_c )
-       call azero(n1,Recnt,Resum)
-    end if
 
     do j=3,n3-2
        do i=3,n2-2
@@ -386,9 +382,14 @@ contains
              if (Xc > 0.) then
                 Xc = MIN(MAX(Xc,X_min),X_bnd)
                 k_c = kc_0
+                nu_c = nu_c1*dn0(k)*rc(k,i,j)+nu_c2
 
                 if (turbulence) then
-                   Dc = ( Xc / prw )**(1./3.)  ! mass mean diameter cloud droplets in m
+                  kc_alf = ( kc_a1 + kc_a2 * nu_c )/ ( 1. + kc_a3 * nu_c )
+                  kc_rad = ( kc_b1 + kc_b2 * nu_c )/ ( 1. + kc_b3 * nu_c )
+                  kc_sig = ( kc_c1 + kc_c2 * nu_c )/ ( 1. + kc_c3 * nu_c )
+                  call azero(n1,Recnt,Resum)
+                  Dc = ( Xc / prw )**(1./3.)  ! mass mean diameter cloud droplets in m
                    !
                    ! Calculate the mixing length, dissipation rate and Taylor-Reynolds number
                    !
