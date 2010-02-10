@@ -103,9 +103,9 @@ contains
        dim_tt = (/ztId,timeId/)
        dim_mt = (/zmId,timeId/)
        dim_tttt= (/ztID,xtID,ytID,timeId/)  ! thermo point
-       dim_mttt= (/zmID,xtID,ytID,timeId/)  ! zpoint
+       dim_mttt= (/zmID,xtID,ytID,timeId/)  ! wpoint
        dim_tmtt= (/ztID,xmID,ytID,timeId/)  ! upoint
-       dim_ttmt= (/ztId,xtID,ymID,timeId/)  ! ypoint
+       dim_ttmt= (/ztId,xtID,ymID,timeId/)  ! vpoint
 
        do n=1,nVar
           select case(trim(ncinfo(2,sx(n))))
@@ -239,15 +239,15 @@ contains
     case('u')
        if (itype==0) ncinfo = 'Zonal wind'
        if (itype==1) ncinfo = 'm/s'
-       if (itype==2) ncinfo = 'mttt'
+       if (itype==2) ncinfo = 'tmtt'
     case('v')
        if (itype==0) ncinfo = 'Meridional wind'
        if (itype==1) ncinfo = 'm/s'
-       if (itype==2) ncinfo = 'tmtt'
+       if (itype==2) ncinfo = 'ttmt'
     case('w')
        if (itype==0) ncinfo = 'Vertical velocity'
        if (itype==1) ncinfo = 'm/s'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'mttt'
     case('t')
        if (itype==0) ncinfo = 'Liquid Water Potential temperature'
        if (itype==1) ncinfo = 'K'
