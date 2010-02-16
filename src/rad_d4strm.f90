@@ -435,7 +435,7 @@ contains
        end do
        where (tau(:) + tauToAdd(:) > 0.)
           ssa(:) = (ssa(:) * tau(:) + ssaToAdd(:) * tauToAdd(:)) /            &
-               (tau(:) + tauToAdd(:))
+               (tau(:) + tauToAdd(:)+epsilon(tau(1)))
        elsewhere     
           ssa(:) = 0. 
        end where
@@ -444,7 +444,7 @@ contains
       !
       ! New medium is absorbing - phase function doesn't change
       !
-       ssa(:) = (ssa(:) * tau(:)) / (tau(:) + tauToAdd(:))
+       ssa(:) = (ssa(:) * tau(:)) / (tau(:) + tauToAdd(:)+epsilon(tau(1)))
        tau(:) = tau(:) + tauToAdd(:) 
     end if
  

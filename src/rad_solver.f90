@@ -81,7 +81,7 @@ contains
        q2 =   w2w * ( 1.5 * fw - 0.5 )
        q3 = - w3w * ( 2.5 * fw - 1.5 ) * u0
        do i = 1, 4
-          c(i,5) = (w0w + q1*p1d(i) + q2*p2d(i) + q3*p3d(i))/u(i)
+          c(i,5) = (w0w + q1*p1d(i) + q2*p2d(i) + q3*p3d(i))/(u0+epsilon(u0))
        end do
     else
        do i = 1, 4
@@ -128,10 +128,10 @@ contains
     a(2,1,2) = b(1,2) * b(2,1) + b(2,2) * b(4,1)
     a(1,2,2) = b(3,2) * b(1,1) + b(4,2) * b(3,1)
     a(1,1,2) = fw2 + fw4
-    d(1) = b(3,2) * b(4,3) + b(4,2) * b(3,3) + b(2,3) / u0
-    d(2) = b(1,2) * b(4,3) + b(2,2) * b(3,3) + b(1,3) / u0
-    d(3) = b(3,1) * b(1,3) + b(4,1) * b(2,3) + b(3,3) / u0
-    d(4) = b(1,1) * b(1,3) + b(2,1) * b(2,3) + b(4,3) / u0
+    d(1) = b(3,2) * b(4,3) + b(4,2) * b(3,3) + b(2,3) / (u0+epsilon(u0))
+    d(2) = b(1,2) * b(4,3) + b(2,2) * b(3,3) + b(1,3) / (u0+epsilon(u0))
+    d(3) = b(3,1) * b(1,3) + b(4,1) * b(2,3) + b(3,3) / (u0+epsilon(u0))
+    d(4) = b(1,1) * b(1,3) + b(2,1) * b(2,3) + b(4,3) / (u0+epsilon(u0))
 
     ! **********************************************************************
     ! coefficient calculations for fourth-order differential equations.
@@ -139,10 +139,10 @@ contains
     x = u0 * u0
     b1 = a(2,2,1) + a(1,1,1)
     c1 = a(2,1,1) * a(1,2,1) - a(1,1,1) * a(2,2,1)
-    z(1) = a(2,1,1) * d(3) + d(4) / x - a(1,1,1) * d(4)
-    z(2) = a(1,2,1) * d(4) - a(2,2,1) *d(3) + d(3) / x
-    z(3) = a(2,1,2) * d(1) + d(2) / x - a(1,1,2) * d(2)
-    z(4) = a(1,2,2) * d(2) - a(2,2,2) * d(1) + d(1) / x
+    z(1) = a(2,1,1) * d(3) + d(4) / (x+epsilon(u0)) - a(1,1,1) * d(4)
+    z(2) = a(1,2,1) * d(4) - a(2,2,1) *d(3) + d(3) / (x+epsilon(u0))
+    z(3) = a(2,1,2) * d(1) + d(2) / (x+epsilon(u0)) - a(1,1,2) * d(2)
+    z(4) = a(1,2,2) * d(2) - a(2,2,2) * d(1) + d(1) / (x+epsilon(u0))
 
     ! **********************************************************************
     ! fk1 and fk2 are the eigenvalues.
@@ -152,7 +152,7 @@ contains
     fk1 = sqrt ( ( b1 + x ) * 0.5 )
     fk2 = sqrt ( ( b1 - x ) * 0.5 )
     fw = u0 * u0
-    x = 1.0 / ( fw * fw ) - b1 / fw - c1
+    x = 1.0 / ( fw * fw+epsilon(u0) ) - b1 / (fw+epsilon(u0)) - c1
     fw = 0.5 * f0 / x
     z(1) = fw * z(1) 
     z(2) = fw * z(2) 
@@ -188,11 +188,11 @@ contains
     a1(4,3) = a1(1,2)
     a1(4,4) = a1(1,1)
     if ( solar ) then
-       fq0 = exp ( - t0 / u0 )
-       fq1 = exp ( - t1 / u0 )
+       fq0 = exp ( - t0 / (u0+epsilon(u0)) )
+       fq1 = exp ( - t1 / (u0+epsilon(u0)) )
     else
        fq0 = 1.0
-       fq1 = exp ( - dt / u0 )
+       fq1 = exp ( - dt / (u0+epsilon(u0)) )
     endif
     x = exp ( - fk1 * dt )
     y = exp ( - fk2 * dt )
@@ -226,7 +226,7 @@ contains
 
     fk1 = 4.7320545
     fk2 = 1.2679491
-    y = exp ( - ( t1 - t0 ) / u0 )
+    y = exp ( - ( t1 - t0 ) / (u0+epsilon(u0)))
     fw = 0.5 * f0
     do i = 1, 4
        if ( solar ) then
@@ -235,7 +235,7 @@ contains
           zz(i,2) = 0.0
        else
           jj = 5 - i
-          z1(i) = fw / ( 1.0 + u(jj) / u0 )
+          z1(i) = fw / ( 1.0 + u(jj) / (u0+epsilon(u0)) )
           zz(i,1) = z1(i) 
           zz(i,2) = z1(i) * y
        endif
@@ -364,7 +364,7 @@ contains
     if ( solar ) then
        v1 = 0.2113247 * asbs
        v2 = 0.7886753 * asbs
-       v3 = asbs * u0(1) * f0(1) * exp ( - t(nv) / u0(1) )
+       v3 = asbs * u0(1) * f0(1) * exp ( - t(nv) / (u0(1)+epsilon(u0)) )
     else
        v1 = 0.2113247 * ( 1.0 - ee )
        v2 = 0.7886753 * ( 1.0 - ee )
@@ -653,7 +653,7 @@ contains
           x(3) = 1.0
           x(4) = 1.0
           if (solar) y1 = t(kk)
-          xy =  exp ( - y1 / u0a(kk) )
+          xy =  exp ( - y1 / (u0a(kk)+epsilon(u0a(1)) ))
        endif
        if (kk > 1) tkm1 = t(kk)
 

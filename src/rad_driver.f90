@@ -94,7 +94,7 @@ module radiation
                   plwc(kk) = 1000.*dn0(k)*max(0.,(rc(k,i,j)-rr(k,i,j)))
                   prwc(kk) = 1000.*dn0(k)*rr(k,i,j)
                else
-                  plwc(kk) = 1000.*dn0(k)*rc(k,i,j)
+                  plwc(kk) = 1000.*dn0(k)*max(0.,rc(i,j,k))
                   prwc(kk) = 0.
                end if
                pre(kk)  = 1.e6*(plwc(kk)/(1000.*prw*CCN*dn0(k)))**(1./3.)
