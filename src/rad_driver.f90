@@ -110,6 +110,7 @@ module radiation
             !print *, "plwc",plwc(:)
             !print *, "pre",pre(:)
             !print *, "u0",u0
+
             call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
                  fds, fus, fdir, fuir, plwc=plwc, pre=pre, useMcICA=.True.)
 

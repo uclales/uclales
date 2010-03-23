@@ -64,7 +64,8 @@ module grid
   integer           :: nz, nxyzp, nxyp, nstep
   real              :: dxi, dyi, dt, psrf
   real, dimension(:), allocatable :: xt, xm, yt, ym, zt, zm, dzt, dzm,        &
-       u0, v0, pi0, pi1, th0, dn0, rt0, spngt, spngm, wsavex, wsavey
+       u0, v0, pi0, pi1, th0, dn0, rt0, spngt, spngm, wsavex, wsavey,         &
+       wfls, dthldtls,dqtdtls                                       !cgils
   !
   ! 2D Arrays (surface fluxes)
   !
@@ -81,9 +82,7 @@ module grid
   ! Named pointers (to 3D arrays) 
   !
   real, dimension (:,:,:), pointer :: a_up, a_ut, a_vp, a_vt, a_wp, a_wt,     &
-       a_sp, a_st, a_tp, a_tt, a_rp, a_rt, a_rpp, a_rpt, a_npp, a_npt,        &
-       a_ninuct , a_micet , a_nicet , a_msnowt , a_nsnowt , a_mgrt, a_ngrt,     &
-       a_ninucp , a_micep , a_nicep , a_msnowp , a_nsnowp , a_mgrp , a_ngrp
+       a_sp, a_st, a_tp, a_tt, a_rp, a_rt, a_rpp, a_rpt, a_npp, a_npt 
   !
   ! Memory for prognostic variables
   !
@@ -103,6 +102,11 @@ contains
     integer :: memsize
 
     allocate (u0(nzp),v0(nzp),pi0(nzp),pi1(nzp),th0(nzp),dn0(nzp),rt0(nzp))
+!cgils    
+    allocate (wfls(nzp),dthldtls(nzp),dqtdtls(nzp))
+    wfls(:) = 0.
+    dthldtls(:) = 0.
+    dqtdtls(:) = 0.
 
     memsize = 2*nxyzp ! complex array in pressure solver
 
@@ -195,15 +199,6 @@ contains
     if (level >= 3) then
       a_rpp =>a_xp(:,:,:,6)
       a_npp =>a_xp(:,:,:,7)
-    end if
-    if (level >= 4) then
-      a_ninucp =>a_xp(:,:,:, 8)
-      a_micep  =>a_xp(:,:,:, 9)
-      a_nicep  =>a_xp(:,:,:,10)
-      a_msnowp =>a_xp(:,:,:,11)
-      a_nsnowp =>a_xp(:,:,:,12)
-      a_mgrp   =>a_xp(:,:,:,13)
-      a_ngrp   =>a_xp(:,:,:,14)
     end if
 
     allocate (a_ustar(nxp,nyp),a_tstar(nxp,nyp),a_rstar(nxp,nyp))
@@ -441,7 +436,7 @@ contains
     if (level  >= 1) nvar0 = nvar0+1
     if (level  >= 2) nvar0 = nvar0+1
     if (level  >= 3) nvar0 = nvar0+2
-    if (level  >= 4) nvar0 = nvar0+7
+    !irina
     if (iradtyp > 1) nvar0 = nvar0+3
 
     allocate (sanal(nvar0))
@@ -470,22 +465,6 @@ contains
        sanal(nvar0) = sbase(nbase+3)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(nbase+4)
-    end if
-    if (level >= 4) then
-       nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+5)
-       nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+6)
-       nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+7)
-       nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+8)
-       nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+9)
-       nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+10)
-       nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+11)
     end if
 
     !irina

@@ -31,6 +31,8 @@ module init
   real                  :: zrand = 200.
   character  (len=80)   :: hfilin = 'test.'  
 
+
+
 contains
   !
   ! ----------------------------------------------------------------------
@@ -43,9 +45,15 @@ contains
     use stat, only : init_stat
     use mpi_interface, only : appl_abort, myid
     use thrm, only : thermo
-!
+!cgils
+    use forc, only : lstendflg
+    
 
     implicit none
+
+
+
+
 
     if (runtype == 'INITIAL') then
        time=0.
@@ -65,6 +73,10 @@ contains
     !irina
        if (lsvarflg) then
        call lsvar_init
+       end if
+    !cgils
+       if (lstendflg) then
+       call lstend_init
        end if
     !    
     ! write analysis and history files from restart if appropriate
@@ -565,6 +577,40 @@ contains
  
     return
   end subroutine lsvar_init
+
+!cgils
+  !----------------------------------------------------------------------
+  ! Lstend_init if lstendflg is true reads the lstend  from the respective
+  ! file lstend_in
+  ! 
+  subroutine lstend_init
+
+   use grid,only   : wfls,dqtdtls,dthldtls
+    use mpi_interface, only : myid
+   
+
+   implicit none
+   
+   real     :: tmp1
+
+    ! reads the time varying lscale forcings
+    !
+ !   print *, wfls
+    if (wfls(2) == 0.) then
+ !         print *, 'lstend_init '                 
+       open (1,file='lstend_in',status='old',form='formatted')
+        if(myid == 0)  print *, 'lstend_init read'                 
+       do ns=1,nzp-1
+          read (1,'(F10.3,2X, E10.3,2X, E10.3,2X, E10.3)',end=100) tmp1,wfls(ns),dqtdtls(ns),dthldtls(ns)
+        if(myid == 0)  print *, ns, tmp1,wfls(ns),dqtdtls(ns),dthldtls(ns)
+       end do
+       close (1)
+    end if
+100 continue
+ 
+    return
+  end subroutine lstend_init
+
 
   !
 

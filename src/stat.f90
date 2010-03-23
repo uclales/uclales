@@ -153,7 +153,7 @@ contains
 
     if (nsmp == 0.) fsttm = time
     nsmp=nsmp+1.
-    ssclr(14:nvar1) = -999
+    ssclr(14:nvar1) = -999.
     !
     ! profile statistics
     !
@@ -251,12 +251,13 @@ contains
     real, intent(in)    :: rt(n1,n2,n3),rs(n1,n2,n3), zt(n1)
 
     integer :: k,i,j
-    real    :: cpnt, unit, xaqua
+    real    :: cpnt, unit, xaqua, ct_tmp, cb_tmp
 
     ssclr(18)  = zt(n1)
     ssclr(19)  = 0.
     ssclr(20)  = 0.
 !irina    
+    ssclr(17)  = 0.
     ssclr(28)  = 0.
     ssclr(29)  = 0.
 
@@ -264,11 +265,19 @@ contains
     do j=3,n3-2
        do i=3,n2-2
           cpnt  = 0.
+!irina
+        ct_tmp =0.
+        cb_tmp =zt(n1)
+!        
           do k=2,n1-2
              xaqua = rt(k,i,j) - rs(k,i,j)
              if (xaqua > 1.e-5) then
                 ssclr(17) = max(ssclr(17),zt(k))
                 ssclr(18) = min(ssclr(18),zt(k))
+!irina                
+                ct_tmp = max(ct_tmp,zt(k))
+                cb_tmp = min(cb_tmp,zt(k))
+!irina                
                 cpnt = unit
                 ssclr(20) = max(ssclr(20), xaqua)
              end if
@@ -276,9 +285,8 @@ contains
           ssclr(19) = ssclr(19) + cpnt
 !irina
         if (cpnt.ne.0) then
-        ssclr(28) = ssclr(28)+ssclr(17)
-        ssclr(29) = ssclr(29)+ssclr(18)
-  !      print *,i,j,ssclr(28),ssclr(29)
+        ssclr(28) = ssclr(28)+ct_tmp
+        ssclr(29) = ssclr(29)+cb_tmp
         end if
        end do
     end do
@@ -286,6 +294,7 @@ contains
   !  print *,'mean',ssclr(28),ssclr(19),unit
      ssclr(28) =ssclr(28)/ssclr(19)*unit
      ssclr(29) =ssclr(29)/ssclr(19)*unit
+  !      print *,'ct cb', ssclr(28),ssclr(29), ssclr(17),ssclr(18)
 
     if (ssclr(18) == zt(n1)) ssclr(18) = -999.
 
