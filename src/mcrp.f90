@@ -28,7 +28,7 @@ module mcrp
   use util, only : get_avg3, azero
   implicit none
 
-  logical, parameter :: droplet_sedim = .true., khairoutdinov = .false., turbulence = .false.
+  logical, parameter :: droplet_sedim = .true., khairoutdinov = .true., turbulence = .false.
   !logical, parameter :: droplet_sedim = .False., khairoutdinov = .False., turbulence = .False.
   ! 
   ! drop sizes definition is based on vanZanten (2005)

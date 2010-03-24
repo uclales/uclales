@@ -23,7 +23,7 @@ module radiation
   use fuliou, only     : rad
   implicit none
 
-  character (len=19), parameter :: background = 'datafiles/kmls.lay'
+  character (len=19), parameter :: background = 'datafiles/s11.lay'
  ! character (len=19), parameter :: background = 'datafiles/astx.lay'
  !  character (len=19), parameter :: background = 'datafiles/dsrt.lay'
 
@@ -71,7 +71,9 @@ module radiation
       ! determine the solar geometery, as measured by u0, the cosine of the 
       ! solar zenith angle
       !
-      u0 = zenith(alat,time)
+    !   u0 = zenith(alat,time)
+    !cgils
+      u0 = 1.
       !
       ! call the radiation 
       !

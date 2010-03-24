@@ -112,14 +112,19 @@ contains
        do j=3,nyp-2
           do i=3,nxp-2
              dtdz(i,j) = a_theta(2,i,j) - sst*(p00/psrf)**rcp
-             drdz(i,j) = vapor(2,i,j) - rslf(psrf,sst)
+            ! drdz(i,j) = vapor(2,i,j) - rslf(psrf,sst)
+   !cgils
+             drdz(i,j) = vapor(2,i,j) - 0.98*rslf(psrf,sst)
              if (ubmin > 0.) then
                 a_ustar(i,j) = sqrt(zrough)* wspd(i,j)
              else
                 a_ustar(i,j) = abs(ubmin)
              end if
-             a_tstar(i,j) =  dthcon * wspd(i,j)*dtdz(i,j)/a_ustar(i,j)
-             a_rstar(i,j) =  drtcon * wspd(i,j)*drdz(i,j)/a_ustar(i,j)
+   !cgils  : drag coeff C = 0.0012*6.75 m/s = 0.0081 m/s
+             a_tstar(i,j) =  0.0081*dtdz(i,j)/a_ustar(i,j)
+             a_rstar(i,j) =  0.0081*drdz(i,j)/a_ustar(i,j)
+             !a_tstar(i,j) =  dthcon * wspd(i,j)*dtdz(i,j)/a_ustar(i,j)
+             !a_rstar(i,j) =  drtcon * wspd(i,j)*drdz(i,j)/a_ustar(i,j)
              bfct(i,j) = g*zt(2)/(a_theta(2,i,j)*wspd(i,j)**2)
           end do
        end do
