@@ -93,6 +93,7 @@ contains
          zrand
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
+    use modnudge, only : lnudge,tnudgefac
 
     implicit none
 
@@ -123,7 +124,8 @@ contains
          case_name,                 & !irina:name of the case, i.e. astex, rico, etc  
          lsvarflg,                  & !irina:flag for time bvarying large scale forcing  
          lstendflg,                  & !irina:flag for time large scale advective tendencies  
-         div                          !irina: divergence  
+         div,  &                       !irina: divergence
+         lnudge, tnudgefac             !thijs: Nudging
 
     ps       = 0.
     ts       = th00

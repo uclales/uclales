@@ -25,6 +25,7 @@ module forc
   use rad_gcss, only : gcss_rad
   !cgils
   use grid, only : wfls,dthldtls,dqtdtls
+  use modnudge, only : nudge 
   implicit none
 
    !character (len=5), parameter :: case_name = 'xxxx'
@@ -153,7 +154,10 @@ contains
        end if
        
     end select 
+!cgils: Nudging
+    call nudge(time_in)
 
+    
   end subroutine forcings
   !
   ! -------------------------------------------------------------------
