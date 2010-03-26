@@ -53,7 +53,7 @@ contains
     use grid, only: nxp, nyp, nzp, zm, zt, dzt, dzm, dn0, iradtyp, liquid  &
          , a_rflx, a_sflx, albedo, a_tt, a_tp, a_rt, a_rp, a_pexnr, a_scr1 &
          , vapor, a_rpp, CCN, pi0, pi1, level, a_ut, a_up, a_vt, a_vp,a_theta,&
-          a_lflxu, a_lflxd, a_sflxu, a_sflxd
+          a_lflxu, a_lflxd, a_sflxu, a_sflxd,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa
 
     use mpi_interface, only : myid, appl_abort
 
@@ -91,7 +91,9 @@ contains
           if (level == 3) then
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
                   dn0, pi0, pi1, dzt, a_pexnr, a_theta, vapor, liquid, a_tt,&
-                  a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, rr=a_rpp)
+                  a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
+                  rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
+                  lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
             !old      
             ! call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
             !      dn0, pi0, pi1, dzt, a_pexnr, a_scr1, vapor, liquid, a_tt,&
@@ -101,7 +103,9 @@ contains
              xref2 = 0.
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,    &
                   dn0, pi0, pi1, dzt, a_pexnr, a_theta, vapor, liquid, a_tt, &
-                  a_rflx, a_sflx,a_lflxu, a_lflxd,a_sflxu,a_sflxd,albedo)
+                  a_rflx, a_sflx,a_lflxu, a_lflxd,a_sflxu,a_sflxd,albedo, &
+                  sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
+                  lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
              !call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,    &
              !     dn0, pi0, pi1, dzt, a_pexnr, a_scr1, vapor, liquid, a_tt, &
              !     a_rflx, a_sflx, albedo)

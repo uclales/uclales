@@ -70,7 +70,7 @@ module grid
   ! 2D Arrays (surface fluxes)
   !
   real, dimension (:,:), allocatable :: albedo, a_ustar, a_tstar, a_rstar,    &
-       uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc
+       uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa
   !
   ! 3D Arrays 
   !irina
@@ -142,9 +142,13 @@ contains
     end if
     !irina
     if (iradtyp == 2 .and. level > 1) then
-       allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp))
+       allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp),sflxu_toa(nxp,nyp),sflxd_toa(nxp,nyp),lflxu_toa(nxp,nyp),lflxd_toa(nxp,nyp))
        a_sflx(:,:,:) = 0.
        albedo(:,:) = 0.
+       sflxu_toa(:,:) = 0.
+       sflxd_toa(:,:) = 0.
+       lflxu_toa(:,:) = 0.
+       lflxd_toa(:,:) = 0.
        memsize = memsize + nxyzp + nxyp
        !irina
        allocate (a_sflxu(nzp,nxp,nyp))

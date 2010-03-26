@@ -42,12 +42,14 @@ SAVE
   integer :: ntnudge = 100
   logical :: firsttime = .true.
 contains
-  subroutine initnudge
-    use grid, only : nzp
+  subroutine initnudge(time)
+    use grid, only : nzp,zt,th00
+    use mpi_interface, only : myid
     implicit none
 
     integer :: ierr,k,t,ifinput = 19
     real,allocatable,dimension(:) :: height
+    real, intent(in) :: time
     character(1) :: chmess1
     allocate(tnudge(nzp,ntnudge),unudge(nzp,ntnudge),vnudge(nzp,ntnudge),wnudge(nzp,ntnudge),thlnudge(nzp,ntnudge),qtnudge(nzp,ntnudge))
     allocate(timenudge(0:ntnudge), height(nzp))
@@ -63,7 +65,7 @@ contains
 
     if (.not. lnudge) return
       t = 0
-      open (ifinput,file='nudge.in')
+      open (ifinput,file='nudge_in')
       ierr = 0 
       readloop: do
         t = t + 1
@@ -85,20 +87,24 @@ contains
                 thlnudge(k,t), &
                 qtnudge(k,t)
         end do
-
-        do k=nzp-1,1,-1
-          write (6,'(f7.1,6e12.4)') &
-                height (k), &
-                tnudge (k,t), &
-                unudge (k,t), &
-                vnudge (k,t), &
-                wnudge (k,t), &
-                thlnudge(k,t), &
-                qtnudge(k,t)
-        end do
+        if (myid == 0) then
+          do k=nzp-1,1,-1
+            write (6,'(2f7.1,6e12.4)') &
+                  zt (k), &
+                  height (k), &
+                  tnudge (k,t), &
+                  unudge (k,t), &
+                  vnudge (k,t), &
+                  wnudge (k,t), &
+                  thlnudge(k,t), &
+                  qtnudge(k,t)
+          end do
+        end if
       end do readloop
       close(ifinput)
+      timenudge = timenudge/86400+time
       tnudge  = tnudgefac*tnudge
+      thlnudge = thlnudge - th00
     lunudge = any(abs(unudge)>1e-8)
     lvnudge = any(abs(vnudge)>1e-8)
     lwnudge = any(abs(wnudge)>1e-8)
@@ -112,15 +118,14 @@ contains
   subroutine nudge(time)
 !     use modglobal, only : rdt
 !     use modfields, only : u0av,v0av,qt0av,thl0av
-    use grid, only : dt, nxp, nyp, nzp, a_ut, a_vt, a_wt, a_tt, a_rt, a_up,a_vp,a_tp,a_rp
+    use grid, only : dt, nxp, nyp, nzp, a_ut, a_vt, a_wt, a_tt, a_rt, a_up,a_vp,a_tp,a_rp,zt,a_wp
     implicit none
     real, intent (in) :: time
     integer k,t,i,j
     real :: dtm,dtp,currtnudge
-    
     if (firsttime) then
       firsttime = .false.
-      call initnudge
+      call initnudge(time)
     end if
     if (.not.(lnudge)) return
 !     if (rk3step/=3) return
@@ -144,9 +149,9 @@ contains
           (a_up(k,i,j)-(unudge  (k,t)*dtp+unudge  (k,t+1)*dtm))/currtnudge
       if(lvnudge  ) a_vt(k,i,j)=a_vt(k,i,j)-&
           (a_vp(k,i,j)-(vnudge  (k,t)*dtp+vnudge  (k,t+1)*dtm))/currtnudge
-      if(lunudge  ) a_ut(k,i,j)=a_ut(k,i,j)-&
+      if(lthlnudge  ) a_tt(k,i,j)=a_tt(k,i,j)-&
           (a_tp(k,i,j)-(thlnudge  (k,t)*dtp+thlnudge  (k,t+1)*dtm))/currtnudge
-      if(lunudge  ) a_rt(k,i,j)=a_rt(k,i,j)-&
+      if(lqtnudge  ) a_rt(k,i,j)=a_rt(k,i,j)-&
           (a_rp(k,i,j)-(qtnudge  (k,t)*dtp+qtnudge  (k,t+1)*dtm))/currtnudge
     end do
     end do

@@ -28,7 +28,7 @@ module stat
   private
 
 !irina
-  integer, parameter :: nvar1 = 30, nvar2 = 97
+  integer, parameter :: nvar1 = 34, nvar2 = 97
 
   integer, save      :: nrec1, nrec2, ncid1, ncid2, nv1=nvar1, nv2=nvar2
   real, save         :: fsttm, lsttm, nsmp = 0
@@ -43,7 +43,8 @@ module stat
        'vtke   ','sfcbflx','wmax   ','tsrf   ','ustar  ','shf_bar', & ! 7
        'lhf_bar','zi_bar ','lwp_bar','lwp_var','zc     ','zb     ', & !13
        'cfrac  ','lmax   ','albedo ','rwp_bar','prcp   ','pfrac  ', & !19
-       'CCN    ','nrain  ','nrcnt  ','zcmn   ','zbmn   ','tkeint '/),                             &
+       'CCN    ','nrain  ','nrcnt  ','zcmn   ','zbmn   ','tkeint ', & !25
+       'lflxut ','lflxdt ','sflxut ','sflxdt ' /),                  &
        s2(nvar2)=(/                                                 &
        'time   ','zt     ','zm     ','dn0    ','u0     ','v0     ', & ! 1
        'fsttm  ','lsttm  ','nsmp   ','u      ','v      ','t      ', & ! 7
@@ -147,7 +148,7 @@ contains
     use grid, only : a_up, a_vp, a_wp, liquid, a_theta, a_scr1, a_scr2       &
          , a_rp, a_tp, press, nxp, nyp, nzp, dzm, dzt, zm, zt, th00, umean &
          , vmean, dn0, precip, a_rpp, a_npp, albedo, CCN, iradtyp, a_rflx    &
-         , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd
+         , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa
 
     real, intent (in) :: time
 
@@ -168,7 +169,8 @@ contains
     end if
     if (iradtyp >2) then
        call accum_rad(nzp, nxp, nyp, a_rflx, sflx=a_sflx, alb=albedo,lflxu=a_lflxu,&
-       lflxd=a_lflxd,sflxu=a_sflxu, sflxd=a_sflxd)
+       lflxd=a_lflxd,sflxu=a_sflxu, sflxd=a_sflxd,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
+       lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
     end if
     if (level >=1) call accum_lvl1(nzp, nxp, nyp, a_rp)
     if (level >=2) call accum_lvl2(nzp, nxp, nyp, th00, dn0, zm, a_wp,       &
@@ -349,13 +351,14 @@ contains
   ! SUBROUTINE ACCUM_STAT: Accumulates various statistics over an 
   ! averaging period for radiation variables
   !
-  subroutine accum_rad(n1,n2,n3,rflx,sflx,alb,lflxu,lflxd,sflxu,sflxd)
+  subroutine accum_rad(n1,n2,n3,rflx,sflx,alb,lflxu,lflxd,sflxu,sflxd,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa)
 
     integer, intent (in) :: n1,n2,n3
     real, intent (in)    :: rflx(n1,n2,n3)
  !irina   
     real, optional, intent (in) :: sflx(n1,n2,n3), alb(n2,n3), lflxu(n1,n2,n3),&
-                                   lflxd(n1,n2,n3),sflxu(n1,n2,n3),sflxd(n1,n2,n3) 
+                                   lflxd(n1,n2,n3),sflxu(n1,n2,n3),sflxd(n1,n2,n3) ,&
+                                   sflxu_toa(n2,n3),sflxd_toa(n2,n3),lflxu_toa(n2,n3),lflxd_toa(n2,n3)
 
     integer :: k
     real    :: a1(n1),a2(n1)
@@ -401,6 +404,18 @@ contains
           svctr(k,96)=svctr(k,96) + a1(k)
     end do
   end if
+    if (present(lflxu_toa)) then
+      ssclr(30) = get_avg(1,n2,n3,1,lflxu_toa)
+    end if
+    if (present(lflxd_toa)) then
+      ssclr(30) = get_avg(1,n2,n3,1,lflxd_toa)
+    end if
+    if (present(sflxu_toa)) then
+      ssclr(30) = get_avg(1,n2,n3,1,sflxu_toa)
+    end if
+    if (present(sflxd_toa)) then
+      ssclr(30) = get_avg(1,n2,n3,1,sflxd_toa)
+    end if
 
 
   end subroutine accum_rad

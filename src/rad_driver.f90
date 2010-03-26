@@ -37,7 +37,7 @@ module radiation
   contains
 
     subroutine d4stream(n1, n2, n3, alat, time, sknt, sfc_albedo, CCN, dn0, &
-         pi0, pi1, dzm, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,sflxd, albedo, rr)
+         pi0, pi1, dzm, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,sflxd, albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa, rr)
 
 
       integer, intent (in) :: n1, n2, n3
@@ -46,7 +46,7 @@ module radiation
       real, dimension (n1,n2,n3), intent (in)           :: pip, th, rv, rc
       real, optional, dimension (n1,n2,n3), intent (in) :: rr
       real, dimension (n1,n2,n3), intent (inout)        :: tt, rflx, sflx, lflxu, lflxd, sflxu, sflxd 
-      real, intent (out)                                :: albedo(n2,n3)
+      real, dimension (n2,n3), intent (out),optional    :: albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa
 
       integer :: kk
       real    :: xfact, prw, p0(n1), exner(n1), pres(n1)
@@ -130,12 +130,25 @@ module radiation
              !  print *,k, fuir(kk),fdir(kk),sflx(k,i,j), rflx(k,i,j)
             end do
 
-            if (u0 > 0.) then
-               albedo(i,j) = fus(1)/fds(1)
-            else
-               albedo(i,j) = -999.
+            if (present(albedo)) then
+              if (u0 > 0.) then
+                albedo(i,j) = fus(1)/fds(1)
+              else
+                albedo(i,j) = -999.
+              end if
             end if
-
+            if (present(sflxu_toa)) then
+              sflxu_toa(i,j) = fus(1)
+            end if
+            if (present(sflxd_toa)) then
+              sflxd_toa(i,j) = fds(1)
+            end if
+            if (present(lflxu_toa)) then
+              lflxu_toa(i,j) = fuir(1)
+            end if
+            if (present(lflxd_toa)) then
+              lflxd_toa(i,j) = fdir(1)
+            end if 
             do k=2,n1-3
                xfact  = exner(k)*dzm(k)/(cp*dn0(k))
                tt(k,i,j) = tt(k,i,j) - (rflx(k,i,j) - rflx(k-1,i,j))*xfact
