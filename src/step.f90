@@ -39,7 +39,7 @@ module step
 !irina  
   real    :: sst=292.
   real    :: div = 3.75e-6
-  logical :: lsvarflg = .false.
+  logical :: lsvarflg = .true.
   character (len=5) :: case_name = 'astex'
 
 contains
@@ -143,8 +143,8 @@ contains
        if(myid == 0) then
           call cpu_time(t2)           !t1=timing()
           if (mod(istp,istpfl) == 0 ) print "('   Timestep # ',i5," //     &
-              "'   Model time(sec)=',f10.2,3x,'CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2)",     &
-              istp, time, t2-t1, t2*(timmax/time-1)
+              "'   Model time(sec)=',f10.2,3x,'CPU time(sec)=',f8.3)",     &
+              istp, time, t2-t1
        endif
 
     enddo
@@ -237,9 +237,8 @@ contains
   ! 
   subroutine tendencies(nstep)
 
-    use grid, only : a_ut, a_vt, a_wt, a_tt, a_rt, a_rpt, a_npt, a_ninuct, &
-                     a_micet,a_nicet,a_msnowt,a_nsnowt, a_mgrt, a_ngrt,&
-                     a_xt1, a_xt2, nscl, nxyzp, level
+    use grid, only : a_ut, a_vt, a_wt, a_tt, a_rt, a_rpt, a_npt, a_xt1,  &
+         a_xt2, nscl, nxyzp, level
     use util, only : azero
 
     integer, intent (in) :: nstep
@@ -257,16 +256,6 @@ contains
           a_rpt =>a_xt1(:,:,:,6)
           a_npt =>a_xt1(:,:,:,7)
        end if
-       if (level >= 4) then
-          a_ninuct =>a_xt1(:,:,:, 8)
-          a_micet  =>a_xt1(:,:,:, 9)
-          a_nicet  =>a_xt1(:,:,:,10)
-          a_msnowt =>a_xt1(:,:,:,11)
-          a_nsnowt =>a_xt1(:,:,:,12)
-          a_mgrt   =>a_xt1(:,:,:,13)
-          a_ngrt   =>a_xt1(:,:,:,14)
-       end if
-
     case(2)
        call azero(nxyzp*nscl,a_xt2)
        a_ut => a_xt2(:,:,:,1)
@@ -278,15 +267,6 @@ contains
           a_rpt =>a_xt2(:,:,:,6)
           a_npt =>a_xt2(:,:,:,7)
        end if
-       if (level >= 4) then
-          a_ninuct =>a_xt2(:,:,:, 8)
-          a_micet  =>a_xt2(:,:,:, 9)
-          a_nicet  =>a_xt2(:,:,:,10)
-          a_msnowt =>a_xt2(:,:,:,11)
-          a_nsnowt =>a_xt2(:,:,:,12)
-          a_mgrt   =>a_xt2(:,:,:,13)
-          a_ngrt   =>a_xt2(:,:,:,14)
-       end if
     end select
 
   end subroutine tendencies
@@ -296,8 +276,9 @@ contains
   !
   subroutine update(nstep)
 
+!irina
     use grid, only : a_xp, a_xt1, a_xt2, a_up, a_vp, a_wp, a_sp, dzt, dt,  &
-         nscl, nxp, nyp, nzp, newvar
+         nscl, nxp, nyp, nzp, newvar,level, a_rpp,a_npp
     use util, only : sclrset,velset
 
     real, parameter ::  alpha(3) = (/ 8./15., -17./60.,  3./4. /), &
@@ -316,6 +297,15 @@ contains
        call sclrset('mixd',nzp,nxp,nyp,a_sp,dzt)
     end do
 
+!irina
+   if (level >= 3) then
+   where (a_rpp < 0.) 
+    a_rpp=0.
+    end where
+   where (a_npp < 0.) 
+    a_npp=0.
+    end where
+   end if
 
 
   end subroutine update

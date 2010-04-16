@@ -165,6 +165,10 @@ contains
        xran(k) = 0.2*(zrand - zt(k))/zrand
     end do
     call random_pert(nzp,nxp,nyp,zt,a_tp,xran,k) 
+<<<<<<< HEAD
+=======
+print *, 'init', maxval(a_tp)
+>>>>>>> cgils
     if (associated(a_rp)) then
        k=1
        do while( zt(k+1) <= zrand .and. k < nzp)

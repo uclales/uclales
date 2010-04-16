@@ -83,15 +83,17 @@ contains
     !use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon, sst
     use step, only : timmax, timrsm, istpfl, corflg, outflg, frqanl, frqhis,          &
          strtim, radfrq, cntlat,& 
-         case_name,lsvarflg, sst, div                                   !irina
+         case_name,lsvarflg, sst, div                   !irina
+!cgils         
+    use forc, only : lstendflg     
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
          filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype, CCN
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,iseed, hfilin,   &
          zrand
-    use thrm, only : thetal_noprecip
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
+    use modnudge, only : lnudge,tnudgefac
 
     implicit none
 
@@ -121,8 +123,9 @@ contains
          umean  , vmean  , th00  ,  & ! gallilean E/W wind, basic state
          case_name,                 & !irina:name of the case, i.e. astex, rico, etc  
          lsvarflg,                  & !irina:flag for time bvarying large scale forcing  
-         div,                       & !irina: divergence
-         thetal_noprecip              !thijs: include precipitative water into total water and theta_l
+         lstendflg,                  & !irina:flag for time large scale advective tendencies  
+         div,  &                       !irina: divergence
+         lnudge, tnudgefac             !thijs: Nudging
 
     ps       = 0.
     ts       = th00

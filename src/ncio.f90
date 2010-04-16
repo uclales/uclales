@@ -372,7 +372,7 @@ contains
        if (itype==1) ncinfo = 'kg/kg'
        if (itype==2) ncinfo = 'time'
     case('albedo')
-       if (itype==0) ncinfo = 'Relfected (TOA) shortwave radiation'
+       if (itype==0) ncinfo = 'Reflected (TOA) shortwave radiation'
        if (itype==1) ncinfo = '-'
        if (itype==2) ncinfo = 'time'
     case('rwp_bar')
@@ -588,6 +588,14 @@ contains
        if (itype==0) ncinfo =  'Longwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
+    case('lflxut')
+       if (itype==0) ncinfo =  'Top of Atmosphere Longwave Radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('lflxdt')
+       if (itype==0) ncinfo =  'Top of Atmosphere Longwave Radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
     case('rflx2')  
        if (itype==0) ncinfo = 'Variance of total radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
@@ -597,15 +605,23 @@ contains
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
     !irina   
-    case('sflxu')   
+    case('sflxu')
        if (itype==0) ncinfo = 'Shortwave radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('sflxd')   
+    case('sflxd')
        if (itype==0) ncinfo = 'Shortwave radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('sflx2')  
+    case('sflxut')
+       if (itype==0) ncinfo = 'Top of Atmosphere Shortwave radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('sflxdt')
+       if (itype==0) ncinfo = 'Top of Atmosphere Shortwave radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('sflx2')
        if (itype==0) ncinfo = 'Variance of shortwave radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
