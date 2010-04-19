@@ -64,12 +64,13 @@ module grid
   integer           :: nz, nxyzp, nxyp, nstep
   real              :: dxi, dyi, dt, psrf
   real, dimension(:), allocatable :: xt, xm, yt, ym, zt, zm, dzt, dzm,        &
-       u0, v0, pi0, pi1, th0, dn0, rt0, spngt, spngm, wsavex, wsavey
+       u0, v0, pi0, pi1, th0, dn0, rt0, spngt, spngm, wsavex, wsavey,         &
+       wfls, dthldtls,dqtdtls                                       !cgils
   !
   ! 2D Arrays (surface fluxes)
   !
   real, dimension (:,:), allocatable :: albedo, a_ustar, a_tstar, a_rstar,    &
-       uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc
+       uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa
   !
   ! 3D Arrays 
   !irina
@@ -103,6 +104,11 @@ contains
     integer :: memsize
 
     allocate (u0(nzp),v0(nzp),pi0(nzp),pi1(nzp),th0(nzp),dn0(nzp),rt0(nzp))
+!cgils    
+    allocate (wfls(nzp),dthldtls(nzp),dqtdtls(nzp))
+    wfls(:) = 0.
+    dthldtls(:) = 0.
+    dqtdtls(:) = 0.
 
     memsize = 2*nxyzp ! complex array in pressure solver
 
@@ -138,9 +144,13 @@ contains
     end if
     !irina
     if (iradtyp == 2 .and. level > 1) then
-       allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp))
+       allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp),sflxu_toa(nxp,nyp),sflxd_toa(nxp,nyp),lflxu_toa(nxp,nyp),lflxd_toa(nxp,nyp))
        a_sflx(:,:,:) = 0.
        albedo(:,:) = 0.
+       sflxu_toa(:,:) = 0.
+       sflxd_toa(:,:) = 0.
+       lflxu_toa(:,:) = 0.
+       lflxd_toa(:,:) = 0.
        memsize = memsize + nxyzp + nxyp
        !irina
        allocate (a_sflxu(nzp,nxp,nyp))
@@ -151,7 +161,11 @@ contains
        memsize = memsize + nxyzp 
     end if
     if (iradtyp > 2) then
-       allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp))
+       allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp),sflxu_toa(nxp,nyp),sflxd_toa(nxp,nyp),lflxu_toa(nxp,nyp),lflxd_toa(nxp,nyp))
+       sflxu_toa(:,:) = 0.
+       sflxd_toa(:,:) = 0.
+       lflxu_toa(:,:) = 0.
+       lflxd_toa(:,:) = 0.
        a_sflx(:,:,:) = 0.
        albedo(:,:) = 0.
        memsize = memsize + nxyzp + nxyp

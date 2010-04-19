@@ -39,7 +39,7 @@ module step
 !irina  
   real    :: sst=292.
   real    :: div = 3.75e-6
-  logical :: lsvarflg = .false.
+  logical :: lsvarflg = .true.
   character (len=5) :: case_name = 'astex'
 
 contains
@@ -296,8 +296,9 @@ contains
   !
   subroutine update(nstep)
 
+!irina
     use grid, only : a_xp, a_xt1, a_xt2, a_up, a_vp, a_wp, a_sp, dzt, dt,  &
-         nscl, nxp, nyp, nzp, newvar
+         nscl, nxp, nyp, nzp, newvar,level, a_rpp,a_npp
     use util, only : sclrset,velset
 
     real, parameter ::  alpha(3) = (/ 8./15., -17./60.,  3./4. /), &
@@ -316,6 +317,15 @@ contains
        call sclrset('mixd',nzp,nxp,nyp,a_sp,dzt)
     end do
 
+!irina
+   if (level >= 3) then
+   where (a_rpp < 0.) 
+    a_rpp=0.
+    end where
+   where (a_npp < 0.) 
+    a_npp=0.
+    end where
+   end if
 
 
   end subroutine update

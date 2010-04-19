@@ -23,6 +23,9 @@ module forc
   use radiation, only : d4stream
   !irina
   use rad_gcss, only : gcss_rad
+  !cgils
+  use grid, only : wfls,dthldtls,dqtdtls
+  use modnudge, only : nudge 
   implicit none
 
    !character (len=5), parameter :: case_name = 'xxxx'
@@ -34,6 +37,9 @@ module forc
    real, dimension(nls)  :: sst_ls=0.
    real, dimension(nls)  :: ugeo_ls=0.
    real, dimension(nls)  :: vgeo_ls=0.
+!cgils
+   logical :: lstendflg=.false.
+
 
     
 contains
@@ -47,14 +53,14 @@ contains
     use grid, only: nxp, nyp, nzp, zm, zt, dzt, dzm, dn0, iradtyp, liquid  &
          , a_rflx, a_sflx, albedo, a_tt, a_tp, a_rt, a_rp, a_pexnr, a_scr1 &
          , vapor, a_rpp, CCN, pi0, pi1, level, a_ut, a_up, a_vt, a_vp,a_theta,&
-          a_lflxu, a_lflxd, a_sflxu, a_sflxd
+          a_lflxu, a_lflxd, a_sflxu, a_sflxd,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa
 
     use mpi_interface, only : myid, appl_abort
 
 !irina
     real, optional, intent (in) :: time_in, cntlat, sst,div
 
-    character (len=5), intent (in) :: case_name
+   character (len=5), intent (in) :: case_name
 !irina
     real :: xref1, xref2
     integer :: i, j, k, kp1
@@ -85,7 +91,9 @@ contains
           if (level == 3) then
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
                   dn0, pi0, pi1, dzt, a_pexnr, a_theta, vapor, liquid, a_tt,&
-                  a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, rr=a_rpp)
+                  a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
+                  rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
+                  lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
             !old      
             ! call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
             !      dn0, pi0, pi1, dzt, a_pexnr, a_scr1, vapor, liquid, a_tt,&
@@ -95,7 +103,9 @@ contains
              xref2 = 0.
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,    &
                   dn0, pi0, pi1, dzt, a_pexnr, a_theta, vapor, liquid, a_tt, &
-                  a_rflx, a_sflx,a_lflxu, a_lflxd,a_sflxu,a_sflxd,albedo)
+                  a_rflx, a_sflx,a_lflxu, a_lflxd,a_sflxu,a_sflxd,albedo, &
+                  sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
+                  lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
              !call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,    &
              !     dn0, pi0, pi1, dzt, a_pexnr, a_scr1, vapor, liquid, a_tt, &
              !     a_rflx, a_sflx, albedo)
@@ -107,6 +117,26 @@ contains
           !
           ! subsidence
           !
+!cgils          
+       if (lstendflg) then
+
+      do j=3,nyp-2
+          do i=3,nxp-2
+             do k=2,nzp-2
+                kp1 = k+1
+ !               if (i.eq.4 .and. j.eq.4) then
+ !               print *, k, wfls(k),dthldtls(k),dqtdtls(k)
+ !               end if
+                a_tt(k,i,j) = a_tt(k,i,j) - &
+                        wfls(k)*(a_tp(kp1,i,j)-a_tp(k,i,j))*dzt(k)+dthldtls(k)
+                a_rt(k,i,j)=a_rt(k,i,j) - &
+                        wfls(k)*(a_rp(kp1,i,j)-a_rp(k,i,j))*dzt(k)+dqtdtls(k)
+             end do
+          enddo
+       enddo
+
+       else 
+!       
        do j=3,nyp-2
           do i=3,nxp-2
            if (div /= 0.) then
@@ -120,13 +150,18 @@ contains
            end if
           enddo
        enddo
+!       
+       end if
        else
           if (myid == 0) print *, '  ABORTING: inproper call to radiation'
           call appl_abort(0)
        end if
-
+       
     end select 
+!cgils: Nudging
+    call nudge(time_in)
 
+    
   end subroutine forcings
   !
   ! -------------------------------------------------------------------
