@@ -39,9 +39,7 @@ module defs
   real, parameter :: rowt   = 1.e+3
   real, parameter :: vonk   = 0.40
   real, parameter :: stefan = 5.6696e-8
-!cgils  
-  real, parameter :: SolarConstant  = 471.5
-  !real, parameter :: SolarConstant  = 1.365d+3
+  real, parameter :: SolarConstant  = 1.365d+3
   real, parameter :: mair   = 28.967  
   real, parameter :: pi     = 3.14159265358979323846264338327
 

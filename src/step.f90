@@ -143,8 +143,8 @@ contains
        if(myid == 0) then
           call cpu_time(t2)           !t1=timing()
           if (mod(istp,istpfl) == 0 ) print "('   Timestep # ',i5," //     &
-              "'   Model time(sec)=',f10.2,3x,'CPU time(sec)=',f8.3)",     &
-              istp, time, t2-t1
+              "'   Model time(sec)=',f10.2,3x,'CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2)",     &
+              istp, time, t2-t1, t2*(timmax/time-1)
        endif
 
     enddo
@@ -237,8 +237,9 @@ contains
   ! 
   subroutine tendencies(nstep)
 
-    use grid, only : a_ut, a_vt, a_wt, a_tt, a_rt, a_rpt, a_npt, a_xt1,  &
-         a_xt2, nscl, nxyzp, level
+    use grid, only : a_ut, a_vt, a_wt, a_tt, a_rt, a_rpt, a_npt, a_ninuct, &
+                     a_micet,a_nicet,a_msnowt,a_nsnowt, a_mgrt, a_ngrt,&
+                     a_xt1, a_xt2, nscl, nxyzp, level
     use util, only : azero
 
     integer, intent (in) :: nstep
@@ -256,6 +257,16 @@ contains
           a_rpt =>a_xt1(:,:,:,6)
           a_npt =>a_xt1(:,:,:,7)
        end if
+       if (level >= 4) then
+          a_ninuct =>a_xt1(:,:,:, 8)
+          a_micet  =>a_xt1(:,:,:, 9)
+          a_nicet  =>a_xt1(:,:,:,10)
+          a_msnowt =>a_xt1(:,:,:,11)
+          a_nsnowt =>a_xt1(:,:,:,12)
+          a_mgrt   =>a_xt1(:,:,:,13)
+          a_ngrt   =>a_xt1(:,:,:,14)
+       end if
+
     case(2)
        call azero(nxyzp*nscl,a_xt2)
        a_ut => a_xt2(:,:,:,1)
@@ -266,6 +277,15 @@ contains
        if (level >= 3) then
           a_rpt =>a_xt2(:,:,:,6)
           a_npt =>a_xt2(:,:,:,7)
+       end if
+       if (level >= 4) then
+          a_ninuct =>a_xt2(:,:,:, 8)
+          a_micet  =>a_xt2(:,:,:, 9)
+          a_nicet  =>a_xt2(:,:,:,10)
+          a_msnowt =>a_xt2(:,:,:,11)
+          a_nsnowt =>a_xt2(:,:,:,12)
+          a_mgrt   =>a_xt2(:,:,:,13)
+          a_ngrt   =>a_xt2(:,:,:,14)
        end if
     end select
 

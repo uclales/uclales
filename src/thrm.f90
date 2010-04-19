@@ -21,9 +21,9 @@
 module thrm
 
   implicit none
+  logical :: thetal_noprecip = .false.
 
 contains
-
 !
 ! -------------------------------------------------------------------------
 ! THERMO: calculates thermodynamics quantities according to level.  Level
@@ -34,7 +34,6 @@ contains
 
     use grid, only : liquid, vapor, a_theta, a_pexnr, press, a_scr1,  &
          a_scr2, a_rp, a_tp, nxp, nyp, nzp, th00, pi0, pi1,a_rpp
-
     integer, intent (in) :: level
 
     select case (level) 
@@ -44,11 +43,14 @@ contains
     case (2)
        call satadjst(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
             pi1,th00,a_rp,vapor,liquid,a_scr2)
-    case (3) 
-       call satadjst3(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0, &
+    case (3,4)
+       if (thetal_noprecip) then
+          call satadjst(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
+            pi1,th00,a_rp,vapor,liquid,a_scr2)
+       else
+          call satadjst3(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0, &
             pi1,th00,a_rp,vapor,liquid,a_scr2,a_rpp)
-    case (4) 
-       stop 'level not supported'
+       end if
     end select
 
   end subroutine thermo
@@ -223,7 +225,7 @@ contains
     enddo
 
   end subroutine satadjst3
-! 
+!
 ! ---------------------------------------------------------------------
 ! This function calculates the liquid saturation vapor mixing ratio as
 ! a function of temperature and pressure
@@ -340,7 +342,7 @@ contains
               end if
               en2(k,i,j)=g*dzm(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
                    + bb*(rt(k+1,i,j)-rt(k,i,j)))
-           case (3)
+           case (3,4)
               rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
               rsbar=0.5*(rs(k,i,j)+rs(k+1,i,j))
               kp1=min(n1-1,k+2)
