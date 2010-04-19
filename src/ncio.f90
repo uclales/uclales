@@ -69,7 +69,7 @@ contains
   end subroutine open_nc
   !
   ! ----------------------------------------------------------------------
-  ! Subroutine Define_NC: Defines the structure of the nc file (if not 
+  ! Subroutine Define_NC: Defines the structure of the nc file (if not
   ! already open)
   !
   subroutine define_nc(ncID, nRec, nVar, sx, n1, n2, n3)
@@ -85,7 +85,7 @@ contains
 
     character (len=7) :: xnm
     integer :: iret, n, VarID
-    ! 
+    !
     if (nRec == 0) then
        iret = nf90_def_dim(ncID, 'time', NF90_UNLIMITED, timeID)
        if (present(n1)) then
@@ -98,7 +98,7 @@ contains
        end if
        if (present(n3)) then
           iret = nf90_def_dim(ncID, 'yt', n3, ytID)
-          iret = nf90_def_dim(ncID, 'ym', n3, ymID)       
+          iret = nf90_def_dim(ncID, 'ym', n3, ymID)
        end if
        dim_tt = (/ztId,timeId/)
        dim_mt = (/zmId,timeId/)
@@ -301,7 +301,7 @@ contains
        if (itype==0) ncinfo = 'Vertical integral of total TKE'
        if (itype==1) ncinfo = 'kg/s'
        if (itype==2) ncinfo = 'time'
-!irina       
+!irina
     case('tkeint')
        if (itype==0) ncinfo = 'Vertical integral of total TKE non-weighted'
        if (itype==1) ncinfo = 'm3/s2'
@@ -354,7 +354,7 @@ contains
        if (itype==0) ncinfo = 'Cloud-base height'
        if (itype==1) ncinfo = 'm'
        if (itype==2) ncinfo = 'time'
-!irina       
+!irina
     case('zcmn')
        if (itype==0) ncinfo = 'Mean Cloud-top height'
        if (itype==1) ncinfo = 'm'
@@ -372,7 +372,7 @@ contains
        if (itype==1) ncinfo = 'kg/kg'
        if (itype==2) ncinfo = 'time'
     case('albedo')
-       if (itype==0) ncinfo = 'Relfected (TOA) shortwave radiation'
+       if (itype==0) ncinfo = 'Reflected (TOA) shortwave radiation'
        if (itype==1) ncinfo = '-'
        if (itype==2) ncinfo = 'time'
     case('rwp_bar')
@@ -383,7 +383,7 @@ contains
        if (itype==2) ncinfo = 'time'
     case('prcp')
        if (itype==0) ncinfo = 'Surface precipitation rate'
-    !irina   
+    !irina
        if (itype==1) ncinfo = 'kg/kg m/s'
       ! if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
@@ -415,16 +415,16 @@ contains
        if (itype==0) ncinfo = 'Basic state density'
        if (itype==1) ncinfo = 'kg/m^3'
        if (itype==2) ncinfo = 'time'
-    case('u_2')    
+    case('u_2')
        if (itype==0) ncinfo = 'Variance of u wind'
        if (itype==1) ncinfo = 'm^2/s^2'
        if (itype==2) ncinfo = 'tttt'
     case('v_2')
-       if (itype==0) ncinfo = 'Variance of v wind' 
+       if (itype==0) ncinfo = 'Variance of v wind'
        if (itype==1) ncinfo = 'm^2/s^2'
        if (itype==2) ncinfo = 'tttt'
-    case('w_2') 
-       if (itype==0) ncinfo = 'Variance of w wind'                      
+    case('w_2')
+       if (itype==0) ncinfo = 'Variance of w wind'
        if (itype==1) ncinfo = 'm^2/s^2'
        if (itype==2) ncinfo = 'ttmt'
     case('t_2')
@@ -451,39 +451,39 @@ contains
        if (itype==0) ncinfo = 'Total vertical flux of u-wind'
        if (itype==1) ncinfo = 'm^2/s^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('sfs_uw') 
+    case('sfs_uw')
        if (itype==0) ncinfo = 'Sub-filter scale vertical flux of u-wind'
        if (itype==1) ncinfo = 'm^2/s^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('tot_vw') 
+    case('tot_vw')
        if (itype==0) ncinfo = 'Total vertical flux of v-wind'
        if (itype==1) ncinfo = 'm^2/s^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('sfs_vw') 
+    case('sfs_vw')
        if (itype==0) ncinfo = 'SGS vertical flux of v-wind'
        if (itype==1) ncinfo = 'm^2/s^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('tot_ww') 
+    case('tot_ww')
        if (itype==0) ncinfo = 'Total vertical flux of v-wind'
        if (itype==1) ncinfo = 'm^2/s^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('sfs_ww') 
+    case('sfs_ww')
        if (itype==0) ncinfo = 'SGS vertical flux of v-wind'
        if (itype==1) ncinfo = 'm^2/s^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('km')     
+    case('km')
        if (itype==0) ncinfo = 'Eddy viscosity'
        if (itype==1) ncinfo = 'm^2/s'
        if (itype==2) ncinfo = 'ttmt'
-    case('kh')     
+    case('kh')
        if (itype==0) ncinfo = 'Eddy diffusivity'
        if (itype==1) ncinfo = 'm^2/s'
        if (itype==2) ncinfo = 'ttmt'
-    case('lmbd')   
+    case('lmbd')
        if (itype==0) ncinfo = 'Mixing lengthscale'
        if (itype==1) ncinfo = 'm'
        if (itype==2) ncinfo = 'ttmt'
-    case('lmbde')  
+    case('lmbde')
        if (itype==0) ncinfo = 'Dissipation lengthscale'
        if (itype==1) ncinfo = 'm'
        if (itype==2) ncinfo = 'ttmt'
@@ -507,51 +507,51 @@ contains
        if (itype==0) ncinfo = 'Shear production of resolved TKE'
        if (itype==1) ncinfo = 'm^2/s^3'
        if (itype==2) ncinfo = 'tttt'
-    case('trans')  
+    case('trans')
        if (itype==0) ncinfo = 'Net transport of resolved TKE'
        if (itype==1) ncinfo = 'm^2/s^3'
        if (itype==2) ncinfo = 'ttmt'
-    case('diss')   
+    case('diss')
        if (itype==0) ncinfo = 'Dissipation rate of resolved TKE'
        if (itype==1) ncinfo = 'm^2/s^3'
        if (itype==2) ncinfo = 'ttmt'
-    case('dff_u')  
+    case('dff_u')
        if (itype==0) ncinfo = 'u(du/dt) from diffusion'
        if (itype==1) ncinfo = 'm^2/s^3'
        if (itype==2) ncinfo = 'tttt'
-    case('dff_v')  
+    case('dff_v')
        if (itype==0) ncinfo = 'v(dv/dt) from diffusion'
        if (itype==1) ncinfo = 'm^2/s^3'
        if (itype==2) ncinfo = 'tttt'
-    case('dff_w')  
+    case('dff_w')
        if (itype==0) ncinfo = 'w(dw/dt) from diffusion'
        if (itype==1) ncinfo = 'm^2/s^3'
        if (itype==2) ncinfo = 'ttmt'
-    case('adv_u')  
+    case('adv_u')
        if (itype==0) ncinfo = 'u(du/dt) from advection'
        if (itype==1) ncinfo = 'm^2/s^3'
        if (itype==2) ncinfo = 'tttt'
-    case('adv_v')  
+    case('adv_v')
        if (itype==0) ncinfo = 'v(dv/dt) from advection'
        if (itype==1) ncinfo = 'm^2/s^3'
        if (itype==2) ncinfo = 'tttt'
-    case('adv_w')  
+    case('adv_w')
        if (itype==0) ncinfo = 'w(dw/dt) from advection'
        if (itype==1) ncinfo = 'm^2/s^3'
        if (itype==2) ncinfo = 'ttmt'
-    case('prs_u')  
+    case('prs_u')
        if (itype==0) ncinfo = 'u(du/dt) from pressure'
        if (itype==1) ncinfo = 'm^2/s^3'
        if (itype==2) ncinfo = 'tttt'
-    case('prs_v')  
+    case('prs_v')
        if (itype==0) ncinfo = 'v(dv/dt) from pressure'
        if (itype==1) ncinfo = 'm^2/s^3'
        if (itype==2) ncinfo = 'tttt'
-    case('prs_w')  
+    case('prs_w')
        if (itype==0) ncinfo = 'w(dw/dt) from pressure'
        if (itype==1) ncinfo = 'm^2/s^3'
        if (itype==2) ncinfo = 'ttmt'
-    case('prd_uw') 
+    case('prd_uw')
        if (itype==0) ncinfo = 'uw shear production'
        if (itype==1) ncinfo = 'm^2/s^3'
        if (itype==2) ncinfo = 'tttt'
@@ -559,73 +559,89 @@ contains
        if (itype==0) ncinfo = 'Rate of increase of resolved TKE'
        if (itype==1) ncinfo = 'm^2/s^3'
        if (itype==2) ncinfo = 'tttt'
-    case('q_2')    
+    case('q_2')
        if (itype==0) ncinfo = 'Variance of total water'
        if (itype==1) ncinfo = 'kg^2/kg^2'
        if (itype==2) ncinfo = 'tttt'
-    case('q_3')    
+    case('q_3')
        if (itype==0) ncinfo = 'Third moment of total water'
        if (itype==1) ncinfo = 'kg^3/kg^3'
        if (itype==2) ncinfo = 'tttt'
-    case('tot_qw') 
+    case('tot_qw')
        if (itype==0) ncinfo = 'Total vertical flux of q'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('sfs_qw') 
+    case('sfs_qw')
        if (itype==0) ncinfo = 'Sub-filter scale vertical flux of q'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('rflx')  
+    case('rflx')
        if (itype==0) ncinfo =  'Total Radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
        !irina
-    case('lflxu')  
+    case('lflxu')
        if (itype==0) ncinfo =  'Longwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('lflxd')  
+    case('lflxd')
        if (itype==0) ncinfo =  'Longwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('rflx2')  
+    case('lflxut')
+       if (itype==0) ncinfo =  'Top of Atmosphere Longwave Radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('lflxdt')
+       if (itype==0) ncinfo =  'Top of Atmosphere Longwave Radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('rflx2')
        if (itype==0) ncinfo = 'Variance of total radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('sflx')   
+    case('sflx')
        if (itype==0) ncinfo = 'Shortwave radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    !irina   
-    case('sflxu')   
+    !irina
+    case('sflxu')
        if (itype==0) ncinfo = 'Shortwave radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('sflxd')   
+    case('sflxd')
        if (itype==0) ncinfo = 'Shortwave radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('sflx2')  
+    case('sflxut')
+       if (itype==0) ncinfo = 'Top of Atmosphere Shortwave radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('sflxdt')
+       if (itype==0) ncinfo = 'Top of Atmosphere Shortwave radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('sflx2')
        if (itype==0) ncinfo = 'Variance of shortwave radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('l_2')    
+    case('l_2')
        if (itype==0) ncinfo = 'Variance of liquid'
        if (itype==1) ncinfo = 'kg^2/kg^2'
        if (itype==2) ncinfo = 'tttt'
-    case('l_3')    
+    case('l_3')
        if (itype==0) ncinfo = 'Third moment of liquid'
        if (itype==1) ncinfo = 'kg^3/kg^3'
        if (itype==2) ncinfo = 'tttt'
-    case('tot_lw') 
+    case('tot_lw')
        if (itype==0) ncinfo = 'Resolved turbulent flux of liquid'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('sed_lw') 
+    case('sed_lw')
        if (itype==0) ncinfo = 'Sedimentation flux of r_l'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('cs1')    
+    case('cs1')
        if (itype==0) ncinfo = 'Conditionally sampled fraction of flow'
        if (itype==1) ncinfo = '-'
        if (itype==2) ncinfo = 'tttt'
@@ -633,39 +649,39 @@ contains
        if (itype==0) ncinfo = 'Sum of I_cs1'
        if (itype==1) ncinfo = '#'
        if (itype==2) ncinfo = 'tttt'
-    case('w_cs1')  
+    case('w_cs1')
        if (itype==0) ncinfo = 'Conditional average of w over cs1'
        if (itype==1) ncinfo = 'm'
        if (itype==2) ncinfo = 'ttmt'
-    case('tl_cs1') 
+    case('tl_cs1')
        if (itype==0) ncinfo = 'Conditional average of theta_l over cs1'
        if (itype==1) ncinfo = 'K'
        if (itype==2) ncinfo = 'ttmt'
-    case('tv_cs1') 
+    case('tv_cs1')
        if (itype==0) ncinfo = 'Conditional average of theta_v over cs1'
        if (itype==1) ncinfo = 'K'
        if (itype==2) ncinfo = 'tttt'
-    case('rt_cs1') 
+    case('rt_cs1')
        if (itype==0) ncinfo = 'Conditional average of rt over cs1'
        if (itype==1) ncinfo = 'kg/kg'
        if (itype==2) ncinfo = 'tttt'
-    case('rl_cs1') 
+    case('rl_cs1')
        if (itype==0) ncinfo = 'Conditional average of rl over cs1'
        if (itype==1) ncinfo = 'kg/kg'
        if (itype==2) ncinfo = 'tttt'
-    case('wt_cs1') 
+    case('wt_cs1')
        if (itype==0) ncinfo = 'Covariance of wtheta_l flux and cs1'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('wv_cs1') 
+    case('wv_cs1')
        if (itype==0) ncinfo = 'Covariance of wtheta_v flux and cs1'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('wr_cs1') 
+    case('wr_cs1')
        if (itype==0) ncinfo = 'Covariance of wr_t flux and cs1'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('cs2')    
+    case('cs2')
        if (itype==0) ncinfo = 'Conditionally sampled fraction of flow'
        if (itype==1) ncinfo = '-'
        if (itype==2) ncinfo = 'tttt'
@@ -673,56 +689,56 @@ contains
        if (itype==0) ncinfo = 'Sum of I_cs2'
        if (itype==1) ncinfo = '#'
        if (itype==2) ncinfo = 'tttt'
-    case('w_cs2')  
+    case('w_cs2')
        if (itype==0) ncinfo = 'Conditional average of w over cs2'
        if (itype==1) ncinfo = 'm'
        if (itype==2) ncinfo = 'ttmt'
-    case('tl_cs2') 
+    case('tl_cs2')
        if (itype==0) ncinfo = 'Conditional average of theta_l over cs2'
        if (itype==1) ncinfo = 'K'
        if (itype==2) ncinfo = 'tttt'
-    case('tv_cs2') 
+    case('tv_cs2')
        if (itype==0) ncinfo = 'Conditional average of theta_v over cs2'
        if (itype==1) ncinfo = 'K'
        if (itype==2) ncinfo = 'tttt'
-    case('rt_cs2') 
+    case('rt_cs2')
        if (itype==0) ncinfo = 'Conditional average of rt over cs2'
        if (itype==1) ncinfo = 'kg/kg'
        if (itype==2) ncinfo = 'tttt'
-    case('rl_cs2') 
+    case('rl_cs2')
        if (itype==0) ncinfo = 'Conditional average of rl over cs2'
        if (itype==1) ncinfo = 'kg/kg'
        if (itype==2) ncinfo = 'tttt'
-    case('wt_cs2') 
+    case('wt_cs2')
        if (itype==0) ncinfo = 'Covariance of wtheta_l flux and cs2'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('wv_cs2') 
+    case('wv_cs2')
        if (itype==0) ncinfo = 'Covariance of wtheta_v flux and cs2'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('wr_cs2') 
+    case('wr_cs2')
        if (itype==0) ncinfo = 'Covariance of wr_t flux and cs2'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('Nc')     
+    case('Nc')
        if (itype==0) ncinfo = 'Cloud Number Concentration'
        if (itype==1) ncinfo = 'dm^-3'
        if (itype==2) ncinfo = 'tttt'
-    case('Nr')     
+    case('Nr')
        if (itype==0) ncinfo = 'Rain Number Concentration'
        if (itype==1) ncinfo = 'dm^-3'
        if (itype==2) ncinfo = 'tttt'
-    case('rr')     
+    case('rr')
        if (itype==0) ncinfo = 'Rain water'
        if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
-    case('precip') 
+    case('precip')
        if (itype==0) ncinfo = 'Precipitation Flux (positive downward'
        !irina
        if (itype==1) ncinfo = 'kg/kg m/s'
        if (itype==2) ncinfo = 'ttmt'
-    case('evap')   
+    case('evap')
        if (itype==0) ncinfo = 'Net evap  of rain-water'
        if (itype==1) ncinfo = 's^-1'
        if (itype==2) ncinfo = 'tttt'
@@ -743,7 +759,7 @@ contains
        if (itype==1) ncinfo = '-'
        if (itype==2) ncinfo = 'tttt'
        !irina
-    case('cdsed') 
+    case('cdsed')
        if (itype==0) ncinfo = 'Sedimentation Flux (positive downward)'
        if (itype==1) ncinfo = 'kg/kg m/s'
        if (itype==2) ncinfo = 'ttmt'

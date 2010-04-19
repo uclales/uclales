@@ -41,7 +41,7 @@ contains
   !
   subroutine initialize
 !irina use lsvarflg
-    use step, only : time, outflg,lsvarflg
+    use step, only : time, outflg,lsvarflg,case_name
     use stat, only : init_stat
     use mpi_interface, only : appl_abort, myid
     use thrm, only : thermo
@@ -68,7 +68,7 @@ contains
        call appl_abort(0)
     end if
     call sponge_init
-    call init_stat(time+dt,filprf,expnme,nzp)
+    call init_stat(time+dt,filprf,case_name,nzp)
     !
     !irina
        if (lsvarflg) then
@@ -104,11 +104,14 @@ contains
     use defs, only : alvl, cpr, cp, p00
     use util, only : azero, atob
     use thrm, only : thermo, rslf
+    use mpi_interface,  only : nyprocs, nxprocs
+    use step, only : case_name
 
     implicit none
 
     integer :: i,j,k
     real    :: exner, pres, tk, rc, xran(nzp)
+    real    :: xc,yc,zc,dist
 
     call htint(ns,ts,hs,nzp,th0,zt)
 
@@ -122,6 +125,13 @@ contains
              if (associated (a_rp)) a_rp(k,i,j)   = rt0(k)
              a_theta(k,i,j) = th0(k)
              a_pexnr(k,i,j) = 0.
+             if (case_name == 'bubble') then
+                xc = (nxp-4)*deltax*nxprocs
+                yc = (nyp-4)*deltay*nyprocs
+                zc = 1400
+                dist = sqrt((xt(i)-xc)**2+(yt(i)-yc)**2+(zt(i)-zc)**2)
+                a_tp(k,i,j) = a_tp(k,i,j) + max(0.,2.*(1.-dist/1400))
+             end if
           end do
        end do
     end do
@@ -203,8 +213,8 @@ contains
        if(myid == 0) then
           print "(//' ',49('-')/)"
           print '(2X,A17)', 'Sponge Layer Init '
-          print '(3X,A12,F6.1,A1)', 'Starting at ', zt(nzp-nfpt), 'm'
-          print '(3X,A18,F6.1,A1)', 'Minimum timescale ', 1/spngm(nfpt),'s'
+          print '(3X,A12,F9.1,A1)', 'Starting at ', zt(nzp-nfpt), 'm'
+          print '(3X,A18,F9.1,A1)', 'Minimum timescale ', 1/spngm(nfpt),'s'
        end if
     end if
 
@@ -221,6 +231,7 @@ contains
     use defs, only          : p00,p00i,cp,cpr,rcp,r,g,ep2,alvl,Rm,ep
     use thrm, only          : rslf
     use mpi_interface, only : appl_abort, myid
+    use step, only          : case_name
 
     implicit none
 
@@ -250,6 +261,7 @@ contains
        ! filling relative humidity array only accepts sounding in mixing
        ! ratio (g/kg) converts to (kg/kg)
        !
+       
        rts(ns)=rts(ns)*1.e-3
        !
        ! filling pressure array:
@@ -261,6 +273,9 @@ contains
           ps(ns)=ps(ns)*100.
        case default
           xs(ns)=(1.+ep2*rts(ns))
+          if (case_name == 'bubble') then
+            xs(ns) = rts(ns)*1e3
+          end if
           if (ns == 1)then
              ps(ns)=ps(ns)*100.
              zold2=0.
@@ -304,9 +319,14 @@ contains
           if (myid == 0) print *, '  ABORTING: itsflg not supported'
           call appl_abort(0)
        end select
+       if (case_name == 'bubble') then
+         rts(ns) = xs(ns)*rslf(ps(ns),tks(ns))
+       end if
        ns = ns+1
     end do
     ns=ns-1
+
+
     !                                  
     ! compute height levels of input sounding.
     !
