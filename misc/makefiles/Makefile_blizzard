@@ -15,10 +15,10 @@ ECHO    = /bin/echo
 RM      = /bin/rm -f
 
 ifeq ($(ARCH),AIX)
-  NCDF = /sw/aix53/netcdf-4.0.1-ibm
+  NCDF = /sw/aix61/netcdf-4.1.1-rc1
   NCDFLIB = -L$(NCDF)/lib -lnetcdf
   NCDFINC = -I$(NCDF)/include
-  HDF5 = /sw/aix53/hdf5-1.8.2
+  HDF5 = /sw/aix61/hdf5-1.8.4-patch1
   HDF5LIB = -L$(HDF5)/lib -lhdf5 -lhdf5_hl
   HDF5INC = -I$(HDF5)/include
   SZIP = /sw/aix53/szip-2.1
