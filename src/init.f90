@@ -68,7 +68,7 @@ contains
        call appl_abort(0)
     end if
     call sponge_init
-    call init_stat(time+dt,filprf,expnm,nzp)
+    call init_stat(time+dt,filprf,expnme,nzp)
     !
     !irina
        if (lsvarflg) then
