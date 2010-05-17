@@ -1,18 +1,18 @@
  &model
-  nzp =   105
-  nxp =   70 
-  nyp =   100
+  nzp =   28
+  nxp =   36 
+  nyp =   36
   nxpart = .True.
-  deltax = 625
-  deltay = 625
-  deltaz = 50.
-  dzrat = 1.02
+  deltax = 2000
+  deltay = 2000
+  deltaz = 350.
+  dzrat = 1.04
   dzmax = 100.
   zrand = 3000
   nfpt = 5
   dtlong = 20.
   distim = 100.
-  timmax = 14400.
+  timmax = 7200.
   runtype = "INITIAL"
   igrdtyp = 1
   level = 3
@@ -23,7 +23,7 @@
   ssam_intvl = 60.
   corflg = .false.
   prndtl = -0.3333333
-  iradtyp = 4
+  iradtyp = 0
   strtim= 196.58 
   th00 = 289.  
   umean = 5.

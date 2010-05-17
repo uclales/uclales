@@ -22,7 +22,7 @@
 ! *Include irina - alterations !DONE
 ! *Remove irreversible water frm q_t !DONE
 ! *Work do-loops outward   !WONT
-! *Include Oliviers modifications  
+! *Include Oliviers modifications  !DONE
 ! *Do serialization of warmmicrophysics
 ! *Include partitioning function between ice and water
 ! *Include icemicro processess one by one

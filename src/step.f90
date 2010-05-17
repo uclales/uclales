@@ -178,9 +178,9 @@ contains
     use lsvar, only : varlscale
     use util, only : velset,get_avg
 
-    integer :: k
+!     integer :: k
     real :: xtime
-    character (len=11)    :: fname = 'debugXX.dat'
+!     character (len=11)    :: fname = 'debugXX.dat'
 
     xtime = time/86400. + strtim
 
@@ -238,7 +238,7 @@ contains
   subroutine tendencies(nstep)
 
     use grid, only : a_ut, a_vt, a_wt, a_tt, a_rt, a_rpt, a_npt, a_ninuct, &
-                     a_micet,a_nicet,a_msnowt,a_nsnowt, a_mgrt, a_ngrt,&
+                     a_ricet,a_nicet,a_rsnowt,a_nsnowt, a_rgrt, a_ngrt,&
                      a_xt1, a_xt2, nscl, nxyzp, level
     use util, only : azero
 
@@ -259,11 +259,11 @@ contains
        end if
        if (level >= 4) then
           a_ninuct =>a_xt1(:,:,:, 8)
-          a_micet  =>a_xt1(:,:,:, 9)
+          a_ricet  =>a_xt1(:,:,:, 9)
           a_nicet  =>a_xt1(:,:,:,10)
-          a_msnowt =>a_xt1(:,:,:,11)
+          a_rsnowt =>a_xt1(:,:,:,11)
           a_nsnowt =>a_xt1(:,:,:,12)
-          a_mgrt   =>a_xt1(:,:,:,13)
+          a_rgrt   =>a_xt1(:,:,:,13)
           a_ngrt   =>a_xt1(:,:,:,14)
        end if
 
@@ -280,11 +280,11 @@ contains
        end if
        if (level >= 4) then
           a_ninuct =>a_xt2(:,:,:, 8)
-          a_micet  =>a_xt2(:,:,:, 9)
+          a_ricet  =>a_xt2(:,:,:, 9)
           a_nicet  =>a_xt2(:,:,:,10)
-          a_msnowt =>a_xt2(:,:,:,11)
+          a_rsnowt =>a_xt2(:,:,:,11)
           a_nsnowt =>a_xt2(:,:,:,12)
-          a_mgrt   =>a_xt2(:,:,:,13)
+          a_rgrt   =>a_xt2(:,:,:,13)
           a_ngrt   =>a_xt2(:,:,:,14)
        end if
     end select

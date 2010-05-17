@@ -42,5 +42,7 @@ module defs
   real, parameter :: SolarConstant  = 1.365d+3
   real, parameter :: mair   = 28.967  
   real, parameter :: pi     = 3.14159265358979323846264338327
+  real, parameter :: tmelt  = 273.16
+  real, parameter :: t_hn   = 236.15
 
 end module defs

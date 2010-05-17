@@ -75,7 +75,7 @@ module grid
   ! 3D Arrays 
   !irina
   real, dimension (:,:,:), allocatable ::                                     &
-       a_theta, a_pexnr, press, vapor, liquid, a_rflx, a_sflx, precip,        &
+       a_theta, a_pexnr, press, vapor, liquid, a_rflx, a_sflx, precip,rsup,   &
        a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7,                &
        a_lflxu, a_lflxd, a_sflxu, a_sflxd
   !
@@ -83,8 +83,8 @@ module grid
   !
   real, dimension (:,:,:), pointer :: a_up, a_ut, a_vp, a_vt, a_wp, a_wt,     &
        a_sp, a_st, a_tp, a_tt, a_rp, a_rt, a_rpp, a_rpt, a_npp, a_npt,        &
-       a_ninuct , a_micet , a_nicet , a_msnowt , a_nsnowt , a_mgrt, a_ngrt,     &
-       a_ninucp , a_micep , a_nicep , a_msnowp , a_nsnowp , a_mgrp , a_ngrp
+       a_ninuct , a_ricet , a_nicet , a_rsnowt , a_nsnowt , a_rgrt, a_ngrt,     &
+       a_ninucp , a_ricep , a_nicep , a_rsnowp , a_nsnowp , a_rgrp , a_ngrp
   !
   ! Memory for prognostic variables
   !
@@ -212,11 +212,11 @@ contains
     end if
     if (level >= 4) then
       a_ninucp =>a_xp(:,:,:, 8)
-      a_micep  =>a_xp(:,:,:, 9)
+      a_ricep  =>a_xp(:,:,:, 9)
       a_nicep  =>a_xp(:,:,:,10)
-      a_msnowp =>a_xp(:,:,:,11)
+      a_rsnowp =>a_xp(:,:,:,11)
       a_nsnowp =>a_xp(:,:,:,12)
-      a_mgrp   =>a_xp(:,:,:,13)
+      a_rgrp   =>a_xp(:,:,:,13)
       a_ngrp   =>a_xp(:,:,:,14)
     end if
 
@@ -226,6 +226,11 @@ contains
 
     if (level >= 3) then
        allocate(precip(nzp,nxp,nyp))
+       memsize = memsize + nxyzp
+    end if
+    if (level >= 4) then
+       allocate(rsup(nzp,nxp,nyp))
+       rsup = 0.
        memsize = memsize + nxyzp
     end if
 
@@ -269,7 +274,7 @@ contains
     nxyp   = nxp*nyp
 
     nz= nzp-1
-
+    dzmin = 0.
     dxi=1./deltax
     dyi=1./deltay
     allocate(wsavex(4*nxpg+100),wsavey(4*nypg+100))
