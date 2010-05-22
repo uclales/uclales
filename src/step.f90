@@ -372,15 +372,20 @@ contains
   !
   subroutine buoyancy
 
-    use grid, only : a_up, a_vp, a_wp, a_wt, vapor, a_theta, a_scr1, a_scr3,&
-         a_rp, nxp, nyp, nzp, dzm, th00, level, pi1
+    use grid, only : a_up, a_vp, a_wp, a_wt, vapor, a_theta, a_scr1, a_scr3,liquid,&
+         a_rp,a_rpp,a_ricep, a_rsnowp, a_rgrp, nxp, nyp, nzp, dzm, th00, level, pi1
     use stat, only : sflg, comp_tke
     use util, only : ae1mm
     use thrm, only : update_pi1
-
+    real, dimension(nzp,nxp,nyp) :: rl
     real, dimension (nzp) :: awtbar
-
-    call boyanc(nzp,nxp,nyp,level,a_wt,a_theta,a_rp,vapor,th00,a_scr1)
+    rl = 0.
+    if (level>1) rl = liquid
+    if (level>2) rl = rl + a_rpp
+    if (level>3) rl = rl + a_ricep + a_rsnowp + a_rgrp
+    
+    
+    call boyanc(nzp,nxp,nyp,level,a_wt,a_theta,vapor,rl,th00,a_scr1)
     call ae1mm(nzp,nxp,nyp,a_wt,awtbar)
     call update_pi1(nzp,awtbar,pi1)
 
@@ -391,12 +396,12 @@ contains
   ! ----------------------------------------------------------------------
   ! subroutine boyanc:
   !
-  subroutine boyanc(n1,n2,n3,level,wt,th,rt,rv,th00,scr)
+  subroutine boyanc(n1,n2,n3,level,wt,th,rv,rl,th00,scr)
 
     use defs, only: g, ep2
 
     integer, intent(in) :: n1,n2,n3,level
-    real, intent(in)    :: th00,th(n1,n2,n3),rt(n1,n2,n3),rv(n1,n2,n3)
+    real, intent(in)    :: th00,th(n1,n2,n3),rv(n1,n2,n3),rl(n1,n2,n3)
     real, intent(inout) :: wt(n1,n2,n3)
     real, intent(out)   :: scr(n1,n2,n3)
 
@@ -410,7 +415,7 @@ contains
           if (level >= 2) then
              do k=1,n1
                 scr(k,i,j)=gover2*((th(k,i,j)*(1.+ep2*rv(k,i,j))-th00)       &
-                     /th00-(rt(k,i,j)-rv(k,i,j)))
+                     /th00-(rl(k,i,j)))
              end do
           else
              do k=1,n1

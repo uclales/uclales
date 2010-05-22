@@ -33,7 +33,7 @@ contains
   subroutine thermo (level)
 
     use grid, only : liquid, vapor, a_theta, a_pexnr, press, a_scr1,  &
-         a_scr2, a_rp, a_tp, nxp, nyp, nzp, th00, pi0, pi1,a_rpp,rsup
+         a_scr2, a_rp, a_tp, nxp, nyp, nzp, th00, pi0, pi1,a_rpp,rsup,a_ricep,a_rsnowp,a_rgrp
     integer, intent (in) :: level
 
     select case (level) 
@@ -45,7 +45,7 @@ contains
             pi1,th00,a_rp,vapor,liquid,a_scr2)
     case (4)
        call satadjst4(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
-            pi1,th00,a_rp,vapor,liquid,a_scr2,rsup)
+            pi1,th00,a_rp,vapor,liquid,a_scr2,rsup,a_rpp,a_ricep,a_rsnowp,a_rgrp)
     end select
 
   end subroutine thermo
@@ -220,7 +220,7 @@ contains
     enddo
 
   end subroutine satadjst3
-  subroutine satadjst4(n1,n2,n3,pp,p,tl,th,tk,pi0,pi1,th00,rt,rv,rc,rs,rsup)
+  subroutine satadjst4(n1,n2,n3,pp,p,tl,th,tk,pi0,pi1,th00,rt,rv,rc,rs,rsup,rain,ice,graupel,snow)
 !
 ! -------------------------------------------------------------------------
 ! SATADJST4:  this routine calculates theta, and pressure and diagnoses
@@ -228,11 +228,11 @@ contains
 ! addition, takes in the account the precipitable water when present
 !
 
-    use defs, only : cp, cpr, alvl, ep, Rm, p00,tmelt,t_hn
+    use defs, only : cp, cpr, alvl,alvi, ep, Rm, p00,tmelt,t_hn
 
     integer, intent (in) ::  n1,n2,n3
 
-    real, intent (in), dimension (n1,n2,n3)    :: pp, tl, rt
+    real, intent (in), dimension (n1,n2,n3)    :: pp, tl, rt,rain,ice,graupel,snow
     real, intent (in), dimension (n1)          :: pi0, pi1
     real, intent (in)                          :: th00
     real, intent (out), dimension (n1,n2,n3)   :: rc,rv,rs,th,tk,p,rsup
@@ -245,7 +245,7 @@ contains
           do k=1,n1
              exner = (pi0(k)+pi1(k)+pp(k,i,j))/cp
              p(k,i,j) = p00 * (exner)**cpr
-             til=(tl(k,i,j)+th00)*exner
+             til=(tl(k,i,j)+th00)*exner+alvl/cp*rain(i,j,k)+alvi/cp*(ice(i,j,k)+graupel(i,j,k)+snow(i,j,k))
              xx=til
              yy=rslf(p(k,i,j),xx)
              zz=max(rt(k,i,j)-yy,0.)

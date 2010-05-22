@@ -37,6 +37,7 @@ module defs
   real, parameter :: alvl   = 2.5e+06
   real, parameter :: alvi   = 2.834e+06
   real, parameter :: rowt   = 1.e+3
+  real, parameter :: roice  = 0.9e+3
   real, parameter :: vonk   = 0.40
   real, parameter :: stefan = 5.6696e-8
   real, parameter :: SolarConstant  = 1.365d+3
