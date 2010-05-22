@@ -67,19 +67,19 @@ module mcrp
 
   real, parameter :: prw = pi * rowt / 6.
 !   
-!   real, parameter :: t_nuc     = 273.2d+0 ! maximum temperature for ice nucleation
-!   real, parameter :: t_freeze  = 273.2d+0 ! maximum temperature for freezing
-  real, parameter :: nu_l = 1.460d-5     !..kinem. visc. von luft
-  real, parameter :: d_v  = 3.000d-5     !..diffusivitaet von wasserdampf
-  real, parameter :: k_t  = 2.500d-2     !..waermeleitfaehigkeit
+!   real, parameter :: t_nuc     = 273.2e+0 ! maximum temperature for ice nucleation
+!   real, parameter :: t_freeze  = 273.2e+0 ! maximum temperature for freezing
+  real, parameter :: nu_l = 1.460e-5     !..kinem. visc. von luft
+  real, parameter :: d_v  = 3.000e-5     !..diffusivitaet von wasserdampf
+  real, parameter :: k_t  = 2.500e-2     !..waermeleitfaehigkeit
 
-!   real, parameter :: k_w  = 0.930d+0     !..dielektrizitaetsfaktor wasser
-!   real, parameter :: k_i  = 0.176d+0     !..dielektrizitaetsfaktor eis
-!   real, parameter :: rho0 = 1.225d+0     !..norm-luftdichte
-!   real, parameter :: t_f  = 2.330d+2     !..bei t < t_f kein fl.wasser
-!   real, parameter :: r_l  = 2.870d+2     !..gaskonstante trockener luft
-!   real, parameter :: c_w  = 4.218d+3     !..spezifische waerme von wasser
-!   real, parameter :: sigma_wa  = 7.1d-2  !..oberflaechenspannung wasser-luft
+!   real, parameter :: k_w  = 0.930e+0     !..dielektrizitaetsfaktor wasser
+!   real, parameter :: k_i  = 0.176e+0     !..dielektrizitaetsfaktor eis
+!   real, parameter :: rho0 = 1.225e+0     !..norm-luftdichte
+!   real, parameter :: t_f  = 2.330e+2     !..bei t < t_f kein fl.wasser
+!   real, parameter :: r_l  = 2.870e+2     !..gaskonstante trockener luft
+!   real, parameter :: c_w  = 4.218e+3     !..spezifische waerme von wasser
+!   real, parameter :: sigma_wa  = 7.1e-2  !..oberflaechenspannung wasser-luft
 !   real, parameter :: rowt   = 1000.0    !..materialdichte von fluessigwasser
 !   real, parameter :: rho_ice = 900.0     !..materialdichte von eis
   ! .. wolkenphysikalische konstanten und parameter ..
@@ -88,11 +88,11 @@ module mcrp
   real, parameter :: n_f  = 0.333        !..exponent von n_sc im vent-koeff. (pk, s.541)
   real, parameter :: m_f  = 0.500        !..exponent von n_re im vent-koeff. (pk, s.541)
 ! 
-  real, parameter :: a_e  = 2.18745584d1 !..konst. saettigungsdamppfdruck - eis
-  real, parameter :: a_w  = 1.72693882d1 !..konst. saettigungsdamppfdruck - wasser
-  real, parameter :: b_e  = 7.66000000d0 !..konst. saettigungsdamppfdruck - eis
-  real, parameter :: b_w  = 3.58600000d1 !..konst. saettigungsdamppfdruck - wasser
-  real, parameter :: e_3  = 6.10780000d2 !..saettigungsdamppfdruck bei t = tmelt
+  real, parameter :: a_e  = 2.18745584e1 !..konst. saettigungsdamppfdruck - eis
+  real, parameter :: a_w  = 1.72693882e1 !..konst. saettigungsdamppfdruck - wasser
+  real, parameter :: b_e  = 7.66000000e0 !..konst. saettigungsdamppfdruck - eis
+  real, parameter :: b_w  = 3.58600000e1 !..konst. saettigungsdamppfdruck - wasser
+  real, parameter :: e_3  = 6.10780000e2 !..saettigungsdamppfdruck bei t = tmelt
 ! 
   real, parameter :: c_mult     = 3.5d8    !..koeff. fuer splintering
   real, parameter :: t_mult_min = 265.0    !..minimale temp. splintering
@@ -102,8 +102,8 @@ module mcrp
 !   ! ... spezielle parameter des kamm2-wolkenmoduls
 ! 
 !   real, parameter :: r_c     = 12.0e-6         !..mean radius (bei 1-moment)
-!   real, parameter :: rho_vel    = 0.5d0        !..exponent in dichtekorrektur
-!   real, parameter :: rho_vel_c  = 1.0d0        !..fuer wolkentropfen
+!   real, parameter :: rho_vel    = 0.5e0        !..exponent in dichtekorrektur
+!   real, parameter :: rho_vel_c  = 1.0e0        !..fuer wolkentropfen
 ! 
 !   ! ... spezielle parameter des kamm2-wolkenmoduls (eisphase)
 ! 
@@ -121,38 +121,38 @@ module mcrp
 !   ! rain_freeze: der teil des regenspektrums kleiner als d_rainfrz_ig
 !   ! wird nach gefrieren dem eis zugeschlagen, der teil von dort bis zu d_rainfrz_gh dem graupel
 !   ! und der rest dem hagel.
-!   real, parameter :: d_rainfrz_ig = 0.50d-3 !  rain --> ice oder graupel
-!   real, parameter :: d_rainfrz_gh = 1.25d-3 ! rain --> graupel oder hail
-!   real, parameter :: q_krit_ic = 1.000d-5 ! q-schwellenwert fuer ice_cloud_riming
-!   real, parameter :: d_krit_ic = 150.0d-6 ! d-schwellenwert fuer ice_cloud_riming
-!   real, parameter :: q_krit_ir = 1.000d-5 ! q-schwellenwert fuer ice_rain_riming
-!   real, parameter :: d_krit_ir = 100.0d-6 ! d-schwellenwert fuer ice_rain_riming
-!   real, parameter :: q_krit_sc = 1.000d-5 ! q-schwellenwert fuer snow_cloud_riming
-!   real, parameter :: d_krit_sc = 150.0d-6 ! d-schwellenwert fuer snow_cloud_riming
-!   real, parameter :: q_krit_sr = 1.000d-5 ! q-schwellenwert fuer snow_rain_riming
-!   real, parameter :: d_krit_sr = 100.0d-6 ! d-schwellenwert fuer snow_rain_riming
-!   real, parameter :: q_krit_gc = 1.000d-6 ! q-schwellenwert fuer graupel_cloud_riming
-!   real, parameter :: d_krit_gc = 100.0d-6 ! d-schwellenwert fuer graupel_cloud_riming
-!   real, parameter :: q_krit_hc = 1.000d-6 ! q-schwellenwert fuer hail_cloud_riming
-!   real, parameter :: d_krit_hc = 100.0d-6 ! d-schwellenwert fuer hail_cloud_riming
-!   real, parameter :: q_krit_fr = 1.000d-6 ! q-schwellenwert fuer rain_freeze
-!   real, parameter :: q_krit_c  = 1.000d-6 ! q-schwellenwert sonst
-!   real, parameter :: q_krit    = 1.000d-9 ! q-schwellenwert sonst
-!   real, parameter :: d_conv_sg = 200.0d-6 ! d-schwellenwert
-!   real, parameter :: d_conv_ig = 200.0d-6 ! d-schwellenwert
-!   real, parameter :: d_shed_g  = 3.000d-3 ! d-schwellenwert fuer graupel_shedding
-!   real, parameter :: d_shed_h  = 5.000d-3 ! d-schwellenwert fuer hagel_shedding
-!   real, parameter :: d_krit_c  = 10.00d-6 ! d-schwellenwert fuer cloud_collection
-!   real, parameter :: d_coll_c  = 40.00d-6 ! oberer wert fuer cloud_coll_eff
-!   real, parameter :: t_nuc     = 273.2d+0 ! temperatur ab der eisnukleation einsetzt
-!   real, parameter :: t_freeze  = 273.2d+0 ! temperatur ab der gefrieren einsetzt
+!   real, parameter :: d_rainfrz_ig = 0.50e-3 !  rain --> ice oder graupel
+!   real, parameter :: d_rainfrz_gh = 1.25e-3 ! rain --> graupel oder hail
+!   real, parameter :: q_krit_ic = 1.000e-5 ! q-schwellenwert fuer ice_cloud_riming
+!   real, parameter :: d_krit_ic = 150.0e-6 ! e-schwellenwert fuer ice_cloud_riming
+!   real, parameter :: q_krit_ir = 1.000e-5 ! q-schwellenwert fuer ice_rain_riming
+!   real, parameter :: d_krit_ir = 100.0e-6 ! e-schwellenwert fuer ice_rain_riming
+!   real, parameter :: q_krit_sc = 1.000e-5 ! q-schwellenwert fuer snow_cloud_riming
+!   real, parameter :: d_krit_sc = 150.0e-6 ! e-schwellenwert fuer snow_cloud_riming
+!   real, parameter :: q_krit_sr = 1.000e-5 ! q-schwellenwert fuer snow_rain_riming
+!   real, parameter :: d_krit_sr = 100.0e-6 ! e-schwellenwert fuer snow_rain_riming
+!   real, parameter :: q_krit_gc = 1.000e-6 ! q-schwellenwert fuer graupel_cloud_riming
+!   real, parameter :: d_krit_gc = 100.0e-6 ! e-schwellenwert fuer graupel_cloud_riming
+!   real, parameter :: q_krit_hc = 1.000e-6 ! q-schwellenwert fuer hail_cloud_riming
+!   real, parameter :: d_krit_hc = 100.0e-6 ! e-schwellenwert fuer hail_cloud_riming
+!   real, parameter :: q_krit_fr = 1.000e-6 ! q-schwellenwert fuer rain_freeze
+!   real, parameter :: q_krit_c  = 1.000e-6 ! q-schwellenwert sonst
+!   real, parameter :: q_krit    = 1.000e-9 ! q-schwellenwert sonst
+!   real, parameter :: d_conv_sg = 200.0e-6 ! e-schwellenwert
+!   real, parameter :: d_conv_ig = 200.0e-6 ! e-schwellenwert
+!   real, parameter :: d_shed_g  = 3.000e-3 ! e-schwellenwert fuer graupel_shedding
+!   real, parameter :: d_shed_h  = 5.000e-3 ! e-schwellenwert fuer hagel_shedding
+!   real, parameter :: d_krit_c  = 10.00e-6 ! e-schwellenwert fuer cloud_collection
+!   real, parameter :: d_coll_c  = 40.00e-6 ! oberer wert fuer cloud_coll_eff
+!   real, parameter :: t_nuc     = 273.2e+0 ! temperatur ab der eisnukleation einsetzt
+!   real, parameter :: t_freeze  = 273.2e+0 ! temperatur ab der gefrieren einsetzt
 ! 
-!   real, parameter :: q_krit_aus = 1.00d-5 ! q-schwellenwert fuer ausgabe von d und z
+!   real, parameter :: q_krit_aus = 1.00e-5 ! q-schwellenwert fuer ausgabe von d und z
 ! 
 !     real :: q_crit_self  ! q-schwellenwert fuer ice_selfcollection
 !     real :: d_crit_self  ! d-schwellenwert fuer ice_selfcollection
-!     real :: d_conv_self  ! d-schwellenwert fuer ice_selfcollection
-!     real :: d_coll  ! d-schwellenwert fuer ice_selfcollection
+!     real :: d_conv_self  ! e-schwellenwert fuer ice_selfcollection
+!     real :: d_coll  ! e-schwellenwert fuer ice_selfcollection
 !    
 
   type particle
@@ -659,7 +659,7 @@ contains
   subroutine sedim_cd(n1,dt,tl,th,tk,rc)
   !
   ! ---------------------------------------------------------------------
-  ! SEDIM_CD: calculates the cloud-droplet sedimentation flux and its effect
+  ! SEDIM_CD: calculates the cloue-droplet sedimentation flux and its effect
   ! on the evolution of r_t and theta_l assuming a log-normal distribution
   !
 
@@ -717,7 +717,7 @@ contains
     
     do k=2,n1
       if (tk(k) < tmelt .and. qsup(k) > 0.0) then
-        nuc_n = 0d0
+        nuc_n = 0e0
         nuc_n = max(nin(k) - (nice(k)),0.)
 
         nuc_q = min(nuc_n * ice%x_min, qsup(k))
@@ -738,8 +738,8 @@ contains
 !         ! .. local variables ..
         integer          ::  k
         real :: frq, frn,qc,xc,jhet,jhom,jtot,tc
-        real, parameter :: ahet = 6.5d-1 ! 1/k,      messung nach barklie and gokhale
-        real, parameter :: bhet = 2.0d+2 ! 1/(m3 s), messung nach barklie and gokhale
+        real, parameter :: ahet = 6.5e-1 ! 1/k,      messung nach barklie and gokhale
+        real, parameter :: bhet = 2.0e+2 ! 1/(m3 s), messung nach barklie and gokhale
         real            :: facg
 
 
@@ -799,19 +799,19 @@ contains
         real            :: fr_q,fr_n,q_r,x_r,n_r,j_het,&
             &  fr_q_i,fr_n_i,fr_q_g,fr_n_g,n_0,lam,xmax_ice,fr_q_tmp,fr_n_tmp
         real, save      :: coeff_z
-        real, parameter :: a_het = 6.5d-1 ! messung nach barklie and gokhale (pk s.350)
-        real, parameter :: b_het = 2.0d+2 ! messung nach barklie and gokhale (pk s.350)
-        real, parameter :: q_crit_fr = 1.000d-6 ! q-schwellenwert fuer rain_freeze
-        real, parameter :: d_rainfrz_ig = 0.50d-3 !  rain --> ice oder graupel
-!         real, parameter :: d_rainfrz_gh = 1.25d-3 ! rain --> graupel oder hail
+        real, parameter :: a_het = 6.5e-1 ! messung nach barklie and gokhale (pk s.350)
+        real, parameter :: b_het = 2.0e+2 ! messung nach barklie and gokhale (pk s.350)
+        real, parameter :: q_crit_fr = 1.000e-6 ! q-schwellenwert fuer rain_freeze
+        real, parameter :: d_rainfrz_ig = 0.50e-3 !  rain --> ice oder graupel
+!         real, parameter :: d_rainfrz_gh = 1.25e-3 ! rain --> graupel oder hail
 
 ! 
 ! 
 !           !..koeff. fuer reflektivitaet z (2. moment)
           coeff_z = moment_gamma(rain,2)
 ! 
-        xmax_ice = (d_rainfrz_ig/rain%a_geo)**(1.0d0/rain%b_geo)
-!         xmax_gr  = (d_rainfrz_gh/rain%a_geo)**(1.0d0/rain%b_geo)
+        xmax_ice = (d_rainfrz_ig/rain%a_geo)**(1.0e0/rain%b_geo)
+!         xmax_gr  = (d_rainfrz_gh/rain%a_geo)**(1.0e0/rain%b_geo)
         fr_q_g = 0.0
         !..test auf schmelzen oder gefrieren von regentropfen
         do k = 1, n1
@@ -868,14 +868,14 @@ contains
                     fr_q_tmp = q_r/max(fr_q,q_r)
 
                   else                           !..heterogenes gefrieren
-                    j_het = max(b_het * ( exp( a_het * (tmelt - tk(k))) - 1.0 ),0.d0) / rowt * dt
+                    j_het = max(b_het * ( exp( a_het * (tmelt - tk(k))) - 1.0 ),0.) / rowt * dt
 
                     ! ub>> je nach groesse werden die gefrorenen regentropfen dem wolkeneis zugeschlagen
                     !      oder dem graupel oder hagel. hierzu erfolgt eine partielle integration des spektrums von 0
                     !      bis zu einer ersten trennmasse xmax_ice (--> eis), von dort bis zu xmax_gr (--> graupel)
                     !      und von xmax_gr bis unendlich (--> hagel).
 
-                    if (j_het >= 1d-20) then
+                    if (j_het >= 1-20) then
                       fr_n  = j_het * q_r
                       fr_q  = j_het * q_r * x_r * coeff_z
 
@@ -915,11 +915,11 @@ contains
 
                 if (qrain(k) < 0.0) then
                   !write (*,*) 'seifert rain_freeze: qrain < 0.0, ', k, tk(k), q_r, j_het, fr_q, fr_q_tmp
-                  qrain(k) = 0.0d0
+                  qrain(k) = 0.0e0
                 end if
                 if (nrain(k) < 0.0) then
                   !write (*,*) 'seifert rain_freeze: nrain < 0.0, ', k, tk(k), n_r, j_het, fr_n, fr_n_tmp
-                  nrain(k) = 0.0d0
+                  nrain(k) = 0.0e0
                 end if
 
               qice(k) = qice(k)  + fr_q_i
@@ -973,8 +973,8 @@ contains
           !              f_n  = a_n + b_n * f_v_fakt * n_re**m_f                    !..mean vent.koeff.
           f_n = a_n + vent_fakt * (f_v - a_f)                        !..mean vent.koeff.
           ! ub<<
-          f_v  = max(f_v,1.d0) !unnoetig??
-          f_n  = max(f_n,1.d0) !unnoetig??
+          f_v  = max(f_v,1.e0) !unnoetig??
+          f_n  = max(f_n,1.e0) !unnoetig??
 !           e_si = e_es(tk(k))
           gi = 4.0*pi / ( alvi**2 / (K_T * Rm * tk(k)**2) + Rm * tk(k) / (D_v * e_es(tk(k))) )
           dep = gi * n_g * c_g * d_g * f_v * qsup(k) * dt
@@ -1041,13 +1041,13 @@ contains
 !            melt_n = (melt_h * fh_n + melt_v * fv_n) / x_m
 
 ! ub>> setzte melt_n so, dass x_h beim Schmelzvorgang erhalten bleibt:
-            melt_n = MIN(MAX( (melt_q - q(k)) / x_m + nr(k), 0.0d0), nr(k))
+            melt_n = MIN(MAX( (melt_q - q(k)) / x_m + nr(k), 0.0e0), nr(k))
 
             melt_q = MIN(q(k),melt_q)
             melt_n = MIN(nr(k),melt_n)
 
-            melt_q = MAX(0.d0,melt_q)
-            melt_n = MAX(0.d0,melt_n)
+            melt_q = MAX(0.e0,melt_q)
+            melt_n = MAX(0.e0,melt_n)
 
 
             q(k) = q(k) - melt_q
@@ -1136,17 +1136,17 @@ contains
             else
               !.. temperaturabhaengige efficiency nach cotton et al. (1986)
               !   (siehe auch straka, 1989; s. 53)
-              e_coll = min(10**(0.035*(tk(k)-tmelt)-0.7),0.2d0)
+              e_coll = min(10**(0.035*(tk(k)-tmelt)-0.7),0.2e0)
               !.. temperaturabhaengige efficiency nach lin et al. (1983)
-              !e_coll = min(exp(0.09*(t_a-t_3)),1.0d0)
-              !e_coll = max(e_ii,min(exp(0.09*(t_a-t_3)),1.0d0))
+              !e_coll = min(exp(0.09*(t_a-t_3)),1.0e0)
+              !e_coll = max(e_ii,min(exp(0.09*(t_a-t_3)),1.0e0))
             end if
 
 
             v_i = metin%a_vel * x_i**metin%b_vel * dn0(k)      !..mean sedimentationsgeschw.
 
 
-            self_q = pi * 0.25d0 * e_coll * delta_q * n_i * q_i * d_i * d_i &
+            self_q = pi * 0.25e0 * e_coll * delta_q * n_i * q_i * d_i * d_i &
                   * ( theta_q * v_i * v_i + 2.0*metin%s_vel**2 )**0.5 * dt
 
             self_q = min(self_q,q_i)
@@ -1154,7 +1154,7 @@ contains
             q_in(k)  = q_in(k)  - self_q
             q_out(k) = q_out(k) + self_q
 
-              self_n = pi * 0.25d0 * e_coll * delta_n * n_i * n_i * d_i * d_i &
+              self_n = pi * 0.25e0 * e_coll * delta_n * n_i * n_i * d_i * d_i &
                       * ( theta_n * v_i * v_i + 2.0*metin%s_vel**2 )**0.5 * dt
               self_n = min(min(self_n,self_q/x_conv),n_i)
               n_in(k)  = n_in(k)  - self_n
@@ -1173,7 +1173,7 @@ contains
       
       integer                     :: k
   real, parameter :: e_min = 0.01              !..min. eff. fuer gc,ic,sc
-  real, parameter :: x_conv    = 0.100d-9 ! minimale graupel-/hagelmasse riming
+  real, parameter :: x_conv    = 0.100e-9 ! minimale graupel-/hagelmasse riming
 
       real     :: x_i,d_i,v_i
       real     :: x_c,d_c,v_c,e_coll,x_coll_c
@@ -1252,8 +1252,8 @@ contains
                 if (tk(k) < tmelt .and. ice_multiplication) then
                   mult_1 = (tk(k) - t_mult_min)*const3
                   mult_2 = (tk(k) - t_mult_max)*const4
-                  mult_1 = max(0.d0,min(mult_1,1.d0))
-                  mult_2 = max(0.d0,min(mult_2,1.d0))
+                  mult_1 = max(0.e0,min(mult_1,1.e0))
+                  mult_2 = max(0.e0,min(mult_2,1.e0))
                   mult_n = c_mult * mult_1 * mult_2 * rime_q
 
                   n_i(k)  = n_i(k)  + mult_n
@@ -1392,8 +1392,8 @@ contains
               if (tk(k) < tmelt .and. ice_multiplication) then
                 mult_1 = (tk(k) - t_mult_min) / (t_mult_opt - t_mult_min)
                 mult_2 = (tk(k) - t_mult_max) / (t_mult_opt - t_mult_max)
-                mult_1 = max(0.d0,min(mult_1,1.d0))
-                mult_2 = max(0.d0,min(mult_2,1.d0))
+                mult_1 = max(0.e0,min(mult_1,1.e0))
+                mult_2 = max(0.e0,min(mult_2,1.e0))
                 mult_n = c_mult * mult_1 * mult_2 * rime_qr
                 mult_q = mult_n * ice%x_min
                 mult_q = min(rime_qr,mult_q)
@@ -1470,10 +1470,10 @@ contains
               e_coll = 1.0
             else
               !.. temperaturabhaengige sticking efficiency nach lin (1983)
-              e_coll = max(0.1d0,min(exp(0.09*(tk(k)-tmelt)),1.0d0))
+              e_coll = max(0.1e0,min(exp(0.09*(tk(k)-tmelt)),1.0e0))
               !.. temperaturabhaengige efficiency nach cotton et al. (1986)
               !   (siehe auch straka, 1989; s. 53)
-              !e_coll = min(10**(0.035*(tk(k)-tmelt)-0.7),0.2d0)
+              !e_coll = min(10**(0.035*(tk(k)-tmelt)-0.7),0.2e0)
             endif
 
             x_i = min(max(q_i(k)/(n_i(k)+eps0),met1%x_min),met1%x_max)     !..mean masse in si
@@ -1527,21 +1527,21 @@ contains
           &                / gfct((meteor%nu+2.0)/meteor%mu)
     c_lam = gfct((meteor%nu+1.0)/meteor%mu)/gfct((meteor%nu+2.0)/meteor%mu)
 
-    where (rp < 0.0d0) rp = 0.0d0
-    where (np < 0.0d0) np = 0.0d0
+    where (rp < 0.0e0) rp = 0.0e0
+    where (np < 0.0e0) np = 0.0e0
 
     do k=n1-1,2,-1
 
       Xp = rp(k) / (np(k)+eps0)
       lam = ( c_lam * xp )**(meteor%b_vel)
       vr(k) = alfq * lam
-      vr(k) = max(vr(k),0.1d+0)
-      vr(k) = min(vr(k),30.d0)
+      vr(k) = max(vr(k),0.1e+0)
+      vr(k) = min(vr(k),30.e0)
       vr(k) = -vr(k)
 
       vn(k) = alfn * lam
-      vn(k) = max(vn(k),0.1d+0)
-      vn(k) = min(vn(k),30.d0)
+      vn(k) = max(vn(k),0.1e+0)
+      vn(k) = min(vn(k),30.e0)
       vn(k) = -vn(k)
     end do
     do k=2,n1-1
@@ -1619,13 +1619,13 @@ contains
     ! diagnostische beziehung fuer anzahldichte der eisteilchen nach meyers (1992)
 !
     real, intent(in):: s,t_a
-    real, parameter :: n_0 = 1.0d+3
-    real, parameter :: n_m = 1.0d+3
+    real, parameter :: n_0 = 1.0e+3
+    real, parameter :: n_m = 1.0e+3
     real, parameter :: a_d = -0.639
     real, parameter :: b_d = 12.960
     real, parameter :: c_d = -2.8
     real, parameter :: d_d = 0.262
-    real, parameter :: tmelt  = 2.732d+2     !..tripelpunkt wasser
+    real, parameter :: tmelt  = 2.732e+2     !..tripelpunkt wasser
 
     n_ice_meyers_contact = n_0 * exp( a_d + b_d * s )         &
           &               + n_m * exp( c_d + d_d * (t_a - tmelt) )
@@ -1681,9 +1681,9 @@ contains
     real stp,half,one,x,xx,fpf,tmp,ser,gamma
     integer j
 
-    data cof,stp/76.18009173d0,-86.50532033d0,24.01409822d0,  &
-         &     -1.231739516d0,.120858003d-2,-.536382d-5,2.50662827465d0/
-    data half,one,fpf/0.5d0,1.0d0,5.5d0/
+    data cof,stp/76.18009173e0,-86.50532033e0,24.01409822e0,  &
+         &     -1.231739516e0,.120858003e-2,-.536382e-5,2.50662827465e0/
+    data half,one,fpf/0.5e0,1.0e0,5.5e0/
 
     xx  = x  - one
     tmp = xx + fpf
@@ -1770,10 +1770,10 @@ contains
 
     real :: gammcf, gamser
 
-    if (x.lt.0.0d0 .or. a .le. 0.0d0) then
+    if (x.lt.0.0e0 .or. a .le. 0.0e0) then
       write(*,*) 'error in gammp: bad arguments'
       write(*,*) '  (module gamma_functions, src_seifert.f90)'
-      gammp = 0.0d0
+      gammp = 0.0e0
       return
     end if
 
@@ -1782,7 +1782,7 @@ contains
       gammp = gamser
     else
       call gcf(gammcf,a,x,gln)
-      gammp = 1.0d0 - gammcf
+      gammp = 1.0e0 - gammcf
     endif
     return
   end function gammp
@@ -1795,15 +1795,15 @@ contains
     real, intent(out) :: gln
     real :: gammcf, gamser
 
-    if (x.lt.0.0d0 .or. a .le. 0.0d0) then
+    if (x.lt.0.0e0 .or. a .le. 0.0e0) then
       write(*,*) 'error in gammq: bad arguments (module gamma_functions, src_seifert.f90)'
-      gammq = 0.0d0
+      gammq = 0.0e0
       return
     end if
 
     if (x.lt.a+1.) then
       call gser(gamser,a,x,gln)
-      gammq = 1.0d0 - gamser
+      gammq = 1.0e0 - gamser
     else
       call gcf(gammcf,a,x,gln)
       gammq = gammcf
@@ -1825,17 +1825,17 @@ contains
     real, save :: cof(6), stp
     real :: xx,tmp,ser
     integer :: j
-    data cof /76.18009172947146d0,-86.50532032941677d0, &
-         24.01409824083091d0,-1.231739572450155d0,.1208650973866179d-2, &
-         -.5395239384953d-5/
-    data stp /2.5066282746310005d0/
+    data cof /76.18009172947146e0,-86.50532032941677e0, &
+         24.01409824083091e0,-1.231739572450155e0,.1208650973866179e-2, &
+         -.5395239384953e-5/
+    data stp /2.5066282746310005e0/
 
     xx  = x
-    tmp = xx + 5.5d0
-    tmp = (xx + 0.5d0) * log(tmp) - tmp
-    ser = 1.000000000190015d0
+    tmp = xx + 5.5e0
+    tmp = (xx + 0.5e0) * log(tmp) - tmp
+    ser = 1.000000000190015e0
     do j = 1,6
-       xx  = xx  + 1.0d0
+       xx  = xx  + 1.0e0
        ser = ser + cof(j) / xx
     enddo
     gammln = tmp + log(stp*ser/x)
@@ -1857,9 +1857,9 @@ contains
     real :: xx,tmp,ser,gamma
     integer j
 
-    data cof,stp/76.18009173d0,-86.50532033d0,24.01409822d0,  &
-          &     -1.231739516d0,.120858003d-2,-.536382d-5,2.50662827465d0/
-    data half,one,fpf/0.5d0,1.0d0,5.5d0/
+    data cof,stp/76.18009173e0,-86.50532033e0,24.01409822e0,  &
+          &     -1.231739516e0,.120858003e-2,-.536382e-5,2.50662827465e0/
+    data half,one,fpf/0.5e0,1.0e0,5.5e0/
 
     xx  = x  - one
     tmp = xx + fpf
@@ -1881,7 +1881,7 @@ contains
     implicit none
 
     integer, parameter :: itmax = 100
-    real, parameter :: eps = 3.d-7, fpmin = 1.d-30
+    real, parameter :: eps = 3.e-7, fpmin = 1.e-30
     real, intent(in) :: a, x
     real, intent(out) :: gammcf, gln
 
@@ -1895,7 +1895,7 @@ contains
     h=d
     do i=1,itmax
       an=-i*(i-a)
-      b=b+2.0d0
+      b=b+2.0e0
       d=an*d+b
       if (abs(d).lt.fpmin) d=fpmin
       c=b+an/c
@@ -1908,7 +1908,7 @@ contains
 
     if (abs(del-1.).ge.eps) then
       write (*,*) 'error in gcf: a too large, itmax too small (module gamma_functions, src_seifert.f90)'
-      gammcf = 0.0d0
+      gammcf = 0.0e0
       return
     end if
 
@@ -1922,7 +1922,7 @@ contains
     implicit none
 
     integer, parameter :: itmax = 100
-    real, parameter :: eps=3.d-7
+    real, parameter :: eps=3.e-7
     real, intent(in) :: a, x
     real, intent(out) :: gamser, gln
 
@@ -1934,7 +1934,7 @@ contains
       if (x.lt.0.) then
         write (*,*) 'error in gser: x < 0 (module gamma_functions, src_seifert.f90)'
       end if
-      gamser=0.0d0
+      gamser=0.0e0
       return
     endif
 
@@ -1951,7 +1951,7 @@ contains
     if (abs(del).ge.abs(sum)*eps) then
       write (*,*) 'error in gser: a too large, itmax too small'
       write (*,*) '  (module gamma_functions, src_seifert.f90)'
-      gamser = 0.0d0
+      gamser = 0.0e0
       return
     end if
 
@@ -2139,11 +2139,11 @@ contains
          CCN, & !Number of droplets
          0.333333, & !.nu.....Breiteparameter der Verteil.
          0.666666, & !.mu.....Exp.-parameter der Verteil.
-         2.60d-10, & !.x_max..maximale Teilchenmasse D=80e-6m
-         4.20d-15, & !.x_min..minimale Teilchenmasse D=2.e-6m
-         1.24d-01, & !.a_geo..Koeff. Geometrie
+         2.60e-10, & !.x_max..maximale Teilchenmasse D=80e-6m
+         4.20e-15, & !.x_min..minimale Teilchenmasse D=2.e-6m
+         1.24e-01, & !.a_geo..Koeff. Geometrie
          0.333333, & !.b_geo..Koeff. Geometrie = 1/3
-         3.75d+05, & !.a_vel..Koeff. Fallgesetz
+         3.75e+05, & !.a_vel..Koeff. Fallgesetz
          0.666667, & !.b_vel..Koeff. Fallgesetz
          0.25     , &!.s_vel...Dispersion der Fallgeschw.
          0.780000, & !.a_ven..Koeff. Ventilation (PK, S.541)
@@ -2156,11 +2156,11 @@ contains
          0, & !Number of droplets
          0.333333, & !.nu.....Breiteparameter der Verteil.
          0.666666, & !.mu.....Exp.-parameter der Verteil.
-         2.60d-10, & !.x_max..maximale Teilchenmasse D=80e-6m
-         4.20d-15, & !.x_min..minimale Teilchenmasse D=2.e-6m
-         1.24d-01, & !.a_geo..Koeff. Geometrie
+         2.60e-10, & !.x_max..maximale Teilchenmasse D=80e-6m
+         4.20e-15, & !.x_min..minimale Teilchenmasse D=2.e-6m
+         1.24e-01, & !.a_geo..Koeff. Geometrie
          0.333333, & !.b_geo..Koeff. Geometrie = 1/3
-         3.75d+05, & !.a_vel..Koeff. Fallgesetz
+         3.75e+05, & !.a_vel..Koeff. Fallgesetz
          0.666667, & !.b_vel..Koeff. Fallgesetz
          0.25     , &!.s_vel...Dispersion der Fallgeschw.
          0.780000, & !.a_ven..Koeff. Ventilation (PK, S.541)
@@ -2172,11 +2172,11 @@ contains
         0, & !
         0.000000, & !.nu.....Breiteparameter der Verteil.
         0.333333, & !.mu.....Exp.-parameter der Verteil.
-        1.00d-07, & !.x_max..maximale Teilchenmasse D=???e-2m
-        1.00d-12, & !.x_min..minimale Teilchenmasse D=200e-6m
+        1.00e-07, & !.x_max..maximale Teilchenmasse D=???e-2m
+        1.00e-12, & !.x_min..minimale Teilchenmasse D=200e-6m
         3.303633, & !.a_geo..Koeff. Geometrie
         0.476191, & !.b_geo..Koeff. Geometrie = 1/2.1
-        2.77d+01, & !.a_vel..Koeff. Fallgesetz
+        2.77e+01, & !.a_vel..Koeff. Fallgesetz
         0.215790, & !.b_vel..Koeff. Fallgesetz = 0.41/1.9
          0.25     , &!.s_vel...Dispersion der Fallgeschw.
         0.780000, & !.a_ven..Koeff. Ventilation (PK, S.541)
@@ -2190,11 +2190,11 @@ contains
          CCN, &
         0.000000, & !.nu.....Breiteparameter der Verteil.
         0.333333, & !.mu.....Exp.-parameter der Verteil.
-        1.00d-07, & !.x_max..maximale Teilchenmasse D=???e-2m
-        1.00d-12, & !.x_min..minimale Teilchenmasse D=200e-6m
+        1.00e-07, & !.x_max..maximale Teilchenmasse D=???e-2m
+        1.00e-12, & !.x_min..minimale Teilchenmasse D=200e-6m
         3.303633, & !.a_geo..Koeff. Geometrie
         0.476191, & !.b_geo..Koeff. Geometrie = 1/2.1
-        2.47d+02, & !.a_vel..Koeff. Fallgesetz
+        2.47e+02, & !.a_vel..Koeff. Fallgesetz
         0.333333, & !.b_vel..Koeff. Fallgesetz
          0.25     , &!.s_vel...Dispersion der Fallgeschw.
         0.780000, & !.a_ven..Koeff. Ventilation (PK, S.541)
@@ -2207,11 +2207,11 @@ graupel = PARTICLE( & ! 'graupel im standard'
          CCN, &
          1.000000, & !.nu.....Breiteparameter der Verteil.
          0.166666, & !.mu.....Exp.-parameter der Verteil.
-         1.00d-04, & !.x_max..maximale Teilchenmasse
-         2.60d-10, & !.x_min..minimale Teilchenmasse
-         1.10d-01, & !.a_geo..Koeff. Geometrie
+         1.00e-04, & !.x_max..maximale Teilchenmasse
+         2.60e-10, & !.x_min..minimale Teilchenmasse
+         1.10e-01, & !.a_geo..Koeff. Geometrie
          0.300000, & !.b_geo..Koeff. Geometrie = 1/3.10
-         7.64d+01,& !.a_vel..Koeff. Fallgesetz
+         7.64e+01,& !.a_vel..Koeff. Fallgesetz
          0.255200, & !.b_vel..Koeff. Fallgesetz
          0.25     , &!.s_vel...Dispersion der Fallgeschw.
          0.780000, & !.a_ven..Koeff. Ventilation (PK, S.541)
