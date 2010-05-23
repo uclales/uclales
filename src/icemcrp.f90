@@ -39,8 +39,8 @@ module mcrp
   use grid, only : dt, dxi, dyi ,dzt, nxp, nyp, nzp, a_pexnr, a_rp, a_tp, th00, ccn,    &
        dn0, pi0,pi1, a_rt, a_tt,a_rpp, a_rpt, a_npp, a_npt, vapor, liquid,       &
        a_theta, a_scr1, a_scr2, a_scr7, precip, &
-       a_ninuct,a_ricet,a_nicet,a_rsnowt,a_nsnowt,a_rgrt,a_ngrt,&
-       a_ninucp,a_ricep,a_nicep,a_rsnowp,a_nsnowp,a_rgrp,a_ngrp,rsup
+       a_ninuct,a_ricet,a_nicet,a_rsnowt,a_rgrt,&
+       a_ninucp,a_ricep,a_nicep,a_rsnowp,a_rgrp,rsup
   use thrm, only : thermo, fll_tkrs, thetal_noprecip
   use stat, only : sflg, updtst
   use util, only : get_avg3, azero
@@ -196,8 +196,8 @@ contains
     case(4)
        call mcrph(level,nzp,nxp,nyp,dn0,a_tp,a_theta,a_scr1,vapor,a_scr2,liquid,a_rpp, &
               a_npp,precip,a_rt,a_tt,a_rpt,a_npt,a_scr7,&
-              a_ninuct,a_ricet,a_nicet,a_rsnowt,a_nsnowt,a_rgrt,a_ngrt,&
-              a_ninucp,a_ricep,a_nicep,a_rsnowp,a_nsnowp,a_rgrp,a_ngrp,rsup)
+              a_ninuct,a_ricet,a_nicet,a_rsnowt,a_rgrt,&
+              a_ninucp,a_ricep,a_nicep,a_rsnowp,a_rgrp,rsup)
     end select
 
   end subroutine micro
@@ -208,7 +208,7 @@ contains
 
   subroutine mcrph(level,n1,n2,n3,dn0,thl,th,tk,rv,rs,rc,rp,np,         &
        rrate, rtt,tlt,rpt,npt,dissip,    &
-       ninuct,ricet,nicet,rsnowt,nsnowt,rgrt,ngrt,ninucp,ricep,nicep,rsnowp,nsnowp,rgrp,ngrp,rsup)
+       ninuct,ricet,nicet,rsnowt,rgrt,ninucp,ricep,nicep,rsnowp,rgrp,rsup)
 
     integer, intent (in) :: level,n1,n2,n3
     real, dimension(n1)      , intent (in)             :: dn0  !Density
@@ -226,12 +226,12 @@ contains
                                                           npt,&!rain droplet number tendency
                                                           dissip
     real, intent (out)                                 :: rrate(n1,n2,n3)
-    real, dimension(n1,n2,n3), intent (inout),optional :: ninuct,ricet,nicet,rsnowt,nsnowt,rgrt,ngrt,&
-                                                          ninucp,ricep,nicep,rsnowp,nsnowp,rgrp,ngrp,&
+    real, dimension(n1,n2,n3), intent (inout),optional :: ninuct,ricet,nicet,rsnowt,rgrt,&
+                                                          ninucp,ricep,nicep,rsnowp,rgrp,&
                                                           rsup
 
     real, dimension(n1) :: q1,q2,q3,q4,q5 !dummy-arrays for conversion between mixing rate 
-    integer :: i, j,n
+    integer :: i, j!,n
     rrate = 0.    
     if(firsttime) call initmcrp(level)
     
@@ -244,42 +244,42 @@ contains
       ricet  = ricet  - ricep/dt
       nicet  = nicet  - nicep/dt
       rsnowt = rsnowt - rsnowp/dt
-      nsnowt = nsnowt - nsnowp/dt
       rgrt   = rgrt   - rgrp/dt
-      ngrt   = ngrt   - ngrp/dt
     end if
 
     seq =  gen_sequence(nprocess)
-
+    allocate(convice(n1),convliq(n1))
+  
 
     do j=3,n3-2
       do i=3,n2-2
         convliq = alvl*th(:,i,j)/(cp*tk(:,i,j))
         convice = alvi*th(:,i,j)/(cp*tk(:,i,j))
-        do n=1,nprocess
-          select case(seq(n))
-          case(iwtrdff)
+!         do n=1,nprocess
+!           select case(seq(n))
+!           case(iwtrdff)
             call resetvar(cldw,rc(:,i,j))
             call wtr_dff_SB(n1,dn0,rp(:,i,j),np(:,i,j),rc(:,i,j),rs(:,i,j),rv(:,i,j),thl(:,i,j),tk(:,i,j))
-          case(iauto)
+!           case(iauto)
             call resetvar(cldw,rc(:,i,j))
             call auto_SB(n1,dn0,rc(:,i,j),rp(:,i,j),np(:,i,j),thl(:,i,j),dissip(:,i,j))
-          case(iaccr)
+!           case(iaccr)
             call resetvar(cldw,rc(:,i,j))
             call accr_SB(n1,dn0,rc(:,i,j),rp(:,i,j),np(:,i,j),thl(:,i,j),dissip(:,i,j))
-          case(isedimrd)
+!           case(isedimrd)
             call sedim_rd(n1,dt,dn0,rp(:,i,j),np(:,i,j))
-          case(isedimcd)
+!           case(isedimcd)
             call sedim_cd(n1,dt,thl(:,i,j),th(:,i,j),tk(:,i,j),rc(:,i,j))
-          case(iicenucnr)
+!           case(iicenucnr)
+if (level==4) then
             q1 = dn0*rsup(:,i,j)
             call n_icenuc(n1,ninucp(:,i,j),tk(:,i,j),q1)
-          case(iicenuc)
+!           case(iicenuc)
             q1 = dn0*ricep(:,i,j)
             q2 = dn0*rsup(:,i,j)
             call ice_nucleation(n1,ninucp,q1,nicep(:,i,j),q2,thl(:,i,j),tk(:,i,j))
             ricep(:,i,j) = q1/dn0
-          case(ifreez)
+!           case(ifreez)
             call resetvar(cldw,rc(:,i,j))
             q1 = dn0*rc(:,i,j)
             q2 = dn0*rp(:,i,j)
@@ -291,8 +291,8 @@ contains
             rp(:,i,j)    = q2/dn0
             ricep(:,i,j) = q3/dn0
             rgrp(:,i,j)  = q4/dn0
-          case(idep)
-          case(imelt)
+!           case(idep)
+!           case(imelt)
             call resetvar(cldw,rc(:,i,j))
             q1 = dn0*rc(:,i,j)
             q2 = dn0*rp(:,i,j)
@@ -307,15 +307,16 @@ contains
             ricep(:,i,j) = q3/dn0
             rgrp(:,i,j)  = q4/dn0
             rsnowp(:,i,j)= q5/dn0
-          case(ised_ice)
+!           case(ised_ice)
             call sedimentation (n1,ice, ricep(:,i,j),nicep(:,i,j))
             call sedimentation (n1,graupel, rgrp(:,i,j))
             call sedimentation (n1,snow, rsnowp(:,i,j))
-          case(iauto_ice)
-          case(iaggr_ice)
-          case default
-          end select
-        end do
+!           case(iauto_ice)
+!           case(iaggr_ice)
+!           case default
+!           end select
+!         end do
+end if
       end do
     end do
 
@@ -328,10 +329,9 @@ contains
       ricet  = ricet  + ricep/dt
       nicet  = nicet  + nicep/dt
       rsnowt = rsnowt + rsnowp/dt
-      nsnowt = nsnowt + nsnowp/dt
       rgrt   = rgrt   + rgrp/dt
-      ngrt   = ngrt   + ngrp/dt
     end if
+    deallocate(convice,convliq)
   end subroutine mcrph
   subroutine wtr_dff_SB(n1,dn0,rp,np,rl,rs,rv,tl,tk)
  !
@@ -1509,18 +1509,23 @@ contains
 
   end subroutine snow_ice_collection
   
-  subroutine sedimentation(n1,meteor,rp,np)
+  subroutine sedimentation(n1,meteor,rp,nr)
     integer, intent(in) :: n1
     real, dimension(n1), intent(inout) :: rp
     type(particle),  intent(in) :: meteor
-    real, dimension(n1), intent(inout),optional :: np
+    real, dimension(n1), intent(inout),optional :: nr
 ! 
 !     ! .. local variables ..
     integer  :: k,kk,km1,kp1
     real      :: alfn,alfq,c_lam,lam,sk,tot,zz,xp
-    real, dimension(n1)   :: nfl,rfl,vn,vr,dn,dr,rslope,cn,cr,nslope
+    real, dimension(n1)   :: nfl,rfl,vn,vr,dn,dr,rslope,cn,cr,nslope,np
     real :: cc, flxdiv,maxi,mini
-
+    if (present(nr)) then
+      np = nr
+    else
+      np = meteor%nr
+    end if
+    
     alfn = meteor%a_vel * gfct((meteor%nu+meteor%b_vel+1.0)/meteor%mu)&
           &                / gfct((meteor%nu+1.0)/meteor%mu)
     alfq = meteor%a_vel * gfct((meteor%nu+meteor%b_vel+2.0)/meteor%mu)&
@@ -1528,7 +1533,7 @@ contains
     c_lam = gfct((meteor%nu+1.0)/meteor%mu)/gfct((meteor%nu+2.0)/meteor%mu)
 
     where (rp < 0.0e0) rp = 0.0e0
-    where (np < 0.0e0) np = 0.0e0
+    if (meteor%moments==2) where (np < 0.0e0) np = 0.0e0
 
     do k=n1-1,2,-1
 
@@ -2104,6 +2109,7 @@ contains
   integer, intent(in) :: nprocess
   integer, dimension(nprocess) :: gen_sequence
   integer :: i
+  i=0
     gen_sequence = (/(i,i=1,nprocess)/)
     if (.not. droplet_sedim) then
       where (gen_sequence==isedimcd)

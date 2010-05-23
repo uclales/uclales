@@ -8,7 +8,7 @@
   deltaz  = 40.
   dzmax   = 10.
   dzrat   = 1.0
-  dtlong  = 40.
+  dtlong  = 4.
   timmax =  86400.
   runtype= 'INITIAL'
   filprf = 'rico'
@@ -17,14 +17,14 @@
   ssam_intvl=  30.
   frqhis = 28800.
   frqanl = 28800.
-  level  = 3
+  level  = 4
   CCN    = 70.e6
   corflg = .true.
   cntlat = 18.
   th00   = 299.8
   sst    = 299.8
   isfctyp=3
-  iradtyp=1
+  iradtyp=0
   zrough = 0.001229
   dthcon = 0.001094
   drtcon = 0.001133

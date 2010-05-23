@@ -269,6 +269,26 @@ contains
        if (itype==0) ncinfo = 'Rain-water mixing ratio'
        if (itype==1) ncinfo = 'kg/kg'
        if (itype==2) ncinfo = 'tttt'
+    case('inuc')
+       if (itype==0) ncinfo = 'Number of ice nuclei'
+       if (itype==1) ncinfo = '#/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('rice')
+       if (itype==0) ncinfo = 'Cloud Ice mixing ratio'
+       if (itype==1) ncinfo = 'kg/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('nice')
+       if (itype==0) ncinfo = 'Number of ice particles'
+       if (itype==1) ncinfo = '#/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('rsnow')
+       if (itype==0) ncinfo = 'Snow mixing ratio'
+       if (itype==1) ncinfo = 'kg/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('rgrp')
+       if (itype==0) ncinfo = 'Graupel mixing ratio'
+       if (itype==1) ncinfo = 'kg/kg'
+       if (itype==2) ncinfo = 'tttt'
     case('n')
        if (itype==0) ncinfo = 'Rain-drop number mixing ratio'
        if (itype==1) ncinfo = '#/kg'

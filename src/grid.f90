@@ -83,14 +83,14 @@ module grid
   !
   real, dimension (:,:,:), pointer :: a_up, a_ut, a_vp, a_vt, a_wp, a_wt,     &
        a_sp, a_st, a_tp, a_tt, a_rp, a_rt, a_rpp, a_rpt, a_npp, a_npt,        &
-       a_ninuct , a_ricet , a_nicet , a_rsnowt , a_nsnowt , a_rgrt, a_ngrt,     &
-       a_ninucp , a_ricep , a_nicep , a_rsnowp , a_nsnowp , a_rgrp , a_ngrp
+       a_ninuct , a_ricet , a_nicet , a_rsnowt , a_rgrt,     &
+       a_ninucp , a_ricep , a_nicep , a_rsnowp , a_rgrp 
   !
   ! Memory for prognostic variables
   !
   real, dimension (:,:,:,:), allocatable, target :: a_xp, a_xt1, a_xt2
   !
-  integer :: nscl = 4
+  integer :: nscl = 9
   integer, save :: ncid0,ncid_s
   !
 contains
@@ -215,9 +215,7 @@ contains
       a_ricep  =>a_xp(:,:,:, 9)
       a_nicep  =>a_xp(:,:,:,10)
       a_rsnowp =>a_xp(:,:,:,11)
-      a_nsnowp =>a_xp(:,:,:,12)
-      a_rgrp   =>a_xp(:,:,:,13)
-      a_ngrp   =>a_xp(:,:,:,14)
+      a_rgrp   =>a_xp(:,:,:,12)
     end if
 
     allocate (a_ustar(nxp,nyp),a_tstar(nxp,nyp),a_rstar(nxp,nyp))
@@ -446,11 +444,12 @@ contains
     use mpi_interface, only :myid
 
 !irina
-    integer, parameter :: nnames = 23
+    integer, parameter :: nnames = 28
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,&
          'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,&  
          'w      ','t      ','p      ','q      ','l      ','r      '   ,&
+         'inuc   ','rice   ','nice   ','rsnow  ','rgrp   ',&
          'n      ','stke   ','rflx   ', 'lflxu  ','lflxd  '/)
 
     real, intent (in) :: time
@@ -460,7 +459,7 @@ contains
     if (level  >= 1) nvar0 = nvar0+1
     if (level  >= 2) nvar0 = nvar0+1
     if (level  >= 3) nvar0 = nvar0+2
-    if (level  >= 4) nvar0 = nvar0+7
+    if (level  >= 4) nvar0 = nvar0+5
     if (iradtyp > 1) nvar0 = nvar0+3
 
     allocate (sanal(nvar0))
@@ -501,10 +500,6 @@ contains
        sanal(nvar0) = sbase(nbase+8)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(nbase+9)
-       nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+10)
-       nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+11)
     end if
 
     !irina

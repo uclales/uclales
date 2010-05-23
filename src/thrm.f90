@@ -84,7 +84,7 @@ contains
   real, intent (in)    :: pp(n1,n2,n3),thil(n1,n2,n3),rt(n1,n2,n3)
   real, intent (out)   :: p(n1,n2,n3),theta(n1,n2,n3),rv(n1,n2,n3),t(n1,n2,n3)
 
-  integer :: i,j,k 
+  integer :: k,i,j
   real    :: exner
 
   do j=3,n3-2
@@ -239,13 +239,12 @@ contains
 
     integer :: k, i, j, iterate
     real    :: exner,til,x1,xx,yy,zz,part
-
     do j=3,n3-2
        do i=3,n2-2
           do k=1,n1
              exner = (pi0(k)+pi1(k)+pp(k,i,j))/cp
              p(k,i,j) = p00 * (exner)**cpr
-             til=(tl(k,i,j)+th00)*exner+alvl/cp*rain(i,j,k)+alvi/cp*(ice(i,j,k)+graupel(i,j,k)+snow(i,j,k))
+             til=(tl(k,i,j)+th00)*exner+alvl/cp*rain(k,i,j)+alvi/cp*(ice(k,i,j)+graupel(k,i,j)+snow(k,i,j))
              xx=til
              yy=rslf(p(k,i,j),xx)
              zz=max(rt(k,i,j)-yy,0.)

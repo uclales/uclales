@@ -294,8 +294,8 @@ contains
     end do
 !irina
   !  print *,'mean',ssclr(28),ssclr(19),unit
-     ssclr(28) =ssclr(28)/ssclr(19)*unit
-     ssclr(29) =ssclr(29)/ssclr(19)*unit
+     ssclr(28) =0!ssclr(28)/ssclr(19)*unit
+     ssclr(29) =0!ssclr(29)/ssclr(19)*unit
   !      print *,'ct cb', ssclr(28),ssclr(29), ssclr(17),ssclr(18)
 
     if (ssclr(18) == zt(n1)) ssclr(18) = -999.

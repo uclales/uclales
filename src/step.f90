@@ -238,7 +238,7 @@ contains
   subroutine tendencies(nstep)
 
     use grid, only : a_ut, a_vt, a_wt, a_tt, a_rt, a_rpt, a_npt, a_ninuct, &
-                     a_ricet,a_nicet,a_rsnowt,a_nsnowt, a_rgrt, a_ngrt,&
+                     a_ricet,a_nicet,a_rsnowt, a_rgrt,&
                      a_xt1, a_xt2, nscl, nxyzp, level
     use util, only : azero
 
@@ -262,9 +262,7 @@ contains
           a_ricet  =>a_xt1(:,:,:, 9)
           a_nicet  =>a_xt1(:,:,:,10)
           a_rsnowt =>a_xt1(:,:,:,11)
-          a_nsnowt =>a_xt1(:,:,:,12)
-          a_rgrt   =>a_xt1(:,:,:,13)
-          a_ngrt   =>a_xt1(:,:,:,14)
+          a_rgrt   =>a_xt1(:,:,:,12)
        end if
 
     case(2)
@@ -283,9 +281,7 @@ contains
           a_ricet  =>a_xt2(:,:,:, 9)
           a_nicet  =>a_xt2(:,:,:,10)
           a_rsnowt =>a_xt2(:,:,:,11)
-          a_nsnowt =>a_xt2(:,:,:,12)
-          a_rgrt   =>a_xt2(:,:,:,13)
-          a_ngrt   =>a_xt2(:,:,:,14)
+          a_rgrt   =>a_xt2(:,:,:,12)
        end if
     end select
 
