@@ -753,6 +753,26 @@ contains
        if (itype==0) ncinfo = 'Rain water'
        if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
+    case('i_nuc')
+       if (itype==0) ncinfo = 'Ice nuclei Concentration'
+       if (itype==1) ncinfo = 'dm^-3'
+       if (itype==2) ncinfo = 'tttt'
+    case('n_ice')
+       if (itype==0) ncinfo = 'Ice Number Concentration'
+       if (itype==1) ncinfo = 'dm^-3'
+       if (itype==2) ncinfo = 'tttt'
+    case('ice')
+       if (itype==0) ncinfo = 'Cloud ice'
+       if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('snow')
+       if (itype==0) ncinfo = 'Snow'
+       if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('graupel')
+       if (itype==0) ncinfo = 'Graupel'
+       if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
     case('precip')
        if (itype==0) ncinfo = 'Precipitation Flux (positive downward'
        !irina
@@ -783,9 +803,63 @@ contains
        if (itype==0) ncinfo = 'Sedimentation Flux (positive downward)'
        if (itype==1) ncinfo = 'kg/kg m/s'
        if (itype==2) ncinfo = 'ttmt'
+    case('wvp_bar')
+       if (itype==0) ncinfo = 'Water vapor path'
+       !irina
+       if (itype==1) ncinfo = 'g/m^2'
+       !if (itype==1) ncinfo = 'kg/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('wvp_var')
+       if (itype==0) ncinfo = 'Water vapor path variance'
+       !irina
+       if (itype==1) ncinfo = 'g/m^2'
+       !if (itype==1) ncinfo = 'kg/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('iwp_bar')
+       if (itype==0) ncinfo = 'Cloud ice path'
+       !irina
+       if (itype==1) ncinfo = 'g/m^2'
+       !if (itype==1) ncinfo = 'kg/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('iwp_var')
+       if (itype==0) ncinfo = 'Cloud ice path variance'
+       !irina
+       if (itype==1) ncinfo = 'g/m^2'
+       !if (itype==1) ncinfo = 'kg/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('swp_bar')
+       if (itype==0) ncinfo = 'Snow path'
+       !irina
+       if (itype==1) ncinfo = 'g/m^2'
+       !if (itype==1) ncinfo = 'kg/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('swp_var')
+       if (itype==0) ncinfo = 'Snow path variance'
+       !irina
+       if (itype==1) ncinfo = 'g/m^2'
+       !if (itype==1) ncinfo = 'kg/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('gwp_bar')
+       if (itype==0) ncinfo = 'Graupel path'
+       !irina
+       if (itype==1) ncinfo = 'g/m^2'
+       !if (itype==1) ncinfo = 'kg/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('gwp_var')
+       if (itype==0) ncinfo = 'Graupel path variance'
+       !irina
+       if (itype==1) ncinfo = 'g/m^2'
+       !if (itype==1) ncinfo = 'kg/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('thl_int')
+       if (itype==0) ncinfo = 'Integrated theta_l'
+       !irina
+       if (itype==1) ncinfo = 'Km'
+       !if (itype==1) ncinfo = 'kg/m^2'
+       if (itype==2) ncinfo = 'time'
 
     case default
-       if (myid==0) print *, 'ABORTING: variable not found '
+       if (myid==0) print *, 'ABORTING: variable not found ',trim(short_name)
        call appl_abort(0)
     end select
 

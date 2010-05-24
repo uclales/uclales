@@ -28,7 +28,7 @@ module stat
   private
 
 !irina
-  integer, parameter :: nvar1 = 34, nvar2 = 97
+  integer, parameter :: nvar1 = 43, nvar2 = 102
 
   integer, save      :: nrec1, nrec2, ncid1, ncid2, nv1=nvar1, nv2=nvar2
   real, save         :: fsttm, lsttm, nsmp = 0
@@ -44,7 +44,9 @@ module stat
        'lhf_bar','zi_bar ','lwp_bar','lwp_var','zc     ','zb     ', & !13
        'cfrac  ','lmax   ','albedo ','rwp_bar','prcp   ','pfrac  ', & !19
        'CCN    ','nrain  ','nrcnt  ','zcmn   ','zbmn   ','tkeint ', & !25
-       'lflxut ','lflxdt ','sflxut ','sflxdt ' /),                  &
+       'lflxut ','lflxdt ','sflxut ','sflxdt ','thl_int','wvp_bar', & !31
+       'wvp_var','iwp_bar','iwp_var','swp_bar','swp_var','gwp_bar', & !37
+       'gwp_var'/),                                                 & !43
        s2(nvar2)=(/                                                 &
        'time   ','zt     ','zm     ','dn0    ','u0     ','v0     ', & ! 1
        'fsttm  ','lsttm  ','nsmp   ','u      ','v      ','t      ', & ! 7
@@ -61,7 +63,8 @@ module stat
        'wr_cs1 ','cs2    ','cnt_cs2','w_cs2  ','tl_cs2 ','tv_cs2 ', & !73
        'rt_cs2 ','rl_cs2 ','wt_cs2 ','wv_cs2 ','wr_cs2 ','Nc     ', & !79  
        'Nr     ','rr     ','precip ','evap   ','frc_prc','prc_prc', & !85
-       'frc_ran','hst_srf', 'lflxu  ','lflxd  ','sflxu  ','sflxd  ','cdsed  ' /)
+       'frc_ran','hst_srf','lflxu  ','lflxd  ','sflxu  ','sflxd  ',& !91
+       'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel' /)
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:), svctr(:,:), ssclr(:)
@@ -148,8 +151,8 @@ contains
     use grid, only : a_up, a_vp, a_wp, liquid, a_theta, a_scr1, a_scr2       &
          , a_rp, a_tp, press, nxp, nyp, nzp, dzm, dzt, zm, zt, th00, umean &
          , vmean, dn0, precip, a_rpp, a_npp, albedo, CCN, iradtyp, a_rflx    &
-         , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa
-
+         , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa &
+         , a_ricep, a_rsnowp, a_rgrp,a_ninucp,a_nicep,vapor
     real, intent (in) :: time
 
     if (nsmp == 0.) fsttm = time
@@ -158,7 +161,7 @@ contains
     !
     ! profile statistics
     !
-    call accum_stat(nzp, nxp, nyp, a_up, a_vp, a_wp, a_tp, press, umean    &
+    call accum_stat(nzp, nxp, nyp, zm, a_up, a_vp, a_wp, a_tp, press, umean    &
          ,vmean,th00)
     !irina     
     if (iradtyp == 2 .and. level == 1) then
@@ -177,6 +180,7 @@ contains
          a_scr1, a_theta, a_tp, liquid, a_scr2, a_rp)
     if (level >=3) call accum_lvl3(nzp, nxp, nyp, dn0, zm, liquid, a_rpp,    &
          a_npp, precip, CCN)
+    if (level >=4) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp,a_ninucp,a_nicep)
     !
     ! scalar statistics
     !
@@ -306,15 +310,16 @@ contains
   ! SUBROUTINE ACCUM_STAT: Accumulates various statistics over an 
   ! averaging period for base (level 0) version of model
   !
-  subroutine accum_stat(n1,n2,n3,u,v,w,t,p,um,vm,th00)
+  subroutine accum_stat(n1,n2,n3,zm,u,v,w,t,p,um,vm,th00)
 
     integer, intent (in) :: n1,n2,n3
     real, dimension (n1,n2,n3), intent (in)    :: u, v, w, t, p
     real, intent (in)           :: um, vm, th00
+    real, dimension (n1),intent (in)           :: zm
 
-    integer :: i,j,k
+    integer :: i,j,k,km1
     real    :: a1(n1), b1(n1), c1(n1), d1(n1), a3(n1), b3(n1), x
-
+    real, dimension(n2,n3) :: scr
     x = 1./real( (n3-4)*(n2-4))
     call get_avg3(n1,n2,n3, u,a1)
     call get_avg3(n1,n2,n3, v,b1)
@@ -344,6 +349,16 @@ contains
        svctr(k,18)=svctr(k,18) + a3(k) * x
        svctr(k,19)=svctr(k,19) + b3(k) * x
     end do
+    do j=3,n3-2
+       do i=3,n2-2
+          scr(i,j) = 0.
+          do k=1,n1
+             km1=max(1,k-1)
+             scr(i,j)=scr(i,j)+t(k,i,j)*(zm(k)-zm(km1))
+          enddo
+       end do
+    end do
+    ssclr(35) = get_avg(1,n2,n3,1,scr)
 
   end subroutine accum_stat
   !
@@ -693,6 +708,119 @@ contains
     ssclr(27) = nrcnt
 
   end subroutine accum_lvl3
+  !
+  !---------------------------------------------------------------------
+  ! SUBROUTINE ACCUM_LVL4: Accumulates specialized statistics that depend
+  ! on level 4 variables.
+  !
+  subroutine accum_lvl4(n1, n2, n3,  dn0, zm, rv, rice, rsnow, rgrp,ninuc,nice)
+
+    integer, intent (in) :: n1,n2,n3
+    real, intent (in), dimension(n1)        :: zm, dn0
+    real, intent (in), dimension(n1,n2,n3)  :: rv,rice,rsnow,rgrp,ninuc,nice
+    integer                   :: k, i, j, km1
+    real, dimension(n2,n3)    :: scr
+
+    real                   :: nrsum, nrcnt
+    real, dimension(n1)    :: a1
+    real, dimension(n2,n3) :: scr1
+    logical                :: aflg
+ 
+
+    !
+    ! average ice nuclei
+    !
+
+    call get_avg3(n1,n2,n3,ninuc,a1)
+    svctr(:,98)=svctr(k,98) + a1(k)*dn0(k)/1000.
+
+    !
+    ! conditionally average ice numbers, and droplet concentrations
+    !
+
+    call get_avg3(n1,n2,n3,rice,a1)
+    nrsum = 0.
+    nrcnt = 0.
+    do k=1,n1-1
+       aflg = .false.
+       do j=3,n3-2
+          do i=3,n2-2
+             scr1(i,j) = 0.
+             if (rice(k,i,j) > 0.001e-3) then
+                aflg = .true.
+                scr1(i,j) = 1.
+                nrsum = nrsum + (nice(k,i,j)*dn0(k)/1000.)  ! Nr in dm^-3 (1/liter)
+                nrcnt = nrcnt + 1.
+             end if
+          end do
+       end do
+       svctr(k,99)=svctr(k,99) + a1(k)*1000.
+       if (aflg) then
+          svctr(k,100)= svctr(k,100)+get_csum(n1,n2,n3,k,nice*dn0(k)/1000.,scr1) ! Nr in dm^-3 (1/liter)
+       end if
+    end do
+
+    !
+    ! average snow and graupel profiles
+    !
+
+    call get_avg3(n1,n2,n3,rsnow,a1)
+    svctr(:,101)=svctr(k,101) + a1(k)*dn0(k)/1000.
+
+    call get_avg3(n1,n2,n3,rgrp,a1)
+    svctr(:,102)=svctr(k,102) + a1(k)*dn0(k)/1000.
+
+!Watervaporpath
+    do j=3,n3-2
+       do i=3,n2-2
+          scr(i,j) = 0.
+          do k=1,n1
+             km1=max(1,k-1)
+             scr(i,j)=scr(i,j)+rv(k,i,j)*dn0(k)*(zm(k)-zm(km1))*1000.
+          end do
+       end do
+    end do
+    ssclr(36) = get_avg(1,n2,n3,1,scr)
+    ssclr(37) = get_cor(1,n2,n3,1,scr,scr)
+!Cloud ice path
+       do j=3,n3-2
+       do i=3,n2-2
+          scr(i,j) = 0.
+          do k=1,n1
+             km1=max(1,k-1)
+             scr(i,j)=scr(i,j)+rice(k,i,j)*dn0(k)*(zm(k)-zm(km1))*1000.
+          end do
+       end do
+    end do
+    ssclr(38) = get_avg(1,n2,n3,1,scr)
+    ssclr(39) = get_cor(1,n2,n3,1,scr,scr)
+ !Snow path
+   do j=3,n3-2
+       do i=3,n2-2
+          scr(i,j) = 0.
+          do k=1,n1
+             km1=max(1,k-1)
+             scr(i,j)=scr(i,j)+rsnow(k,i,j)*dn0(k)*(zm(k)-zm(km1))*1000.
+          end do
+       end do
+    end do
+    ssclr(40) = get_avg(1,n2,n3,1,scr)
+    ssclr(41) = get_cor(1,n2,n3,1,scr,scr)
+!Graupel path
+   do j=3,n3-2
+       do i=3,n2-2
+          scr(i,j) = 0.
+          do k=1,n1
+             km1=max(1,k-1)
+             scr(i,j)=scr(i,j)+rgrp(k,i,j)*dn0(k)*(zm(k)-zm(km1))*1000.
+          end do
+       end do
+    end do
+    ssclr(42) = get_avg(1,n2,n3,1,scr)
+    ssclr(43) = get_cor(1,n2,n3,1,scr,scr)
+
+  end subroutine accum_lvl4
+
   ! 
   ! ---------------------------------------------------------------------
   ! subroutine comp_tke: calculates some components of the turbulent
@@ -1078,16 +1206,18 @@ contains
 
     integer :: k,ii
     real    :: x1(n1),x2(n1),x3(n1)
-
+    
     call get_cor3(n1,n2,n3,f1,t1,x1)
     call get_cor3(n1,n2,n3,f2,t2,x2)
     call get_cor3(n1,n2,n3,f3,t3,x3)
-
+    ii = -1
     select case (routine)
     case ('sgs')
        ii = 39
     case ('adv')
        ii = 42
+    case default
+       ii = -1
     end select
 
     select case (ic)
@@ -1117,7 +1247,7 @@ contains
     character (len=3), intent (in) :: routine
 
     integer :: nn,k
-
+    nn = 0
     select case (routine)
     case("sgs")
        select case (nfld)

@@ -17,7 +17,7 @@
   ssam_intvl=  30.
   frqhis = 28800.
   frqanl = 28800.
-  level  = 3
+  level  = 4
   CCN    = 70.e6
   corflg = .true.
   cntlat = 18.
