@@ -231,7 +231,7 @@ contains
                                                           rsup
 
     real, dimension(n1) :: q1,q2,q3,q4,q5 !dummy-arrays for conversion between mixing rate 
-    integer :: i, j!,n
+    integer :: i, j,n
     rrate = 0.    
     if(firsttime) call initmcrp(level)
     
@@ -279,7 +279,7 @@ contains
             q1 = dn0*rsup(:,i,j)
             call n_icenuc(n1,ninucp(:,i,j),tk(:,i,j),q1)
           case(iicenuc)
-	    where (ninucp<0.) ninucp = 0.
+            where (ninucp<0.) ninucp = 0.
             q1 = dn0*ricep(:,i,j)
             q2 = dn0*rsup(:,i,j)
             call ice_nucleation(n1,ninucp,q1,nicep(:,i,j),q2,thl(:,i,j),tk(:,i,j))
