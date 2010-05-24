@@ -249,38 +249,44 @@ contains
 
     seq =  gen_sequence(nprocess)
     allocate(convice(n1),convliq(n1))
-  
-
+    seq = (/1,2,3,4,5,6,7,8,9,10,11,12,13/)
+    if (level ==3) seq(6:13) = 0
     do j=3,n3-2
       do i=3,n2-2
         convliq = alvl*th(:,i,j)/(cp*tk(:,i,j))
         convice = alvi*th(:,i,j)/(cp*tk(:,i,j))
-!         do n=1,nprocess
-!           select case(seq(n))
-!           case(iwtrdff)
+        do n=1,nprocess
+          select case(seq(n))
+          case(iwtrdff)
             call resetvar(cldw,rc(:,i,j))
+            call resetvar(rain,rp(:,i,j),np(:,i,j))
             call wtr_dff_SB(n1,dn0,rp(:,i,j),np(:,i,j),rc(:,i,j),rs(:,i,j),rv(:,i,j),thl(:,i,j),tk(:,i,j))
-!           case(iauto)
+          case(iauto)
             call resetvar(cldw,rc(:,i,j))
+            call resetvar(rain,rp(:,i,j),np(:,i,j))
             call auto_SB(n1,dn0,rc(:,i,j),rp(:,i,j),np(:,i,j),thl(:,i,j),dissip(:,i,j))
-!           case(iaccr)
+          case(iaccr)
             call resetvar(cldw,rc(:,i,j))
+            call resetvar(rain,rp(:,i,j),np(:,i,j))
             call accr_SB(n1,dn0,rc(:,i,j),rp(:,i,j),np(:,i,j),thl(:,i,j),dissip(:,i,j))
-!           case(isedimrd)
+          case(isedimrd)
+            call resetvar(rain,rp(:,i,j),np(:,i,j))
             call sedim_rd(n1,dt,dn0,rp(:,i,j),np(:,i,j))
-!           case(isedimcd)
+          case(isedimcd)
+            call resetvar(cldw,rc(:,i,j))
             call sedim_cd(n1,dt,thl(:,i,j),th(:,i,j),tk(:,i,j),rc(:,i,j))
-!           case(iicenucnr)
-if (level==4) then
+          case(iicenucnr)
             q1 = dn0*rsup(:,i,j)
             call n_icenuc(n1,ninucp(:,i,j),tk(:,i,j),q1)
-!           case(iicenuc)
+          case(iicenuc)
+	    where (ninucp<0.) ninucp = 0.
             q1 = dn0*ricep(:,i,j)
             q2 = dn0*rsup(:,i,j)
             call ice_nucleation(n1,ninucp,q1,nicep(:,i,j),q2,thl(:,i,j),tk(:,i,j))
             ricep(:,i,j) = q1/dn0
-!           case(ifreez)
+          case(ifreez)
             call resetvar(cldw,rc(:,i,j))
+            call resetvar(rain,rp(:,i,j),np(:,i,j))
             q1 = dn0*rc(:,i,j)
             q2 = dn0*rp(:,i,j)
             q3 = dn0*ricep(:,i,j)
@@ -291,9 +297,11 @@ if (level==4) then
             rp(:,i,j)    = q2/dn0
             ricep(:,i,j) = q3/dn0
             rgrp(:,i,j)  = q4/dn0
-!           case(idep)
-!           case(imelt)
-            call resetvar(cldw,rc(:,i,j))
+          case(idep)
+          case(imelt)
+            call resetvar(ice,ricep(:,i,j),nicep(:,i,j))
+            call resetvar(snow,rsnowp(:,i,j))
+            call resetvar(graupel,rgrp(:,i,j))
             q1 = dn0*rc(:,i,j)
             q2 = dn0*rp(:,i,j)
             q3 = dn0*ricep(:,i,j)
@@ -307,16 +315,18 @@ if (level==4) then
             ricep(:,i,j) = q3/dn0
             rgrp(:,i,j)  = q4/dn0
             rsnowp(:,i,j)= q5/dn0
-!           case(ised_ice)
+          case(ised_ice)
+            call resetvar(ice,ricep(:,i,j),nicep(:,i,j))
+            call resetvar(snow,rsnowp(:,i,j))
+            call resetvar(graupel,rgrp(:,i,j))
             call sedimentation (n1,ice, ricep(:,i,j),nicep(:,i,j))
             call sedimentation (n1,graupel, rgrp(:,i,j))
             call sedimentation (n1,snow, rsnowp(:,i,j))
-!           case(iauto_ice)
-!           case(iaggr_ice)
-!           case default
-!           end select
-!         end do
-end if
+          case(iauto_ice)
+          case(iaggr_ice)
+          case default
+          end select
+        end do
       end do
     end do
 
