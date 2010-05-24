@@ -448,9 +448,9 @@ contains
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,&
          'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,&  
-         'w      ','t      ','p      ','q      ','l      ','r      '   ,&
+         'w      ','t      ','p      ','q      ','l      ','r      '   ,'n      ',&
          'inuc   ','rice   ','nice   ','rsnow  ','rgrp   ',&
-         'n      ','stke   ','rflx   ', 'lflxu  ','lflxd  '/)
+         'stke   ','rflx   ', 'lflxu  ','lflxd  '/)
 
     real, intent (in) :: time
     integer           :: nbeg, nend
@@ -468,19 +468,19 @@ contains
 
     nvar0 = nbase
     !
-    ! add liquid water, which is a diagnostic variable, first
-    !
-    if (level >= 2) then
-       nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+2)
-    end if
-    !
     ! add additional scalars, in the order in which they appear in scalar
     ! table
     !
     if (level >= 1) then
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(nbase+1)
+    end if
+    !
+    ! add liquid water, which is a diagnostic variable, first
+    !
+    if (level >= 2) then
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+2)
     end if
 
     if (level >= 3) then
@@ -501,16 +501,15 @@ contains
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(nbase+9)
     end if
-
     !irina
     if (iradtyp > 1) then
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+6)
+       sanal(nvar0) = sbase(nbase+10)
     !irina
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+7)
+       sanal(nvar0) = sbase(nbase+11)
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+8)
+       sanal(nvar0) = sbase(nbase+12)
     end if
 
 
@@ -603,36 +602,38 @@ contains
          count=icnt)
 
     nn = nbase
-    if (level >= 2)  then
-       nn = nn+1
-       iret = nf90_inq_varid(ncid0, 'l', VarID)
-       iret = nf90_put_var(ncid0, VarID, liquid(:,i1:i2,j1:j2), start=ibeg, &
-            count=icnt)
-    end if
+!     if (level >= 2)  then
+!        nn = nn+1
+!        iret = nf90_inq_varid(ncid0, 'l', VarID)
+!        iret = nf90_put_var(ncid0, VarID, liquid(:,i1:i2,j1:j2), start=ibeg, &
+!             count=icnt)
+!     end if
 
-    do n = 5, nscl
+!     if (level >=3) then
+      do n = nbase, nvar0-1
        nn = nn+1
        call newvar(n)
        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
             count=icnt)
     end do
-
-    if (iradtyp > 1)  then
-       nn = nn+1
-       iret = nf90_inq_varid(ncid0, 'rflx', VarID)
-       iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
-            count=icnt)
-  !irina          
-       nn = nn+1
-       iret = nf90_inq_varid(ncid0, 'lflxu', VarID)
-       iret = nf90_put_var(ncid0, VarID, a_lflxu(:,i1:i2,j1:j2), start=ibeg, &
-            count=icnt)
-       nn = nn+1
-       iret = nf90_inq_varid(ncid0, 'lflxd', VarID)
-       iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
-            count=icnt)
-    end if
+!     end if
+! 
+!     if (iradtyp > 1)  then
+!        nn = nn+1
+!        iret = nf90_inq_varid(ncid0, 'rflx', VarID)
+!        iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
+!             count=icnt)
+!   !irina          
+!        nn = nn+1
+!        iret = nf90_inq_varid(ncid0, 'lflxu', VarID)
+!        iret = nf90_put_var(ncid0, VarID, a_lflxu(:,i1:i2,j1:j2), start=ibeg, &
+!             count=icnt)
+!        nn = nn+1
+!        iret = nf90_inq_varid(ncid0, 'lflxd', VarID)
+!        iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
+!             count=icnt)
+!     end if
 
     if (nn /= nvar0) then
        if (myid == 0) print *, 'ABORTING:  Anal write error'

@@ -69,7 +69,7 @@ contains
     end if
     call sponge_init
     call init_stat(time+dt,filprf,expnme,nzp)
-    !
+   !
     !irina
        if (lsvarflg) then
        call lsvar_init
@@ -78,7 +78,7 @@ contains
        if (lstendflg) then
        call lstend_init
        end if
-    !    
+   !
     ! write analysis and history files from restart if appropriate
     ! 
     if (outflg) then
