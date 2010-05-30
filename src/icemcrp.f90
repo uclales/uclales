@@ -18,18 +18,7 @@
 !----------------------------------------------------------------------------
 !
 !!!!!!!!!!!!!!!!
-! TODOLIST ICEMICRO
-! *Include irina - alterations !DONE
-! *Remove irreversible water frm q_t !DONE
-! *Work do-loops outward   !DONE
-! *Include Oliviers modifications  !DONE
-! *Do serialization of warmmicrophysics !DONE
-! *Include partitioning function between ice and water !DONE
-! *Include Statistics
-! *Resetvars
-! *Include riming
-! *Include selfcollection
-! *Include collection
+
 
 
 
@@ -50,7 +39,7 @@ module mcrp
   logical            :: firsttime = .true.
   integer            :: nprocess
   
-  integer,parameter  :: iwtrdff = 1,iauto = 2,iaccr = 3,isedimrd = 4,isedimcd = 5,iicenucnr = 6,iicenuc = 7,ifreez=8,idep=9,imelt=10,ised_ice=11,iauto_ice=12,iaggr_ice=13
+  integer,parameter  :: iwtrdff = 1,iauto = 2,iaccr = 3,isedimrd = 4,isedimcd = 5,iicenucnr = 6,iicenuc = 7,ifreez=8,idep=9,imelt=10,ised_ice=11,iself_ice=12,icoll_ice=13,iriming_ice_cloud=14,iriming_ice_rain=15
   real, dimension(:),allocatable :: convice,convliq
   integer, dimension(:), allocatable :: seq
   ! 
@@ -108,9 +97,9 @@ module mcrp
 !   ! ... spezielle parameter des kamm2-wolkenmoduls (eisphase)
 ! 
 !   real, parameter :: e_ii  = 0.00              !..min. eff.
-!   real, parameter :: e_ic  = 0.80              !..max. eff. fuer ice_cloud_riming
-!   real, parameter :: e_sc  = 0.80              !..max. eff. fuer snow_cloud_riming
-!   real, parameter :: e_gc  = 1.00              !..max. eff. fuer graupel_cloud_riming
+  real, parameter :: e_ic  = 0.80              !..max. eff. fuer ice_cloud_riming
+  real, parameter :: e_sc  = 0.80              !..max. eff. fuer snow_cloud_riming
+  real, parameter :: e_gc  = 1.00              !..max. eff. fuer graupel_cloud_riming
 !   real, parameter :: e_hc  = 1.00              !..max. eff. fuer hail_cloud_riming
   real, parameter :: alpha_spacefilling = 0.1  !..raumerfuellungskoeff (max. 0.68)
 !   real, parameter :: ice_s_vel  = 0.25         !..dispersion der fallgeschw.
@@ -123,35 +112,39 @@ module mcrp
 !   ! und der rest dem hagel.
 !   real, parameter :: d_rainfrz_ig = 0.50e-3 !  rain --> ice oder graupel
 !   real, parameter :: d_rainfrz_gh = 1.25e-3 ! rain --> graupel oder hail
-!   real, parameter :: q_krit_ic = 1.000e-5 ! q-schwellenwert fuer ice_cloud_riming
-!   real, parameter :: d_krit_ic = 150.0e-6 ! e-schwellenwert fuer ice_cloud_riming
-!   real, parameter :: q_krit_ir = 1.000e-5 ! q-schwellenwert fuer ice_rain_riming
-!   real, parameter :: d_krit_ir = 100.0e-6 ! e-schwellenwert fuer ice_rain_riming
-!   real, parameter :: q_krit_sc = 1.000e-5 ! q-schwellenwert fuer snow_cloud_riming
-!   real, parameter :: d_krit_sc = 150.0e-6 ! e-schwellenwert fuer snow_cloud_riming
-!   real, parameter :: q_krit_sr = 1.000e-5 ! q-schwellenwert fuer snow_rain_riming
-!   real, parameter :: d_krit_sr = 100.0e-6 ! e-schwellenwert fuer snow_rain_riming
-!   real, parameter :: q_krit_gc = 1.000e-6 ! q-schwellenwert fuer graupel_cloud_riming
-!   real, parameter :: d_krit_gc = 100.0e-6 ! e-schwellenwert fuer graupel_cloud_riming
+  real, parameter :: q_crit_ic = 1.000e-5 ! q-schwellenwert fuer ice_cloud_riming
+  real, parameter :: d_crit_ic = 150.0e-6 ! e-schwellenwert fuer ice_cloud_riming
+  real, parameter :: q_crit_ir = 1.000e-5 ! q-schwellenwert fuer ice_rain_riming
+  real, parameter :: d_crit_ir = 100.0e-6 ! e-schwellenwert fuer ice_rain_riming
+  real, parameter :: q_crit_sc = 1.000e-5 ! q-schwellenwert fuer snow_cloud_riming
+  real, parameter :: d_crit_sc = 150.0e-6 ! e-schwellenwert fuer snow_cloud_riming
+  real, parameter :: q_crit_sr = 1.000e-5 ! q-schwellenwert fuer snow_rain_riming
+  real, parameter :: d_crit_sr = 100.0e-6 ! e-schwellenwert fuer snow_rain_riming
+  real, parameter :: q_crit_gc = 1.000e-6 ! q-schwellenwert fuer graupel_cloud_riming
+  real, parameter :: d_crit_gc = 100.0e-6 ! e-schwellenwert fuer graupel_cloud_riming
 !   real, parameter :: q_krit_hc = 1.000e-6 ! q-schwellenwert fuer hail_cloud_riming
 !   real, parameter :: d_krit_hc = 100.0e-6 ! e-schwellenwert fuer hail_cloud_riming
 !   real, parameter :: q_krit_fr = 1.000e-6 ! q-schwellenwert fuer rain_freeze
-!   real, parameter :: q_krit_c  = 1.000e-6 ! q-schwellenwert sonst
-!   real, parameter :: q_krit    = 1.000e-9 ! q-schwellenwert sonst
-!   real, parameter :: d_conv_sg = 200.0e-6 ! e-schwellenwert
-!   real, parameter :: d_conv_ig = 200.0e-6 ! e-schwellenwert
+  real, parameter :: q_crit_c  = 1.000e-6 ! q-schwellenwert sonst
+  real, parameter :: q_crit    = 1.000e-9 ! q-schwellenwert sonst
+  real, parameter :: d_conv_sg = 200.0e-6 ! e-schwellenwert
+  real, parameter :: d_conv_ig = 200.0e-6 ! e-schwellenwert
 !   real, parameter :: d_shed_g  = 3.000e-3 ! e-schwellenwert fuer graupel_shedding
 !   real, parameter :: d_shed_h  = 5.000e-3 ! e-schwellenwert fuer hagel_shedding
-!   real, parameter :: d_krit_c  = 10.00e-6 ! e-schwellenwert fuer cloud_collection
-!   real, parameter :: d_coll_c  = 40.00e-6 ! oberer wert fuer cloud_coll_eff
+  real, parameter :: d_crit_c  = 10.00e-6 ! e-schwellenwert fuer cloud_collection
+  real, parameter :: d_coll_c  = 40.00e-6 ! oberer wert fuer cloud_coll_eff
 !   real, parameter :: t_nuc     = 273.2e+0 ! temperatur ab der eisnukleation einsetzt
 !   real, parameter :: t_freeze  = 273.2e+0 ! temperatur ab der gefrieren einsetzt
-! 
+!   DOUBLE PRECISION, PARAMETER :: D_conv_ii = 75.00d-6 ! D-Schwellenwert fuer ice_selfcollection
+
 !   real, parameter :: q_krit_aus = 1.00e-5 ! q-schwellenwert fuer ausgabe von d und z
-! 
+!
+  real, parameter :: q_crit_is = 1.000e-6 ! q-schwellenwert fuer ice_selfcollection
+  real, parameter :: d_crit_is = 50.00e-6 ! e-schwellenwert fuer ice_selfcollection
+  real, parameter :: d_conv_is = 75.00e-6 ! e-schwellenwert fuer ice_selfcollection
+
 !     real :: q_crit_self  ! q-schwellenwert fuer ice_selfcollection
 !     real :: d_crit_self  ! d-schwellenwert fuer ice_selfcollection
-!     real :: d_conv_self  ! e-schwellenwert fuer ice_selfcollection
 !     real :: d_coll  ! e-schwellenwert fuer ice_selfcollection
 !    
 
@@ -230,7 +223,7 @@ contains
                                                           ninucp,ricep,nicep,rsnowp,rgrp,&
                                                           rsup
 
-    real, dimension(n1) :: q1,q2,q3,q4,q5 !dummy-arrays for conversion between mixing rate 
+    real, dimension(n1) :: q1,q2,q3,q4,q5,nr1,nr2,nr3,nr4 !dummy-arrays for conversion between mixing rate
     integer :: i, j,n
     rrate = 0.    
     if(firsttime) call initmcrp(level)
@@ -249,7 +242,7 @@ contains
 
     seq =  gen_sequence(nprocess)
     allocate(convice(n1),convliq(n1))
-    seq = (/1,2,3,4,5,6,7,8,9,10,11,12,13/)
+    seq = (/1,2,3,4,5,6,7,8,9,10,11,12,13,14,15/)
     if (level ==3) seq(6:13) = 0
     do j=3,n3-2
       do i=3,n2-2
@@ -298,6 +291,21 @@ contains
             ricep(:,i,j) = q3/dn0
             rgrp(:,i,j)  = q4/dn0
           case(idep)
+            q1 = dn0*rv(:,i,j)
+            q2 = dn0*ricep(:,i,j)
+            q3 = dn0*rsnowp(:,i,j)
+            q4 = dn0*rgrp(:,i,j)
+            nr1 = nicep(:,i,j)
+            nr2 = snow%nr
+            nr3 = graupel%nr
+            call deposition(n1,ice,q2,nr1,q1,thl(:,i,j),tk(:,i,j),rsup(:,i,j))
+            call deposition(n1,snow,q3,nr2,q1,thl(:,i,j),tk(:,i,j),rsup(:,i,j))
+            call deposition(n1,graupel,q4,nr3,q1,thl(:,i,j),tk(:,i,j),rsup(:,i,j))
+            rv(:,i,j)    = q1/dn0
+            nicep(:,i,j) = nr1
+            ricep(:,i,j)    = q2/dn0
+            rsnowp(:,i,j) = q3/dn0
+            rgrp(:,i,j)  = q4/dn0
           case(imelt)
             call resetvar(ice,ricep(:,i,j),nicep(:,i,j))
             call resetvar(snow,rsnowp(:,i,j))
@@ -322,12 +330,79 @@ contains
             call sedimentation (n1,ice, ricep(:,i,j),nicep(:,i,j))
             call sedimentation (n1,graupel, rgrp(:,i,j))
             call sedimentation (n1,snow, rsnowp(:,i,j))
-          case(iauto_ice)
-          case(iaggr_ice)
+          case(iself_ice)
+            call resetvar(ice,ricep(:,i,j),nicep(:,i,j))
+            call resetvar(snow,rsnowp(:,i,j))
+            call resetvar(graupel,rgrp(:,i,j))
+            q1 = dn0*ricep(:,i,j)
+            q2 = dn0*rsnowp(:,i,j)
+            nr1 = nicep(:,i,j)
+            call ice_selfcollection(n1,ice,snow,q1,q2,nr1,tk(:,i,j),d_conv_is,q_crit_is,d_crit_is)
+            nicep(:,i,j) = nr1
+            ricep(:,i,j)    = q1/dn0
+            rsnowp(:,i,j) = q2/dn0
+          case(icoll_ice)
+            call resetvar(ice,ricep(:,i,j),nicep(:,i,j))
+            call resetvar(snow,rsnowp(:,i,j))
+            call resetvar(graupel,rgrp(:,i,j))
+            q1 = dn0*ricep(:,i,j)
+            q2 = dn0*rsnowp(:,i,j)
+            q3 = dn0*rgrp(:,i,j)
+            nr1 = nicep(:,i,j)
+            nr2 = snow%nr
+            call ice_collection(n1,snow,ice,q1,nr1,q2,tk(:,i,j),q_crit)
+            call ice_collection(n1,graupel,ice,q1,nr1,q3,tk(:,i,j),q_crit)
+            call ice_collection(n1,snow,graupel,q2,nr2,q3,tk(:,i,j),q_crit)
+            nicep(:,i,j) = nr1
+            ricep(:,i,j)    = q1/dn0
+            rsnowp(:,i,j) = q2/dn0
+            rgrp(:,i,j) = q3/dn0
+          case(iriming_ice_cloud)
+            call resetvar(ice,ricep(:,i,j),nicep(:,i,j))
+            call resetvar(snow,rsnowp(:,i,j))
+            call resetvar(graupel,rgrp(:,i,j))
+            call resetvar(cldw,rc(:,i,j))
+            q1 = dn0*rc(:,i,j)
+            q2 = dn0*ricep(:,i,j)
+            q3 = dn0*rsnowp(:,i,j)
+            q4 = dn0*rgrp(:,i,j)
+            nr1 = nicep(:,i,j)
+            nr2 = snow%nr
+            nr3 = graupel%nr
+            call ice_cloud_riming(n1,cldw,ice,q1,q2,nr1,q4,thl(:,i,j),tk(:,i,j),d_coll_c,q_crit_c,d_crit_c,q_crit_ic,d_crit_ic,d_conv_ig,e_ic)
+            call ice_cloud_riming(n1,cldw,snow,q1,q3,nr2,q4,thl(:,i,j),tk(:,i,j),d_coll_c,q_crit_c,d_crit_c,q_crit_sc,d_crit_sc,d_conv_sg,e_sc)
+            call ice_cloud_riming(n1,cldw,graupel,q1,q4,nr3,q4,thl(:,i,j),tk(:,i,j),d_coll_c,q_crit_c,d_crit_c,q_crit_gc,d_crit_gc,d_conv_sg,e_gc)
+            nicep(:,i,j) = nr1
+            ricep(:,i,j)    = q1/dn0
+            rsnowp(:,i,j) = q2/dn0
+            rgrp(:,i,j) = q3/dn0
+          case(iriming_ice_rain)
+            call resetvar(ice,ricep(:,i,j),nicep(:,i,j))
+            call resetvar(snow,rsnowp(:,i,j))
+            call resetvar(graupel,rgrp(:,i,j))
+            call resetvar(rain,rp(:,i,j),np(:,i,j))
+            q1 = dn0*rp(:,i,j)
+            q2 = dn0*ricep(:,i,j)
+            q3 = dn0*rsnowp(:,i,j)
+            q4 = dn0*rgrp(:,i,j)
+            nr1 = nicep(:,i,j)
+            nr2 = snow%nr
+            call ice_rain_riming(n1,rain,ice,q1,nr1,q2,nr2,q4,tk(:,i,j),q_crit, q_crit_ir,d_crit_ir)
+            call ice_rain_riming(n1,rain,snow,q1,nr1,q3,nr3,q4,tk(:,i,j),q_crit, q_crit_sr,d_crit_sr)
+            call ice_rain_riming(n1,rain,graupel,q1,nr1,q4,nr4,q4,tk(:,i,j),q_crit, q_crit,0.)
+            nicep(:,i,j) = nr2
+            ricep(:,i,j)    = q1/dn0
+            rsnowp(:,i,j) = q2/dn0
+            rgrp(:,i,j) = q3/dn0
           case default
           end select
         end do
-      end do
+        call resetvar(cldw,rc(:,i,j))
+        call resetvar(rain,rp(:,i,j),np(:,i,j))
+        call resetvar(ice,ricep(:,i,j),nicep(:,i,j))
+        call resetvar(snow,rsnowp(:,i,j))
+        call resetvar(graupel,rgrp(:,i,j))
+     end do
     end do
 
     tlt    = tlt    + thl/dt
@@ -1174,12 +1249,13 @@ contains
         enddo
 
   end subroutine ice_selfcollection
-  subroutine ice_cloud_riming(n1,cloud,ice,q_c,q_i,n_i,q_g,thl,tk,d_coll,q_crit_c,d_crit_c,q_crit_i,d_crit_i,d_conv,e_ic)
+  subroutine ice_cloud_riming(n1,cloud,ice,q_c,q_i,n_i,q_g,thl,tk,d_coll,q_crit_c,d_crit_c,q_crit_i,d_crit_i,e_ic,d_conv)
       integer, intent(in) :: n1
       type(particle), intent(in) :: cloud,ice
       real, dimension(n1), intent(inout) :: q_c,q_i,n_i,q_g,thl
       real, dimension(n1), intent(in) :: tk
-      real, intent(in) :: d_coll,q_crit_c,d_crit_c,q_crit_i,d_crit_i,d_conv,e_ic
+      real, intent(in) :: d_coll,q_crit_c,d_crit_c,q_crit_i,d_crit_i,e_ic
+      real, intent(in), optional :: d_conv
       
       integer                     :: k
   real, parameter :: e_min = 0.01              !..min. eff. fuer gc,ic,sc
@@ -1270,22 +1346,22 @@ contains
                 endif
 
                 ! umwandlung ice -> graupel
-
-                if (d_i > d_conv) then
-                  conv_q = (rime_q - mult_q) / ( const5 * (pi/6.0*roice*d_i**3/x_i - 1.0) )
-                  ! d_i darf durch conv nicht kleiner werden als d_conv_ig
-                  !conv_q = min(q_i(k)ce(k)-n_i(k)*(d_conv_ig/ice%a_geo)**(1.0/ice%b_geo),conv_q)
-                  conv_q = min(q_i(k),conv_q)
-                  ! ub >>
-                  x_i = min(max((q_i(k))/(n_i(k)+eps0),ice%x_min),ice%x_max)    !..mean masse incl. riming
-                  ! ub <<
-                  conv_n = conv_q / max(x_i,x_conv)
-                  conv_n = min(n_i(k),conv_n)
-                else
                   conv_q = 0.0
                   conv_n = 0.0
+                if(present(d_conv)) then
+                  if (d_i > d_conv) then
+                    conv_q = (rime_q - mult_q) / ( const5 * (pi/6.0*roice*d_i**3/x_i - 1.0) )
+                    ! d_i darf durch conv nicht kleiner werden als d_conv_ig
+                    !conv_q = min(q_i(k)ce(k)-n_i(k)*(d_conv_ig/ice%a_geo)**(1.0/ice%b_geo),conv_q)
+                    conv_q = min(q_i(k),conv_q)
+                    ! ub >>
+                    x_i = min(max((q_i(k))/(n_i(k)+eps0),ice%x_min),ice%x_max)    !..mean masse incl. riming
+                    ! ub <<
+                    conv_n = conv_q / max(x_i,x_conv)
+                    conv_n = min(n_i(k),conv_n)
+                  end if
                 endif
-
+              
                 q_i(k)     = q_i(k)     - conv_q
                 q_g(k) = q_g(k) + conv_q
 
@@ -1439,7 +1515,7 @@ contains
     enddo
 
   end subroutine ice_rain_riming
-  subroutine snow_ice_collection(n1,met1,met2,q_i,n_i,q_g,tk,q_crit)
+  subroutine ice_collection(n1,met1,met2,q_i,n_i,q_g,tk,q_crit)
       integer, intent(in) :: n1
       type(particle), intent(in) :: met1,met2
       real, dimension(n1), intent(inout) :: q_i,q_g,n_i
@@ -1457,19 +1533,19 @@ contains
 
     real            :: e_coll,coll_n,coll_q
 
-      delta_n_ss = coll_delta_11(snow,0)
-      delta_n_si = coll_delta_12(snow,ice,0)
-      delta_n_ii = coll_delta_22(ice,0)
-      delta_q_ss = coll_delta_11(snow,0)
-      delta_q_si = coll_delta_12(snow,ice,1)
-      delta_q_ii = coll_delta_22(ice,1)
+      delta_n_ss = coll_delta_11(met1,0)
+      delta_n_si = coll_delta_12(met1,met2,0)
+      delta_n_ii = coll_delta_22(met2,0)
+      delta_q_ss = coll_delta_11(met1,0)
+      delta_q_si = coll_delta_12(met1,met2,1)
+      delta_q_ii = coll_delta_22(met2,1)
 
-      theta_n_ss = coll_theta_11(snow,0)
-      theta_n_si = coll_theta_12(snow,ice,0)
-      theta_n_ii = coll_theta_22(ice,0)
-      theta_q_ss = coll_theta_11(snow,0)
-      theta_q_si = coll_theta_12(snow,ice,1)
-      theta_q_ii = coll_theta_22(ice,1)
+      theta_n_ss = coll_theta_11(met1,0)
+      theta_n_si = coll_theta_12(met1,met2,0)
+      theta_n_ii = coll_theta_22(met2,0)
+      theta_q_ss = coll_theta_11(met1,0)
+      theta_q_si = coll_theta_12(met1,met2,1)
+      theta_q_ii = coll_theta_22(met2,1)
 
 
     do k = 1, n1
@@ -1517,7 +1593,7 @@ contains
           endif
         enddo
 
-  end subroutine snow_ice_collection
+  end subroutine ice_collection
   
   subroutine sedimentation(n1,meteor,rp,nr)
     integer, intent(in) :: n1
@@ -2145,7 +2221,7 @@ contains
   nprocess = 0
   if (droplet_sedim) nprocess = nprocess + 1
   if (level==3)      nprocess = 4
-  if (level==4)      nprocess = nprocess + 0
+  if (level==4)      nprocess = nprocess + 10
 
   allocate(seq(nprocess))
 
