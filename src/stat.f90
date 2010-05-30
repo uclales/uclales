@@ -161,6 +161,7 @@ contains
     !
     ! profile statistics
     !
+
     call accum_stat(nzp, nxp, nyp, zm, a_up, a_vp, a_wp, a_tp, press, umean    &
          ,vmean,th00)
     !irina     
@@ -175,15 +176,19 @@ contains
        lflxd=a_lflxd,sflxu=a_sflxu, sflxd=a_sflxd,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
        lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
     end if
+
     if (level >=1) call accum_lvl1(nzp, nxp, nyp, a_rp)
     if (level >=2) call accum_lvl2(nzp, nxp, nyp, th00, dn0, zm, a_wp,       &
          a_scr1, a_theta, a_tp, liquid, a_scr2, a_rp)
+
     if (level >=3) call accum_lvl3(nzp, nxp, nyp, dn0, zm, liquid, a_rpp,    &
          a_npp, precip, CCN)
+
     if (level >=4) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp,a_ninucp,a_nicep)
     !
     ! scalar statistics
     !
+
     call set_ts(nzp, nxp, nyp, a_wp, a_theta, dn0, zt,zm,dzt,dzm,th00,time)
     if (level >=1) call ts_lvl1(nzp, nxp, nyp, dn0, zt, dzm, a_rp)
     if (level >=2) call ts_lvl2(nzp, nxp, nyp, a_rp, a_scr2, zt)
@@ -732,12 +737,11 @@ contains
     !
 
     call get_avg3(n1,n2,n3,ninuc,a1)
-    svctr(:,98)=svctr(k,98) + a1(k)*dn0(k)/1000.
+    svctr(:,98)=svctr(:,98) + a1(:)*dn0(:)/1000.
 
     !
     ! conditionally average ice numbers, and droplet concentrations
     !
-
     call get_avg3(n1,n2,n3,rice,a1)
     nrsum = 0.
     nrcnt = 0.
@@ -759,16 +763,15 @@ contains
           svctr(k,100)= svctr(k,100)+get_csum(n1,n2,n3,k,nice*dn0(k)/1000.,scr1) ! Nr in dm^-3 (1/liter)
        end if
     end do
-
     !
     ! average snow and graupel profiles
     !
 
     call get_avg3(n1,n2,n3,rsnow,a1)
-    svctr(:,101)=svctr(k,101) + a1(k)*dn0(k)/1000.
+    svctr(:,101)=svctr(:,101) + a1(:)*dn0(:)/1000.
 
     call get_avg3(n1,n2,n3,rgrp,a1)
-    svctr(:,102)=svctr(k,102) + a1(k)*dn0(k)/1000.
+    svctr(:,102)=svctr(:,102) + a1(:)*dn0(:)/1000.
 
 !Watervaporpath
     do j=3,n3-2

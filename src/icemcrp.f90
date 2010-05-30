@@ -174,7 +174,6 @@ contains
   ! ---------------------------------------------------------------------
   ! MICRO: sets up call to microphysics
   !
-
   subroutine micro(level)
 
     integer, intent (in) :: level

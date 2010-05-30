@@ -223,13 +223,12 @@ contains
        call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
 
     end do
- 
+
     if (statflg) then 
        call thermo (level)
        call statistics (time+dt)
        sflg = .False.
     end if
-
   end subroutine t_step
   ! 
   !----------------------------------------------------------------------
