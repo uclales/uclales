@@ -95,6 +95,7 @@ contains
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
     use modnudge, only : lnudge,tnudgefac
+    use mcrp, only : microseq
 
     implicit none
 
@@ -127,7 +128,8 @@ contains
          lstendflg,                  & !irina:flag for time large scale advective tendencies  
          div,  &                       !irina: divergence
          thetal_noprecip,          &    !thijs: include precipitative water into total water and theta_l
-         lnudge, tnudgefac             !thijs: Nudging
+         lnudge, tnudgefac, &             !thijs: Nudging
+         microseq    !thijs: sequence of variables for microphysics
 
     ps       = 0.
     ts       = th00

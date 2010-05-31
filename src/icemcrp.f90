@@ -37,11 +37,11 @@ module mcrp
 
   logical, parameter :: droplet_sedim = .False., khairoutdinov = .False., turbulence = .False.,ice_multiplication = .TRUE.
   logical            :: firsttime = .true.
-  integer            :: nprocess
+  integer            :: nprocess,nprocess_3=4,nprocess_4=10
   
   integer,parameter  :: iwtrdff = 1,iauto = 2,iaccr = 3,isedimrd = 4,isedimcd = 5,iicenucnr = 6,iicenuc = 7,ifreez=8,idep=9,imelt=10,ised_ice=11,iself_ice=12,icoll_ice=13,iriming_ice_cloud=14,iriming_ice_rain=15
   real, dimension(:),allocatable :: convice,convliq
-  integer, dimension(:), allocatable :: seq
+  integer, dimension(15) :: microseq
   ! 
   ! drop sizes definition is based on vanZanten (2005)
   ! cloud droplets' diameter: 2-50 e-6 m
@@ -227,7 +227,7 @@ contains
     rrate = 0.    
 
     if(firsttime) call initmcrp(level)
-
+! print *,'bef',tlt(15,3,34),thl(15,3,34),rp(15,3,34),rpt(15,3,34)
     tlt    = tlt    - thl/dt
     rtt    = rtt    - (rv+rc)/dt
     rpt    = rpt    - rp/dt
@@ -240,23 +240,24 @@ contains
       rgrt   = rgrt   - rgrp/dt
     end if
 
-    seq =  gen_sequence(nprocess)
+!     seq =  gen_sequence(nprocess)
     allocate(convice(n1),convliq(n1))
-    seq = (/1,2,3,4,5,6,7,8,9,10,11,12,13,14,15/)
+!     microseq = (/1,2,3,4,5,6,7,8,9,10,11,12,13,14,15/)
     if (level ==3) then
-       seq(6:15) = 0
+       microseq(4:15) = 0
        nprocess = 5
     end if
-       
-
+!     seq(4:5)=0
+! print *,microseq
+! microseq(3:15)=0
     do j=3,n3-2
       do i=3,n2-2
-
+! print *,i,j
         convliq = alvl*th(:,i,j)/(cp*tk(:,i,j))
         convice = alvi*th(:,i,j)/(cp*tk(:,i,j))
         do n=1,nprocess
 
-          select case(seq(n))
+          select case(microseq(n))
           case(iwtrdff)
             call resetvar(cldw,rc(:,i,j))
             call resetvar(rain,rp(:,i,j),np(:,i,j))
@@ -419,6 +420,8 @@ contains
     rtt    = rtt    + (rv+rc)/dt
     rpt    = rpt    + rp/dt
     npt    = npt    + np/dt
+!     print *,'aft',tlt(15,3,34),thl(15,3,34),rp(15,3,34),rpt(15,3,34)
+
     if (level==4) then
 !ninucp = 0.
 !ricep = 0.
@@ -575,7 +578,7 @@ contains
           rc(k) = rc(k) - au*dt
           tl(k) = tl(k) + convliq(k)*au*dt
           np(k) = np(k) + au/cldw%x_max*dt
-          !
+!           if (k==15 .and. au>1e-6) print *,au
         end if
     end do
 
@@ -2244,7 +2247,7 @@ contains
 !  if (level==3)      nprocess = 4
 !  if (level==4)      nprocess = nprocess + 10
 
-  allocate(seq(nprocess))
+!   allocate(seq(nprocess))
 
 !Cloudwater properties
  cldw = PARTICLE( &! HN: made variable for seeding experiments

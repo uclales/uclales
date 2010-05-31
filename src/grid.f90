@@ -520,7 +520,6 @@ contains
        sanal(nvar0) = v_snm
     end do
     nvar0=nend
-
     fname =  trim(filprf)
     if(myid == 0) print                                                  &
             "(//' ',49('-')/,' ',/,'   Initializing: ',A20)",trim(fname)
@@ -561,7 +560,6 @@ contains
     i2 = nxp-2
     j1 = 3
     j2 = nyp-2
-
     iret = nf90_inq_Varid(ncid0, sanal(1), VarID)
     iret = nf90_put_var(ncid0, VarID, time, start=(/nrec0/))
     if (nrec0 == 1) then
@@ -584,7 +582,6 @@ contains
        iret = nf90_inq_varid(ncid0, sanal(10), VarID)
        iret = nf90_put_var(ncid0, VarID, dn0, start = (/nrec0/))
     end if
-
     iret = nf90_inq_varid(ncid0, sanal(11), VarID)
     iret = nf90_put_var(ncid0, VarID, a_up(:,i1:i2,j1:j2), start=ibeg,    &
          count=icnt)
@@ -612,12 +609,11 @@ contains
 !     if (level >=3) then
       do n = nbase, nvar0-1
        nn = nn+1
-       call newvar(n)
+       call newvar(nn-12)
        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
             count=icnt)
-    end do
-!     end if
+      end do
 ! 
 !     if (iradtyp > 1)  then
 !        nn = nn+1
@@ -690,7 +686,6 @@ contains
     write(10) xt, xm, yt, ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf
     write(10) a_ustar, a_tstar, a_rstar
     write(10) a_pexnr
-
     do n=1,nscl
        call newvar(n)
        write(10) a_sp
@@ -783,7 +778,6 @@ contains
 
     integer, intent(in) :: inum
     integer, optional, intent(in)   :: istep
-
     a_sp =>a_xp (:,:,:,inum)
 
     if (present(istep)) then

@@ -49,7 +49,6 @@ contains
   !
   subroutine init_mpi
 
-    integer ierror
     character (len=8) date
 
     myid=0
@@ -254,7 +253,7 @@ contains
 
     integer, intent(in):: nx,ny,nz,isign
     complex, intent(inout):: a(ny,nx,nz),atmp((nx+1)*(ny+1)*(nz+1))
-    integer ierr,ll,i,j,k
+    integer ll,i,j,k
 
     if(isign .eq. 1) then
        ll=0

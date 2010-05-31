@@ -42,7 +42,7 @@ contains
 
     integer :: i, j, k, km1, kp1,ki
     real    :: lwp(n2,n3), mu,tauc, tau(n1), xka,fr0,fr1,xkb,fact
-    real,parameter :: dens_air=1.14
+!     real,parameter :: dens_air=1.14
     real,parameter :: rho_l=1000.
     real,parameter :: reff=1.e-05
 

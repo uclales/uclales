@@ -94,7 +94,7 @@ contains
 
     allocate (wtv_sgs(nzp),wtv_res(nzp),wrl_sgs(nzp))
     allocate (tke_res(nzp),tke_sgs(nzp),tke0(nzp),thvar(nzp))
-    allocate (ssclr(nvar1),svctr(nzp,100))
+    allocate (ssclr(nvar1),svctr(nzp,120))
 
     wtv_sgs(:) = 0.
     wtv_res(:) = 0.
@@ -359,7 +359,7 @@ contains
           scr(i,j) = 0.
           do k=1,n1
              km1=max(1,k-1)
-             scr(i,j)=scr(i,j)+t(k,i,j)*(zm(k)-zm(km1))
+             scr(i,j)=scr(i,j)+(t(k,i,j)+th00)*(zm(k)-zm(km1))
           enddo
        end do
     end do
@@ -589,7 +589,7 @@ contains
           scr(i,j) = 0.
           do k=1,n1
              km1=max(1,k-1)
-             scr(i,j)=scr(i,j)+rl(k,i,j)*dn0(k)*(zm(k)-zm(km1))*1000.
+             scr(i,j)=scr(i,j)+rl(k,i,j)*(zm(k)-zm(km1))*dn0(k)*1000.
           enddo
        end do
     end do
@@ -603,7 +603,8 @@ contains
   !
   subroutine accum_lvl3(n1, n2, n3, dn0, zm, rc, rr, nr, rrate, CCN)
 
-    use defs, only : alvl
+    use grid, only : press
+    use defs, only : alvl,p00,cpr,cp
 
     integer, intent (in) :: n1,n2,n3
     real, intent (in)                      :: CCN
@@ -699,8 +700,8 @@ contains
              !xaqua = max(0.,rc(k,i,j))
              !old
              xaqua = max(xrain,rc(k,i,j))
-             scr1(i,j)=scr1(i,j)+xaqua*dn0(k)*(zm(k)-zm(km1))*1000.
-             scr2(i,j)=scr2(i,j)+xrain*dn0(k)*(zm(k)-zm(km1))*1000.
+             scr1(i,j)=scr1(i,j)+xaqua*(zm(k)-zm(km1))*alvl/cp*(press(k,i,j)/p00)**(-cpr)!*a_pexnr(k,i,j)*alvl/cp!dn0(k)*1000
+             scr2(i,j)=scr2(i,j)+xrain*(zm(k)-zm(km1))*alvl/cp*(press(k,i,j)/p00)**(-cpr)!*a_pexnr(k,i,j)*alvl/cp!dn0(k)*1000
           enddo
        end do
     end do
@@ -719,7 +720,8 @@ contains
   ! on level 4 variables.
   !
   subroutine accum_lvl4(n1, n2, n3,  dn0, zm, rv, rice, rsnow, rgrp,ninuc,nice)
-
+    use grid, only : press
+    use defs, only : alvi,cpr,p00,cp
     integer, intent (in) :: n1,n2,n3
     real, intent (in), dimension(n1)        :: zm, dn0
     real, intent (in), dimension(n1,n2,n3)  :: rv,rice,rsnow,rgrp,ninuc,nice
@@ -766,7 +768,7 @@ contains
     !
     ! average snow and graupel profiles
     !
-
+    
     call get_avg3(n1,n2,n3,rsnow,a1)
     svctr(:,101)=svctr(:,101) + a1(:)*dn0(:)/1000.
 
@@ -791,7 +793,7 @@ contains
           scr(i,j) = 0.
           do k=1,n1
              km1=max(1,k-1)
-             scr(i,j)=scr(i,j)+rice(k,i,j)*dn0(k)*(zm(k)-zm(km1))*1000.
+             scr(i,j)=scr(i,j)+rice(k,i,j)*(zm(k)-zm(km1))*alvi/cp*(press(k,i,j)/p00)**(-cpr)!dn0(k)*1000.
           end do
        end do
     end do
@@ -803,7 +805,7 @@ contains
           scr(i,j) = 0.
           do k=1,n1
              km1=max(1,k-1)
-             scr(i,j)=scr(i,j)+rsnow(k,i,j)*dn0(k)*(zm(k)-zm(km1))*1000.
+             scr(i,j)=scr(i,j)+rsnow(k,i,j)*(zm(k)-zm(km1))*alvi/cp*(press(k,i,j)/p00)**(-cpr)!dn0(k)*1000
           end do
        end do
     end do
@@ -815,7 +817,7 @@ contains
           scr(i,j) = 0.
           do k=1,n1
              km1=max(1,k-1)
-             scr(i,j)=scr(i,j)+rgrp(k,i,j)*dn0(k)*(zm(k)-zm(km1))*1000.
+             scr(i,j)=scr(i,j)+rgrp(k,i,j)*(zm(k)-zm(km1))*alvi/cp*(press(k,i,j)/p00)**(-cpr)!dn0(k)*1000
           end do
        end do
     end do
@@ -1045,7 +1047,6 @@ contains
     iret = nf90_put_var(ncid2, VarID, lsttm, start=(/nrec2/))
     iret = nf90_inq_VarID(ncid2, s2(9), VarID)
     iret = nf90_put_var(ncid2, VarID, nsmp,  start=(/nrec2/))
-
     do n=10,nv2
        iret = nf90_inq_varid(ncid2, s2(n), VarID)
        iret = nf90_put_var(ncid2,VarID,svctr(:,n), start=(/1,nrec2/),    &
