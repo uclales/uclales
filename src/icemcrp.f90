@@ -225,8 +225,9 @@ contains
     real, dimension(n1) :: q1,q2,q3,q4,q5,nr1,nr2,nr3,nr4 !dummy-arrays for conversion between mixing rate
     integer :: i, j,n
     rrate = 0.    
+
     if(firsttime) call initmcrp(level)
-    
+
     tlt    = tlt    - thl/dt
     rtt    = rtt    - (rv+rc)/dt
     rpt    = rpt    - rp/dt
@@ -242,12 +243,19 @@ contains
     seq =  gen_sequence(nprocess)
     allocate(convice(n1),convliq(n1))
     seq = (/1,2,3,4,5,6,7,8,9,10,11,12,13,14,15/)
-    if (level ==3) seq(6:13) = 0
+    if (level ==3) then
+       seq(6:15) = 0
+       nprocess = 5
+    end if
+       
+
     do j=3,n3-2
       do i=3,n2-2
+
         convliq = alvl*th(:,i,j)/(cp*tk(:,i,j))
         convice = alvi*th(:,i,j)/(cp*tk(:,i,j))
         do n=1,nprocess
+
           select case(seq(n))
           case(iwtrdff)
             call resetvar(cldw,rc(:,i,j))
@@ -372,9 +380,10 @@ contains
             call ice_cloud_riming(n1,cldw,snow,q1,q3,nr2,q4,thl(:,i,j),tk(:,i,j),d_coll_c,q_crit_c,d_crit_c,q_crit_sc,d_crit_sc,d_conv_sg,e_sc)
             call ice_cloud_riming(n1,cldw,graupel,q1,q4,nr3,q4,thl(:,i,j),tk(:,i,j),d_coll_c,q_crit_c,d_crit_c,q_crit_gc,d_crit_gc,d_conv_sg,e_gc)
             nicep(:,i,j) = nr1
-            ricep(:,i,j)    = q1/dn0
-            rsnowp(:,i,j) = q2/dn0
-            rgrp(:,i,j) = q3/dn0
+            rc(:,i,j) = q1/dn0
+            ricep(:,i,j)    = q2/dn0
+            rsnowp(:,i,j) = q3/dn0
+            rgrp(:,i,j) = q4/dn0
           case(iriming_ice_rain)
             call resetvar(ice,ricep(:,i,j),nicep(:,i,j))
             call resetvar(snow,rsnowp(:,i,j))
@@ -390,32 +399,45 @@ contains
             call ice_rain_riming(n1,rain,snow,q1,nr1,q3,nr3,q4,tk(:,i,j),q_crit, q_crit_sr,d_crit_sr)
             call ice_rain_riming(n1,rain,graupel,q1,nr1,q4,nr4,q4,tk(:,i,j),q_crit, q_crit,0.)
             nicep(:,i,j) = nr2
-            ricep(:,i,j)    = q1/dn0
-            rsnowp(:,i,j) = q2/dn0
-            rgrp(:,i,j) = q3/dn0
+            rp(:,i,j) = q1/dn0
+            ricep(:,i,j)    = q2/dn0
+            rsnowp(:,i,j) = q3/dn0
+            rgrp(:,i,j) = q4/dn0
           case default
           end select
         end do
         call resetvar(cldw,rc(:,i,j))
         call resetvar(rain,rp(:,i,j),np(:,i,j))
-        call resetvar(ice,ricep(:,i,j),nicep(:,i,j))
-        call resetvar(snow,rsnowp(:,i,j))
-        call resetvar(graupel,rgrp(:,i,j))
+        if (level==4) then
+          call resetvar(ice,ricep(:,i,j),nicep(:,i,j))
+          call resetvar(snow,rsnowp(:,i,j))
+          call resetvar(graupel,rgrp(:,i,j))
+        end if 
      end do
     end do
-
     tlt    = tlt    + thl/dt
     rtt    = rtt    + (rv+rc)/dt
     rpt    = rpt    + rp/dt
     npt    = npt    + np/dt
     if (level==4) then
+!ninucp = 0.
+!ricep = 0.
+!nicep = 0.
+!rsnowp = 0.
+!rgrp = 0.
       ninuct = ninuct + ninucp/dt
       ricet  = ricet  + ricep/dt
       nicet  = nicet  + nicep/dt
       rsnowt = rsnowt + rsnowp/dt
       rgrt   = rgrt   + rgrp/dt
+!ninuct = 0.
+!ricet = 0.
+!nicet = 0.
+!rsnowt = 0.
+!rgrt = 0.
     end if
     deallocate(convice,convliq)
+
   end subroutine mcrph
   subroutine wtr_dff_SB(n1,dn0,rp,np,rl,rs,rv,tl,tk)
  !
@@ -2217,10 +2239,10 @@ contains
   integer , intent(in) :: level
 
   firsttime = .false.
-  nprocess = 0
-  if (droplet_sedim) nprocess = nprocess + 1
-  if (level==3)      nprocess = 4
-  if (level==4)      nprocess = nprocess + 10
+  nprocess = 15
+!  if (droplet_sedim) nprocess = nprocess + 1
+!  if (level==3)      nprocess = 4
+!  if (level==4)      nprocess = nprocess + 10
 
   allocate(seq(nprocess))
 
