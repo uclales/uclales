@@ -314,5 +314,7 @@ contains
 
   end subroutine double_array_par_sum
 
+  subroutine barrier
 
+  end subroutine barrier
 end module mpi_interface

@@ -649,5 +649,8 @@ contains
 
   end subroutine double_array_par_sum
 
-
+  subroutine barrier
+   integer :: ierror
+    call mpi_barrier(mpi_comm_world, ierror)
+  end subroutine barrier
 end module mpi_interface
