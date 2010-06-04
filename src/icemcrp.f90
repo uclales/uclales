@@ -183,10 +183,10 @@ contains
 !        if (droplet_sedim) call sedim_cd(level,nzp,nxp,nyp,dn0,dt,a_theta,a_scr1,      &
 !             liquid,precip,a_rt,a_tt)     
     case(3)
-       call mcrph(level,nzp,nxp,nyp,dn0,a_tp,a_theta,a_scr1,vapor,a_scr2,liquid,a_rpp, &
+       call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,a_tp,a_theta,a_scr1,vapor,a_scr2,liquid,a_rpp, &
               a_npp,precip,a_rt,a_tt,a_rpt,a_npt,a_scr7)
     case(4)
-       call mcrph(level,nzp,nxp,nyp,dn0,a_tp,a_theta,a_scr1,vapor,a_scr2,liquid,a_rpp, &
+       call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,a_tp,a_theta,a_scr1,vapor,a_scr2,liquid,a_rpp, &
               a_npp,precip,a_rt,a_tt,a_rpt,a_npt,a_scr7,&
               a_ninuct,a_ricet,a_nicet,a_rsnowt,a_rgrt,&
               a_ninucp,a_ricep,a_nicep,a_rsnowp,a_rgrp,rsup)
@@ -198,13 +198,14 @@ contains
   ! MCRPH: calls microphysical parameterization 
   !
 
-  subroutine mcrph(level,n1,n2,n3,dn0,thl,th,tk,rv,rs,rc,rp,np,         &
+  subroutine mcrph(level,n1,n2,n3,dn0,exner,thl,th,tk,rv,rs,rc,rp,np,         &
        rrate, rtt,tlt,rpt,npt,dissip,    &
        ninuct,ricet,nicet,rsnowt,rgrt,ninucp,ricep,nicep,rsnowp,rgrp,rsup)
 
     integer, intent (in) :: level,n1,n2,n3
     real, dimension(n1)      , intent (in)             :: dn0  !Density
-    real, dimension(n1,n2,n3), intent (inout)          :: thl,& !Theta_l
+    real, dimension(n1,n2,n3), intent (inout)          :: exner, & !exner function
+                                                          thl,& !Theta_l
                                                           th, & !theta
                                                           tk, & !temperature
                                                           rv, & !water vapor
@@ -225,6 +226,7 @@ contains
     real, dimension(n1) :: q1,q2,q3,q4,q5,nr1,nr2,nr3,nr4 !dummy-arrays for conversion between mixing rate
     integer :: i, j,n
     rrate = 0.    
+print *, 'conv', exner(:,3,3)
 
     if(firsttime) call initmcrp(level)
 ! print *,'bef',tlt(15,3,34),thl(15,3,34),rp(15,3,34),rpt(15,3,34)
@@ -253,8 +255,8 @@ contains
     do j=3,n3-2
       do i=3,n2-2
 ! print *,i,j
-        convliq = alvl*th(:,i,j)/(cp*tk(:,i,j))
-        convice = alvi*th(:,i,j)/(cp*tk(:,i,j))
+        convliq = alvl/cp*exner(:,i,j)
+        convice = alvi/cp*exner(:,i,j)
         do n=1,nprocess
 
           select case(microseq(n))
@@ -421,7 +423,8 @@ contains
     rpt    = rpt    + rp/dt
     npt    = npt    + np/dt
 !     print *,'aft',tlt(15,3,34),thl(15,3,34),rp(15,3,34),rpt(15,3,34)
-
+! print *, 'b', tlt(15,15,15),thl(15,15,15),rpt(15,15,15),rp(15,15,15)
+! print *, 'conv', exner(:,3,3)
     if (level==4) then
 !ninucp = 0.
 !ricep = 0.
@@ -573,13 +576,16 @@ contains
               Dc = ( Xc / prw )**(1./3.)
               au = Cau * (Dc * mmt / 2.)**Eau
           end if
-
+        else
+          au = 0.
+        end if
+! if (k==15) then
+!   au = 1e-6
+! end if
           rp(k) = rp(k) + au*dt
           rc(k) = rc(k) - au*dt
           tl(k) = tl(k) + convliq(k)*au*dt
           np(k) = np(k) + au/cldw%x_max*dt
-!           if (k==15 .and. au>1e-6) print *,au
-        end if
     end do
 
   end subroutine auto_SB
@@ -597,7 +603,7 @@ contains
     real, intent (in)    :: dn0(n1),diss(n1)
 
     real, parameter :: k_r0 = 4.33
-    real, parameter :: k_1 = 5.e-5
+    real, parameter :: k_1 = 5.e-4
     real, parameter :: Cac = 67.     ! accretion coefficient in KK param.
     real, parameter :: Eac = 1.15    ! accretion exponent in KK param.
 
@@ -692,8 +698,8 @@ contains
 !              end if
 !irina-olivier
           if (khairoutdinov) then
-              vn(k) = max(0.,an * Dm + bn)
-              vr(k) = max(0.,aq * Dm + bq)
+              vn(k) = max(0.,an * Dp + bn)
+              vr(k) = max(0.,aq * Dp + bq)
           end if
 
         end do
@@ -781,6 +787,7 @@ contains
     real, intent (inout),dimension(n1) :: rc,tl
 
     real, parameter :: c = 1.19e8 ! Stokes fall velocity coef [m^-1 s^-1]
+    real, parameter :: sgg = 1.2  ! geometric standard dev of cloud droplets
 
     integer ::  k, kp1
     real    :: Dc, Xc, vc, flxdiv
@@ -794,7 +801,8 @@ contains
           do k=n1-1,2,-1
              Xc = rc(k) / (cldw%nr+eps0)
              Dc = ( Xc / prw )**(1./3.)
-             vc = min(c*(Dc*0.5)**2 * exp(5*(log(1.3))**2),1./(dzt(k)*dt))
+             vc = min(c*(Dc*0.5)**2 * exp(4.5*(log(sgg))**2),1./(dzt(k)*dt))
+!               vc = min(c*(Dc*0.5)**2 * exp(5*(log(1.3))**2),1./(dzt(k)*dt))
              rfl(k) = - rc(k) * vc
              !
              kp1=k+1
