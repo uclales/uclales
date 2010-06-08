@@ -603,8 +603,8 @@ contains
   !
   subroutine accum_lvl3(n1, n2, n3, dn0, zm, rc, rr, nr, rrate, CCN)
 
-    use grid, only : press
-    use defs, only : alvl,p00,cpr,cp
+    use grid, only : a_pexnr,pi0,pi1
+    use defs, only : alvl,cp
 
     integer, intent (in) :: n1,n2,n3
     real, intent (in)                      :: CCN
@@ -612,7 +612,7 @@ contains
     real, intent (in), dimension(n1,n2,n3) :: rc, rr, nr, rrate
 
     integer                :: k, i, j, km1
-    real                   :: nrsum, nrcnt, rrsum, rrcnt, xrain, xaqua
+    real                   :: nrsum, nrcnt, rrsum, rrcnt, xrain, xaqua,convliq
     real                   :: unit 
     real                   :: rmax, rmin
     real, dimension(n1)    :: a1
@@ -694,14 +694,16 @@ contains
           scr1(i,j) = 0.
           scr2(i,j) = 0.
           do k=1,n1
+             convliq = alvl/cp*(pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp
+
              km1=max(1,k-1)
              xrain = max(0.,rr(k,i,j))
              !irina
              !xaqua = max(0.,rc(k,i,j))
              !old
              xaqua = max(xrain,rc(k,i,j))
-             scr1(i,j)=scr1(i,j)+xaqua*(zm(k)-zm(km1))*alvl/cp*(press(k,i,j)/p00)**(-cpr)!*a_pexnr(k,i,j)*alvl/cp!dn0(k)*1000
-             scr2(i,j)=scr2(i,j)+xrain*(zm(k)-zm(km1))*alvl/cp*(press(k,i,j)/p00)**(-cpr)!*a_pexnr(k,i,j)*alvl/cp!dn0(k)*1000
+             scr1(i,j)=scr1(i,j)+xaqua*(zm(k)-zm(km1))* convliq
+             scr2(i,j)=scr2(i,j)+xrain*(zm(k)-zm(km1))*convliq
           enddo
        end do
     end do
@@ -720,15 +722,15 @@ contains
   ! on level 4 variables.
   !
   subroutine accum_lvl4(n1, n2, n3,  dn0, zm, rv, rice, rsnow, rgrp,ninuc,nice)
-    use grid, only : press
-    use defs, only : alvi,cpr,p00,cp
+    use grid, only : a_pexnr,pi0,pi1
+    use defs, only : alvi,cp
     integer, intent (in) :: n1,n2,n3
     real, intent (in), dimension(n1)        :: zm, dn0
     real, intent (in), dimension(n1,n2,n3)  :: rv,rice,rsnow,rgrp,ninuc,nice
     integer                   :: k, i, j, km1
     real, dimension(n2,n3)    :: scr
 
-    real                   :: nrsum, nrcnt
+    real                   :: nrsum, nrcnt,convice
     real, dimension(n1)    :: a1
     real, dimension(n2,n3) :: scr1
     logical                :: aflg
@@ -792,8 +794,9 @@ contains
        do i=3,n2-2
           scr(i,j) = 0.
           do k=1,n1
-             km1=max(1,k-1)
-             scr(i,j)=scr(i,j)+rice(k,i,j)*(zm(k)-zm(km1))*alvi/cp*(press(k,i,j)/p00)**(-cpr)!dn0(k)*1000.
+              convice = alvi/cp*(pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp
+            km1=max(1,k-1)
+             scr(i,j)=scr(i,j)+rice(k,i,j)*(zm(k)-zm(km1))*convice
           end do
        end do
     end do
@@ -804,8 +807,9 @@ contains
        do i=3,n2-2
           scr(i,j) = 0.
           do k=1,n1
+              convice = alvi/cp*(pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp
              km1=max(1,k-1)
-             scr(i,j)=scr(i,j)+rsnow(k,i,j)*(zm(k)-zm(km1))*alvi/cp*(press(k,i,j)/p00)**(-cpr)!dn0(k)*1000
+             scr(i,j)=scr(i,j)+rsnow(k,i,j)*(zm(k)-zm(km1))*convice
           end do
        end do
     end do
@@ -816,8 +820,9 @@ contains
        do i=3,n2-2
           scr(i,j) = 0.
           do k=1,n1
-             km1=max(1,k-1)
-             scr(i,j)=scr(i,j)+rgrp(k,i,j)*(zm(k)-zm(km1))*alvi/cp*(press(k,i,j)/p00)**(-cpr)!dn0(k)*1000
+               convice = alvi/cp*(pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp
+            km1=max(1,k-1)
+             scr(i,j)=scr(i,j)+rgrp(k,i,j)*(zm(k)-zm(km1))*convice
           end do
        end do
     end do

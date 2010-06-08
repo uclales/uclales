@@ -25,7 +25,7 @@
 module mcrp
 
   use defs, only : tmelt,alvl, alvi,rowt,roice, pi, Rm, cp,t_hn
-  use grid, only : dt, dxi, dyi ,dzt, nxp, nyp, nzp, a_pexnr, a_rp, a_tp, th00, ccn,    &
+  use grid, only : dt, dxi, dyi ,dzt, nxp, nyp, nzp, a_pexnr, pi0,pi1,a_rp, a_tp, th00, ccn,    &
        dn0, pi0,pi1, a_rt, a_tt,a_rpp, a_rpt, a_npp, a_npt, vapor, liquid,       &
        a_theta, a_scr1, a_scr2, a_scr7, precip, &
        a_ninuct,a_ricet,a_nicet,a_rsnowt,a_rgrt,&
@@ -34,9 +34,8 @@ module mcrp
   use stat, only : sflg, updtst
   use util, only : get_avg3, azero
   implicit none
-
+ 
   logical, parameter :: droplet_sedim = .False., khairoutdinov = .False., turbulence = .False.,ice_multiplication = .TRUE.
-  logical            :: firsttime = .true.
   integer            :: nprocess,nprocess_3=4,nprocess_4=10
   
   integer,parameter  :: iwtrdff = 1,iauto = 2,iaccr = 3,isedimrd = 4,isedimcd = 5,iicenucnr = 6,iicenuc = 7,ifreez=8,idep=9,imelt=10,ised_ice=11,iself_ice=12,icoll_ice=13,iriming_ice_cloud=14,iriming_ice_rain=15
@@ -149,6 +148,7 @@ module mcrp
 !    
 
   type particle
+    character(10) :: name
     integer :: moments
     real :: nr
     real :: nu
@@ -183,10 +183,10 @@ contains
 !        if (droplet_sedim) call sedim_cd(level,nzp,nxp,nyp,dn0,dt,a_theta,a_scr1,      &
 !             liquid,precip,a_rt,a_tt)     
     case(3)
-       call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,a_tp,a_theta,a_scr1,vapor,a_scr2,liquid,a_rpp, &
+       call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_theta,a_scr1,vapor,a_scr2,liquid,a_rpp, &
               a_npp,precip,a_rt,a_tt,a_rpt,a_npt,a_scr7)
     case(4)
-       call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,a_tp,a_theta,a_scr1,vapor,a_scr2,liquid,a_rpp, &
+       call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_theta,a_scr1,vapor,a_scr2,liquid,a_rpp, &
               a_npp,precip,a_rt,a_tt,a_rpt,a_npt,a_scr7,&
               a_ninuct,a_ricet,a_nicet,a_rsnowt,a_rgrt,&
               a_ninucp,a_ricep,a_nicep,a_rsnowp,a_rgrp,rsup)
@@ -198,12 +198,12 @@ contains
   ! MCRPH: calls microphysical parameterization 
   !
 
-  subroutine mcrph(level,n1,n2,n3,dn0,exner,thl,th,tk,rv,rs,rc,rp,np,         &
+  subroutine mcrph(level,n1,n2,n3,dn0,exner,pi0,pi1,thl,th,tk,rv,rs,rc,rp,np,         &
        rrate, rtt,tlt,rpt,npt,dissip,    &
        ninuct,ricet,nicet,rsnowt,rgrt,ninucp,ricep,nicep,rsnowp,rgrp,rsup)
 
     integer, intent (in) :: level,n1,n2,n3
-    real, dimension(n1)      , intent (in)             :: dn0  !Density
+    real, dimension(n1)      , intent (in)             :: dn0,pi0,pi1  !Density and mean pressures
     real, dimension(n1,n2,n3), intent (inout)          :: exner, & !exner function
                                                           thl,& !Theta_l
                                                           th, & !theta
@@ -225,10 +225,13 @@ contains
 
     real, dimension(n1) :: q1,q2,q3,q4,q5,nr1,nr2,nr3,nr4 !dummy-arrays for conversion between mixing rate
     integer :: i, j,n
-    rrate = 0.    
-print *, 'conv', exner(:,3,3)
+    logical,save  :: firsttime = .true.
 
-    if(firsttime) call initmcrp(level)
+    rrate = 0.
+
+! print *, 'conv',exner
+
+    if(firsttime) call initmcrp(level,firsttime)
 ! print *,'bef',tlt(15,3,34),thl(15,3,34),rp(15,3,34),rpt(15,3,34)
     tlt    = tlt    - thl/dt
     rtt    = rtt    - (rv+rc)/dt
@@ -246,17 +249,16 @@ print *, 'conv', exner(:,3,3)
     allocate(convice(n1),convliq(n1))
 !     microseq = (/1,2,3,4,5,6,7,8,9,10,11,12,13,14,15/)
     if (level ==3) then
-       microseq(4:15) = 0
+       microseq(6:15) = 0
        nprocess = 5
     end if
 !     seq(4:5)=0
-! print *,microseq
 ! microseq(3:15)=0
     do j=3,n3-2
       do i=3,n2-2
 ! print *,i,j
-        convliq = alvl/cp*exner(:,i,j)
-        convice = alvi/cp*exner(:,i,j)
+        convliq = alvl/cp*(pi0+pi1+exner(:,i,j))/cp
+        convice = alvi/cp*(pi0+pi1+exner(:,i,j))/cp
         do n=1,nprocess
 
           select case(microseq(n))
@@ -294,8 +296,10 @@ print *, 'conv', exner(:,3,3)
             q2 = dn0*rp(:,i,j)
             q3 = dn0*ricep(:,i,j)
             q4 = dn0*rgrp(:,i,j)
+
             call cloud_freeze(n1,q1,q3,nicep(:,i,j),thl(:,i,j),tk(:,i,j))
-            call rain_freeze(n1,q2,q3,np(:,i,j),q4,nicep(:,i,j),tk(:,i,j))
+            call rain_freeze(n1,q2,np(:,i,j),q3,nicep(:,i,j),q4,tk(:,i,j))
+
             rc(:,i,j)    = q1/dn0
             rp(:,i,j)    = q2/dn0
             ricep(:,i,j) = q3/dn0
@@ -325,9 +329,13 @@ print *, 'conv', exner(:,3,3)
             q3 = dn0*ricep(:,i,j)
             q4 = dn0*rgrp(:,i,j)
             q5 = dn0*rsnowp(:,i,j)
-            call melting(n1,ice,q3,thl(:,i,j),nicep(:,i,j),q1,q2,np(:,i,j),tk(:,i,j))
-            call melting(n1,graupel,q4,thl(:,i,j),nicep(:,i,j),q1,q2,np(:,i,j),tk(:,i,j))
-            call melting(n1,snow,q5,thl(:,i,j),nicep(:,i,j),q1,q2,np(:,i,j),tk(:,i,j))
+            nr1 = nicep(:,i,j)
+            nr2 = graupel%nr
+            nr3 = snow%nr
+            call melting(n1,ice,q3,thl(:,i,j),nr1,q1,q2,np(:,i,j),tk(:,i,j))
+            call melting(n1,graupel,q4,thl(:,i,j),nr2,q1,q2,np(:,i,j),tk(:,i,j))
+            call melting(n1,snow,q5,thl(:,i,j),nr3,q1,q2,np(:,i,j),tk(:,i,j))
+            nicep(:,i,j) = nr1
             rc(:,i,j)    = q1/dn0
             rp(:,i,j)    = q2/dn0
             ricep(:,i,j) = q3/dn0
@@ -360,9 +368,10 @@ print *, 'conv', exner(:,3,3)
             q3 = dn0*rgrp(:,i,j)
             nr1 = nicep(:,i,j)
             nr2 = snow%nr
-            call ice_collection(n1,snow,ice,q1,nr1,q2,tk(:,i,j),q_crit)
-            call ice_collection(n1,graupel,ice,q1,nr1,q3,tk(:,i,j),q_crit)
+            call ice_collection(n1,ice,snow,q1,nr1,q2,tk(:,i,j),q_crit)
+            call ice_collection(n1,ice,graupel,q1,nr1,q3,tk(:,i,j),q_crit)
             call ice_collection(n1,snow,graupel,q2,nr2,q3,tk(:,i,j),q_crit)
+
             nicep(:,i,j) = nr1
             ricep(:,i,j)    = q1/dn0
             rsnowp(:,i,j) = q2/dn0
@@ -380,7 +389,13 @@ print *, 'conv', exner(:,3,3)
             nr2 = snow%nr
             nr3 = graupel%nr
             call ice_cloud_riming(n1,cldw,ice,q1,q2,nr1,q4,thl(:,i,j),tk(:,i,j),d_coll_c,q_crit_c,d_crit_c,q_crit_ic,d_crit_ic,d_conv_ig,e_ic)
+            rc(:,i,j) = q1/dn0
+            call resetvar(cldw,rc(:,i,j))
+            q1 = dn0*rc(:,i,j)
             call ice_cloud_riming(n1,cldw,snow,q1,q3,nr2,q4,thl(:,i,j),tk(:,i,j),d_coll_c,q_crit_c,d_crit_c,q_crit_sc,d_crit_sc,d_conv_sg,e_sc)
+            rc(:,i,j) = q1/dn0
+            call resetvar(cldw,rc(:,i,j))
+            q1 = dn0*rc(:,i,j)
             call ice_cloud_riming(n1,cldw,graupel,q1,q4,nr3,q4,thl(:,i,j),tk(:,i,j),d_coll_c,q_crit_c,d_crit_c,q_crit_gc,d_crit_gc,d_conv_sg,e_gc)
             nicep(:,i,j) = nr1
             rc(:,i,j) = q1/dn0
@@ -424,7 +439,7 @@ print *, 'conv', exner(:,3,3)
     npt    = npt    + np/dt
 !     print *,'aft',tlt(15,3,34),thl(15,3,34),rp(15,3,34),rpt(15,3,34)
 ! print *, 'b', tlt(15,15,15),thl(15,15,15),rpt(15,15,15),rp(15,15,15)
-! print *, 'conv', exner(:,3,3)
+! print *, 'conv', convliq 
     if (level==4) then
 !ninucp = 0.
 !ricep = 0.
@@ -460,7 +475,7 @@ print *, 'conv', exner(:,3,3)
     real, parameter     :: c_Nevap = 0.7
     integer             :: k
     real                :: Xp, Dp, G, S, cerpt, cenpt
-    do k=2,n1
+ do k=2,n1
       if (rp(k) > 0 .and. rl(k)<=0.) then
           Xp = rp(k)/ (np(k)+eps0)
           Dp = ( Xp / prw )**(1./3.)
@@ -675,7 +690,7 @@ print *, 'conv', exner(:,3,3)
      real, dimension(n1) :: nslope,rslope,dn,dr, rfl, nfl, vn, vr, cn, cr
 
      b2 = a2*exp(c2*Dv)
-
+ 
         nfl(n1) = 0.
         rfl(n1) = 0.
         do k=n1-1,2,-1
@@ -834,20 +849,21 @@ print *, 'conv', exner(:,3,3)
     
     do k=2,n1
       if (tk(k) < tmelt .and. qsup(k) > 0.0) then
-        nuc_n = 0e0
-        nuc_n = max(nin(k) - (nice(k)),0.)
-
-        nuc_q = min(nuc_n * ice%x_min, qsup(k))
-        !nuc_n = nuc_q / ice%x_min                !axel 20040416
-        nin(k)  = nin(k)  - nuc_n
-        nice(k) = nice(k) + nuc_n
-        qice(k) = qice(k) + nuc_q
-        tl(k)   = tl(k)   + convice(k)*nuc_q
+        nuc_n = nin(k) - nice(k)
+        if (nuc_n>eps0) then
+          nuc_q = min(nuc_n * ice%x_min, qsup(k))
+          !nuc_n = nuc_q / ice%x_min                !axel 20040416
+          nin(k)  = nin(k)  - nuc_n
+          nice(k) = nice(k) + nuc_n
+          qice(k) = qice(k) + nuc_q
+          tl(k)   = tl(k)   + convice(k)*nuc_q
+        end if
       endif
     end do
   end subroutine
   subroutine cloud_freeze (n1,qcloud,qice,nice,tl,tk)
 !
+
     integer, intent(in) :: n1
     real, intent(inout), dimension(n1) :: qice,nice,qcloud,tl
     real, intent(in), dimension(n1) :: tk
@@ -857,11 +873,13 @@ print *, 'conv', exner(:,3,3)
         real :: frq, frn,qc,xc,jhet,jhom,jtot,tc
         real, parameter :: ahet = 6.5e-1 ! 1/k,      messung nach barklie and gokhale
         real, parameter :: bhet = 2.0e+2 ! 1/(m3 s), messung nach barklie and gokhale
-        real            :: facg
+        real,save       :: facg
+!         logical, save :: firsttime
 
-
-        facg = moment_gamma(cldw,2)    ! <hn
-
+!         if (firsttime) then
+          facg = moment_gamma(cldw,2)    ! <hn
+!           firsttime =.false.
+!         end if
         !..test auf schmelzen oder gefrieren von wolkenteilchen
         do k = 1, n1
           if (tk(k) < tmelt) then
@@ -890,6 +908,7 @@ print *, 'conv', exner(:,3,3)
               frq  = jtot * qc * xc * facg
             end if
             frq  = min(frq,qc)
+!           if (frq>eps0)  frn  = cldw%nr*frq/qc
 
             !..berechnung der h2o-komponenten
             qcloud(k) = qcloud(k) - frq
@@ -914,20 +933,23 @@ print *, 'conv', exner(:,3,3)
         ! .. local variables ..
         integer                     :: k
         real            :: fr_q,fr_n,q_r,x_r,n_r,j_het,&
-            &  fr_q_i,fr_n_i,fr_q_g,fr_n_g,n_0,lam,xmax_ice,fr_q_tmp,fr_n_tmp
-        real, save      :: coeff_z
+            &  fr_q_i,fr_n_i,fr_q_g,fr_n_g,n_0,lam!,fr_q_tmp,fr_n_tmp
+        real, save      :: coeff_z,xmax_ice
         real, parameter :: a_het = 6.5e-1 ! messung nach barklie and gokhale (pk s.350)
         real, parameter :: b_het = 2.0e+2 ! messung nach barklie and gokhale (pk s.350)
         real, parameter :: q_crit_fr = 1.000e-6 ! q-schwellenwert fuer rain_freeze
         real, parameter :: d_rainfrz_ig = 0.50e-3 !  rain --> ice oder graupel
+        logical, save :: firsttime = .true.
 !         real, parameter :: d_rainfrz_gh = 1.25e-3 ! rain --> graupel oder hail
-
 ! 
 ! 
 !           !..koeff. fuer reflektivitaet z (2. moment)
+        if (firsttime) then
+          firsttime = .false.
           coeff_z = moment_gamma(rain,2)
-! 
-        xmax_ice = (d_rainfrz_ig/rain%a_geo)**(1.0e0/rain%b_geo)
+  !
+          xmax_ice = (d_rainfrz_ig/rain%a_geo)**(1.0e0/rain%b_geo)
+        end if
 !         xmax_gr  = (d_rainfrz_gh/rain%a_geo)**(1.0e0/rain%b_geo)
         fr_q_g = 0.0
         !..test auf schmelzen oder gefrieren von regentropfen
@@ -944,10 +966,6 @@ print *, 'conv', exner(:,3,3)
                     fr_q_i= q_r
                     fr_n_g= 0.0
                     fr_q_g= 0.0
-    ! ub_20080220>
-                    fr_n_tmp = 1.0
-                    fr_q_tmp = 1.0
-    ! <ub_20080220
                   else
                     fr_q = 0.0
                     fr_n = 0.0
@@ -955,15 +973,11 @@ print *, 'conv', exner(:,3,3)
                     fr_q_i= 0.0
                     fr_n_g= 0.0
                     fr_q_g= 0.0
-    ! ub_20080220>
-                    fr_n_tmp = 0.0
-                    fr_q_tmp = 0.0
-    ! <ub_20080220
                   end if
                 else
                   x_r = min(max(q_r/(n_r+eps0),rain%x_min),rain%x_max)
                   n_r = q_r / x_r
-                  if (tk(k) < t_hn) then            !..nur eis
+                 if (tk(k) < t_hn) then            !..nur eis
                     fr_q = q_r                  !  ausfrieren unterhalb t_hn \approx -40 c
                     fr_n = n_r
 
@@ -981,12 +995,9 @@ print *, 'conv', exner(:,3,3)
 
                     fr_n_g = fr_n - fr_n_i
                     fr_q_g = fr_q - fr_q_i
-                    fr_n_tmp = n_r/max(fr_n,n_r)
-                    fr_q_tmp = q_r/max(fr_q,q_r)
 
                   else                           !..heterogenes gefrieren
                     j_het = max(b_het * ( exp( a_het * (tmelt - tk(k))) - 1.0 ),0.) / rowt * dt
-
                     ! ub>> je nach groesse werden die gefrorenen regentropfen dem wolkeneis zugeschlagen
                     !      oder dem graupel oder hagel. hierzu erfolgt eine partielle integration des spektrums von 0
                     !      bis zu einer ersten trennmasse xmax_ice (--> eis), von dort bis zu xmax_gr (--> graupel)
@@ -1002,43 +1013,39 @@ print *, 'conv', exner(:,3,3)
                           incgfct_lower((rain%nu+2.0)/rain%mu, lam*xmax_ice**rain%mu)
                       fr_q_i = j_het * n_0/(rain%mu*lam**((rain%nu+3.0)/rain%mu))* &
                           incgfct_lower((rain%nu+3.0)/rain%mu, lam*xmax_ice**rain%mu)
-                      fr_n_tmp = n_r/max(fr_n,n_r)
-                      fr_q_tmp = q_r/max(fr_q,q_r)
+                      fr_n = min(fr_n,n_r)
+                      fr_q = min(fr_q,q_r)
                     else
                       fr_n= 0.0
                       fr_q= 0.0
                       fr_n_i= 0.0
                       fr_q_i= 0.0
                       fr_q_g= 0.0
-    ! <ub_20080212
-                      fr_n_tmp = 0.0
-                      fr_q_tmp = 0.0
                     end if
 
                   end if
 
-                  fr_n = fr_n * fr_n_tmp
-                  fr_q = fr_q * fr_q_tmp
+                  fr_n = fr_n
+                  fr_q = fr_q
 
-                  fr_n_i = fr_n_i * fr_n_tmp
-                  fr_q_i = fr_q_i * fr_q_tmp
-                  fr_q_g = fr_q_g * fr_q_tmp
+                  fr_n_i = fr_n_i
+                  fr_q_i = fr_q_i
+                  fr_q_g = fr_q_g 
                 end if
-
                 !..berechnung der h2o-komponenten
-
                 qrain(k) = qrain(k) - fr_q
                 nrain(k) = n_r - fr_n
 
                 if (qrain(k) < 0.0) then
-                  !write (*,*) 'seifert rain_freeze: qrain < 0.0, ', k, tk(k), q_r, j_het, fr_q, fr_q_tmp
+                  write (*,*) 'seifert rain_freeze: qrain < 0.0, ', k, tk(k), q_r, j_het, fr_q
                   qrain(k) = 0.0e0
+                  stop
                 end if
                 if (nrain(k) < 0.0) then
-                  !write (*,*) 'seifert rain_freeze: nrain < 0.0, ', k, tk(k), n_r, j_het, fr_n, fr_n_tmp
+                  write (*,*) 'seifert rain_freeze: nrain < 0.0, ', k, tk(k), n_r, j_het, fr_n
                   nrain(k) = 0.0e0
+                  stop
                 end if
-
               qice(k) = qice(k)  + fr_q_i
               nice(k) = nice(k)  + fr_n_i
               qgrp(k) = qgrp(k)  + fr_q_g
@@ -1165,14 +1172,14 @@ print *, 'conv', exner(:,3,3)
 
             melt_q = MAX(0.e0,melt_q)
             melt_n = MAX(0.e0,melt_n)
-
-
             q(k) = q(k) - melt_q
-            nr(k) = nr(k) - melt_n
+            if (meteor%nr==2) then
+              nr(k) = nr(k) - melt_n
+            end if
             if(x_m<cldw%x_max) then
               qcld(k)    = qcld(k)    + melt_q
               thl(k)      = thl(k)      - convice(k)*melt_q
-
+! 
             else
               qrain(k)    = qrain(k)    + melt_q
               nrain(k)    = nrain(k)    + melt_n
@@ -1208,38 +1215,38 @@ print *, 'conv', exner(:,3,3)
 ! 
 !     ! locale variablen
     integer                     :: k
-    real       :: q_i,n_i,x_i,d_i,v_i,e_coll,x_conv
+    real       :: q_i,n_i,x_i,d_i,v_i,e_coll
+    real, save :: x_conv
     real       :: self_n,self_q
-    real       :: delta_n_11,delta_n_12,delta_n_22
-    real       :: delta_q_11,delta_q_12,delta_q_22
-    real       :: theta_n_11,theta_n_12,theta_n_22
-    real       :: theta_q_11,theta_q_12,theta_q_22
-    real       :: delta_n,delta_q
-    real       :: theta_n,theta_q
-! 
+      real, dimension(3),save :: delta_n,delta_q, theta_n,theta_q
+      logical, save :: firsttime = .true.
+      integer :: metnr = 0
+      select case (metin%name)
+      case('ice')
+        metnr = 1
+      case('snow')
+        metnr = 2
+      case('graupel')
+        metnr = 3
+       case default
+        stop
+     end select
+      if (firsttime) then
+        firsttime = .false.
+        delta_n(metnr) = 2.0*coll_delta_11(metin,0) + coll_delta_12(metin,metin,0)
+        delta_q(metnr) = 2.0*coll_delta_11(metin,1) + coll_delta_12(metin,metin,1)
+        theta_n(metnr) = 2.0*coll_theta_11(metin,0) + coll_theta_12(metin,metin,0)
+        theta_q(metnr) = 2.0*coll_theta_11(metin,1) + coll_theta_12(metin,metin,1)
 
+        x_conv = (d_conv/metout%a_geo)**(1./metout%b_geo)
 
-      delta_n_11 = coll_delta_11(metin,0)
-      delta_n_12 = coll_delta_12(metin,metin,0)
-      delta_n_22 = coll_delta_22(metin,0)
-      delta_q_11 = coll_delta_11(metin,0)
-      delta_q_12 = coll_delta_12(metin,metin,1)
-      delta_q_22 = coll_delta_22(metin,1)
+      end if
 
-      theta_n_11 = coll_theta_11(metin,0)
-      theta_n_12 = coll_theta_12(metin,metin,0)
-      theta_n_22 = coll_theta_22(metin,0)
-      theta_q_11 = coll_theta_11(metin,0)
-      theta_q_12 = coll_theta_12(metin,metin,1)
-      theta_q_22 = coll_theta_22(metin,1)
+      delta_n(metnr) = 2.0*coll_delta_11(metin,0) + coll_delta_12(metin,metin,0)
+      delta_q(metnr) = 2.0*coll_delta_11(metin,1) + coll_delta_12(metin,metin,1)
+      theta_n(metnr) = 2.0*coll_theta_11(metin,0) + coll_theta_12(metin,metin,0)
+      theta_q(metnr) = 2.0*coll_theta_11(metin,1) + coll_theta_12(metin,metin,1)
 
-      delta_n = delta_n_11 + delta_n_12 + delta_n_22
-      delta_q = delta_q_11 + delta_q_12 + delta_q_22
-      theta_n = theta_n_11 - theta_n_12 + theta_n_22
-      theta_q = theta_q_11 - theta_q_12 + theta_q_22
-
-
-    x_conv = (d_conv/metout%a_geo)**(1./metout%b_geo)
 
     do k = 1, n1
           q_i = q_in(k)                                   !..fluessigwassergehalt in si
@@ -1263,16 +1270,16 @@ print *, 'conv', exner(:,3,3)
             v_i = metin%a_vel * x_i**metin%b_vel * dn0(k)      !..mean sedimentationsgeschw.
 
 
-            self_q = pi * 0.25e0 * e_coll * delta_q * n_i * q_i * d_i * d_i &
-                  * ( theta_q * v_i * v_i + 2.0*metin%s_vel**2 )**0.5 * dt
+            self_q = pi * 0.25e0 * e_coll * delta_q(metnr) * n_i * q_i * d_i * d_i &
+                  * ( theta_q(metnr) * v_i * v_i + 2.0*metin%s_vel**2 )**0.5 * dt
 
             self_q = min(self_q,q_i)
 
             q_in(k)  = q_in(k)  - self_q
             q_out(k) = q_out(k) + self_q
 
-              self_n = pi * 0.25e0 * e_coll * delta_n * n_i * n_i * d_i * d_i &
-                      * ( theta_n * v_i * v_i + 2.0*metin%s_vel**2 )**0.5 * dt
+              self_n = pi * 0.25e0 * e_coll * delta_n(metnr) * n_i * n_i * d_i * d_i &
+                      * ( theta_n(metnr) * v_i * v_i + 2.0*metin%s_vel**2 )**0.5 * dt
               self_n = min(min(self_n,self_q/x_conv),n_i)
               n_in(k)  = n_in(k)  - self_n
 
@@ -1291,32 +1298,53 @@ print *, 'conv', exner(:,3,3)
       
       integer                     :: k
   real, parameter :: e_min = 0.01              !..min. eff. fuer gc,ic,sc
-  real, parameter :: x_conv    = 0.100e-9 ! minimale graupel-/hagelmasse riming
+!   real, parameter :: x_conv    = 0.100e-9 ! minimale graupel-/hagelmasse riming
 
       real     :: x_i,d_i,v_i
       real     :: x_c,d_c,v_c,e_coll,x_coll_c
-      real     :: rime_n,rime_q
+      real     :: rime_q
       real     :: conv_n,conv_q
       real     :: mult_n,mult_q,mult_1,mult_2
-      real     :: delta_n_ii,delta_n_ic,delta_n_cc
+!       real     :: delta_n_ii,delta_n_ic,delta_n_cc
       real     :: delta_q_ii,delta_q_ic,delta_q_cc
-      real     :: theta_n_ii,theta_n_ic,theta_n_cc
+!       real     :: theta_n_ii,theta_n_ic,theta_n_cc
       real     :: theta_q_ii,theta_q_ic,theta_q_cc
       real     :: const1,const2,const3,const4,const5
-        delta_n_ii = coll_delta_11(ice,0)
-        delta_n_ic = coll_delta_12(ice,cloud,0)
-        delta_n_cc = coll_delta_22(cloud,0)
-        delta_q_ii = coll_delta_11(ice,0)
-        delta_q_ic = coll_delta_12(ice,cloud,1)
-        delta_q_cc = coll_delta_22(cloud,1)
+      real, dimension(2,2,3),save :: delta, theta
+      logical, save :: firsttime = .true.
+      integer :: metnr = 0
+      select case (ice%name)
+      case('ice')
+        metnr = 1
+      case('snow')
+        metnr = 2
+      case('graupel')
+        metnr = 3
+       case default
+        stop
+     end select
+      if (firsttime) then
+        firsttime = .false.
+!         delta_n_ii = coll_delta_11(ice,0)
+!         delta_n_ic = coll_delta_12(ice,cloud,0)
+!         delta_n_cc = coll_delta_22(cloud,0)
+        delta(1,1,metnr) = coll_delta_11(ice,1)
+        delta(1,2,metnr) = coll_delta_12(ice,cloud,1)
+        delta(2,2,metnr) = coll_delta_22(cloud,1)
 
-        theta_n_ii = coll_theta_11(ice,0)
-        theta_n_ic = coll_theta_12(ice,cloud,0)
-        theta_n_cc = coll_theta_22(cloud,0)
-        theta_q_ii = coll_theta_11(ice,0)
-        theta_q_ic = coll_theta_12(ice,cloud,1)
-        theta_q_cc = coll_theta_22(cloud,1)
-
+!         theta_n_ii = coll_theta_11(ice,0)
+!         theta_n_ic = coll_theta_12(ice,cloud,0)
+!         theta_n_cc = coll_theta_22(cloud,0)
+        theta(1,1,metnr) = coll_theta_11(ice,1)
+        theta(1,2,metnr) = coll_theta_12(ice,cloud,1)
+        theta(2,2,metnr) = coll_theta_22(cloud,1)
+      end if
+      delta_q_ii =  delta(1,1,metnr)
+      delta_q_ic =  delta(1,2,metnr)
+      delta_q_cc =  delta(2,2,metnr)
+      theta_q_ii =  theta(1,1,metnr)
+      theta_q_ic =  theta(1,2,metnr)
+      theta_q_cc =  theta(2,2,metnr)
 
       x_coll_c = (d_coll/cldw%a_geo)**3          !..mindestmasse fuer collection, begrenzt rime_n
 
@@ -1341,21 +1369,11 @@ print *, 'conv', exner(:,3,3)
 
               e_coll = min(e_ic, max(const1*(d_c - d_crit_c), e_min))
 
-              rime_n = pi/4.0 * e_coll * n_i(k) * cloud%nr * dt &
-                     *     (delta_n_ii * d_i*d_i + delta_n_ic * d_i*d_c + delta_n_cc * d_c*d_c) &
-                     * sqrt(theta_n_ii * v_i*v_i - theta_n_ic * v_i*v_c + theta_n_cc * v_c*v_c  &
-                           +ice%s_vel**2)
-
               rime_q = pi/4.0 * e_coll * n_i(k) * q_c(k) * dt &
                   &   *     (delta_q_ii * d_i*d_i + delta_q_ic * d_i*d_c + delta_q_cc * d_c*d_c) &
                   &   * sqrt(theta_q_ii * v_i*v_i - theta_q_ic * v_i*v_c + theta_q_cc * v_c*v_c  &
                   &          +ice%s_vel**2)
-
-!               if (.not.use_ice_graupel_conv_uli) then
-
                 rime_q = min(q_c(k),rime_q)
-  !ub              rime_n = min(cloud%nr,min(rime_n,const2*rime_q))
-                rime_n = min(cloud%nr,rime_n)
 
                 q_i(k)   = q_i(k)  + rime_q
                 q_c(k) = q_c(k) - rime_q
@@ -1366,8 +1384,8 @@ print *, 'conv', exner(:,3,3)
 
                 ! eismultiplikation nach hallet und mossop
 
-                mult_q = 0.0
-                if (tk(k) < tmelt .and. ice_multiplication) then
+!                 mult_q = 0.0
+                if (tk(k) < tmelt .and. ice_multiplication .and. ice%moments == 2) then
                   mult_1 = (tk(k) - t_mult_min)*const3
                   mult_2 = (tk(k) - t_mult_max)*const4
                   mult_1 = max(0.e0,min(mult_1,1.e0))
@@ -1389,7 +1407,7 @@ print *, 'conv', exner(:,3,3)
                     ! ub >>
                     x_i = min(max((q_i(k))/(n_i(k)+eps0),ice%x_min),ice%x_max)    !..mean masse incl. riming
                     ! ub <<
-                    conv_n = conv_q / max(x_i,x_conv)
+                    conv_n = conv_q / x_i
                     conv_n = min(n_i(k),conv_n)
                   end if
                 endif
@@ -1435,29 +1453,80 @@ print *, 'conv', exner(:,3,3)
     real      :: delta_n_ii,delta_n_ir,           delta_n_rr
     real      :: delta_q_ii,delta_q_ir,delta_q_ri,delta_q_rr
     real      :: theta_n_ii,theta_n_ir,           theta_n_rr
-    real      :: theta_q_ii,theta_q_ir,theta_q_ri,theta_q_rr,d_av_fakt_i,d_av_fakt_r
+    real      :: theta_q_ii,theta_q_ir,theta_q_ri,theta_q_rr
+    real, save :: d_av_fakt_r
+    real,dimension(3),save :: d_av_fakt_i
 
+      real, dimension(2,2,3),save :: delta_n,delta_q, theta_n,theta_q
+      logical, save :: firsttime = .true.
+      integer :: metnr = 0
+      select case (ice%name)
+      case('ice')
+        metnr = 1
+      case('snow')
+        metnr = 2
+      case('graupel')
+        metnr = 3
+       case default
+        stop
+     end select
+      if (firsttime) then
+        firsttime = .false.
+!         delta_n_ii = coll_delta_11(ice,0)
+!         delta_n_ic = coll_delta_12(ice,cloud,0)
+!         delta_n_cc = coll_delta_22(cloud,0)
+        delta_n(1,1,metnr) = coll_delta_11(ice,0)
+        delta_n(1,2,metnr) = coll_delta_12(ice,rain,0)
+        delta_n(2,2,metnr) = coll_delta_22(rain,0)
+        delta_q(1,1,metnr) = coll_delta_11(ice,1)
+        delta_q(1,2,metnr) = coll_delta_12(ice,rain,1)
+        delta_q(2,2,metnr) = coll_delta_22(rain,1)
 
+!         theta_n_ii = coll_theta_11(ice,0)
+!         theta_n_ic = coll_theta_12(ice,rain,0)
+!         theta_n_cc = coll_theta_22(rain,0)
+        theta_n(1,1,metnr) = coll_theta_11(ice,0)
+        theta_n(1,2,metnr) = coll_theta_12(ice,rain,0)
+        theta_n(2,2,metnr) = coll_theta_22(rain,0)
+        theta_q(1,1,metnr) = coll_theta_11(ice,1)
+        theta_q(1,2,metnr) = coll_theta_12(ice,rain,1)
+        theta_q(2,2,metnr) = coll_theta_22(rain,1)
 
-      delta_n_ii = coll_delta_11(ice,0)
-      delta_n_ir = coll_delta_12(ice,rain,0)
-      delta_n_rr = coll_delta_22(rain,0)
-      delta_q_ii = coll_delta_11(ice,1)
-      delta_q_ir = coll_delta_12(ice,rain,1)
-      delta_q_ri = coll_delta_12(rain,ice,1)
-      delta_q_rr = coll_delta_22(rain,1)
+      d_av_fakt_r = d_average_factor(rain)
+      d_av_fakt_i(metnr) = d_average_factor(ice)
+      end if
+      delta_n_ii =  delta_n(1,1,metnr)
+      delta_n_ir =  delta_n(1,2,metnr)
+      delta_n_rr =  delta_n(2,2,metnr)
+      theta_n_ii =  theta_n(1,1,metnr)
+      theta_n_ir =  theta_n(1,2,metnr)
+      theta_n_rr =  theta_n(2,2,metnr)
+      delta_q_ii =  delta_q(1,1,metnr)
+      delta_q_ir =  delta_q(1,2,metnr)
+      delta_q_rr =  delta_q(2,2,metnr)
+      theta_q_ii =  theta_q(1,1,metnr)
+      theta_q_ir =  theta_q(1,2,metnr)
+      theta_q_rr =  theta_q(2,2,metnr)
 
-      theta_n_ii = coll_theta_11(ice,0)
-      theta_n_ir = coll_theta_12(ice,rain,0)
-      theta_n_rr = coll_theta_22(rain,0)
-      theta_q_ii = coll_theta_11(ice,1)
-      theta_q_ir = coll_theta_12(ice,rain,1)
-      theta_q_ri = coll_theta_12(rain,ice,1)
-      theta_q_rr = coll_theta_22(rain,1)
+! 
+!       delta_n_ii = coll_delta_11(ice,0)
+!       delta_n_ir = coll_delta_12(ice,rain,0)
+!       delta_n_rr = coll_delta_22(rain,0)
+!       delta_q_ii = coll_delta_11(ice,1)
+!       delta_q_ir = coll_delta_12(ice,rain,1)
+!       delta_q_ri = coll_delta_12(rain,ice,1)
+!       delta_q_rr = coll_delta_22(rain,1)
+! 
+!       theta_n_ii = coll_theta_11(ice,0)
+!       theta_n_ir = coll_theta_12(ice,rain,0)
+!       theta_n_rr = coll_theta_22(rain,0)
+!       theta_q_ii = coll_theta_11(ice,1)
+!       theta_q_ir = coll_theta_12(ice,rain,1)
+!       theta_q_ri = coll_theta_12(rain,ice,1)
+!       theta_q_rr = coll_theta_22(rain,1)
 
       ! ub>>
-      d_av_fakt_r = d_average_factor(rain)
-      d_av_fakt_i = d_average_factor(ice)
+
       ! ub<<
 
 
@@ -1466,7 +1535,7 @@ print *, 'conv', exner(:,3,3)
 
           x_i = min(max(q_i(k)/(n_i(k)+eps0),ice%x_min),ice%x_max)    !..mean masse in si
           d_i = ice%a_geo * x_i**ice%b_geo                     !..mean durchmesser
-          d_id = d_av_fakt_i * d_i
+          d_id = d_av_fakt_i(metnr) * d_i
 
           if (q_r(k) > q_crit_r .and. q_i(k) > q_crit_i .and. d_i > d_crit_i) then
 
@@ -1507,7 +1576,7 @@ print *, 'conv', exner(:,3,3)
               ! eismultiplikation nach hallet und mossop
 
               mult_q = 0.0
-              if (tk(k) < tmelt .and. ice_multiplication) then
+              if (tk(k) < tmelt .and. ice_multiplication .and. ice%moments==2) then
                 mult_1 = (tk(k) - t_mult_min) / (t_mult_opt - t_mult_min)
                 mult_2 = (tk(k) - t_mult_max) / (t_mult_opt - t_mult_max)
                 mult_1 = max(0.e0,min(mult_1,1.e0))
@@ -1516,7 +1585,7 @@ print *, 'conv', exner(:,3,3)
                 mult_q = mult_n * ice%x_min
                 mult_q = min(rime_qr,mult_q)
 
-                if (ice%moments==2) n_i(k) = n_i(k)  + mult_n
+                n_i(k) = n_i(k)  + mult_n
                 q_i(k) = q_i(k)  + mult_q
               endif
 
@@ -1564,20 +1633,78 @@ print *, 'conv', exner(:,3,3)
     real      :: theta_q_ss,theta_q_si,theta_q_ii
 
     real            :: e_coll,coll_n,coll_q
+      real, dimension(2,2,3,3),save :: delta_n,delta_q, theta_n,theta_q
+      logical, save :: firsttime = .true.
+      integer :: metnr1 = 0,metnr2=0
+      select case (met1%name)
+      case('ice')
+        metnr1 = 1
+      case('snow')
+        metnr1 = 2
+      case('graupel')
+        metnr1 = 3
+       case default
+        stop
+     end select
+      select case (met2%name)
+      case('ice')
+        metnr2 = 1
+      case('snow')
+        metnr2 = 2
+      case('graupel')
+        metnr2 = 3
+      case default
+        stop
+      end select
+      if (firsttime) then
+        firsttime = .false.
+!         delta_n_ii = coll_delta_11(met2,0)
+!         delta_n_ic = coll_delta_12(met2,cloud,0)
+!         delta_n_cc = coll_delta_22(cloud,0)
+        delta_n(1,1,metnr1,metnr2) = coll_delta_11(met2,0)
+        delta_n(1,2,metnr1,metnr2) = coll_delta_12(met2,met1,0)
+        delta_n(2,2,metnr1,metnr2) = coll_delta_22(met1,0)
+        delta_q(1,1,metnr1,metnr2) = coll_delta_11(met2,1)
+        delta_q(1,2,metnr1,metnr2) = coll_delta_12(met2,met1,1)
+        delta_q(2,2,metnr1,metnr2) = coll_delta_22(met1,1)
 
-      delta_n_ss = coll_delta_11(met1,0)
-      delta_n_si = coll_delta_12(met1,met2,0)
-      delta_n_ii = coll_delta_22(met2,0)
-      delta_q_ss = coll_delta_11(met1,0)
-      delta_q_si = coll_delta_12(met1,met2,1)
-      delta_q_ii = coll_delta_22(met2,1)
+!         theta_n_ii = coll_theta_11(met2,0)
+!         theta_n_ic = coll_theta_12(met2,met1,0)
+!         theta_n_cc = coll_theta_22(met1,0)
+        theta_n(1,1,metnr1,metnr2) = coll_theta_11(met2,0)
+        theta_n(1,2,metnr1,metnr2) = coll_theta_12(met2,met1,0)
+        theta_n(2,2,metnr1,metnr2) = coll_theta_22(met1,0)
+        theta_q(1,1,metnr1,metnr2) = coll_theta_11(met2,1)
+        theta_q(1,2,metnr1,metnr2) = coll_theta_12(met2,met1,1)
+        theta_q(2,2,metnr1,metnr2) = coll_theta_22(met1,1)
 
-      theta_n_ss = coll_theta_11(met1,0)
-      theta_n_si = coll_theta_12(met1,met2,0)
-      theta_n_ii = coll_theta_22(met2,0)
-      theta_q_ss = coll_theta_11(met1,0)
-      theta_q_si = coll_theta_12(met1,met2,1)
-      theta_q_ii = coll_theta_22(met2,1)
+      end if
+      delta_n_ss =  delta_n(1,1,metnr1,metnr2)
+      delta_n_si =  delta_n(1,2,metnr1,metnr2)
+      delta_n_ii =  delta_n(2,2,metnr1,metnr2)
+      theta_n_ss =  theta_n(1,1,metnr1,metnr2)
+      theta_n_si =  theta_n(1,2,metnr1,metnr2)
+      theta_n_ii =  theta_n(2,2,metnr1,metnr2)
+      delta_q_ss =  delta_q(1,1,metnr1,metnr2)
+      delta_q_si =  delta_q(1,2,metnr1,metnr2)
+      delta_q_ii =  delta_q(2,2,metnr1,metnr2)
+      theta_q_ss =  theta_q(1,1,metnr1,metnr2)
+      theta_q_si =  theta_q(1,2,metnr1,metnr2)
+      theta_q_ii =  theta_q(2,2,metnr1,metnr2)
+
+!       delta_n_ss = coll_delta_11(met2,0)
+!       delta_n_si = coll_delta_12(met2,met1,0)
+!       delta_n_ii = coll_delta_22(met1,0)
+!       delta_q_ss = coll_delta_11(met2,0)
+!       delta_q_si = coll_delta_12(met2,met1,1)
+!       delta_q_ii = coll_delta_22(met1,1)
+! 
+!       theta_n_ss = coll_theta_11(met2,0)
+!       theta_n_si = coll_theta_12(met2,met1,0)
+!       theta_n_ii = coll_theta_22(met1,0)
+!       theta_q_ss = coll_theta_11(met2,0)
+!       theta_q_si = coll_theta_12(met2,met1,1)
+!       theta_q_ii = coll_theta_22(met1,1)
 
 
     do k = 1, n1
@@ -1635,34 +1762,47 @@ print *, 'conv', exner(:,3,3)
 ! 
 !     ! .. local variables ..
     integer  :: k,kk,km1,kp1
-    real      :: alfn,alfq,c_lam,lam,sk,tot,zz,xp
+    real,dimension(3),save      :: alfn,alfq,c_lam
+    real :: lam,sk,tot,zz,xp
     real, dimension(n1)   :: nfl,rfl,vn,vr,dn,dr,rslope,cn,cr,nslope,np
     real :: cc, flxdiv,maxi,mini
+      logical, save :: firsttime = .true.
+      integer :: metnr = 0
+      select case (ice%name)
+      case('ice')
+        metnr = 1
+      case('snow')
+        metnr = 2
+      case('graupel')
+        metnr = 3
+      case default
+        stop
+      end select
     if (present(nr)) then
       np = nr
     else
       np = meteor%nr
     end if
     
-    alfn = meteor%a_vel * gfct((meteor%nu+meteor%b_vel+1.0)/meteor%mu)&
-          &                / gfct((meteor%nu+1.0)/meteor%mu)
-    alfq = meteor%a_vel * gfct((meteor%nu+meteor%b_vel+2.0)/meteor%mu)&
-          &                / gfct((meteor%nu+2.0)/meteor%mu)
-    c_lam = gfct((meteor%nu+1.0)/meteor%mu)/gfct((meteor%nu+2.0)/meteor%mu)
-
-    where (rp < 0.0e0) rp = 0.0e0
-    if (meteor%moments==2) where (np < 0.0e0) np = 0.0e0
+    if (firsttime) then
+      alfn(metnr) = meteor%a_vel * gfct((meteor%nu+meteor%b_vel+1.0)/meteor%mu)&
+            &                / gfct((meteor%nu+1.0)/meteor%mu)
+      alfq(metnr) = meteor%a_vel * gfct((meteor%nu+meteor%b_vel+2.0)/meteor%mu)&
+            &                / gfct((meteor%nu+2.0)/meteor%mu)
+      c_lam(metnr) = gfct((meteor%nu+1.0)/meteor%mu)/gfct((meteor%nu+2.0)/meteor%mu)
+      firsttime =.false.
+    end if
 
     do k=n1-1,2,-1
 
       Xp = rp(k) / (np(k)+eps0)
-      lam = ( c_lam * xp )**(meteor%b_vel)
-      vr(k) = alfq * lam
+      lam = ( c_lam(metnr) * xp )**(meteor%b_vel)
+      vr(k) = alfq(metnr) * lam
       vr(k) = max(vr(k),0.1e+0)
       vr(k) = min(vr(k),30.e0)
       vr(k) = -vr(k)
 
-      vn(k) = alfn * lam
+      vn(k) = alfn(metnr) * lam
       vn(k) = max(vn(k),0.1e+0)
       vn(k) = min(vn(k),30.e0)
       vn(k) = -vn(k)
@@ -1749,9 +1889,11 @@ print *, 'conv', exner(:,3,3)
     real, parameter :: c_d = -2.8
     real, parameter :: d_d = 0.262
     real, parameter :: tmelt  = 2.732e+2     !..tripelpunkt wasser
-
-    n_ice_meyers_contact = n_0 * exp( a_d + b_d * s )         &
-          &               + n_m * exp( c_d + d_d * (t_a - tmelt) )
+    real :: temp
+    temp = t_a - tmelt
+    n_ice_meyers_contact = n_0 * exp( a_d + b_d * s )
+    n_ice_meyers_contact = n_ice_meyers_contact  &
+          &               + n_m * exp( c_d + d_d * temp )
 
 !     return
   end function n_ice_meyers_contact
@@ -2241,24 +2383,25 @@ print *, 'conv', exner(:,3,3)
     type(particle),intent(in)        :: meteor
     real, dimension(:), intent(inout) :: mass
     real, dimension(:), intent(inout), optional :: number
-    mass = max(0.,mass)
+    where (mass < eps0)
+      mass = 0.
+    end where
     if (present(number)) then
-      number = max(min(number,mass/meteor%x_min),mass/meteor%x_max)
+      number = max(0.,max(min(number,mass/meteor%x_min),mass/meteor%x_max))
     end if
   end subroutine resetvar
-  subroutine initmcrp(level)
+  subroutine initmcrp(level,firsttime)
   integer , intent(in) :: level
+  logical, intent(inout) :: firsttime
 
   firsttime = .false.
-  nprocess = 15
-!  if (droplet_sedim) nprocess = nprocess + 1
-!  if (level==3)      nprocess = 4
-!  if (level==4)      nprocess = nprocess + 10
+ if (level==3)      nprocess = 4
+ if (droplet_sedim) nprocess = nprocess + 1
+ if (level==4)      nprocess = nprocess + 10
 
-!   allocate(seq(nprocess))
 
 !Cloudwater properties
- cldw = PARTICLE( &! HN: made variable for seeding experiments
+ cldw = PARTICLE('cloudw', &! HN: made variable for seeding experiments
          1, & !number of moments
          CCN, & !Number of droplets
          0.333333, & !.nu.....Breiteparameter der Verteil.
@@ -2275,7 +2418,7 @@ print *, 'conv', exner(:,3,3)
          2.0)        !.cap....Koeff. Kapazitaet
 
 !Rainwater properties
- rain = PARTICLE( &! HN: made variable for seeding experiments
+ rain = PARTICLE('rain', &! HN: made variable for seeding experiments
          2, & !number of moments
          0, & !Number of droplets
          0.333333, & !.nu.....Breiteparameter der Verteil.
@@ -2291,9 +2434,9 @@ print *, 'conv', exner(:,3,3)
          0.308000, & !.b_ven..Koeff. Ventilation (PK, S.541)
          2.0)        !.cap....Koeff. Kapazitaet
 !Cloud ice properties
- ice = PARTICLE( &
+ ice = PARTICLE('ice', &
         2, & !number of moments
-        0, & !
+        1e6, & !
         0.000000, & !.nu.....Breiteparameter der Verteil.
         0.333333, & !.mu.....Exp.-parameter der Verteil.
         1.00e-07, & !.x_max..maximale Teilchenmasse D=???e-2m
@@ -2309,9 +2452,9 @@ print *, 'conv', exner(:,3,3)
 
 !Snow properties
 
- snow =  PARTICLE( & ! nach Andy Heymsfield (CRYSTAL-FACE)
+ snow =  PARTICLE('snow', & ! nach Andy Heymsfield (CRYSTAL-FACE)
          1,  & !number of moments
-         CCN, &
+         1e4, &
         0.000000, & !.nu.....Breiteparameter der Verteil.
         0.333333, & !.mu.....Exp.-parameter der Verteil.
         1.00e-07, & !.x_max..maximale Teilchenmasse D=???e-2m
@@ -2326,9 +2469,9 @@ print *, 'conv', exner(:,3,3)
         2.0)        !.cap....Koeff. Kapazitaet
 
 !Graupel properties
-graupel = PARTICLE( & ! 'graupel im standard'
+graupel = PARTICLE('graupel', & ! 'graupel im standard'
          1,  & !number of moments
-         CCN, &
+         1e5, &
          1.000000, & !.nu.....Breiteparameter der Verteil.
          0.166666, & !.mu.....Exp.-parameter der Verteil.
          1.00e-04, & !.x_max..maximale Teilchenmasse
