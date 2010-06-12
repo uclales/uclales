@@ -21,7 +21,6 @@
 module thrm
 
   implicit none
-  logical :: thetal_noprecip = .false.
 
 contains
 !
@@ -40,14 +39,14 @@ contains
     case default 
        call drythrm(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,   &
             pi1,th00,a_rp,vapor)
-    case (2,3)
+    case (2,3,4)
        call satadjst(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
             pi1,th00,a_rp,vapor,liquid,a_scr2)
-    case (4)
-       call satadjst4(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
-            pi1,th00,a_rp,vapor,liquid,a_scr2,rsup,a_rpp,a_ricep,a_rsnowp,a_rgrp)
+!     case (4)
+!        call satadjst4(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
+!             pi1,th00,a_rp,vapor,liquid,a_scr2,rsup,a_rpp,a_ricep,a_rsnowp,a_rgrp)
     end select
-
+    if (level ==4) call satpart(nzp,nxp,nyp,vapor,liquid,rsup,a_scr1)
   end subroutine thermo
 !
 ! -------------------------------------------------------------------------
@@ -269,6 +268,29 @@ contains
     enddo
 
   end subroutine satadjst4
+
+  subroutine satpart(n1,n2,n3,rv,rc,rsup,tk)
+    use defs, only : t_hn, tmelt
+    integer, intent(in) :: n1,n2,n3
+    real,dimension(n1,n2,n3), intent(inout) :: rv,rc
+    real,dimension(n1,n2,n3), intent(out)   :: rsup
+    real,dimension(n1,n2,n3), intent(in)    :: tk
+    integer :: i,j,k
+    real :: part
+    
+     do j=3,n3-2
+       do i=3,n2-2
+          do k=1,n1
+            part = max(0.,min(1.,(tk(k,i,j)-t_hn)/(tmelt-t_hn)))
+            rsup(k,i,j) = rc(k,i,j)*(1-part)
+            rc(k,i,j)   = part*rc(k,i,j)
+            rv(k,i,j)   = rsup(k,i,j)+rv(k,i,j)
+        end do
+      end do
+    end do
+
+  end subroutine satpart
+
 ! !
 ! ---------------------------------------------------------------------
 ! This function calculates the liquid saturation vapor mixing ratio as

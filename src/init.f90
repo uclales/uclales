@@ -111,7 +111,7 @@ contains
 
     integer :: i,j,k
     real    :: exner, pres, tk, rc, xran(nzp)
-    real    :: xc,yc,zc,dist
+    real    :: xc,zc,dist
 
     call htint(ns,ts,hs,nzp,th0,zt)
 
@@ -126,16 +126,17 @@ contains
              a_theta(k,i,j) = th0(k)
              a_pexnr(k,i,j) = 0.
              if (case_name == 'bubble') then
-                xc = (nxp-4)*deltax*nxprocs
-                yc = (nyp-4)*deltay*nyprocs
+                xc = 1e4
                 zc = 1400
-                dist = sqrt((xt(i)-xc)**2+(yt(i)-yc)**2+(zt(i)-zc)**2)
-                a_tp(k,i,j) = a_tp(k,i,j) + max(0.,2.*(1.-dist/1400))
+                if (zt(k)<2*zc) then
+                  dist = (xt(i)**2+yt(j)**2)/xc**2+(zt(k)-zc)**2/zc**2
+  !                 a_rp(k,i,j) = a_rp(k,i,j) + 2e-3*max(0.,(1.-dist))
+                  a_tp(k,i,j) = a_tp(k,i,j) + 2*max(0.,(1.-dist))
+                end if
              end if
           end do
        end do
     end do
-
     if ( allocated (vapor) ) vapor = a_rp
 
     if ( allocated (liquid) .and. itsflg == 0) then
