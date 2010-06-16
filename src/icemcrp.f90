@@ -756,7 +756,7 @@ contains
     do k=2,n1
       nineq = n_ice_meyers_contact(tk(k),min(qsup(k),0.25))
 !       nin(k)  = nin(k) + (n_ice_meyers_contact(tk(k),min(qsup(k),0.25))-nin(k))*fact
-      nin(k) = min(nin(k) + nineq/timenuc,nineq)
+      nin(k) = min(nin(k) + nineq*dt/timenuc,nineq)
 !       nin(k)  = n_ice_meyers_contact(tk(k),min(qsup(k),0.25))
     end do
   end subroutine n_icenuc
