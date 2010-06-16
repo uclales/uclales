@@ -84,48 +84,48 @@ module mcrp
   real, parameter :: e_gc  = 1.00              !..max. eff. fuer graupel_cloud_riming
   real, parameter :: alpha_spacefilling = 0.1  !..raumerfuellungskoeff (max. 0.68)
 
-  real, parameter :: q_crit_ic = 1.000e-5 ! q-schwellenwert fuer ice_cloud_riming
-  real, parameter :: d_crit_ic = 150.0e-6 ! e-schwellenwert fuer ice_cloud_riming
-  real, parameter :: q_crit_sc = 1.000e-5 ! q-schwellenwert fuer snow_cloud_riming
-  real, parameter :: d_crit_sc = 150.0e-6 ! e-schwellenwert fuer snow_cloud_riming
-  real, parameter :: q_crit_ir = 1.000e-5 ! q-schwellenwert fuer ice_rain_riming
-  real, parameter :: d_crit_ir = 100.0e-6 ! e-schwellenwert fuer ice_rain_riming
-  real, parameter :: q_crit_sr = 1.000e-5 ! q-schwellenwert fuer snow_rain_riming
-  real, parameter :: d_crit_sr = 100.0e-6 ! e-schwellenwert fuer snow_rain_riming
-  real, parameter :: q_crit_gc = 1.000e-6 ! q-schwellenwert fuer graupel_cloud_riming
-  real, parameter :: d_crit_gc = 100.0e-6 ! e-schwellenwert fuer graupel_cloud_riming
-  real, parameter :: q_crit_c  = 1.000e-6 ! q-schwellenwert sonst
-  real, parameter :: q_crit    = 1.000e-9 ! q-schwellenwert sonst
-  real, parameter :: d_crit_c  = 10.00e-6 ! e-schwellenwert fuer cloud_collection
-  real, parameter :: d_crit_r  = 10.00e-5 ! e-schwellenwert fuer cloud_collection
-  real, parameter :: d_coll_c  = 40.00e-6 ! oberer wert fuer cloud_coll_eff
-  real, parameter :: q_crit_is = 1.000e-4 ! q-schwellenwert fuer ice_selfcollection
-  real, parameter :: d_crit_is = 50.00e-6 ! e-schwellenwert fuer ice_selfcollection
-
-  real, parameter :: d_conv_is = 75.00e-6 ! e-schwellenwert fuer ice_selfcollection
-  real, parameter :: d_conv_sg = 200.0e-5 ! e-schwellenwert
-  real, parameter :: d_conv_ig = 200.0e-6 ! e-schwellenwert
-
 !   real, parameter :: q_crit_ic = 1.000e-5 ! q-schwellenwert fuer ice_cloud_riming
 !   real, parameter :: d_crit_ic = 150.0e-6 ! e-schwellenwert fuer ice_cloud_riming
-!   real, parameter :: q_crit_ir = 1.000e-5 ! q-schwellenwert fuer ice_rain_riming
-!   real, parameter :: d_crit_ir = 100.0e-6 ! e-schwellenwert fuer ice_rain_riming
 !   real, parameter :: q_crit_sc = 1.000e-5 ! q-schwellenwert fuer snow_cloud_riming
 !   real, parameter :: d_crit_sc = 150.0e-6 ! e-schwellenwert fuer snow_cloud_riming
+!   real, parameter :: q_crit_ir = 1.000e-5 ! q-schwellenwert fuer ice_rain_riming
+!   real, parameter :: d_crit_ir = 100.0e-6 ! e-schwellenwert fuer ice_rain_riming
 !   real, parameter :: q_crit_sr = 1.000e-5 ! q-schwellenwert fuer snow_rain_riming
 !   real, parameter :: d_crit_sr = 100.0e-6 ! e-schwellenwert fuer snow_rain_riming
 !   real, parameter :: q_crit_gc = 1.000e-6 ! q-schwellenwert fuer graupel_cloud_riming
 !   real, parameter :: d_crit_gc = 100.0e-6 ! e-schwellenwert fuer graupel_cloud_riming
 !   real, parameter :: q_crit_c  = 1.000e-6 ! q-schwellenwert sonst
 !   real, parameter :: q_crit    = 1.000e-9 ! q-schwellenwert sonst
-!   real, parameter :: d_conv_sg = 200.0e-5 ! e-schwellenwert
-!   real, parameter :: d_conv_ig = 200.0e-6 ! e-schwellenwert
 !   real, parameter :: d_crit_c  = 10.00e-6 ! e-schwellenwert fuer cloud_collection
-!   real, parameter :: d_crit_r  = 10.00e-6 ! e-schwellenwert fuer cloud_collection
+!   real, parameter :: d_crit_r  = 10.00e-5 ! e-schwellenwert fuer cloud_collection
 !   real, parameter :: d_coll_c  = 40.00e-6 ! oberer wert fuer cloud_coll_eff
 !   real, parameter :: q_crit_is = 1.000e-4 ! q-schwellenwert fuer ice_selfcollection
 !   real, parameter :: d_crit_is = 50.00e-6 ! e-schwellenwert fuer ice_selfcollection
+! 
 !   real, parameter :: d_conv_is = 75.00e-6 ! e-schwellenwert fuer ice_selfcollection
+!   real, parameter :: d_conv_sg = 200.0e-5 ! e-schwellenwert
+!   real, parameter :: d_conv_ig = 200.0e-6 ! e-schwellenwert
+
+  real, parameter :: q_crit_ic = 1.000e-5 ! q-schwellenwert fuer ice_cloud_riming
+  real, parameter :: d_crit_ic = 150.0e-6 ! e-schwellenwert fuer ice_cloud_riming
+  real, parameter :: q_crit_ir = 1.000e-5 ! q-schwellenwert fuer ice_rain_riming
+  real, parameter :: d_crit_ir = 100.0e-6 ! e-schwellenwert fuer ice_rain_riming
+  real, parameter :: q_crit_sc = 1.000e-5 ! q-schwellenwert fuer snow_cloud_riming
+  real, parameter :: d_crit_sc = 150.0e-6 ! e-schwellenwert fuer snow_cloud_riming
+  real, parameter :: q_crit_sr = 1.000e-5 ! q-schwellenwert fuer snow_rain_riming
+  real, parameter :: d_crit_sr = 100.0e-6 ! e-schwellenwert fuer snow_rain_riming
+  real, parameter :: q_crit_gc = 1.000e-6 ! q-schwellenwert fuer graupel_cloud_riming
+  real, parameter :: d_crit_gc = 100.0e-6 ! e-schwellenwert fuer graupel_cloud_riming
+  real, parameter :: q_crit_c  = 1.000e-6 ! q-schwellenwert sonst
+  real, parameter :: q_crit    = 1.000e-9 ! q-schwellenwert sonst
+  real, parameter :: d_conv_sg = 200.0e-5 ! e-schwellenwert
+  real, parameter :: d_conv_ig = 200.0e-6 ! e-schwellenwert
+  real, parameter :: d_crit_c  = 10.00e-6 ! e-schwellenwert fuer cloud_collection
+  real, parameter :: d_crit_r  = 10.00e-6 ! e-schwellenwert fuer cloud_collection
+  real, parameter :: d_coll_c  = 40.00e-6 ! oberer wert fuer cloud_coll_eff
+  real, parameter :: q_crit_is = 1.000e-4 ! q-schwellenwert fuer ice_selfcollection
+  real, parameter :: d_crit_is = 50.00e-6 ! e-schwellenwert fuer ice_selfcollection
+  real, parameter :: d_conv_is = 75.00e-6 ! e-schwellenwert fuer ice_selfcollection
 
   type particle
     character(10) :: name
@@ -307,16 +307,17 @@ contains
           case(icoll_ice_snow)
             call resetvar(ice,qice,nice)
             call resetvar(snow,qsnow)
-            call ice_collection(n1,ice,snow,qice,nice,qsnow,temp,q_crit)
+            call ice_collection(n1,ice,snow,qice,nice,qsnow,temp,q_crit_is)
           case(icoll_ice_grp)
             call resetvar(ice,qice,nice)
             call resetvar(graupel,qgrp)
-            call ice_collection(n1,ice,graupel,qice,nice,qgrp,temp,q_crit)
+            call ice_collection(n1,ice,graupel,qice,nice,qgrp,temp,q_crit_is)
+      
           case(icoll_snow_grp)
             call resetvar(ice,qice,nice)
             call resetvar(snow,qsnow)
             call resetvar(graupel,qgrp)
-            call ice_collection(n1,snow,graupel,qsnow,nsnow,qgrp,temp,q_crit)
+            call ice_collection(n1,snow,graupel,qsnow,nsnow,qgrp,temp,q_crit_is)
           case(iriming_ice_cloud)
             call resetvar(cldw,qc)
             call resetvar(ice,qice,nice)
@@ -1122,7 +1123,7 @@ contains
     real, save :: x_conv
     real       :: self_n,self_q
       real, dimension(3),save :: delta_n,delta_q, theta_n,theta_q
-      logical, save :: firsttime = .true.
+      logical, save :: firsttime(3) = .true.
       integer :: metnr = 0
       select case (metin%name)
       case('ice')
@@ -1134,8 +1135,8 @@ contains
        case default
         stop
      end select
-      if (firsttime) then
-        firsttime = .false.
+      if (firsttime(metnr)) then
+        firsttime(metnr) = .false.
         delta_n(metnr) = 2.0*coll_delta_11(metin,0) + coll_delta_12(metin,metin,0)
         delta_q(metnr) = 2.0*coll_delta_11(metin,1) + coll_delta_12(metin,metin,1)
         theta_n(metnr) = 2.0*coll_theta_11(metin,0) + coll_theta_12(metin,metin,0)
@@ -1144,12 +1145,12 @@ contains
         x_conv = (d_conv/metout%a_geo)**(1./metout%b_geo)
 
       end if
-
-      delta_n(metnr) = 2.0*coll_delta_11(metin,0) + coll_delta_12(metin,metin,0)
-      delta_q(metnr) = 2.0*coll_delta_11(metin,1) + coll_delta_12(metin,metin,1)
-      theta_n(metnr) = 2.0*coll_theta_11(metin,0) + coll_theta_12(metin,metin,0)
-      theta_q(metnr) = 2.0*coll_theta_11(metin,1) + coll_theta_12(metin,metin,1)
-
+! 
+!       delta_n(metnr) = 2.0*coll_delta_11(metin,0) + coll_delta_12(metin,metin,0)
+!       delta_q(metnr) = 2.0*coll_delta_11(metin,1) + coll_delta_12(metin,metin,1)
+!       theta_n(metnr) = 2.0*coll_theta_11(metin,0) + coll_theta_12(metin,metin,0)
+!       theta_q(metnr) = 2.0*coll_theta_11(metin,1) + coll_theta_12(metin,metin,1)
+! 
 
     do k = 1, n1
           q_i = q_in(k)                                   !..fluessigwassergehalt in si
@@ -1164,7 +1165,7 @@ contains
               !   (siehe auch straka, 1989; s. 53)
               e_coll = min(10**(0.035*(tk(k)-tmelt)-0.7),0.2e0)
               !.. temperaturabhaengige efficiency nach lin et al. (1983)
-              !e_coll = min(exp(0.09*(t_a-t_3)),1.0e0)
+!               e_coll = 0.001*min(exp(0.09*(tk(k)-tmelt)),1.0e0)
               !e_coll = max(e_ii,min(exp(0.09*(t_a-t_3)),1.0e0))
             end if
 
@@ -1190,7 +1191,7 @@ contains
         enddo
 
   end subroutine ice_selfcollection
-  subroutine ice_cloud_riming(n1,cloud,ice,q_c,q_i,n_i,q_g,thl,tk,d_coll,q_crit_c,d_crit_c,q_crit_i,d_crit_i,e_ic,d_conv)
+  subroutine ice_cloud_riming(n1,cloud,ice,q_c,q_i,n_i,q_g,thl,tk,d_coll,q_crit_c,d_crit_c,q_crit_i,d_crit_i,d_conv,e_ic)
       integer, intent(in) :: n1
       type(particle), intent(in) :: cloud,ice
       real, dimension(n1), intent(inout) :: q_c,q_i,n_i,q_g,thl
@@ -1213,7 +1214,7 @@ contains
       real     :: theta_q_ii,theta_q_ic,theta_q_cc
       real     :: const1,const2,const3,const4,const5
       real, dimension(2,2,3),save :: delta, theta
-      logical, save :: firsttime = .true.
+      logical, save :: firsttime(3) = .true.
       integer :: metnr = 0
       select case (ice%name)
       case('ice')
@@ -1225,8 +1226,8 @@ contains
        case default
         stop
      end select
-      if (firsttime) then
-        firsttime = .false.
+      if (firsttime(metnr)) then
+        firsttime(metnr) = .false.
 !         delta_n_ii = coll_delta_11(ice,0)
 !         delta_n_ic = coll_delta_12(ice,cloud,0)
 !         delta_n_cc = coll_delta_22(cloud,0)
@@ -1305,7 +1306,7 @@ contains
                   if (d_i > d_conv) then
                     conv_q = (rime_q - mult_q) / ( const5 * (pi/6.0*roice*d_i**3/x_i - 1.0) )
                     ! d_i darf durch conv nicht kleiner werden als d_conv_ig
-                    !conv_q = min(q_i(k)ce(k)-n_i(k)*(d_conv_ig/ice%a_geo)**(1.0/ice%b_geo),conv_q)
+                    conv_q = min(q_i(k)-n_i(k)*(d_conv_ig/ice%a_geo)**(1.0/ice%b_geo),conv_q)
                     conv_q = min(q_i(k),conv_q)
                     ! ub >>
                     x_i = min(max((q_i(k))/(n_i(k)+eps0),ice%x_min),ice%x_max)    !..mean masse incl. riming
@@ -1361,7 +1362,7 @@ contains
     real,dimension(3),save :: d_av_fakt_i
 
       real, dimension(2,2,3),save :: delta_n,delta_q, theta_n,theta_q
-      logical, save :: firsttime = .true.
+      logical, save :: firsttime(3) = .true.
       integer :: metnr = 0
       select case (ice%name)
       case('ice')
@@ -1373,8 +1374,8 @@ contains
        case default
         stop
      end select
-      if (firsttime) then
-        firsttime = .false.
+      if (firsttime(metnr)) then
+        firsttime(metnr) = .false.
 !         delta_n_ii = coll_delta_11(ice,0)
 !         delta_n_ic = coll_delta_12(ice,cloud,0)
 !         delta_n_cc = coll_delta_22(cloud,0)
@@ -1517,7 +1518,7 @@ contains
 
     real            :: e_coll,coll_n,coll_q
       real, dimension(2,2,3,3),save :: delta_n,delta_q, theta_n,theta_q
-      logical, save :: firsttime = .true.
+      logical, save :: firsttime(3,3) = .true.
       integer :: metnr1 = 0,metnr2=0
       select case (met1%name)
       case('ice')
@@ -1539,8 +1540,8 @@ contains
       case default
         stop
       end select
-      if (firsttime) then
-        firsttime = .false.
+      if (firsttime(metnr1,metnr2)) then
+        firsttime(metnr1,metnr2) = .false.
 !         delta_n_ii = coll_delta_11(met2,0)
 !         delta_n_ic = coll_delta_12(met2,cloud,0)
 !         delta_n_cc = coll_delta_22(cloud,0)
@@ -1613,23 +1614,24 @@ contains
             d_g = met2%a_geo * x_g**met2%b_geo                    !..mean durchmesser
             v_g = met2%a_vel * x_g**met2%b_vel * dn0(k)   !..mean sedimentationsgeschw.
 
-            coll_n = pi/4.0 * met2%nr * n_i(k) * e_coll * dt &
-                 &   * (delta_n_ss * d_g**2 + delta_n_si * d_g*d_i + delta_n_ii * d_i**2) &
-                 &   * (theta_n_ss * v_g**2 - theta_n_si * v_g*v_i + theta_n_ii * v_i**2  &
-                 &     +met2%s_vel**2 + met1%s_vel**2)**0.5
 
             coll_q = pi/4.0 * met2%nr * q_i(k) * e_coll * dt &
                  &   * (delta_q_ss * d_g**2 + delta_q_si * d_g*d_i + delta_q_ii * d_i**2) &
                  &   * (theta_q_ss * v_g**2 - theta_q_si * v_g*v_i + theta_q_ii * v_i**2  &
                  &     +met2%s_vel**2 + met1%s_vel**2)**0.5
 
-            coll_n = min(n_i(k),coll_n)
             coll_q = min(q_i(k),coll_q)
 
             q_g(k) = q_g(k) + coll_q
             q_i(k)  = q_i(k)  - coll_q
-            n_i(k)  = n_i(k)  - coll_n
-
+            if (met1%nr ==2) then
+              coll_n = pi/4.0 * met2%nr * n_i(k) * e_coll * dt &
+                  &   * (delta_n_ss * d_g**2 + delta_n_si * d_g*d_i + delta_n_ii * d_i**2) &
+                  &   * (theta_n_ss * v_g**2 - theta_n_si * v_g*v_i + theta_n_ii * v_i**2  &
+                  &     +met2%s_vel**2 + met1%s_vel**2)**0.5
+              coll_n = min(n_i(k),coll_n)
+              n_i(k)  = n_i(k)  - coll_n
+            end if
 
 
           endif
@@ -1649,7 +1651,7 @@ contains
     real :: lam,sk,tot,zz,xp
     real, dimension(n1)   :: nfl,rfl,vn,vr,dn,dr,rslope,cn,cr,nslope,np
     real :: cc, flxdiv,maxi,mini
-      logical, save :: firsttime = .true.
+      logical, save :: firsttime(3) = .true.
       integer :: metnr = 0
       select case (ice%name)
       case('ice')
@@ -1667,13 +1669,13 @@ contains
       np = meteor%nr
     end if
     
-    if (firsttime) then
+    if (firsttime(metnr)) then
       alfn(metnr) = meteor%a_vel * gfct((meteor%nu+meteor%b_vel+1.0)/meteor%mu)&
             &                / gfct((meteor%nu+1.0)/meteor%mu)
       alfq(metnr) = meteor%a_vel * gfct((meteor%nu+meteor%b_vel+2.0)/meteor%mu)&
             &                / gfct((meteor%nu+2.0)/meteor%mu)
       c_lam(metnr) = gfct((meteor%nu+1.0)/meteor%mu)/gfct((meteor%nu+2.0)/meteor%mu)
-      firsttime =.false.
+      firsttime(metnr) =.false.
     end if
 
     do k=n1-1,2,-1
@@ -2113,7 +2115,7 @@ contains
     type(particle) :: p1
     integer        :: n
 
-    coll_delta = gfct((2.0*p1%b_geo+p1%nu+1.0+n)/p1%mu)         &
+    coll_delta = 0.0001*gfct((2.0*p1%b_geo+p1%nu+1.0+n)/p1%mu)         &
          &                  / gfct((p1%nu+1.0  )/p1%mu)         &
          &        * gfct((p1%nu+1.0)/p1%mu)**(2.0*p1%b_geo+n)   &
          &        / gfct((p1%nu+2.0)/p1%mu)**(2.0*p1%b_geo+n)
