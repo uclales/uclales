@@ -131,7 +131,7 @@ contains
                 if (zt(k)<2*zc) then
                   dist = (xt(i)**2+yt(j)**2)/xc**2+(zt(k)-zc)**2/zc**2
   !                 a_rp(k,i,j) = a_rp(k,i,j) + 2e-3*max(0.,(1.-dist))
-                  a_tp(k,i,j) = a_tp(k,i,j) + 2*max(0.,(1.-dist))
+                  a_tp(k,i,j) = a_tp(k,i,j) + 0.002*max(0.,(1.-dist))
                 end if
              end if
           end do

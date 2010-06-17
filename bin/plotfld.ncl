@@ -1,5 +1,6 @@
 load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_code.ncl"   
 load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_csm.ncl"   
+load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/contributed.ncl"
 ;
 ; this plots LES output data using command line arguments to control plots
 ; arguments include:
@@ -15,6 +16,9 @@ load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_csm.ncl"
 ; example call statements can be found in plotfld.csh
 ;
 begin
+cmin = (/1e-9,1e-9,1e-9,1e-9,1e-9/)
+cmax = (/1.e-2,1e-8,1e-5,0.8,3/)
+cstep = 20
 
   colors = (/"black","red","dodgerblue","cyan","magena","orange"/)
   dashes = (/0,1,2,3,4,5/)
@@ -32,6 +36,7 @@ begin
 
   wks = gsn_open_wks("pdf",foname)
   plots = new ( (/nplots/), "graphic")
+  gsn_define_colormap(wks,"gui_default")  ; choose a colormap
 
   time = f1->time/3600.
   time@long_name = "Time [hrs]"
@@ -41,7 +46,7 @@ begin
   xyres = True
   xyres@gsnDraw = False
   xyres@gsnFrame = False
-  xyres@xyLineThicknessF = 2.
+;  xyres@xyLineThicknessF = 2.
 ;
 ; remove upper and right borders
 ;
@@ -53,8 +58,8 @@ begin
 ; define plots
 ;
   do k=0,nplots-1
-    dmy = f1->$ffld(k)$
-
+    dmy = transpose(f1->$ffld(k)$)
+  dmy = where (dmy.gt.cmin(k),dmy,dmy@_FillValue)
     if (isvar("ymax")) then
       xyres@trYMaxF = ymax
     end if
@@ -67,7 +72,7 @@ begin
     if (isvar("xmin")) then
       xyres@trXMinF = xmin
     end if
-
+  xyres@cnFillOn            = True          ; turn on color
     xyres@gsnRightString = f1->$ffld(k)$@longname
     xyres@tiYAxisString = f1->$ffld(k)$@units
 
@@ -82,7 +87,13 @@ begin
       zvar = f1->$ffld(k)$!1
       xfld = dim_avg(dmy({$zvar$|0:},{time|tbeg:tend}))
       yfld = f1->$zvar$({0:})
-      plots(k) = gsn_csm_xy(wks,xfld,yfld,xyres)
+xyres@cnLevelSelectionMode = "ManualLevels"
+xyres@cnMinLevelValF = cmin(k)
+xyres@cnMaxLevelValF = cmax(k)
+xyres@cnLevelSpacingF = (cmax(k)-cmin(k))/cstep
+
+;      plots(k) = gsn_csm_xy(wks,xfld,yfld,xyres)
+      plots(k) = gsn_csm_contour(wks,dmy,xyres)
       do n=1,dimsizes(fname)-1
         fn = addfile(fname(n),"r")
         delete (dmy)
@@ -93,12 +104,6 @@ begin
         zvar = fn->$ffld(k)$!1
         xfld = dim_avg(dmy({$zvar$|0:},{time|tbeg:tend}))
         yfld = fn->$zvar$({0:})
-        xyres@xyLineColor = colors(n)
-        xyres@xyDashPattern = dashes(n)
-        ovrly = gsn_csm_xy(wks,xfld,yfld,xyres)
-        xyres@xyLineColor = "black"
-        xyres@xyDashPattern = dashes(0)
-        overlay (plots(k),ovrly)
       end do
     else
       xyres@vpHeightF = 0.15
@@ -154,7 +159,7 @@ begin
       nrows = nrows+1
     end if
     gsn_panel(wks,plots(n1:n2),(/nrows,ncols/),pres)
-    gsn_text_ndc(wks,tstring,1.,0.,tres)
+;    gsn_text_ndc(wks,tstring,1.,0.,tres)
     frame(wks)
   end do
 end

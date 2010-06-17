@@ -286,8 +286,8 @@ contains
             call resetvar(cldw,qc)
             call resetvar(rain,qrain,nrain)
 
-            call cloud_freeze(n1,qc,qice,nice,tl,temp)
-            call rain_freeze(n1,qrain,nrain,qice,nice,qgrp,temp)
+            call cloud_freeze(n1,qc,ninuc,qice,nice,tl,temp)
+            call rain_freeze(n1,qrain,nrain,ninuc,qice,nice,qgrp,temp)
           case(idep)
             call deposition(n1,ice,qice,nice,qv,tl,temp,qsup)
             call deposition(n1,snow,qsnow,nsnow,qv,tl,temp,qsup)
@@ -782,11 +782,11 @@ contains
       endif
     end do
   end subroutine
-  subroutine cloud_freeze (n1,qcloud,qice,nice,tl,tk)
+  subroutine cloud_freeze (n1,qcloud,ninuc,qice,nice,tl,tk)
 !
 
     integer, intent(in) :: n1
-    real, intent(inout), dimension(n1) :: qice,nice,qcloud,tl
+    real, intent(inout), dimension(n1) :: qice,nice,ninuc,qcloud,tl
     real, intent(in), dimension(n1) :: tk
 !     real, intent(in) :: nc
 !         ! .. local variables ..
@@ -819,17 +819,18 @@ contains
 
               !..umwandlungsraten fuer anzahl- und massendichte
               jtot = (jhom + jhet) / rowt * dt                     !..j*dt in 1/kg
-              frn  = jtot * qc
-              frq  = jtot * qc * xc * facg
+              frn  = min(jtot * qc,ninuc(k))
+              frq  = frn * xc * facg
             end if
             frq  = min(frq,qc)
-            if (frq>eps0)  frn  = cldw%nr*frq/qc
+!             if (frq>eps0)  frn  = cldw%nr*frq/qc
             !..berechnung der h2o-komponenten
             qcloud(k) = qcloud(k) - frq
             tl(k) = tl(k)+ (convice(k)-convliq(k))*frq
 
 ! 
             frn  = max(frn,frq/cldw%x_max)
+            ninuc(k) = ninuc(k)   - frn
             qice(k)   = qice(k)   + frq
             nice(k)   = nice(k)   + frn
 
@@ -840,9 +841,9 @@ contains
 
       end subroutine cloud_freeze
 
-      subroutine rain_freeze (n1,qrain,nrain,qice,nice,qgrp,tk)
+      subroutine rain_freeze (n1,qrain,nrain,ninuc,qice,nice,qgrp,tk)
         integer, intent(in) :: n1
-        real, dimension(n1), intent(inout) :: qrain,nrain,qice,nice,qgrp
+        real, dimension(n1), intent(inout) :: qrain,nrain,qice,nice,qgrp,ninuc
         real, dimension(n1), intent(in) :: tk
         ! .. local variables ..
         integer                     :: k
@@ -908,11 +909,11 @@ contains
                     !      und von xmax_gr bis unendlich (--> hagel).
 
                     if (j_het >= 1-20) then
-                      fr_n  = j_het * q_r
-                      fr_q  = j_het * q_r * x_r * coeff_z
+                      fr_n  = min(j_het * q_r,ninuc(k))
+                      fr_q  = fr_n * x_r * coeff_z
 
                       lam = ( gfct((rain%nu+1.0)/rain%mu) / gfct((rain%nu+2.0)/rain%mu) * x_r)**(-rain%mu)
-                      n_0 = rain%mu * n_r * lam**((rain%nu+1.0)/rain%mu) / gfct((rain%nu+1.0)/rain%mu)
+                      n_0 = min(ninuc(k),rain%mu * n_r * lam**((rain%nu+1.0)/rain%mu) / gfct((rain%nu+1.0)/rain%mu))
                       fr_n_i = j_het * n_0/(rain%mu*lam**((rain%nu+2.0)/rain%mu))* &
                           incgfct_lower((rain%nu+2.0)/rain%mu, lam*xmax_ice**rain%mu)
                       fr_q_i = j_het * n_0/(rain%mu*lam**((rain%nu+3.0)/rain%mu))* &
@@ -1681,7 +1682,7 @@ contains
     do k=n1-1,2,-1
 
       Xp = rp(k) / (np(k)+eps0)
-      lam = ( c_lam(metnr) * xp )**(meteor%b_vel)
+      lam = ( c_lam(metnr) * xp )**(meteor%b_vel)      
       vr(k) = alfq(metnr) * lam
       vr(k) = max(vr(k),0.1e+0)
       vr(k) = min(vr(k),30.e0)
@@ -2115,7 +2116,7 @@ contains
     type(particle) :: p1
     integer        :: n
 
-    coll_delta = 0.0001*gfct((2.0*p1%b_geo+p1%nu+1.0+n)/p1%mu)         &
+    coll_delta = gfct((2.0*p1%b_geo+p1%nu+1.0+n)/p1%mu)         &
          &                  / gfct((p1%nu+1.0  )/p1%mu)         &
          &        * gfct((p1%nu+1.0)/p1%mu)**(2.0*p1%b_geo+n)   &
          &        / gfct((p1%nu+2.0)/p1%mu)**(2.0*p1%b_geo+n)

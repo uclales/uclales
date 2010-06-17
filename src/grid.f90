@@ -597,17 +597,20 @@ contains
     iret = nf90_inq_varid(ncid0, sanal(15), VarID)
     iret = nf90_put_var(ncid0, VarID, press(:,i1:i2,j1:j2), start=ibeg, &
          count=icnt)
+    iret = nf90_inq_varid(ncid0, sanal(16), VarID)
+    iret = nf90_put_var(ncid0, VarID, a_rp(:,i1:i2,j1:j2), start=ibeg, &
+         count=icnt)
 
-    nn = nbase
-!     if (level >= 2)  then
+
+    if (level >= 2)  then
 !        nn = nn+1
-!        iret = nf90_inq_varid(ncid0, 'l', VarID)
-!        iret = nf90_put_var(ncid0, VarID, liquid(:,i1:i2,j1:j2), start=ibeg, &
-!             count=icnt)
-!     end if
-
+       iret = nf90_inq_varid(ncid0, sanal(17), VarID)
+       iret = nf90_put_var(ncid0, VarID, liquid(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+    end if
+    nn = nbase+2
 !     if (level >=3) then
-      do n = nbase, nvar0-1
+      do n = nbase+2, nvar0-1
        nn = nn+1
        call newvar(nn-12)
        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
@@ -631,10 +634,10 @@ contains
 !             count=icnt)
 !     end if
 
-    if (nn /= nvar0) then
-       if (myid == 0) print *, 'ABORTING:  Anal write error'
-       call appl_abort(0)
-    end if
+!     if (nn /= nvar0) then
+!        if (myid == 0) print *, 'ABORTING:  Anal write error'
+!        call appl_abort(0)
+!     end if
 
     if (myid==0) print "(//' ',12('-'),'   Record ',I3,' to: ',A60)",    &
          nrec0,fname 
