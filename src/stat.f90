@@ -284,8 +284,13 @@ contains
     end do
 !irina
   !  print *,'mean',ssclr(28),ssclr(19),unit
+        if (ssclr(19).ne.0) then
      ssclr(28) =ssclr(28)/ssclr(19)*unit
      ssclr(29) =ssclr(29)/ssclr(19)*unit
+       else
+     ssclr(28) =-999.
+     ssclr(29) =-999.
+       end if
 
     if (ssclr(18) == zt(n1)) ssclr(18) = -999.
 
