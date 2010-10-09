@@ -37,6 +37,7 @@ module forc
    real, dimension(nls)  :: sst_ls=0.
    real, dimension(nls)  :: ugeo_ls=0.
    real, dimension(nls)  :: vgeo_ls=0.
+   real :: sfc_albedo = 0.05
 !cgils
    logical :: lstendflg=.false.
 
@@ -89,7 +90,7 @@ contains
           !irina 
           !a_scr1 = a_theta/a_pexnr 
           if (level == 3) then
-             call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
+             call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,   &
                   dn0, pi0, pi1, dzt, a_pexnr, a_theta, vapor, liquid, a_tt,&
                   a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
                   rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
@@ -101,7 +102,7 @@ contains
           else
              xref1 = 0.
              xref2 = 0.
-             call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,    &
+             call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,    &
                   dn0, pi0, pi1, dzt, a_pexnr, a_theta, vapor, liquid, a_tt, &
                   a_rflx, a_sflx,a_lflxu, a_lflxd,a_sflxu,a_sflxd,albedo, &
                   sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&

@@ -85,11 +85,11 @@ contains
          strtim, radfrq, cntlat,& 
          case_name,lsvarflg, sst, div                   !irina
 !cgils         
-    use forc, only : lstendflg     
+    use forc, only : lstendflg, sfc_albedo     
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
          filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype, CCN
-    use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,iseed, hfilin,   &
+    use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,irsflg, iseed, hfilin,   &
          zrand
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
@@ -114,11 +114,11 @@ contains
          timmax , dtlong , istpfl , timrsm, & ! timestep control
          runtype, hfilin , filprf , & ! type of run (INITIAL or HISTORY)
          frqhis , frqanl , outflg , & ! freq of history/anal writes, output flg
-         iradtyp, radfrq , strtim , & ! radiation type flag
+         iradtyp, radfrq , strtim , sfc_albedo, & ! radiation type flag
          isfctyp, ubmin  , zrough , & ! surface parameterization type
          sst    , dthcon , drtcon , & ! SSTs, surface flx parameters
          csx    , prndtl ,          & ! SGS model type, parameters
-         ipsflg , itsflg ,          & ! sounding flags
+         ipsflg , itsflg , irsflg,  & ! sounding flags
          hs     , ps     , ts    ,  & ! sounding heights, pressure, temperature
          us     , vs     , rts   ,  & ! sounding E/W winds, water vapor
          umean  , vmean  , th00  ,  & ! gallilean E/W wind, basic state

@@ -26,6 +26,7 @@ module init
   integer               :: iseed = 0
   integer               :: ipsflg = 1
   integer               :: itsflg = 1
+  integer               :: irsflg = 1
 !  integer, dimension(1) :: seed
   real, dimension(nns)  :: us,vs,ts,thds,ps,hs,rts,rss,tks,xs
   real                  :: zrand = 200.
@@ -259,9 +260,12 @@ contains
     ns=1
     do while (ps(ns) /= 0. .and. ns <= nns)
        !
+       ! irsflg = 1:
        ! filling relative humidity array only accepts sounding in mixing
        ! ratio (g/kg) converts to (kg/kg)
-       !
+       ! irsflg = 2:
+       ! use relative humidity sounding
+       
        
        rts(ns)=rts(ns)*1.e-3
        !
@@ -274,7 +278,7 @@ contains
           ps(ns)=ps(ns)*100.
        case default
           xs(ns)=(1.+ep2*rts(ns))
-          if (case_name == 'bubble') then
+          if (irsflg == 1) then
             xs(ns) = rts(ns)*1e3
           end if
           if (ns == 1)then
@@ -320,7 +324,7 @@ contains
           if (myid == 0) print *, '  ABORTING: itsflg not supported'
           call appl_abort(0)
        end select
-       if (case_name == 'bubble') then
+       if (irsflg == 1) then
          rts(ns) = xs(ns)*rslf(ps(ns),tks(ns))
        end if
        ns = ns+1
