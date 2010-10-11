@@ -51,6 +51,9 @@ contains
     real,allocatable,dimension(:) :: height
     real, intent(in) :: time
     character(1) :: chmess1
+    real :: highheight,highqtnudge,highthlnudge,highunudge,highvnudge,highwnudge,hightnudge
+    real :: lowheight,lowqtnudge,lowthlnudge,lowunudge,lowvnudge,lowwnudge,lowtnudge
+    real :: fac
     allocate(tnudge(nzp,ntnudge),unudge(nzp,ntnudge),vnudge(nzp,ntnudge),wnudge(nzp,ntnudge),thlnudge(nzp,ntnudge),qtnudge(nzp,ntnudge))
     allocate(timenudge(0:ntnudge), height(nzp))
     tnudge = 0
@@ -77,15 +80,26 @@ contains
 
         end do
         write(6,*) ' height    t_nudge    u_nudge    v_nudge    w_nudge    thl_nudge    qt_nudge'
+        read (ifinput,*)  lowheight , lowtnudge ,  lowunudge , lowvnudge , lowwnudge , lowthlnudge, lowqtnudge
+        read (ifinput,*)  highheight , hightnudge ,  highunudge , highvnudge , highwnudge , highthlnudge, highqtnudge
         do  k=2,nzp-1
-          read (ifinput,*) &
-                height (k), &
-                tnudge (k,t), &
-                unudge (k,t), &
-                vnudge (k,t), &
-                wnudge (k,t), &
-                thlnudge(k,t), &
-                qtnudge(k,t)
+          if (highheight<zt(k)) then
+            lowheight = highheight
+            lowtnudge = hightnudge
+            lowunudge = highunudge
+            lowvnudge = highvnudge
+            lowwnudge = highwnudge
+            lowthlnudge= highthlnudge
+            lowqtnudge=highqtnudge
+            read (ifinput,*)  highheight , hightnudge ,  highunudge , highvnudge , highwnudge , highthlnudge, highqtnudge
+          end if
+          fac = (highheight-zt(k))/(highheight - lowheight)
+          tnudge(k,t) = fac*lowtnudge + (1-fac)*hightnudge
+          unudge(k,t) = fac*lowunudge + (1-fac)*highunudge
+          vnudge(k,t) = fac*lowvnudge + (1-fac)*highvnudge
+          wnudge(k,t) = fac*lowwnudge + (1-fac)*highwnudge
+          thlnudge(k,t) = fac*lowthlnudge + (1-fac)*highthlnudge
+          qtnudge(k,t) = fac*lowqtnudge + (1-fac)*highqtnudge
         end do
         if (myid == 0) then
           do k=nzp-1,1,-1

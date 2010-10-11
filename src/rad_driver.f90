@@ -22,8 +22,8 @@ module radiation
   use defs, only       : cp, rcp, cpr, rowt, p00, pi, nv1, nv, SolarConstant
   use fuliou, only     : rad
   implicit none
-
-  character (len=19), parameter :: background = 'datafiles/s11.lay'
+ character (len=10), parameter :: background = 'backrad_in'
+ ! character (len=19), parameter :: background = 'datafiles/s11.lay'
  ! character (len=19), parameter :: background = 'datafiles/astx.lay'
  !  character (len=19), parameter :: background = 'datafiles/dsrt.lay'
 
@@ -177,7 +177,7 @@ module radiation
   !
   subroutine setup(background,n1,npts,nv1,nv,zp)
 
-    character (len=19), intent (in) :: background
+    character (len=10), intent (in) :: background
     integer, intent (in) :: n1
     integer, intent (out):: npts,nv1,nv
     real, intent (in)    :: zp(n1)

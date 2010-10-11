@@ -77,7 +77,7 @@ module grid
   real, dimension (:,:,:), allocatable ::                                     &
        a_theta, a_pexnr, press, vapor, liquid, a_rflx, a_sflx, precip,rsup,   &
        a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7,                &
-       a_lflxu, a_lflxd, a_sflxu, a_sflxd
+       a_lflxu, a_lflxd, a_sflxu, a_sflxd,a_km
   !
   ! Named pointers (to 3D arrays) 
   !
@@ -112,12 +112,12 @@ contains
 
     memsize = 2*nxyzp ! complex array in pressure solver
 
-    allocate (a_theta(nzp,nxp,nyp),a_pexnr(nzp,nxp,nyp),press(nzp,nxp,nyp))
+    allocate (a_theta(nzp,nxp,nyp),a_pexnr(nzp,nxp,nyp),press(nzp,nxp,nyp),a_km(nzp,nxp,nyp))
     a_theta(:,:,:) = 0.
     a_pexnr(:,:,:) = 0.
     press(:,:,:) = 0.
-
-    memsize = memsize + nxyzp*13 !
+    a_km(:,:,:) = 0.
+    memsize = memsize + nxyzp*14 !
 
     if (level >= 0) then
        allocate (vapor(nzp,nxp,nyp))

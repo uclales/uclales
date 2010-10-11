@@ -61,9 +61,9 @@ contains
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
 
-    real, parameter    :: peak_cfl = 0.5
+    real, parameter    :: peak_cfl = 1, peak_peclet = 0.15
 
-    real    :: t1,t2,tplsdt,begtime,cflmax,gcflmax
+    real    :: t1,t2,tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax
     integer :: istp, iret
 
     !
@@ -93,7 +93,10 @@ contains
        call cfl(cflmax)
        call double_scalar_par_max(cflmax,gcflmax)
        cflmax = gcflmax
-       dt = min(dtlong,dt*peak_cfl/(cflmax+epsilon(1.)))
+       call peclet(pecletmax)
+       call double_scalar_par_max(pecletmax,gpecletmax)
+       pecletmax = gpecletmax
+       dt = min(dtlong,dt*peak_cfl/(cflmax+epsilon(1.)),dt*peak_peclet/(pecletmax+epsilon(1.)))
        !
        ! output control
        !
@@ -324,25 +327,25 @@ contains
 
 
   end subroutine update
-  ! 
+  !
   !----------------------------------------------------------------------
   ! Subroutine cfl: Driver for calling CFL computation subroutine
-  ! 
+  !
   subroutine cfl(cflmax)
 
     use grid, only : a_up,a_vp,a_wp,nxp,nyp,nzp,dxi,dyi,dzt,dt
     use stat, only : fill_scalar
 
     real, intent (out)   :: cflmax
-      
+
     cflmax =  cfll(nzp,nxp,nyp,a_up,a_vp,a_wp,dxi,dyi,dzt,dt)
     call fill_scalar(1,cflmax)
 
   end subroutine cfl
-  ! 
+  !
   !----------------------------------------------------------------------
   ! Subroutine cfll: Gets the peak CFL number
-  ! 
+  !
   real function cfll(n1,n2,n3,u,v,w,dxi,dyi,dzt,dt)
 
     integer, intent (in) :: n1, n2, n3
@@ -361,6 +364,42 @@ contains
     end do
 
   end function cfll
+  !
+  !----------------------------------------------------------------------
+  ! Subroutine peclet: Driver for calling peclet computation subroutine
+  !
+  subroutine peclet(pecletmax)
+
+    use grid, only : a_km,nxp,nyp,nzp,dxi,dyi,dzt,dt
+    use stat, only : fill_scalar
+
+    real, intent (out)   :: pecletmax
+
+    pecletmax =  pecletl(nzp,nxp,nyp,a_km,dxi,dyi,dzt,dt)
+    call fill_scalar(1,pecletmax)
+
+  end subroutine peclet
+  !
+  !----------------------------------------------------------------------
+  ! Subroutine pecletl: Gets the peak peclet number
+  !
+  real function pecletl(n1,n2,n3,km,dxi,dyi,dzt,dt)
+
+    integer, intent (in) :: n1, n2, n3
+    real, dimension (n1,n2,n3), intent (in) :: km
+    real, intent (in)    :: dxi,dyi,dzt(n1),dt
+
+    integer :: i, j, k
+    pecletl=0.
+    do j=3,n3-2
+       do i=3,n2-2
+          do k=1,n1
+             pecletl=max(pecletl, dt * km(k,i,j)*max(dxi,dyi,dzt(k)))
+          end do
+       end do
+    end do
+
+  end function pecletl
   ! 
   ! ----------------------------------------------------------------------
   ! subroutine buoyancy:

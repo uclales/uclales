@@ -267,7 +267,7 @@ contains
        ! use relative humidity sounding
        
        
-       rts(ns)=rts(ns)*1.e-3
+       
        !
        ! filling pressure array:
        ! ipsflg = 0 :pressure in millibars
@@ -277,10 +277,6 @@ contains
        case (0)
           ps(ns)=ps(ns)*100.
        case default
-          xs(ns)=(1.+ep2*rts(ns))
-          if (irsflg == 1) then
-            xs(ns) = rts(ns)*1e3
-          end if
           if (ns == 1)then
              ps(ns)=ps(ns)*100.
              zold2=0.
@@ -294,6 +290,13 @@ contains
              ps(ns)=(ps(ns-1)**rcp-g*(zold2-zold1)*(p00**rcp)/(cp*tavg))**cpr
           end if
        end select
+          if (irsflg == 1) then
+          print *,ns,rts(ns)
+            xs(ns) = rts(ns)*1.e-2
+          else
+            rts(ns)=rts(ns)*1.e-3
+            xs(ns)=(1.+ep2*rts(ns))
+          end if
        !
        ! filling temperature array:
        ! itsflg = 0 :potential temperature in kelvin
@@ -363,6 +366,7 @@ contains
 
 604 format('    input sounding needs to go higher ! !', /,                &
          '      sounding top (m) = ',f12.2,'  model top (m) = ',f12.2)
+    
     return
   end subroutine arrsnd
   !
@@ -611,26 +615,53 @@ contains
   subroutine lstend_init
 
    use grid,only   : wfls,dqtdtls,dthldtls
+   use defs, only  : cp,cpr,p00
     use mpi_interface, only : myid
    
 
    implicit none
    
-   real     :: tmp1
+   real     :: lowdthldtls,highdthldtls,lowdqtdtls,highdqtdtls,lowwfls,highwfls,highheight,lowheight,fac,sgn
+   integer :: k
+   real :: height(nzp)
 
     ! reads the time varying lscale forcings
     !
  !   print *, wfls
-    if (wfls(2) == 0.) then
- !         print *, 'lstend_init '                 
-       open (1,file='lstend_in',status='old',form='formatted')
-        if(myid == 0)  print *, 'lstend_init read'                 
-       do ns=1,nzp-1
-          read (1,'(F10.3,2X, E10.3,2X, E10.3,2X, E10.3)',end=100) tmp1,wfls(ns),dqtdtls(ns),dthldtls(ns)
-        if(myid == 0)  print *, ns, tmp1,wfls(ns),dqtdtls(ns),dthldtls(ns)
-       end do
-       close (1)
+    if (ipsflg ==0) then
+      do k=1,nzp
+!         exner = (pi0(k) + pi1(k))/cp
+!         v1db(k)=p00*(exner)**cpr      ! pressure
+        height(k)=1e-2*p00*(pi0(k)/cp)**cpr  ! pressure associated with pi0
+      end do
+!       height = press(:,2,2)
+      sgn = -1
+    else
+      height = zt
+      sgn = 1
     end if
+ !         print *, 'lstend_init '                 
+        open (1,file='lstend_in',status='old',form='formatted')
+        read (1,*,end=100) lowheight,lowwfls,lowdqtdtls,lowdthldtls
+        read (1,*,end=100) highheight,highwfls,highdqtdtls,highdthldtls
+        if(myid == 0)  print *, 'lstend_init read'                 
+        do  k=1,nzp-1
+          if (sgn*highheight<sgn*height(k)) then
+            lowheight = highheight
+            lowwfls = highwfls
+            lowdqtdtls = highdqtdtls
+            lowdthldtls = highdthldtls
+            read (1,*) highheight,highwfls,highdqtdtls,highdthldtls
+          end if
+         fac = (highheight-height(k))/(highheight - lowheight)
+          wfls(k) = fac*lowwfls + (1-fac)*highwfls
+          if(ipsflg==0 .and. k>2) wfls(k) = wfls(k)*(height(k)-height(k-1))/(zt(k)-zt(k-1))
+          dqtdtls(k) = fac*lowdqtdtls + (1-fac)*highdqtdtls
+          dthldtls(k) = fac*lowdthldtls + (1-fac)*highdthldtls
+          if(myid == 0)  print *, k,height(k),zt(k),wfls(k),dqtdtls(k),dthldtls(k)
+        end do
+       
+       close (1)
 100 continue
  
     return

@@ -1,4 +1,4 @@
-module ncio
+ module ncio
 
   use netcdf
   use mpi_interface, only : appl_abort, myid, pecount, wrxid, wryid
@@ -608,6 +608,14 @@ contains
        if (itype==0) ncinfo =  'Longwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
+    case('lwuca')
+       if (itype==0) ncinfo =  'Clear Air Longwave Radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'ttmt'
+    case('lwdca')
+       if (itype==0) ncinfo =  'Clear Air Longwave Radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'ttmt'
     case('lflxut')
        if (itype==0) ncinfo =  'Top of Atmosphere Longwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
@@ -633,7 +641,15 @@ contains
        if (itype==0) ncinfo = 'Shortwave radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('sflxut')
+    case('swuca')
+       if (itype==0) ncinfo =  'Clear Air Shortwave Radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'ttmt'
+    case('swdca')
+       if (itype==0) ncinfo =  'Clear Air Shortwave Radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'ttmt'
+   case('sflxut')
        if (itype==0) ncinfo = 'Top of Atmosphere Shortwave radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'

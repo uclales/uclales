@@ -64,7 +64,7 @@ contains
   subroutine diffuse
 
     use grid, only : newvar, nstep, a_up, a_ut, a_vp, a_vt, a_wp, a_wt       &
-         ,a_rp, a_tp, a_sp, a_st, vapor, a_pexnr, a_theta                    &
+         ,a_rp, a_tp, a_sp, a_st, vapor, a_pexnr, a_theta,a_km               &
          , a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7, nscl, nxp, nyp    &
          , nzp, nxyp, nxyzp, zm, dxi, dyi, dzt, dzm, dt, th00, dn0           &
          , pi0, pi1, level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc
@@ -95,25 +95,25 @@ contains
     ! ----------
     ! Calculate Eddy Viscosity/Diffusivity 
     !
-    call smagor(nzp,nxp,nyp,sflg,dxi,dyi,dn0,a_scr3,a_scr2,a_scr1,a_scr7,zm)
+    call smagor(nzp,nxp,nyp,sflg,dxi,dyi,dn0,a_scr3,a_scr2,a_km,a_scr7,zm)
     !
     ! Diffuse momentum
     !
     if (sflg) call acc_tend(nzp,nxp,nyp,a_up,a_vp,a_wp,a_ut,a_vt,a_wt         &
          ,sz4,sz5,sz6,1,'sgs')
 
-    call diff_prep(nzp,nxp,nyp,a_scr5,a_scr6,a_scr4,a_scr1)
+    call diff_prep(nzp,nxp,nyp,a_scr5,a_scr6,a_scr4,a_km)
 
     call azero(nxyp,sxy1,a2=sxy2)
 
     call diff_vpt(nzp,nxp,nyp,dn0,dzm,dzt,dyi,dt,vw_sfc,sxy2,a_scr6         &
-         ,a_scr5,a_scr1,a_vp,a_wp,a_vt,sz2)
+         ,a_scr5,a_km,a_vp,a_wp,a_vt,sz2)
 
     call diff_upt(nzp,nxp,nyp,dn0,dzm,dzt,dxi,dt,uw_sfc,sxy1,a_scr5         &
-         ,a_scr1,a_up,a_wp,a_ut,sz1)
+         ,a_km,a_up,a_wp,a_ut,sz1)
 
     call diff_wpt(nzp,nxp,nyp,dn0,dzm,dzt,dyi,dxi,dt,ww_sfc,sxy1,a_scr4     &
-         ,a_scr1,a_wp,a_up,a_wt,sz3)
+         ,a_km,a_wp,a_up,a_wt,sz3)
 
     call cyclics(nzp,nxp,nyp,a_wt,req)
     call cyclicc(nzp,nxp,nyp,a_wt,req)

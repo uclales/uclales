@@ -77,6 +77,7 @@ contains
   subroutine define_parm
 
     use util, only : fftinix,fftiniy
+    use defs, only : SolarConstant
     use sgsm, only : csx, prndtl
     !irina
     use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon
@@ -127,6 +128,7 @@ contains
          lstendflg,                  & !irina:flag for time large scale advective tendencies  
          div,  &                       !irina: divergence
          lnudge, tnudgefac, &             !thijs: Nudging
+         SolarConstant, & ! SolarConstant (In case of prescribed TOA radiation
          lrandommicro, microseq,timenuc    !thijs: sequence of variables for microphysics
 
     ps       = 0.
