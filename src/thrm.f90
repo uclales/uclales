@@ -237,7 +237,7 @@ contains
     real, intent (out), dimension (n1,n2,n3)   :: rc,rv,rs,th,tk,p,rsup
 
     integer :: k, i, j, iterate
-    real    :: exner,til,x1,xx,yy,zz,part
+    real    :: exner,til,x1,xx,yy,yy1,zz,part
     do j=3,n3-2
        do i=3,n2-2
           do k=1,n1
@@ -256,8 +256,9 @@ contains
                    zz=max(rt(k,i,j)-yy,0.)
                 enddo
              endif
+             yy1 = yy*(tmelt/xx)**(-2.66)
              part = max(0.,min(1.,(xx-t_hn)/(tmelt-t_hn)))
-             rsup(k,i,j) = zz*(1-part)
+             rsup(k,i,j) = zz*(1-part) +min(max(rt(k,i,j)-yy1,0.),yy1-yy)
              rc(k,i,j)=zz*part
              rv(k,i,j)=rt(k,i,j)-rc(k,i,j)
              rs(k,i,j)=yy
