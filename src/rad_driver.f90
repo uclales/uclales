@@ -37,14 +37,14 @@ module radiation
   contains
 
     subroutine d4stream(n1, n2, n3, alat, time, sknt, sfc_albedo, CCN, dn0, &
-         pi0, pi1, dzm, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,sflxd, albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa, rr)
+         pi0, pi1, dzm, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,sflxd, albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa, rr,ice,nice,grp)
 
 
       integer, intent (in) :: n1, n2, n3
       real, intent (in)    :: alat, time, sknt, sfc_albedo, CCN
       real, dimension (n1), intent (in)                 :: dn0, pi0, pi1, dzm
       real, dimension (n1,n2,n3), intent (in)           :: pip, th, rv, rc
-      real, optional, dimension (n1,n2,n3), intent (in) :: rr
+      real, optional, dimension (n1,n2,n3), intent (in) :: rr,ice,nice,grp
       real, dimension (n1,n2,n3), intent (inout)        :: tt, rflx, sflx, lflxu, lflxd, sflxu, sflxd 
       real, dimension (n2,n3), intent (out),optional    :: albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa
 
@@ -71,9 +71,9 @@ module radiation
       ! determine the solar geometery, as measured by u0, the cosine of the 
       ! solar zenith angle
       !
-    !   u0 = zenith(alat,time)
+      u0 = zenith(alat,time)
     !cgils
-      u0 = 1.
+!       u0 = 1.
       !
       ! call the radiation 
       !
@@ -92,15 +92,25 @@ module radiation
                !old
              !  pt(kk) = tk(k,i,j)
                ph(kk) = rv(k,i,j)
-               if (present(rr)) then
-                  plwc(kk) = 1000.*dn0(k)*max(0.,(rc(k,i,j)-rr(k,i,j)))
-                  prwc(kk) = 1000.*dn0(k)*rr(k,i,j)
-               else
-                  plwc(kk) = 1000.*dn0(k)*max(0.,rc(i,j,k))
-                  prwc(kk) = 0.
-               end if
+               plwc(kk) = 1000.*dn0(k)*max(0.,rc(k,i,j))
                pre(kk)  = 1.e6*(plwc(kk)/(1000.*prw*CCN*dn0(k)))**(1./3.)
                if (plwc(kk).le.0.) pre(kk) = 0.
+               if (present(rr)) then
+                 prwc(kk) = 1000.*dn0(k)*rr(k,i,j)
+               else
+                 prwc(kk) = 0.
+               end if
+               if (present(ice)) then
+                 piwc(kk) = 1000.*dn0(k)*ice(k,i,j)
+                 pde(kk)  = 1.e6*(piwc(kk)/(1000.*prw*nice(k,i,j)*dn0(k)))**(1./3.)
+               else
+                  piwc(kk) = 0.
+               end if
+               if (present(grp)) then
+                 pgwc(kk) = 1000.*dn0(k)*grp(k,i,j)
+               else
+                  pgwc(kk) = 0.
+               end if
                if (k < n1) pp(kk) = 0.5*(pres(k)+pres(k+1)) / 100.
             end do
             pp(nv-n1+2) = pres(n1)/100. - 0.5*(pres(n1-1)-pres(n1)) / 100.
@@ -246,7 +256,7 @@ module radiation
     ! pressure at the top fo the sounding
     !
     allocate (pp(nv1),fds(nv1),fus(nv1),fdir(nv1),fuir(nv1))
-    allocate (pt(nv),ph(nv),po(nv),pre(nv),pde(nv),plwc(nv),prwc(nv))
+    allocate (pt(nv),ph(nv),po(nv),pre(nv),pde(nv),plwc(nv),prwc(nv),piwc(nv),pgwc(nv))
 
     if (blend) then
        pp(1:norig) = sp(1:norig)

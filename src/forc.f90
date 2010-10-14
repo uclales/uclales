@@ -89,7 +89,14 @@ contains
        if (present(time_in) .and. present(cntlat) .and. present(sst)) then
           !irina 
           !a_scr1 = a_theta/a_pexnr 
-          if (level == 3) then
+          select case (level)
+          case(3)
+             call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,   &
+                  dn0, pi0, pi1, dzt, a_pexnr, a_theta, vapor, liquid, a_tt,&
+                  a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
+                  rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
+                  lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
+          case(4)
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,   &
                   dn0, pi0, pi1, dzt, a_pexnr, a_theta, vapor, liquid, a_tt,&
                   a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
@@ -99,7 +106,7 @@ contains
             ! call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
             !      dn0, pi0, pi1, dzt, a_pexnr, a_scr1, vapor, liquid, a_tt,&
             !      a_rflx, a_sflx, albedo, rr=a_rpp)
-          else
+          case default
              xref1 = 0.
              xref2 = 0.
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,    &
@@ -113,7 +120,7 @@ contains
              xref1 = xref1 + a_sflx(nzp,3,3)/albedo(3,3)
              xref2 = xref2 + a_sflx(nzp,3,3)
              albedo(3,3) = xref2/xref1
-          end if
+          end select
 !irina 
           !
           ! subsidence

@@ -44,9 +44,10 @@ module mcrp
                         iriming_ice_cloud=18, iriming_snow_cloud=19, iriming_grp_cloud=20, &
                         iriming_ice_rain=21, iriming_snow_rain=22,iriming_grp_rain=23
   real, dimension(:),allocatable :: convice,convliq
-  integer, dimension(23) :: microseq
+  integer, dimension(23) :: microseq = (/1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,22/)
   logical :: lrandommicro = .false.
   real :: timenuc = 60
+  real :: nin_set = 1e-3
   ! 
   ! drop sizes definition is based on vanZanten (2005)
   ! cloud droplets' diameter: 2-50 e-6 m
@@ -202,7 +203,7 @@ contains
                                                           ninucp,ricep,nicep,rsnowp,rgrp,&
                                                           rsup
 
-    real, dimension(n1) :: tl,temp,qv,qc,nrain,qrain,ninuc,nice,qice,nsnow,qsnow,ngrp,qgrp,qsat,qsup,q1 !dummy-arrays for conversion between mixing rate
+    real, dimension(n1) :: tl,temp,qv,qc,nrain,qrain,ninuc,nice, nin_active,si,qice,nsnow,qsnow,ngrp,qgrp,qsat,qsup,q1 !dummy-arrays for conversion between mixing rate
     integer :: i, j,n
     logical,save  :: firsttime = .true.
 
@@ -236,6 +237,7 @@ contains
           nsnow = snow%nr
           qgrp = rgrp(:,i,j)/dn0
           ngrp = graupel%nr
+          nin_active = nice + nsnow + ngrp
           convice = alvi/cp*(pi0+pi1+exner(:,i,j))/cp
         end if
         if (lrandommicro) call shuffle(microseq)
@@ -278,9 +280,12 @@ contains
             call sedim_cd(n1,dt,tl,qc)
             qc = qc/dn0
           case(iicenucnr)
-            call n_icenuc(n1,ninuc,temp,qsup)
+            where (qsup<0.) qsup = 0.
+            call n_icenuc(n1,ninuc,nin_active,temp,qsup)
           case(iicenuc)
             where (ninuc<0.) ninuc = 0.
+            where (qsup<0.) qsup = 0.
+            si = (qsup+qv)/qv
             call ice_nucleation(n1,ninuc,qice,nice,qsup,tl,temp)
           case(ifreez)
             call resetvar(cldw,qc)
@@ -289,8 +294,11 @@ contains
             call cloud_freeze(n1,qc,ninuc,qice,nice,tl,temp)
             call rain_freeze(n1,qrain,nrain,ninuc,qice,nice,qgrp,temp)
           case(idep)
+            where (qsup<0.) qsup = 0.
             call deposition(n1,ice,qice,nice,qv,tl,temp,qsup)
+            where (qsup<0.) qsup = 0.
             call deposition(n1,snow,qsnow,nsnow,qv,tl,temp,qsup)
+            where (qsup<0.) qsup = 0.
             call deposition(n1,graupel,qgrp,ngrp,qv,tl,temp,qsup)
           case(imelt_ice)
             call resetvar(ice,qice,nice)
@@ -745,26 +753,30 @@ contains
           end do
 
   end subroutine sedim_cd
-  subroutine n_icenuc(n1,nin,tk,qsup)
+  subroutine n_icenuc(n1,nin,nin_active,tk,qsup)
     integer, intent(in) :: n1
     real, intent(inout), dimension (n1) :: nin
-    real, intent(in) , dimension(n1) :: tk,qsup
+    real, intent(in) , dimension(n1) :: tk,qsup,nin_active
     integer :: k
 !     real :: fact
     real :: nineq
 !     fact = (1-exp(-dt/timenuc))
     do k=2,n1
-      nineq = n_ice_meyers_contact(tk(k),min(qsup(k),0.25))
+!       nineq = n_ice_meyers_contact(tk(k),min(qsup(k),0.25))
+!       nineq = 
 !       nin(k)  = nin(k) + (n_ice_meyers_contact(tk(k),min(qsup(k),0.25))-nin(k))*fact
-      nin(k) = min(nin(k) + nineq*dt/timenuc,nineq)
+!       nin(k) = min(nin(k) + nineq*dt/timenuc,nineq)
 !       nin(k)  = n_ice_meyers_contact(tk(k),min(qsup(k),0.25))
+      if (qsup(k)>0.05) then
+        nin(k) = nin_set -nin_active(k)
+      end if
     end do
   end subroutine n_icenuc
 
   subroutine ice_nucleation(n1,nin,qice,nice,qsup,tl,tk)
     integer,intent(in) :: n1
-    real, intent(inout),dimension(n1) :: nin,nice, qice, tl
-    real,intent(in), dimension(n1) :: tk,qsup
+    real, intent(inout),dimension(n1) :: nin,nice, qice, tl,qsup
+    real,intent(in), dimension(n1) :: tk
     real :: nuc_n, nuc_q
     integer :: k
     
@@ -775,6 +787,7 @@ contains
           nuc_q = min(nuc_n * ice%x_min, qsup(k))
           !nuc_n = nuc_q / ice%x_min                !axel 20040416
           nin(k)  = nin(k)  - nuc_n
+          qsup(k) = qsup(k) - nuc_q
           nice(k) = nice(k) + nuc_n
           qice(k) = qice(k) + nuc_q
           tl(k)   = tl(k)   + convice(k)*nuc_q
@@ -963,9 +976,9 @@ contains
       subroutine deposition(n1,meteor,qice,nice,qv,tl,tk,qsup)
       integer, intent(in) :: n1
       type(particle), intent(in) :: meteor
-      real, dimension(n1), intent(inout) :: qice,nice,qv,tl
+      real, dimension(n1), intent(inout) :: qice,nice,qv,tl,qsup
       
-      real, dimension(n1), intent(in)    :: tk,qsup
+      real, dimension(n1), intent(in)    :: tk
 
     
       ! locale variablen
@@ -1009,6 +1022,7 @@ contains
           dep = gi * n_g * c_g * d_g * f_v * qsup(k) * dt
 
           qice(k) = qice(k) + dep
+          qsup(k) = qsup(k) - dep
           qv(k) = qv(k) - dep
           tl(k) = tl(k) + convice(k)*dep
           if (meteor%moments==2) then

@@ -114,7 +114,7 @@ contains
     real    :: exner, pres, tk, rc, xran(nzp)
     real    :: xc,zc,dist
 
-    call htint(ns,ts,hs,nzp,th0,zt)
+!     call htint(ns,ts,hs,nzp,th0,zt)
 
     do j=1,nyp
        do i=1,nxp
@@ -140,6 +140,7 @@ contains
     end do
     if ( allocated (vapor) ) vapor = a_rp
 
+
     if ( allocated (liquid) .and. itsflg == 0) then
        do j=1,nyp
           do i=1,nxp
@@ -163,7 +164,6 @@ contains
           end do
        end do
     end if
-
     k=1
     do while( zt(k+1) <= zrand .and. k < nzp)
        k=k+1
@@ -263,7 +263,7 @@ contains
        ! irsflg = 1:
        ! filling relative humidity array only accepts sounding in mixing
        ! ratio (g/kg) converts to (kg/kg)
-       ! irsflg = 2:
+       ! irsflg = 0:
        ! use relative humidity sounding
        
        
@@ -290,7 +290,7 @@ contains
              ps(ns)=(ps(ns-1)**rcp-g*(zold2-zold1)*(p00**rcp)/(cp*tavg))**cpr
           end if
        end select
-          if (irsflg == 1) then
+          if (irsflg == 0) then
           print *,ns,rts(ns)
             xs(ns) = rts(ns)*1.e-2
           else
@@ -327,7 +327,7 @@ contains
           if (myid == 0) print *, '  ABORTING: itsflg not supported'
           call appl_abort(0)
        end select
-       if (irsflg == 1) then
+       if (irsflg == 0) then
          rts(ns) = xs(ns)*rslf(ps(ns),tks(ns))
        end if
        ns = ns+1

@@ -90,7 +90,7 @@ module grid
   !
   real, dimension (:,:,:,:), allocatable, target :: a_xp, a_xt1, a_xt2
   !
-  integer :: nscl = 9
+  integer :: nscl = 4
   integer, save :: ncid0,ncid_s
   !
 contains
@@ -192,6 +192,7 @@ contains
     nscl = nscl+naddsc
     if (level   > 0) nscl = nscl+1
     if (level   > 2) nscl = nscl+2
+    if (level   > 3) nscl = nscl+5
 
     allocate (a_xp(nzp,nxp,nyp,nscl), a_xt1(nzp,nxp,nyp,nscl),        &
          a_xt2(nzp,nxp,nyp,nscl))         

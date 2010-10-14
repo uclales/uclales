@@ -354,6 +354,7 @@ contains
        svctr(k,18)=svctr(k,18) + a3(k) * x
        svctr(k,19)=svctr(k,19) + b3(k) * x
     end do
+print *,'stat',c1(n1),t(n1,4,4)
     do j=3,n3-2
        do i=3,n2-2
           scr(i,j) = 0.
