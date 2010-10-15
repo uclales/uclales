@@ -773,10 +773,10 @@ print *,'stat',c1(n1),t(n1,4,4)
     !
     
     call get_avg3(n1,n2,n3,rsnow,a1)
-    svctr(:,101)=svctr(:,101) + a1(:)*dn0(:)/1000.
+    svctr(:,101)=svctr(:,101) + a1(:)*1000.
 
     call get_avg3(n1,n2,n3,rgrp,a1)
-    svctr(:,102)=svctr(:,102) + a1(:)*dn0(:)/1000.
+    svctr(:,102)=svctr(:,102) + a1(:)*1000.
 
 !Watervaporpath
     do j=3,n3-2
