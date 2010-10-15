@@ -281,11 +281,10 @@ contains
             qc = qc/dn0
           case(iicenucnr)
             where (qsup<0.) qsup = 0.
-            call n_icenuc(n1,ninuc,nin_active,temp,qsup)
+            call n_icenuc(n1,ninuc,nin_active,temp,qv,qsup)
           case(iicenuc)
             where (ninuc<0.) ninuc = 0.
             where (qsup<0.) qsup = 0.
-            si = (qsup+qv)/qv
             call ice_nucleation(n1,ninuc,qice,nice,qsup,tl,temp)
           case(ifreez)
             call resetvar(cldw,qc)
@@ -753,10 +752,10 @@ contains
           end do
 
   end subroutine sedim_cd
-  subroutine n_icenuc(n1,nin,nin_active,tk,qsup)
+  subroutine n_icenuc(n1,nin,nin_active,tk,qv,qsup)
     integer, intent(in) :: n1
     real, intent(inout), dimension (n1) :: nin
-    real, intent(in) , dimension(n1) :: tk,qsup,nin_active
+    real, intent(in) , dimension(n1) :: tk,qsup,qv,nin_active
     integer :: k
 !     real :: fact
     real :: nineq
@@ -767,7 +766,7 @@ contains
 !       nin(k)  = nin(k) + (n_ice_meyers_contact(tk(k),min(qsup(k),0.25))-nin(k))*fact
 !       nin(k) = min(nin(k) + nineq*dt/timenuc,nineq)
 !       nin(k)  = n_ice_meyers_contact(tk(k),min(qsup(k),0.25))
-      if (qsup(k)>0.05) then
+      if (qsup(k)/qv(k)>0.05) then
         nin(k) = nin_set -nin_active(k)
       end if
     end do
@@ -1019,7 +1018,7 @@ contains
           f_n  = max(f_n,1.e0) !unnoetig??
 !           e_si = e_es(tk(k))
           gi = 4.0*pi / ( alvi**2 / (K_T * Rm * tk(k)**2) + Rm * tk(k) / (D_v * e_es(tk(k))) )
-          dep = gi * n_g * c_g * d_g * f_v * qsup(k) * dt
+          dep = gi * n_g * c_g * d_g * f_v * qsup(k)/qv(k) * dt
 
           qice(k) = qice(k) + dep
           qsup(k) = qsup(k) - dep
