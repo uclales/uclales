@@ -158,7 +158,7 @@ contains
   subroutine micro(level)
 
     integer, intent (in) :: level
-
+    call fll_tkrs(nzp,nxp,nyp,a_theta,a_pexnr,pi0,pi1,dn0,th00,a_scr1,rs=a_scr2)
     select case (level) 
     case(2)
 !        if (droplet_sedim) call sedim_cd(level,nzp,nxp,nyp,dn0,dt,a_theta,a_scr1,      &

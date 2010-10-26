@@ -83,6 +83,7 @@ contains
        dx,dy,dt,s1,wsvx,wsvy)
 
     use util, only  : get_fft_twodim, velset
+    use grid, only  : rkalpha, rkbeta, nstep
 
     integer :: n1,n2,n3,ix,iy
     real    :: pp(n1,n2,n3),pc(n1,n2,n3),dmy
@@ -104,9 +105,9 @@ contains
     call prs_grad(n1,n2,n3,ix,iy,s1,pp,u,v,w,dzm,dx,dy,dt)   
     call get_diverg(n1,n2,n3,ix,iy,s1,u,v,w,dn0,dzt,dx,dy,dt,dmy)
 
-    pp(:,:,:) = pp(:,:,:)/th00
+    pp(:,:,:) = pp(:,:,:)/th00/(rkalpha(nstep)+rkbeta(nstep))
     pc(:,:,:) = pp(:,:,:)
-
+    
   end subroutine poiss
   !
   ! --------------------------------------------------------------------
