@@ -274,7 +274,8 @@ contains
 ! 
   subroutine fll_tkrs(n1,n2,n3,th,pp,pi0,pi1,dn0,th00,tk,rs)
 
-  use defs, only : cp, R
+  use defs, only : cp, R,cpr,p00
+!   use grid, only : p00
 
   integer, intent (in) :: n1,n2,n3
   real, intent (in)    :: th(n1,n2,n3), pp(n1,n2,n3)
@@ -290,7 +291,8 @@ contains
       do k=1,n1
         exner=(pi0(k)+pi1(k)+pp(k,i,j))/cp
         tk(k,i,j)=th(k,i,j)*exner
-        if (present(rs)) rs(k,i,j)=rslf(R*exner*th00*dn0(k),tk(k,i,j))
+!         if (present(rs)) rs(k,i,j)=rslf(R*exner*th00*dn0(k),tk(k,i,j))
+        if (present(rs)) rs(k,i,j)=rslf(p00*(exner)**cpr,tk(k,i,j))
       end do
     end do
   end do
@@ -313,13 +315,13 @@ contains
   integer :: i, k, j, kp1
   real    :: c1, c2, c3, tvk, tvkp1, rtbar, rsbar, aa, bb
 
-  c1=(1.+ep*alvl/R/th00)/ep
-  c2=ep*alvl*alvl/(R*cp*th00*th00)
-  c3=alvl/(cp*th00)
 
   do j=3,n3-2
      do i=3,n2-2
         do k=1,n1-1
+           c1=(1.+ep*alvl/R/th(k,i,j))/ep
+           c2=ep*alvl*alvl/(R*cp*th(k,i,j)*th(k,i,j))
+           c3=alvl/(cp*th(k,i,j))
            select case(level) 
            case (0)
               en2(k,i,j)=g*dzm(k)*((th(k+1,i,j)-th(k,i,j))/th00)

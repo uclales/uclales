@@ -67,7 +67,7 @@ contains
          ,a_rp, a_tp, a_sp, a_st, vapor, a_pexnr, a_theta                    &
          , a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7, nscl, nxp, nyp    &
          , nzp, nxyp, nxyzp, zm, dxi, dyi, dzt, dzm, dt, th00, dn0           &
-         , pi0, pi1, level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc
+         , pi0, pi1, level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,liquid
 
     use util, only         : atob, azero, get_avg3
     use mpi_interface, only: cyclics, cyclicc
@@ -149,9 +149,9 @@ contains
 
           call updtst(nzp,'sgs',n-3,sz1,1)
           if (associated(a_sp,a_tp))                                          &
-             call sgsflxs(nzp,nxp,nyp,level,a_scr3,vapor,a_theta,a_scr1,'tl')
+             call sgsflxs(nzp,nxp,nyp,level,liquid,vapor,a_theta,a_scr1,'tl')
           if (associated(a_sp,a_rp))                                          &
-             call sgsflxs(nzp,nxp,nyp,level,a_scr3,vapor,a_theta,a_scr1,'rt')
+             call sgsflxs(nzp,nxp,nyp,level,liquid,vapor,a_theta,a_scr1,'rt')
 
        endif
        call cyclics(nzp,nxp,nyp,a_st,req)

@@ -55,6 +55,9 @@ module grid
   character (len=80):: filprf = 'x'       ! File Prefix
   character (len=7) :: runtype = 'INITIAL'! Run Type Selection
 
+    real, parameter ::  rkalpha(3) = (/ 8./15., -17./60.,  3./4. /), &
+         rkbeta(3)  = (/    0.0,   5./12., -5./12./)
+
 
   character (len=7),  private :: v_snm='sxx    ' 
   character (len=80), private :: fname

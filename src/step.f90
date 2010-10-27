@@ -277,17 +277,14 @@ contains
   subroutine update(nstep)
 
     use grid, only : a_xp, a_xt1, a_xt2, a_up, a_vp, a_wp, a_sp, dzt, dt,  &
-         nscl, nxp, nyp, nzp, newvar
+         nscl, nxp, nyp, nzp, newvar,level,rkalpha,rkbeta
     use util, only : sclrset,velset
-
-    real, parameter ::  alpha(3) = (/ 8./15., -17./60.,  3./4. /), &
-         beta(3)  = (/    0.0,   5./12., -5./12./)
 
     integer, intent (in) :: nstep
 
     integer :: n
 
-    a_xp = a_xp + dt *(alpha(nstep)*a_xt1 + beta(nstep)*a_xt2)
+    a_xp = a_xp + dt *(rkalpha(nstep)*a_xt1 + rkbeta(nstep)*a_xt2)
 
     call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
 
