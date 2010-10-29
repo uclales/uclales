@@ -72,4 +72,4 @@ rad_cldwtr.o: rad_cldwtr.f90 defs.f90 rad_corkds.f90
 rad_d4strm.o: rad_d4strm.f90 defs.f90 rad_solver.f90 rad_rndnmb.f90
 	rad_corkds.f90 rad_cldwtr.f90
 rad_driver.o: rad_driver.f90 defs.f90 rad_d4strm.f90
-forc.o: forc.f90 rad_gcss.f90
+forc.o: forc.f90 rad_gcss.f90 

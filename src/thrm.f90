@@ -35,18 +35,21 @@ contains
          a_scr2, a_rp, a_tp, nxp, nyp, nzp, th00, pi0, pi1,a_rpp,rsup,a_ricep,a_rsnowp,a_rgrp
     integer, intent (in) :: level
 
-    select case (level) 
-    case default 
+    select case (level)
+    case default
        call drythrm(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,   &
             pi1,th00,a_rp,vapor)
-    case (2,3,4)
+    case (2)
        call satadjst(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
             pi1,th00,a_rp,vapor,liquid,a_scr2)
-!     case (4)
-!        call satadjst4(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
-!             pi1,th00,a_rp,vapor,liquid,a_scr2,rsup,a_rpp,a_ricep,a_rsnowp,a_rgrp)
+    case (3)
+       call satadjst3(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0, &
+            pi1,th00,a_rp,vapor,liquid,a_scr2,a_rpp)
+    case (4)
+       call satadjst4(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
+            pi1,th00,a_rp,vapor,liquid,a_scr2,rsup,a_rpp,a_ricep,a_rsnowp,a_rgrp)
     end select
-    if (level ==4) call satpart(nzp,nxp,nyp,vapor,liquid,rsup,a_scr1)
+!     if (level ==4) call satpart(nzp,nxp,nyp,vapor,liquid,rsup,a_scr1)
   end subroutine thermo
 !
 ! -------------------------------------------------------------------------
@@ -257,8 +260,10 @@ contains
                 enddo
              endif
              yy1 = yy*(tmelt/xx)**(-2.66)
+             yy1 = rsif(p(k,i,j),xx)
              part = max(0.,min(1.,(xx-t_hn)/(tmelt-t_hn)))
-             rsup(k,i,j) = zz*(1-part) +min(max(rt(k,i,j)-yy1,0.),yy1-yy)
+!             part = max(0.,min(1.,(xx-230.)/(tmelt-230.)))
+             rsup(k,i,j) = zz*(1-part) +min(max(rt(k,i,j)-yy1,0.),yy-yy1)-(ice(k,i,j)+graupel(k,i,j)+snow(k,i,j))
              rc(k,i,j)=zz*part
              rv(k,i,j)=rt(k,i,j)-rc(k,i,j)
              rs(k,i,j)=yy
@@ -267,7 +272,7 @@ contains
           enddo
        enddo
     enddo
-
+!print *, 'thrm', maxval(rc),maxval(rsup)
   end subroutine satadjst4
 
   subroutine satpart(n1,n2,n3,rv,rc,rsup,tk)
@@ -332,22 +337,22 @@ real, parameter :: c0_i=0.6114327e+03, c1_i=0.5027041e+02,    &
 ! ! This function calculates the ice saturation vapor mixing ratio as a 
 ! ! function of temperature and pressure
 ! ! 
-!   real function rsif(p,t)
-! 
-!   real, intent (in) :: p, t
-!   real, parameter :: c0_i=0.6114327e+03, c1_i=0.5027041e+02,    &
-!                      c2_i=0.1875982e+01, c3_i=0.4158303e-01,    &
-!                      c4_i=0.5992408e-03, c5_i=0.5743775e-05,    &
-!                      c6_i=0.3566847e-07, c7_i=0.1306802e-09,    &
-!                      c8_i=0.2152144e-12
-! 
-!   real  :: esi, x
-! 
-!   x=max(-80.,t-273.16)
-!   esi=c0+x*(c1+x*(c2+x*(c3+x*(c4+x*(c5+x*(c6+x*(c7+x*c8)))))))
-!   rsif=.622*esi/(p-esi)
-! 
-!   end function rsif
+   real function rsif(p,t)
+ 
+   real, intent (in) :: p, t
+   real, parameter :: c0_i=0.6114327e+03, c1_i=0.5027041e+02,    &
+                      c2_i=0.1875982e+01, c3_i=0.4158303e-01,    &
+                      c4_i=0.5992408e-03, c5_i=0.5743775e-05,    &
+                      c6_i=0.3566847e-07, c7_i=0.1306802e-09,    &
+                      c8_i=0.2152144e-12
+ 
+   real  :: esi, x
+ 
+   x=max(-80.,t-273.16)
+    esi=c0_i+x*(c1_i+x*(c2_i+x*(c3_i+x*(c4_i+x*(c5_i+x*(c6_i+x*(c7_i+x*c8_i)))))))
+   rsif=.622*esi/(p-esi)
+ 
+   end function rsif
 ! 
 ! -------------------------------------------------------------------------
 ! FLL_TKRS: Updates scratch arrays with temperature and saturation mixing

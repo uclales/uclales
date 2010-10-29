@@ -28,7 +28,7 @@ module stat
   private
 
 !irina
-  integer, parameter :: nvar1 = 43, nvar2 = 102
+  integer, parameter :: nvar1 = 43, nvar2 = 103
 
   integer, save      :: nrec1, nrec2, ncid1, ncid2, nv1=nvar1, nv2=nvar2
   real, save         :: fsttm, lsttm, nsmp = 0
@@ -64,7 +64,7 @@ module stat
        'rt_cs2 ','rl_cs2 ','wt_cs2 ','wv_cs2 ','wr_cs2 ','Nc     ', & !79  
        'Nr     ','rr     ','precip ','evap   ','frc_prc','prc_prc', & !85
        'frc_ran','hst_srf','lflxu  ','lflxd  ','sflxu  ','sflxd  ',& !91
-       'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel' /)
+       'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel','rsup   '/)
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:), svctr(:,:), ssclr(:)
@@ -152,7 +152,7 @@ contains
          , a_rp, a_tp, press, nxp, nyp, nzp, dzm, dzt, zm, zt, th00, umean &
          , vmean, dn0, precip, a_rpp, a_npp, albedo, CCN, iradtyp, a_rflx    &
          , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa &
-         , a_ricep, a_rsnowp, a_rgrp,a_ninucp,a_nicep,vapor
+         , a_ricep, a_rsnowp, a_rgrp,a_ninucp,a_nicep,vapor,rsup
     real, intent (in) :: time
 
     if (nsmp == 0.) fsttm = time
@@ -184,7 +184,7 @@ contains
     if (level >=3) call accum_lvl3(nzp, nxp, nyp, dn0, zm, liquid, a_rpp,    &
          a_npp, precip, CCN)
 
-    if (level >=4) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp,a_ninucp,a_nicep)
+    if (level >=4) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, rsup,a_ricep, a_rsnowp, a_rgrp,a_ninucp,a_nicep)
     !
     ! scalar statistics
     !
@@ -354,7 +354,6 @@ contains
        svctr(k,18)=svctr(k,18) + a3(k) * x
        svctr(k,19)=svctr(k,19) + b3(k) * x
     end do
-print *,'stat',c1(n1),t(n1,4,4)
     do j=3,n3-2
        do i=3,n2-2
           scr(i,j) = 0.
@@ -722,12 +721,12 @@ print *,'stat',c1(n1),t(n1,4,4)
   ! SUBROUTINE ACCUM_LVL4: Accumulates specialized statistics that depend
   ! on level 4 variables.
   !
-  subroutine accum_lvl4(n1, n2, n3,  dn0, zm, rv, rice, rsnow, rgrp,ninuc,nice)
+  subroutine accum_lvl4(n1, n2, n3,  dn0, zm, rv, rsup,rice, rsnow, rgrp,ninuc,nice)
     use grid, only : a_pexnr,pi0,pi1
     use defs, only : alvi,cp
     integer, intent (in) :: n1,n2,n3
     real, intent (in), dimension(n1)        :: zm, dn0
-    real, intent (in), dimension(n1,n2,n3)  :: rv,rice,rsnow,rgrp,ninuc,nice
+    real, intent (in), dimension(n1,n2,n3)  :: rv,rsup,rice,rsnow,rgrp,ninuc,nice
     integer                   :: k, i, j, km1
     real, dimension(n2,n3)    :: scr
 
@@ -742,31 +741,18 @@ print *,'stat',c1(n1),t(n1,4,4)
     !
 
     call get_avg3(n1,n2,n3,ninuc,a1)
-    svctr(:,98)=svctr(:,98) + a1(:)*dn0(:)/1000.
+    svctr(:,98)=svctr(:,98) + a1(:)/1000.
 
     !
     ! conditionally average ice numbers, and droplet concentrations
     !
     call get_avg3(n1,n2,n3,rice,a1)
-    nrsum = 0.
-    nrcnt = 0.
     do k=1,n1-1
-       aflg = .false.
-       do j=3,n3-2
-          do i=3,n2-2
-             scr1(i,j) = 0.
-             if (rice(k,i,j) > 0.001e-3) then
-                aflg = .true.
-                scr1(i,j) = 1.
-                nrsum = nrsum + (nice(k,i,j)*dn0(k)/1000.)  ! Nr in dm^-3 (1/liter)
-                nrcnt = nrcnt + 1.
-             end if
-          end do
-       end do
        svctr(k,99)=svctr(k,99) + a1(k)*1000.
-       if (aflg) then
-          svctr(k,100)= svctr(k,100)+get_csum(n1,n2,n3,k,nice*dn0(k)/1000.,scr1) ! Nr in dm^-3 (1/liter)
-       end if
+    end do
+    call get_avg3(n1,n2,n3,nice,a1)
+    do k=1,n1-1
+       svctr(k,100)=svctr(k,100) + a1(k)/1000.
     end do
     !
     ! average snow and graupel profiles
@@ -777,6 +763,8 @@ print *,'stat',c1(n1),t(n1,4,4)
 
     call get_avg3(n1,n2,n3,rgrp,a1)
     svctr(:,102)=svctr(:,102) + a1(:)*1000.
+    call get_avg3(n1,n2,n3,rsup,a1)
+    svctr(:,103)=svctr(:,103) + a1(:)/1000.
 
 !Watervaporpath
     do j=3,n3-2

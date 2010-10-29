@@ -56,7 +56,7 @@ contains
     use mpi_interface, only : myid, double_scalar_par_max
 
     use grid, only : dt, dtlong, zt, zm, nzp, dn0, u0, v0, level, &
-         write_hist, write_anal, close_anal 
+         write_hist, write_anal, close_anal ,a_ninucp
          
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
@@ -79,7 +79,7 @@ contains
   ! print *, 'timmax',timmax
 
     do while (time + 0.1*dt < timmax)
-
+a_ninucp = 0.
        call cpu_time(t1)           !t1=timing()
 
        istp = istp+1

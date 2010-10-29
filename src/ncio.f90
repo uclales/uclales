@@ -289,6 +289,10 @@ contains
        if (itype==0) ncinfo = 'Graupel mixing ratio'
        if (itype==1) ncinfo = 'kg/kg'
        if (itype==2) ncinfo = 'tttt'
+    case('rsup')
+       if (itype==0) ncinfo = 'Supersaturation wrt ice'
+       if (itype==1) ncinfo = 'kg/kg'
+       if (itype==2) ncinfo = 'tttt'
     case('n')
        if (itype==0) ncinfo = 'Rain-drop number mixing ratio'
        if (itype==1) ncinfo = '#/kg'
