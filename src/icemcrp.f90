@@ -1046,16 +1046,17 @@ contains
         
           gi = 4.0*pi / ( alvi**2 / (K_T * Rm * tk(k)**2) + Rm * tk(k) / (D_v * e_es(tk(k))) )
           !si = 1-(qv(k)+qsup(k))/rsif(p,tk(k))
-	  !ndep  = min(gi * n_g * c_g * d_g * qsup(k)/qv(k) * dt * f_n / x_g,ninuc(k))
-          dep = gi * n_g * c_g * d_g * f_v * qsup(k)/qv(k) * dt 
+	  ndep  = min(gi * n_g * c_g * d_g * qsup(k)/qv(k) * dt * f_n / x_g,ninuc(k))
+          !dep = gi * n_g * c_g * d_g * f_v * qsup(k)/qv(k) * dt 
+          dep   = ndep *x_g*f_v/f_n
           qice(k) = qice(k) + dep
           qsup(k) = qsup(k) - dep
           qv(k) = qv(k) - dep
           tl(k) = tl(k) + convice(k)*dep
-         ! if (meteor%moments==2) then
-         !   nice(k) = nice(k) + ndep 
-	 !   ninuc(k) = ninuc(k) - ndep
-         ! end if
+          if (meteor%moments==2) then
+!            nice(k) = nice(k) + ndep 
+!	    ninuc(k) = ninuc(k) - ndep
+          end if
         endif
 
       enddo
