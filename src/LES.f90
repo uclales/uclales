@@ -95,7 +95,7 @@ contains
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
     use modnudge, only : lnudge,tnudgefac
-    use mcrp, only : microseq,lrandommicro,timenuc
+    use mcrp, only : microseq,lrandommicro,timenuc,nin_set
 
     implicit none
 
@@ -129,7 +129,7 @@ contains
          div,  &                       !irina: divergence
          lnudge, tnudgefac, &             !thijs: Nudging
          SolarConstant, & ! SolarConstant (In case of prescribed TOA radiation
-         lrandommicro, microseq,timenuc    !thijs: sequence of variables for microphysics
+         lrandommicro, microseq,timenuc ,nin_set   !thijs: sequence of variables for microphysics
 
     ps       = 0.
     ts       = th00
