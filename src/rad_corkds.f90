@@ -20,7 +20,8 @@
 module ckd
 
   use defs, only : mair, nv, nv1, mb, totalpower
-  implicit none
+  use mpi_interface, only : myid
+   implicit none
   private
 
   character (len=20) :: gasfile = 'datafiles/ckd.dat'
@@ -90,7 +91,7 @@ contains
 
     if (band(mb)%power > 0.) mbs = mbs + 1
     mbir = mb - mbs
-    print 600, trim(gasfile), ngases, mb, mbs, mbir, sum(band%power)
+    if (myid==0) print 600, trim(gasfile), ngases, mb, mbs, mbir, sum(band%power)
 
     do n=1,ngases
        read (66,'(A5,I4)') gas(n)%name,gas(n)%iband
@@ -116,7 +117,7 @@ contains
        end do 
 
        if (abs(sum(gas(n)%hk) - 1.) <= 1.1 * spacing(1.) ) then
-          print 601, gas(n)%name, gas(n)%iband, gas(n)%noverlap,              &
+          if (myid==0) print 601, gas(n)%name, gas(n)%iband, gas(n)%noverlap,              &
                gas(n)%ng, gas(n)%np, gas(n)%nt
        else
           print *, gas(n)%hk, sum(gas(n)%hk(:))
@@ -173,10 +174,10 @@ contains
     end do
     
     do ib=1,mb
-       print 602, ib, band(ib)%power, band(ib)%llimit, band(ib)%rlimit,    &
+       if (myid==0) print 602, ib, band(ib)%power, band(ib)%llimit, band(ib)%rlimit,    &
             band(ib)%ngases, band(ib)%kg
     end do
-    print 604
+    if (myid==0) print 604
 
     Initialized = .True.
 

@@ -785,7 +785,7 @@ contains
           do k=1,n1
               convice = alvi/cp*(pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp
             km1=max(1,k-1)
-             scr(i,j)=scr(i,j)+rice(k,i,j)*(zm(k)-zm(km1))*convice
+             scr(i,j)=scr(i,j)+rice(k,i,j)*(zm(k)-zm(km1))*dn0(k)
           end do
        end do
     end do
@@ -798,7 +798,7 @@ contains
           do k=1,n1
               convice = alvi/cp*(pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp
              km1=max(1,k-1)
-             scr(i,j)=scr(i,j)+rsnow(k,i,j)*(zm(k)-zm(km1))*convice
+             scr(i,j)=scr(i,j)+rsnow(k,i,j)*(zm(k)-zm(km1))*dn0(k)
           end do
        end do
     end do
@@ -811,7 +811,7 @@ contains
           do k=1,n1
                convice = alvi/cp*(pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp
             km1=max(1,k-1)
-             scr(i,j)=scr(i,j)+rgrp(k,i,j)*(zm(k)-zm(km1))*convice
+             scr(i,j)=scr(i,j)+rgrp(k,i,j)*(zm(k)-zm(km1))*dn0(k)
           end do
        end do
     end do
