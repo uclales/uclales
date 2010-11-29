@@ -162,7 +162,7 @@ contains
   ! 
   subroutine t_step
 
-    use grid, only : level, dt, nstep, a_tt, a_up, a_vp, a_wp, dxi, dyi, dzt, &
+    use grid, only : level, dt, nstep, a_tt, a_up, a_vp, a_wp, dxi, dyi, dzi_t, &
          nxp, nyp, nzp, dn0,a_scr1, u0, v0, a_ut, a_vt, a_wt, zt
     use stat, only : sflg, statistics
     use sgsm, only : diffuse
@@ -276,7 +276,7 @@ contains
   !
   subroutine update(nstep)
 
-    use grid, only : a_xp, a_xt1, a_xt2, a_up, a_vp, a_wp, a_sp, dzt, dt,  &
+    use grid, only : a_xp, a_xt1, a_xt2, a_up, a_vp, a_wp, a_sp, dzi_t, dt,  &
          nscl, nxp, nyp, nzp, newvar,level,rkalpha,rkbeta
     use util, only : sclrset,velset
 
@@ -290,7 +290,7 @@ contains
 
     do n=4,nscl
        call newvar(n,istep=nstep)
-       call sclrset('mixd',nzp,nxp,nyp,a_sp,dzt)
+       call sclrset('mixd',nzp,nxp,nyp,a_sp,dzi_t)
     end do
 
 
@@ -302,12 +302,12 @@ contains
   ! 
   subroutine cfl(cflmax)
 
-    use grid, only : a_up,a_vp,a_wp,nxp,nyp,nzp,dxi,dyi,dzt,dt
+    use grid, only : a_up,a_vp,a_wp,nxp,nyp,nzp,dxi,dyi,dzi_t,dt
     use stat, only : fill_scalar
 
     real, intent (out)   :: cflmax
       
-    cflmax =  cfll(nzp,nxp,nyp,a_up,a_vp,a_wp,dxi,dyi,dzt,dt)
+    cflmax =  cfll(nzp,nxp,nyp,a_up,a_vp,a_wp,dxi,dyi,dzi_t,dt)
     call fill_scalar(1,cflmax)
 
   end subroutine cfl
@@ -315,11 +315,11 @@ contains
   !----------------------------------------------------------------------
   ! Subroutine cfll: Gets the peak CFL number
   ! 
-  real function cfll(n1,n2,n3,u,v,w,dxi,dyi,dzt,dt)
+  real function cfll(n1,n2,n3,u,v,w,dxi,dyi,dzi_t,dt)
 
     integer, intent (in) :: n1, n2, n3
     real, dimension (n1,n2,n3), intent (in) :: u, v, w
-    real, intent (in)    :: dxi,dyi,dzt(n1),dt
+    real, intent (in)    :: dxi,dyi,dzi_t(n1),dt
 
     integer :: i, j, k
     cfll=0.
@@ -327,7 +327,7 @@ contains
        do i=3,n2-2
           do k=1,n1
              cfll=max(cfll, dt * max(abs(u(k,i,j)*dxi),                    &
-                  abs(v(k,i,j)*dyi), abs(w(k,i,j)*dzt(k))))
+                  abs(v(k,i,j)*dyi), abs(w(k,i,j)*dzi_t(k))))
           end do
        end do
     end do
@@ -340,7 +340,7 @@ contains
   subroutine buoyancy
 
     use grid, only : a_up, a_vp, a_wp, a_wt, vapor, a_theta, a_scr1, a_scr3,&
-         a_rp, nxp, nyp, nzp, dzm, th00, level, pi1
+         a_rp, nxp, nyp, nzp, dzi_m, th00, level, pi1
     use stat, only : sflg, comp_tke
     use util, only : ae1mm
     use thrm, only : update_pi1
@@ -351,7 +351,7 @@ contains
     call ae1mm(nzp,nxp,nyp,a_wt,awtbar)
     call update_pi1(nzp,awtbar,pi1)
 
-    if (sflg)  call comp_tke(nzp,nxp,nyp,dzm,th00,a_up,a_vp,a_wp,a_scr1,a_scr3)
+    if (sflg)  call comp_tke(nzp,nxp,nyp,dzi_m,th00,a_up,a_vp,a_wp,a_scr1,a_scr3)
 
   end subroutine buoyancy
   ! 

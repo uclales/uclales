@@ -33,7 +33,7 @@ contains
   subroutine fadvect
 
     use grid, only : a_up, a_vp, a_wp, a_sp, a_st, liquid, a_scr1, a_scr2,    &
-         dn0 , nxp, nyp, nzp, nxyzp, dt, dzt, dzm, zt, dxi, dyi, level, nscl, &
+         dn0 , nxp, nyp, nzp, nxyzp, dt, dzi_t, dzi_m, zt, dxi, dyi, level, nscl, &
          newvar, nstep
 
     use stat, only      : sflg, updtst
@@ -47,7 +47,7 @@ contains
     if (sflg .and. level > 1) then
        call atob(nxyzp,liquid,a_scr1)
        call atob(nxyzp,a_wp,a_scr2)
-       call mamaos(nzp,nxp,nyp,a_scr2,liquid,a_scr1,zt,dzm,dn0,dt,.false.)
+       call mamaos(nzp,nxp,nyp,a_scr2,liquid,a_scr1,zt,dzi_m,dn0,dt,.false.)
        call get_avg3(nzp,nxp,nyp,a_scr2,v1da)
        call updtst(nzp,'adv',0,v1da,1)
     end if
@@ -64,7 +64,7 @@ contains
        call mamaos_y(nzp,nxp,nyp,a_vp,a_sp,a_scr1,dyi,dt)
        call mamaos_x(nzp,nxp,nyp,a_up,a_sp,a_scr1,dxi,dt)
        call atob(nxyzp,a_wp,a_scr2)
-       call mamaos(nzp,nxp,nyp,a_scr2,a_sp,a_scr1,dzt,dzm,dn0,dt,.false.)
+       call mamaos(nzp,nxp,nyp,a_scr2,a_sp,a_scr1,dzi_t,dzi_m,dn0,dt,.false.)
 
        if (sflg) then
           call get_avg3(nzp,nxp,nyp,a_scr2,v1da)
@@ -108,20 +108,20 @@ contains
   ! 
   ! July 21, 2003
   !
-  subroutine mamaos(n1,n2,n3,w,scp0,scp,dzt,dzm,dn0,dt,lwpt)
+  subroutine mamaos(n1,n2,n3,w,scp0,scp,dzi_t,dzi_m,dn0,dt,lwpt)
 
     use mpi_interface, only : myid, appl_abort
 
     integer, intent (in)    :: n1,n2,n3
     real, intent (in)       :: scp0(n1,n2,n3)
-    real, intent (in)       :: dn0(n1),dzt(n1),dzm(n1)
+    real, intent (in)       :: dn0(n1),dzi_t(n1),dzi_m(n1)
     real, intent (in)       :: dt
     logical, intent (in)    :: lwpt
     real, intent (inout)    :: w(n1,n2,n3),scp(n1,n2,n3)
 
     real    :: density(n1)   ! averaged density
-    real    :: dzt_local(n1) ! grid spacing for scalars
-    real    :: dzm_local(n1) ! grid spacing for velocity
+    real    :: dzi_t_local(n1) ! grid spacing for scalars
+    real    :: dzi_m_local(n1) ! grid spacing for velocity
     real    :: cfl(n1)       ! cfl numbers at the interface (staggered)
     real    :: C(n1)         ! limiter    
     real    :: r(n1)         ! slope ratio
@@ -135,11 +135,11 @@ contains
        kp1 = min(k+1,n1)
        density(k) = 0.5 * (dn0(k) + dn0(kp1))
        if (lwpt) then
-          dzt_local(k) = dzm(k)
-          dzm_local(k) = dzt(kp1)
+          dzi_t_local(k) = dzi_m(k)
+          dzi_m_local(k) = dzi_t(kp1)
        else
-          dzt_local(k) = dzt(k)
-          dzm_local(k) = dzm(k)
+          dzi_t_local(k) = dzi_t(k)
+          dzi_m_local(k) = dzi_m(k)
        endif
     enddo
 
@@ -149,7 +149,7 @@ contains
           ! compute CFL and momentum
           !
           do k = 1, n1-1
-             cfl(k)  = w(k,i,j) * dt * dzm_local(k)
+             cfl(k)  = w(k,i,j) * dt * dzi_m_local(k)
              wpdn(k) = w(k,i,j) * density(k)
              if (abs(cfl(k)) > 1.0) then
                 if (myid == 0) print *, '  ABORTING: mamaos_z'
@@ -206,7 +206,7 @@ contains
           do k = 2,n1-1
              scp(k,i,j) = scp(k,i,j) - ((w(k,i,j)-w(k-1,i,j)) -        & 
                   scp0(k,i,j)*(wpdn(k)-wpdn(k-1))) *                   &
-                  dt*dzt_local(k)/dn0(k)
+                  dt*dzi_t_local(k)/dn0(k)
           enddo
 
        enddo

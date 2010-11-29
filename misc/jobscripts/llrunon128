@@ -1,0 +1,59 @@
+#!/bin/ksh
+
+# @ shell = /usr/bin/ksh
+# @ class = cluster
+# @ rset = rset_mcm_affinity
+# @ mcm_affinity_options = mcm_accumulate
+# @ job_type = parallel
+# @ job_name = dycoms_testcase_newsrc
+# @ output   = $(job_name).$(jobid).out
+# @ error    = $(job_name).$(jobid).err
+# @ notification = complete
+# @ notify_user = malte.rieck@zmaw.de
+# @ wall_clock_limit = 08:00:00
+# @ node_usage = not_shared
+# @ network.MPI = sn_all,not_shared,us
+# @ tasks_per_node = 32 
+# @ node = 4
+# @ resources = ConsumableMemory(0.75gb)
+# @ task_affinity = core(1)
+# @ queue
+
+
+export MEMORY_AFFINITY=MCM
+export MP_PRINTENV=YES
+export MP_LABELIO=YES
+export MP_INFOLEVEL=2
+export MP_EAGER_LIMIT=64k
+export MP_BUFFER_MEM=64M,256M
+export MP_USE_BULK_XFER=NO
+export MP_BULK_MIN_MSG_SIZE=128k
+export MP_RFIFO_SIZE=4M
+export MP_SHM_ATTACH_THRESH=500000
+export LAPI_DEBUG_STRIPE_SEND_FLIP=8
+
+filepath=`pwd`
+cd /work/mh0492/m300042/LES/OUTPUT/DYCOMS_SRC_TESTCASE_NEW/DATA_NEW
+
+
+timex poe /pf/m/m300042/LES/uclales_new/bin/les.mpi
+
+echo $filepath
+n_submit=`cat ${filepath}/nsubmit.dat`
+n_maxsubmit=`cat ${filepath}/nmaxsubmit.dat`
+n_time=`cat ${filepath}/ntime.dat`
+nmaxsubmit=$(( n_maxsubmit - 1 ))
+echo $n_submit
+if [ n_submit -lt ${n_maxsubmit} ]; then
+n_time_ini=$n_time
+n_time=$(( n_time + 7200 ))
+n_submit=$(( n_submit + 1 ))
+echo 'llsubmit llrunon128procs'
+echo $n_submit > ${filepath}/nsubmit.dat
+echo $n_time > ${filepath}/ntime.dat
+ sed -e 's/'${n_time_ini}'/'${n_time}'/g' NAMELIST_test > NAMELIST${n_submit}
+cp NAMELIST${n_submit}  NAMELIST_test
+cp NAMELIST${n_submit}  NAMELIST
+cd $filepath
+llsubmit llrunon128procs_auto
+fi

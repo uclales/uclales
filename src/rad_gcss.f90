@@ -29,12 +29,12 @@ contains
   ! SW fluxes (LW similar to DYCOMS, but without the 3rd term, SW Delta Eddington EUROCS)
   ! case and simultaneously update fields due to vertical motion as given by div
 
-  subroutine gcss_rad(n1,n2,n3,alat,time,case_name,div,sst, rc,dn0,flx,swn,zt,zm,dzt,   &
+  subroutine gcss_rad(n1,n2,n3,alat,time,case_name,div,sst, rc,dn0,flx,swn,zt,zm,dzi_t,   &
        tt,tl,rtt,rt)
 
     integer, intent (in):: n1,n2, n3
     real, intent (in)   :: div, sst, alat, time
-    real, intent (in)   :: zt(n1),zm(n1),dzt(n1),dn0(n1),rc(n1,n2,n3),   &
+    real, intent (in)   :: zt(n1),zm(n1),dzi_t(n1),dn0(n1),rc(n1,n2,n3),   &
          tl(n1,n2,n3),rt(n1,n2,n3)
     real, intent (inout):: tt(n1,n2,n3),rtt(n1,n2,n3)
     real, intent (inout)  :: flx(n1,n2,n3),swn(n1,n2,n3)
@@ -64,7 +64,7 @@ contains
        fr1 = 10.
     end if
 
-print *, 'uses astex rad'
+!print *, 'uses astex rad'
 
 ! determine the solar geometery, as measured by mu, the cosine of the 
 ! solar zenith angle
@@ -120,14 +120,13 @@ mu = zenith(alat,time)
             lwp(i,j)=lwp(i,j)-max(0.,rc(k,i,j)*dn0(k)*(zm(k)-zm(k-1)))
              flx(k,i,j)=flx(k,i,j)+fr0*exp(-1.*xka*lwp(i,j))
           if (trim(case_name) .ne. 'astex' .and. trim(case_name) .ne. 'trans') then
-print *, 'should go here'
              if (zm(k) > zm(ki) .and. ki > 1 .and. fact > 0.) then
                 flx(k,i,j)=flx(k,i,j) + fact*(0.25*(zm(k)-zm(ki))**1.333 + &
                   zm(ki)*(zm(k)-zm(ki))**0.333333)
              end if
              end if
-             tt(k,i,j) =tt(k,i,j)-(flx(k,i,j)-flx(km1,i,j))*dzt(k)/(dn0(k)*cp)
-             tt(k,i,j) =tt(k,i,j)+(swn(k,i,j)-swn(km1,i,j))*dzt(k)/(dn0(k)*cp)
+             tt(k,i,j) =tt(k,i,j)-(flx(k,i,j)-flx(km1,i,j))*dzi_t(k)/(dn0(k)*cp)
+             tt(k,i,j) =tt(k,i,j)+(swn(k,i,j)-swn(km1,i,j))*dzi_t(k)/(dn0(k)*cp)
           enddo
 
 !print *, 'astex rad after lw2'
@@ -139,9 +138,9 @@ print *, 'should go here'
              do k=2,n1-2
                 kp1 = k+1
                 tt(k,i,j) = tt(k,i,j) + &
-                        div*zt(k)*(tl(kp1,i,j)-tl(k,i,j))*dzt(k)
+                        div*zt(k)*(tl(kp1,i,j)-tl(k,i,j))*dzi_t(k)
                 rtt(k,i,j)=rtt(k,i,j) + &
-                        div*zt(k)*(rt(kp1,i,j)-rt(k,i,j))*dzt(k)
+                        div*zt(k)*(rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)
              end do
           end if
        enddo

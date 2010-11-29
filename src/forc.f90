@@ -44,7 +44,7 @@ contains
   subroutine forcings(time_in, cntlat, sst,div, case_name)
 
 !irina
-    use grid, only: nxp, nyp, nzp, zm, zt, dzt, dzm, dn0, iradtyp, liquid  &
+    use grid, only: nxp, nyp, nzp, zm, zt, dzi_t, dzi_m, dn0, iradtyp, liquid  &
          , a_rflx, a_sflx, albedo, a_tt, a_tp, a_rt, a_rp, a_pexnr, a_scr1 &
          , vapor, a_rpp, CCN, pi0, pi1, level, a_ut, a_up, a_vt, a_vp,a_theta,&
           a_lflxu, a_lflxd, a_sflxu, a_sflxd
@@ -63,20 +63,20 @@ contains
 !irina
     select case(iradtyp)
     case (1)
-        call case_forcing(nzp,nxp,nyp,case_name,zt,dzt,dzm,a_tp,a_rp,a_tt,a_rt)
+        call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt)
     case (2)
        select case(level)
        case(1) 
-          call smoke_rad(nzp, nxp, nyp, dn0, a_rflx, zm, dzt,a_tt,a_rp)
+          call smoke_rad(nzp, nxp, nyp, dn0, a_rflx, zm, dzi_t,a_tt,a_rp)
        case(2)
           call gcss_rad(nzp, nxp, nyp, cntlat, time_in, case_name, div, sst, liquid, dn0,   &
-              a_rflx, a_sflx, zt, zm, dzt, a_tt, a_tp, a_rt, a_rp)
+              a_rflx, a_sflx, zt, zm, dzi_t, a_tt, a_tp, a_rt, a_rp)
        case(3)
           call gcss_rad(nzp, nxp, nyp, cntlat, time_in, case_name, div, sst, liquid, dn0,   &
-              a_rflx, a_sflx, zt, zm, dzt, a_tt, a_tp, a_rt, a_rp)
+              a_rflx, a_sflx, zt, zm, dzi_t, a_tt, a_tp, a_rt, a_rp)
        end select
     case (3)
-       call bellon(nzp, nxp, nyp, a_rflx, a_sflx, zt, dzt, dzm, a_tt, a_tp&
+       call bellon(nzp, nxp, nyp, a_rflx, a_sflx, zt, dzi_t, dzi_m, a_tt, a_tp&
             ,a_rt, a_rp, a_ut, a_up, a_vt, a_vp)
     case (4)
        if (present(time_in) .and. present(cntlat) .and. present(sst)) then
@@ -84,20 +84,20 @@ contains
           !a_scr1 = a_theta/a_pexnr 
           if (level == 3) then
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
-                  dn0, pi0, pi1, dzt, a_pexnr, a_theta, vapor, liquid, a_tt,&
+                  dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt,&
                   a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, rr=a_rpp)
             !old      
             ! call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
-            !      dn0, pi0, pi1, dzt, a_pexnr, a_scr1, vapor, liquid, a_tt,&
+            !      dn0, pi0, pi1, dzi_t, a_pexnr, a_scr1, vapor, liquid, a_tt,&
             !      a_rflx, a_sflx, albedo, rr=a_rpp)
           else
              xref1 = 0.
              xref2 = 0.
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,    &
-                  dn0, pi0, pi1, dzt, a_pexnr, a_theta, vapor, liquid, a_tt, &
+                  dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt, &
                   a_rflx, a_sflx,a_lflxu, a_lflxd,a_sflxu,a_sflxd,albedo)
              !call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,    &
-             !     dn0, pi0, pi1, dzt, a_pexnr, a_scr1, vapor, liquid, a_tt, &
+             !     dn0, pi0, pi1, dzi_t, a_pexnr, a_scr1, vapor, liquid, a_tt, &
              !     a_rflx, a_sflx, albedo)
              xref1 = xref1 + a_sflx(nzp,3,3)/albedo(3,3)
              xref2 = xref2 + a_sflx(nzp,3,3)
@@ -113,9 +113,9 @@ contains
              do k=2,nzp-2
                 kp1 = k+1
                 a_tt(k,i,j) = a_tt(k,i,j) + &
-                        div*zt(k)*(a_tp(kp1,i,j)-a_tp(k,i,j))*dzt(k)
+                        div*zt(k)*(a_tp(kp1,i,j)-a_tp(k,i,j))*dzi_t(k)
                 a_rt(k,i,j)=a_rt(k,i,j) + &
-                        div*zt(k)*(a_rp(kp1,i,j)-a_rp(k,i,j))*dzt(k)
+                        div*zt(k)*(a_rp(kp1,i,j)-a_rp(k,i,j))*dzi_t(k)
              end do
            end if
           enddo
@@ -133,10 +133,10 @@ contains
   ! subroutine smoke_rad:  call simple radiative parameterization for 
   ! the smoke cloud
   !
-  subroutine smoke_rad(n1,n2,n3,dn0,flx,zm,dzt,tt,rt)
+  subroutine smoke_rad(n1,n2,n3,dn0,flx,zm,dzi_t,tt,rt)
 
     integer, intent (in):: n1,n2, n3
-    real, intent (in)   :: zm(n1),dzt(n1),dn0(n1),rt(n1,n2,n3)
+    real, intent (in)   :: zm(n1),dzi_t(n1),dn0(n1),rt(n1,n2,n3)
     real, intent (inout):: tt(n1,n2,n3)
     real, intent (out)  :: flx(n1,n2,n3)
     real, parameter     :: xka= 50.0, fr0=60.0
@@ -157,7 +157,7 @@ contains
              km1=max(2,k-1)
              smoke(i,j)=smoke(i,j)-max(0.,rt(k,i,j)*dn0(k)*(zm(k)-zm(k-1)))
              flx(k,i,j)=fr0*exp(-1.*xka*smoke(i,j))
-             tt(k,i,j) =tt(k,i,j)-(flx(k,i,j)-flx(km1,i,j))*dzt(k)/(dn0(k)*cp)
+             tt(k,i,j) =tt(k,i,j)-(flx(k,i,j)-flx(km1,i,j))*dzi_t(k)/(dn0(k)*cp)
           enddo
        enddo
     enddo
@@ -168,13 +168,13 @@ contains
   ! subroutine case_forcing: adjusts tendencies according to a specified
   ! large scale forcing.  Normally case (run) specific.
   !
-  subroutine case_forcing(n1,n2,n3,case_name,zt,dzt,dzm,tl,rt,tt,rtt)
+  subroutine case_forcing(n1,n2,n3,case_name,zt,dzi_t,dzi_m,tl,rt,tt,rtt)
 
     use mpi_interface, only : pecount, double_scalar_par_sum,myid, appl_abort
     use stat, only : get_zi
 
     integer, intent (in):: n1,n2, n3
-    real, dimension (n1), intent (in)          :: zt, dzt, dzm
+    real, dimension (n1), intent (in)          :: zt, dzi_t, dzi_m
     real, dimension (n1,n2,n3), intent (in)    :: tl, rt
     real, dimension (n1,n2,n3), intent (inout) :: tt, rtt
     character (len=5), intent (in) :: case_name
@@ -198,7 +198,7 @@ contains
           else
              sf(k) =  -0.005 
           end if
-          sf(k) = sf(k)*dzt(k)
+          sf(k) = sf(k)*dzi_t(k)
        end do
 
        do j=3,n3-2
@@ -236,7 +236,7 @@ contains
           else
              sf(k) =  min(0.,-0.0065  + 0.0065*(zt(k)-1500.)/600.)
           end if
-          sf(k) = sf(k)*dzt(k)
+          sf(k) = sf(k)*dzi_t(k)
        end do
 
        do j=3,n3-2
@@ -269,7 +269,7 @@ contains
        !
        ! calculate subsidence factor (wsub / dz)
        !
-       zil = get_zi (n1, n2, n3, 2, rt, dzm, zt, 6.5e-3)
+       zil = get_zi (n1, n2, n3, 2, rt, dzi_m, zt, 6.5e-3)
        call double_scalar_par_sum(zil,zig)
        zibar = real(zig/pecount)
 
@@ -279,7 +279,7 @@ contains
           else
              sf(k) =  min(0.,-0.0065*(1 - (zt(k)-zibar)/300.))
           end if
-          sf(k) = sf(k)*dzt(k)
+          sf(k) = sf(k)*dzi_t(k)
        end do
 
        do j=3,n3-2
@@ -314,11 +314,11 @@ contains
   ! -------------------------------------------------------------------
   ! subroutine bellon_rad:  call simple radiative parameterization
   !
-  subroutine bellon(n1,n2,n3,flx,sflx,zt,dzt,dzm,tt,tl,rtt,rt, ut,u,vt,v)
+  subroutine bellon(n1,n2,n3,flx,sflx,zt,dzi_t,dzi_m,tt,tl,rtt,rt, ut,u,vt,v)
 
     integer, intent (in) :: n1,n2, n3
 
-    real, dimension (n1), intent (in)            :: zt, dzt, dzm
+    real, dimension (n1), intent (in)            :: zt, dzi_t, dzi_m
     real, dimension (n1, n2, n3), intent (inout) :: tt, tl, rtt, rt, ut,u,vt,v
     real,  dimension (n1, n2, n3), intent (out)  :: flx, sflx
     real, parameter      :: w0= 7.5e-3, H=1000., Qrate = 2.5/86400.
@@ -337,15 +337,15 @@ contains
              kp1 = k+1
              wk = w0*(1.-exp(-zt(k)/H))
              grad = Qrate/wk
-             flx(k,i,j)  = wk*((tl(kp1,i,j)-tl(k,i,j))*dzt(k)-grad)
-             sflx(k,i,j) = wk*((rt(kp1,i,j)-rt(k,i,j))*dzt(k)-grad)
+             flx(k,i,j)  = wk*((tl(kp1,i,j)-tl(k,i,j))*dzi_t(k)-grad)
+             sflx(k,i,j) = wk*((rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)-grad)
              tt(k,i,j) = tt(k,i,j) + flx(k,i,j)
              rtt(k,i,j)=rtt(k,i,j) + &
-                  wk*(rt(kp1,i,j)-rt(k,i,j))*dzt(k)
+                  wk*(rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)
              ut(k,i,j) =  ut(k,i,j) + &
-                  wk*(u(kp1,i,j)-u(k,i,j))*dzm(k)
+                  wk*(u(kp1,i,j)-u(k,i,j))*dzi_m(k)
              vt(k,i,j) =  vt(k,i,j) + &
-                  wk*(v(kp1,i,j)-v(k,i,j))*dzm(k)
+                  wk*(v(kp1,i,j)-v(k,i,j))*dzi_m(k)
           end do
           flx(n1,  i,j)  = 0.
           flx(n1-1,i,j)  = 0.

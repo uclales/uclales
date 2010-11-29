@@ -1,7 +1,7 @@
  &model
   nzp =   97
   nxp =   132
-  nyp =   132
+  nyp =   132  
   nxpart = .True.
   deltax = 50.
   deltay = 50.
@@ -12,18 +12,22 @@
   igrdtyp = -3
   level = 3
   CCN = 55.e6
-  filprf = 'rf02'
-  hfilin = 'rf02.h.rst'
+  filprf = 'rf02khRt'
+  hfilin = 'rf02khRt.h.rst'
   savg_intvl = 900.
   ssam_intvl = 15.
   corflg = .true.
-  prndlt = -0.3333333
+  prndtl = -0.3333333
   iradtyp = 2
   dthcon = 16.
   drtcon = 93.
   th00 = 289.
   umean = 5.
   vmean = -5.
+  cntlat=31.5
+  case_name='dycoms'
+  lsvarflg=.false.
+  div=0.00000375
  /
 
 

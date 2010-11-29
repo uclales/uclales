@@ -145,7 +145,7 @@ contains
 
 !irina
     use grid, only : a_up, a_vp, a_wp, liquid, a_theta, a_scr1, a_scr2       &
-         , a_rp, a_tp, press, nxp, nyp, nzp, dzm, dzt, zm, zt, th00, umean &
+         , a_rp, a_tp, press, nxp, nyp, nzp, dzi_m, dzi_t, zm, zt, th00, umean &
          , vmean, dn0, precip, a_rpp, a_npp, albedo, CCN, iradtyp, a_rflx    &
          , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd
 
@@ -178,8 +178,8 @@ contains
     !
     ! scalar statistics
     !
-    call set_ts(nzp, nxp, nyp, a_wp, a_theta, dn0, zt,zm,dzt,dzm,th00,time)
-    if (level >=1) call ts_lvl1(nzp, nxp, nyp, dn0, zt, dzm, a_rp)
+    call set_ts(nzp, nxp, nyp, a_wp, a_theta, dn0, zt,zm,dzi_t,dzi_m,th00,time)
+    if (level >=1) call ts_lvl1(nzp, nxp, nyp, dn0, zt, dzi_m, a_rp)
     if (level >=2) call ts_lvl2(nzp, nxp, nyp, a_rp, a_scr2, zt)
 
     call write_ts
@@ -189,19 +189,19 @@ contains
   ! -----------------------------------------------------------------------
   ! subroutine set_ts: computes and writes time sequence stats
   !
-  subroutine set_ts(n1,n2,n3,w,th,dn0,zt,zm,dzt,dzm,th00,time)
+  subroutine set_ts(n1,n2,n3,w,th,dn0,zt,zm,dzi_t,dzi_m,th00,time)
 
     use defs, only : cp
 
     integer, intent(in) :: n1,n2,n3
     real, intent(in)    :: w(n1,n2,n3),th(n1,n2,n3)
-    real, intent(in)    :: dn0(n1),zt(n1),zm(n1),dzt(n1),dzm(n1),th00,time
+    real, intent(in)    :: dn0(n1),zt(n1),zm(n1),dzi_t(n1),dzi_m(n1),th00,time
 
     integer :: k
     real    :: bf(n1)
 
     ssclr(1) = time
-    ssclr(4) = get_zi(n1, n2, n3, 2, th, dzm, zt, 1.)   ! maximum gradient
+    ssclr(4) = get_zi(n1, n2, n3, 2, th, dzi_m, zt, 1.)   ! maximum gradient
     ssclr(5) = get_zi(n1, n2, n3, 3, th, thvar, zt, 1.) ! maximum variance
     ! 
     ! buoyancy flux statistics
@@ -211,9 +211,9 @@ contains
     ssclr(30) = 0.
     do k = 2,n1-2
        bf(k) = wtv_res(k) + wtv_sgs(k)
-       ssclr(7) = ssclr(7) + (tke_res(k)+tke_sgs(k))*dn0(k)/dzt(k)
+       ssclr(7) = ssclr(7) + (tke_res(k)+tke_sgs(k))*dn0(k)/dzi_t(k)
   !irina
-       ssclr(30) = ssclr(30) + (tke_res(k)+tke_sgs(k))/dzt(k)
+       ssclr(30) = ssclr(30) + (tke_res(k)+tke_sgs(k))/dzi_t(k)
        svctr(k,33) = svctr(k,33) + wtv_sgs(k)*9.8/th00
     end do
     ssclr(6) = get_zi(n1, n2, n3, 4, th, bf, zm, 1.) ! minimum buoyancy flux
@@ -229,16 +229,16 @@ contains
   ! subroutine ts_lvl1: computes and writes time sequence stats; for the
   ! zi calculation setting itype=1 selects a concentration threshold
   !
-  subroutine ts_lvl1(n1,n2,n3,dn0,zt,dzm,q)
+  subroutine ts_lvl1(n1,n2,n3,dn0,zt,dzi_m,q)
 
     use defs, only : alvl
 
     integer, intent(in) :: n1,n2,n3
     real, intent(in)    :: q(n1,n2,n3)
-    real, intent(in)    :: dn0(n1),zt(n1),dzm(n1)
+    real, intent(in)    :: dn0(n1),zt(n1),dzi_m(n1)
 
     ssclr(13) = ssclr(13)*alvl*(dn0(1)+dn0(2))*0.5
-    ssclr(14) = get_zi(n1, n2, n3, 1, q, dzm, zt, 0.5e-3)
+    ssclr(14) = get_zi(n1, n2, n3, 1, q, dzi_m, zt, 0.5e-3)
 
   end subroutine ts_lvl1
   ! 
@@ -680,10 +680,10 @@ contains
   ! subroutine comp_tke: calculates some components of the turbulent
   ! kinetic energy budgets and velocity statistics
   ! 
-  subroutine comp_tke(n1,n2,n3,dzm,th00,u,v,w,s,scr)
+  subroutine comp_tke(n1,n2,n3,dzi_m,th00,u,v,w,s,scr)
 
     integer, intent (in) :: n1,n2,n3
-    real, intent (in)    :: dzm(n1),th00,u(n1,n2,n3),v(n1,n2,n3),w(n1,n2,n3)
+    real, intent (in)    :: dzi_m(n1),th00,u(n1,n2,n3),v(n1,n2,n3),w(n1,n2,n3)
     real, intent (inout) :: s(n1,n2,n3)
     real, intent (out) :: scr(n1,n2,n3)
 
@@ -699,7 +699,7 @@ contains
     ! ------
     ! Estimates shear component of TKE budget
     ! 
-    call get_shear(n1,n2,n3,u,v,w,dzm)
+    call get_shear(n1,n2,n3,u,v,w,dzi_m)
     ! 
     ! ------
     ! Calculates horizontal variances and resolved TKE
@@ -784,10 +784,10 @@ contains
   ! ---------------------------------------------------------------------
   ! get_shear:  estimates shear production term in tke budget
   !
-  subroutine get_shear(n1,n2,n3,u,v,w,dzm)
+  subroutine get_shear(n1,n2,n3,u,v,w,dzi_m)
 
     integer, intent(in) :: n3,n2,n1
-    real, intent(in)    :: w(n1,n2,n3),dzm(n1),u(n1,n2,n3),v(n1,n2,n3)
+    real, intent(in)    :: w(n1,n2,n3),dzi_m(n1),u(n1,n2,n3),v(n1,n2,n3)
 
     real :: ub(n1), vb(n1)
     integer i,j,k
@@ -802,11 +802,11 @@ contains
        do i=3,n2-2
           do k=2,n1-1
              uw_shear = -(u(k,i,j)-ub(k))*fact*(                              &
-                  (w(k,i,j)  +w(k,i+1,j)  )*(ub(k+1)-ub(k)  )*dzm(k) +        &
-                  (w(k-1,i,j)+w(k-1,i+1,j))*(ub(k)  -ub(k-1))*dzm(k-1))
+                  (w(k,i,j)  +w(k,i+1,j)  )*(ub(k+1)-ub(k)  )*dzi_m(k) +        &
+                  (w(k-1,i,j)+w(k-1,i+1,j))*(ub(k)  -ub(k-1))*dzi_m(k-1))
              if (j > 1) vw_shear = -(v(k,i,j)-vb(k))*fact*(                   &
-                  (w(k,i,j)  +w(k,i,j+1)  )*(vb(k+1)-vb(k)  )*dzm(k) +        &
-                  (w(k-1,i,j)+w(k-1,i,j+1))*(vb(k)  -vb(k-1))*dzm(k-1))
+                  (w(k,i,j)  +w(k,i,j+1)  )*(vb(k+1)-vb(k)  )*dzi_m(k) +        &
+                  (w(k-1,i,j)+w(k-1,i,j+1))*(vb(k)  -vb(k-1))*dzi_m(k-1))
 
              svctr(k,48) = svctr(k,48)+uw_shear
              svctr(k,36) = svctr(k,36)+uw_shear+vw_shear

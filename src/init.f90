@@ -379,7 +379,7 @@ contains
     !
     pi1(1)=cp*(ps(1)*p00i)**rcp+g*(hs(1)-zt(1))/v1dc(1)
     do k=2,nzp
-       pi1(k) = pi1(k-1)-g/(dzm(k-1)*0.5*(v1dc(k)+v1dc(k-1)))
+       pi1(k) = pi1(k-1)-g/(dzi_m(k-1)*0.5*(v1dc(k)+v1dc(k-1)))
     end do
     !
     ! calculate hydrostatic exner function associated with th00 constant along

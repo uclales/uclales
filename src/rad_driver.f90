@@ -37,12 +37,12 @@ module radiation
   contains
 
     subroutine d4stream(n1, n2, n3, alat, time, sknt, sfc_albedo, CCN, dn0, &
-         pi0, pi1, dzm, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,sflxd, albedo, rr)
+         pi0, pi1, dzi_m, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,sflxd, albedo, rr)
 
 
       integer, intent (in) :: n1, n2, n3
       real, intent (in)    :: alat, time, sknt, sfc_albedo, CCN
-      real, dimension (n1), intent (in)                 :: dn0, pi0, pi1, dzm
+      real, dimension (n1), intent (in)                 :: dn0, pi0, pi1, dzi_m
       real, dimension (n1,n2,n3), intent (in)           :: pip, th, rv, rc
       real, optional, dimension (n1,n2,n3), intent (in) :: rr
       real, dimension (n1,n2,n3), intent (inout)        :: tt, rflx, sflx, lflxu, lflxd, sflxu, sflxd 
@@ -134,7 +134,7 @@ module radiation
             end if
 
             do k=2,n1-3
-               xfact  = exner(k)*dzm(k)/(cp*dn0(k))
+               xfact  = exner(k)*dzi_m(k)/(cp*dn0(k))
                tt(k,i,j) = tt(k,i,j) - (rflx(k,i,j) - rflx(k-1,i,j))*xfact
              !  print *, 'dt', k, rc(k,i,j),(rflx(k,i,j) - rflx(k-1,i,j))*xfact*3600.
             end do

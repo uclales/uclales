@@ -35,4 +35,7 @@
   vs =      -3.8,  -3.8,  -3.8,  -3.8,
   vmean = -4.
   umean = -5.
+  case_name='rico'
+  lsvarflg=.false.
+  div=0.00000000
  /

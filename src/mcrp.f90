@@ -20,7 +20,7 @@
 module mcrp
 
   use defs, only : alvl, rowt, pi, Rm, cp
-  use grid, only : dt, dxi, dyi ,dzt, nxp, nyp, nzp, a_pexnr, a_rp, a_tp, th00, CCN,    &
+  use grid, only : dt, dxi, dyi ,dzi_t, nxp, nyp, nzp, a_pexnr, a_rp, a_tp, th00, CCN,    &
        dn0, pi0,pi1, a_rt, a_tt,a_up, a_rpp, a_rpt, a_npp, a_npt, vapor, liquid,       &
        a_theta, a_scr1, a_scr2, a_scr7, precip
   use thrm, only : thermo, fll_tkrs
@@ -235,7 +235,7 @@ contains
                    ! 
                    ! Calculate the mixing length, dissipation rate and Taylor-Reynolds number
                    !
-                   l = csx*((1/dxi)*(1/dyi)*(1/dzt(k)))**(1./3.)
+                   l = csx*((1/dxi)*(1/dyi)*(1/dzi_t(k)))**(1./3.)
                    epsilon = min(diss(k,i,j),0.06)
                    Re = (6./11.)*((l/ce)**(2./3))*((15./(1.5e-5))**0.5)*(epsilon**(1./6) )                   
                    !
@@ -422,8 +422,8 @@ contains
            do k=2,n1-1
               kp1 = min(k+1,n1-1)
               km1 = max(k,2)
-              cn(k) = 0.25*(vn(kp1)+2.*vn(k)+vn(km1))*dzt(k)*dt
-              cr(k) = 0.25*(vr(kp1)+2.*vr(k)+vr(km1))*dzt(k)*dt
+              cn(k) = 0.25*(vn(kp1)+2.*vn(k)+vn(km1))*dzi_t(k)*dt
+              cr(k) = 0.25*(vr(kp1)+2.*vr(k)+vr(km1))*dzi_t(k)*dt
            end do
 
            !...piecewise linear method: get slopes
@@ -459,10 +459,10 @@ contains
               zz  = 0.0
               cc  = min(1.,cn(k))
               do while (cc > 0 .and. kk <= n1-1)
-                 tot = tot + dn0(kk)*(np(kk,i,j)+nslope(kk)*(1.-cc))*cc/dzt(kk)
-                 zz  = zz + 1./dzt(kk)
+                 tot = tot + dn0(kk)*(np(kk,i,j)+nslope(kk)*(1.-cc))*cc/dzi_t(kk)
+                 zz  = zz + 1./dzi_t(kk)
                  kk  = kk + 1
-                 cc  = min(1.,cn(kk) - zz*dzt(kk))
+                 cc  = min(1.,cn(kk) - zz*dzi_t(kk))
               enddo
               nfl(k) = -tot /dt
 
@@ -471,20 +471,20 @@ contains
               zz  = 0.0
               cc  = min(1.,cr(k))
               do while (cc > 0 .and. kk <= n1-1)
-                 tot = tot + dn0(kk)*(rp(kk,i,j)+rslope(kk)*(1.-cc))*cc/dzt(kk)
-                 zz  = zz + 1./dzt(kk)
+                 tot = tot + dn0(kk)*(rp(kk,i,j)+rslope(kk)*(1.-cc))*cc/dzi_t(kk)
+                 zz  = zz + 1./dzi_t(kk)
                  kk  = kk + 1
-                 cc  = min(1.,cr(kk) - zz*dzt(kk))
+                 cc  = min(1.,cr(kk) - zz*dzi_t(kk))
               enddo
               rfl(k) = -tot /dt
 
               kp1=k+1
-              flxdiv = (rfl(kp1)-rfl(k))*dzt(k)/dn0(k)
+              flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)/dn0(k)
               rpt(k,i,j) =rpt(k,i,j)-flxdiv
               rtt(k,i,j) =rtt(k,i,j)-flxdiv
               tlt(k,i,j) =tlt(k,i,j)+flxdiv*(alvl/cp)*th(k,i,j)/tk(k,i,j)
 
-              npt(k,i,j) = npt(k,i,j)-(nfl(kp1)-nfl(k))*dzt(k)/dn0(k)
+              npt(k,i,j) = npt(k,i,j)-(nfl(kp1)-nfl(k))*dzi_t(k)/dn0(k)
 
 !irina sends out the rrate in kg/hg m/s, in order to avoid double multiplication
 !by Lv dn0, as this is done also in stat.f90
@@ -544,11 +544,11 @@ contains
              Xc = rc(k,i,j) / (CCN+eps0)
              Dc = ( Xc / prw )**(1./3.)
              Dc = MIN(MAX(Dc,D_min),D_bnd)
-             vc = min(c*(Dc*0.5)**2 * exp(4.5*(log(sgg))**2),1./(dzt(k)*dt))
+             vc = min(c*(Dc*0.5)**2 * exp(4.5*(log(sgg))**2),1./(dzi_t(k)*dt))
              rfl(k) = - rc(k,i,j) * vc
              !
              kp1=k+1
-             flxdiv = (rfl(kp1)-rfl(k))*dzt(k)
+             flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)
              rtt(k,i,j) = rtt(k,i,j)-flxdiv
              tlt(k,i,j) = tlt(k,i,j)+flxdiv*(alvl/cp)*th(k,i,j)/tk(k,i,j)
              !irina , stores the sedimentation flux in kg/kg m/s

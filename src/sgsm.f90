@@ -66,7 +66,7 @@ contains
     use grid, only : newvar, nstep, a_up, a_ut, a_vp, a_vt, a_wp, a_wt       &
          ,a_rp, a_tp, a_sp, a_st, vapor, a_pexnr, a_theta                    &
          , a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7, nscl, nxp, nyp    &
-         , nzp, nxyp, nxyzp, zm, dxi, dyi, dzt, dzm, dt, th00, dn0           &
+         , nzp, nxyp, nxyzp, zm, dxi, dyi, dzi_t, dzi_m, dt, th00, dn0           &
          , pi0, pi1, level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,liquid
 
     use util, only         : atob, azero, get_avg3
@@ -86,10 +86,10 @@ contains
          rs=a_scr2)
 
 
-    call bruvais(nzp,nxp,nyp,level,a_theta,a_tp,a_rp,a_scr2,a_scr3,dzm,th00)
+    call bruvais(nzp,nxp,nyp,level,a_theta,a_tp,a_rp,a_scr2,a_scr3,dzi_m,th00)
     !
     !
-    call deform(nzp,nxp,nyp,dzm,dzt,dxi,dyi,a_up,a_vp,a_wp,a_scr5,a_scr6     &
+    call deform(nzp,nxp,nyp,dzi_m,dzi_t,dxi,dyi,a_up,a_vp,a_wp,a_scr5,a_scr6     &
          ,a_scr4,a_scr2)
 
     ! ----------
@@ -106,13 +106,13 @@ contains
 
     call azero(nxyp,sxy1,a2=sxy2)
 
-    call diff_vpt(nzp,nxp,nyp,dn0,dzm,dzt,dyi,dt,vw_sfc,sxy2,a_scr6         &
+    call diff_vpt(nzp,nxp,nyp,dn0,dzi_m,dzi_t,dyi,dt,vw_sfc,sxy2,a_scr6         &
          ,a_scr5,a_scr1,a_vp,a_wp,a_vt,sz2)
 
-    call diff_upt(nzp,nxp,nyp,dn0,dzm,dzt,dxi,dt,uw_sfc,sxy1,a_scr5         &
+    call diff_upt(nzp,nxp,nyp,dn0,dzi_m,dzi_t,dxi,dt,uw_sfc,sxy1,a_scr5         &
          ,a_scr1,a_up,a_wp,a_ut,sz1)
 
-    call diff_wpt(nzp,nxp,nyp,dn0,dzm,dzt,dyi,dxi,dt,ww_sfc,sxy1,a_scr4     &
+    call diff_wpt(nzp,nxp,nyp,dn0,dzi_m,dzi_t,dyi,dxi,dt,ww_sfc,sxy1,a_scr4     &
          ,a_scr1,a_wp,a_up,a_wt,sz3)
 
     call cyclics(nzp,nxp,nyp,a_wt,req)
@@ -140,7 +140,7 @@ contains
 
        if (sflg) call azero(nxyzp,a_scr1)
 
-       call diffsclr(nzp,nxp,nyp,dt,dxi,dyi,dzm,dzt,dn0,sxy1,sxy2   &
+       call diffsclr(nzp,nxp,nyp,dt,dxi,dyi,dzi_m,dzi_t,dn0,sxy1,sxy2   &
             ,a_sp,a_scr2,a_st,a_scr1)
 
        if (sflg) then
@@ -170,11 +170,11 @@ contains
   ! szx3 -> s33, 
   ! szx4 -> s13
   !
-  subroutine deform(n1,n2,n3,dzm,dzt,dx,dy,u,v,w,s12,s22,s23,s)
+  subroutine deform(n1,n2,n3,dzi_m,dzi_t,dx,dy,u,v,w,s12,s22,s23,s)
 
     integer, intent(in) :: n1,n2,n3
     real, intent(in)    :: u(n1,n2,n3),v(n1,n2,n3),w(n1,n2,n3)
-    real, intent(in)    :: dzm(n1),dzt(n1),dx,dy
+    real, intent(in)    :: dzi_m(n1),dzi_t(n1),dx,dy
 
     real, intent(out)   :: s(n1,n2,n3), s22(n1,n2,n3)
     real, intent(out)   :: s12(n1,n2,n3),s23(n1,n2,n3)
@@ -194,14 +194,14 @@ contains
           do k=1,n1
              szx2(k,i) = 2.*(u(k,i,j)-u(k,im,j))*dx
              s22(k,i,j)= 2.*(v(k,i,j)-v(k,i,jm))*dy
-             szx3(k,i) = 2.*(w(k,i,j)-w(max(1,k-1),i,j))*dzt(k)
+             szx3(k,i) = 2.*(w(k,i,j)-w(max(1,k-1),i,j))*dzi_t(k)
              s12(k,i,j)= (u(k,i,jp)-u(k,i,j))*dy + (v(k,ip,j)-v(k,i,j))*dx
              szx1(k,i) = 0.333333*(szx2(k,i)+s22(k,i,j)+szx3(k,i))
           enddo
 
           do k=1,n1-1
-             szx4(k,i) =(u(k+1,i,j)-u(k,i,j))*dzm(k)+(w(k,ip,j)-w(k,i,j))*dx
-             s23(k,i,j)=(v(k+1,i,j)-v(k,i,j))*dzm(k)+(w(k,i,jp)-w(k,i,j))*dy
+             szx4(k,i) =(u(k+1,i,j)-u(k,i,j))*dzi_m(k)+(w(k,ip,j)-w(k,i,j))*dx
+             s23(k,i,j)=(v(k+1,i,j)-v(k,i,j))*dzi_m(k)+(w(k,i,jp)-w(k,i,j))*dy
           end do
        end do
        !
@@ -380,7 +380,7 @@ contains
   ! a tri-diagnonal solver in the vertical at a u point, the deformation
   ! tensor component d31 is passed in via the tendency array
   !
-  subroutine  diff_upt(n1,n2,n3,dn0,dzm,dzt,dxi,dt,sflx,tflx,sij,km,   &
+  subroutine  diff_upt(n1,n2,n3,dn0,dzi_m,dzi_t,dxi,dt,sflx,tflx,sij,km,   &
        u,w,tnd,flx)
 
     logical, parameter  :: noslip = .false.
@@ -388,7 +388,7 @@ contains
     real, intent(in)    :: sij(n1,n2,n3)
     real, intent(in)    :: km(n1,n2,n3),u(n1,n2,n3),w(n1,n2,n3)
     real, intent(in)    :: sflx(n2,n3),tflx(n2,n3)
-    real, intent(in)    :: dn0(n1),dzm(n1),dzt(n1),dxi,dt
+    real, intent(in)    :: dn0(n1),dzi_m(n1),dzi_t(n1),dxi,dt
 
     real, intent(inout) :: flx(n1), tnd(n1,n2,n3)
 
@@ -404,15 +404,15 @@ contains
        indh=0
        do i=3,n2-2
           indh=indh+1
-          sz8(1)=dzm(1)*(km(1,i,j)+km(1,i+1,j))
+          sz8(1)=dzi_m(1)*(km(1,i,j)+km(1,i+1,j))
           sz7(n1-1)  =.5*tflx(i,j)*(dn0(n1)+dn0(n1-1))
           sz7(1)     =.5*sflx(i,j)*(dn0(1)+dn0(2))
           do k=2,n1-1
-             sz8(k)=dzm(k)*(km(k,i,j)+km(k,i+1,j))
+             sz8(k)=dzi_m(k)*(km(k,i,j)+km(k,i+1,j))
              sz7(k)= (-(w(k,i+1,j)-w(k,i,j))*dxi)*0.5*(km(k,i,j)+km(k,i+1,j))
-             sxz4(indh,k)=u(k,i,j)*dn0(k) + dt*dzt(k)*(sz7(k-1)-sz7(k))
-             sxz3(indh,k)=-0.5*dt*dzt(k)*sz8(k)
-             sxz2(indh,k)=-0.5*dt*dzt(k)*sz8(k-1)
+             sxz4(indh,k)=u(k,i,j)*dn0(k) + dt*dzi_t(k)*(sz7(k-1)-sz7(k))
+             sxz3(indh,k)=-0.5*dt*dzi_t(k)*sz8(k)
+             sxz2(indh,k)=-0.5*dt*dzi_t(k)*sz8(k-1)
              sxz1(indh,k)=dn0(k)-sxz2(indh,k)-sxz3(indh,k)
           end do
           !
@@ -455,7 +455,7 @@ contains
              tnd(k,i,j)=tnd(k,i,j) + dti*(sxz1(indh,k)-u(k,i,j)) - dfact *    &
                   ((szx5(k,i+1)-szx5(k,i))*dxi + (sij(k,i,j)-sij(k,i,j-1))*dxi)
 
-             if (k < n1-1) flx(k)= flx(k)-dzm(k)*(km(k,i,j)+km(k,i+1,j))      &
+             if (k < n1-1) flx(k)= flx(k)-dzi_m(k)*(km(k,i,j)+km(k,i+1,j))      &
                   *(sxz1(indh,k+1)-sxz1(indh,k))*.5
           enddo
           tnd(n1,i,j) = 0.
@@ -469,12 +469,12 @@ contains
   ! a tri-diagnonal solver in the vertical at u or v pts depending on
   ! the values of ip and jp and the input arguments
   !
-  subroutine  diff_vpt(n1,n2,n3,dn0,dzm,dzt,dyi,dt,sflx,tflx,sii,sij,  &
+  subroutine  diff_vpt(n1,n2,n3,dn0,dzi_m,dzi_t,dyi,dt,sflx,tflx,sii,sij,  &
        km,v,w,tnd,flx)
 
     logical, parameter  :: noslip = .false.
     integer, intent(in) :: n1,n2,n3
-    real, intent(in)    :: dn0(n1),dzm(n1),dzt(n1),dyi,dt
+    real, intent(in)    :: dn0(n1),dzi_m(n1),dzi_t(n1),dyi,dt
     real, intent(in)    :: sflx(n2,n3),tflx(n2,n3)
     real, intent(in)    :: sii(n1,n2,n3),sij(n1,n2,n3)
     real, intent(in)    :: km(n1,n2,n3),v(n1,n2,n3),w(n1,n2,n3)
@@ -493,15 +493,15 @@ contains
        indh  = 0
        do i=3,n2-2
           indh=indh+1
-          sz8(1)=dzm(1)*(km(1,i,j)+km(1,i,j+1))
+          sz8(1)=dzi_m(1)*(km(1,i,j)+km(1,i,j+1))
           sz7(n1-1)  =.5*(tflx(i,j))*(dn0(n1)+dn0(n1-1))
           sz7(1)     =.5*(sflx(i,j))*(dn0(1)+dn0(2))
           do k=2,n1-1
-             sz8(k)=dzm(k)*(km(k,i,j)+km(k,i,j+1))
+             sz8(k)=dzi_m(k)*(km(k,i,j)+km(k,i,j+1))
              sz7(k)= (-(w(k,i,j+1)-w(k,i,j))*dyi)*0.5*(km(k,i,j)+km(k,i,j+1))
-             sxz4(indh,k)=v(k,i,j)*dn0(k) + dt*dzt(k)*(sz7(k-1)-sz7(k))
-             sxz3(indh,k)=-0.5*dt*dzt(k)*sz8(k)
-             sxz2(indh,k)=-0.5*dt*dzt(k)*sz8(k-1)
+             sxz4(indh,k)=v(k,i,j)*dn0(k) + dt*dzi_t(k)*(sz7(k-1)-sz7(k))
+             sxz3(indh,k)=-0.5*dt*dzi_t(k)*sz8(k)
+             sxz2(indh,k)=-0.5*dt*dzi_t(k)*sz8(k-1)
              sxz1(indh,k)=dn0(k)-sxz2(indh,k)-sxz3(indh,k)
           end do
           !
@@ -533,7 +533,7 @@ contains
              dfact = 1./dn0(k) 
              tnd(k,i,j)=tnd(k,i,j) + dti*(sxz1(indh,k)-v(k,i,j)) - dfact *    &
                  ((sii(k,i,j+1)-sii(k,i,j))*dyi+(sij(k,i,j)-sij(k,i-1,j))*dyi)
-             if (k < n1-1) flx(k)= flx(k)-dzm(k)*(km(k,i,j)+km(k,i,j+1))      &
+             if (k < n1-1) flx(k)= flx(k)-dzi_m(k)*(km(k,i,j)+km(k,i,j+1))      &
                   *(sxz1(indh,k+1)-sxz1(indh,k))*.5
           enddo
        enddo
@@ -545,14 +545,14 @@ contains
   ! subroutine diff_wpt: computes the diffusivity of velocities at a
   ! wpt
   !
-  subroutine  diff_wpt(n1,n2,n3,dn0,dzm,dzt,dxi,dyi,dt,sflx,tflx,s23,km,w,u   &
+  subroutine  diff_wpt(n1,n2,n3,dn0,dzi_m,dzi_t,dxi,dyi,dt,sflx,tflx,s23,km,w,u   &
        ,tnd,flx)
 
     integer, intent(in) :: n1,n2,n3
     real, intent(in)    :: s23(n1,n2,n3)
     real, intent(in)    :: km(n1,n2,n3),w(n1,n2,n3),u(n1,n2,n3)
     real, intent(in)    :: sflx(n2,n3),tflx(n2,n3)
-    real, intent(in)    :: dn0(n1),dzm(n1),dzt(n1),dxi,dyi,dt
+    real, intent(in)    :: dn0(n1),dzi_m(n1),dzi_t(n1),dxi,dyi,dt
 
     real, intent(inout) :: flx(n1), tnd(n1,n2,n3)
 
@@ -575,13 +575,13 @@ contains
        do i=3,n2-2
           indh=indh+1
 
-          sz8(1)=dzt(2)*.5*(km(1,i,j)+km(2,i,j))
+          sz8(1)=dzi_t(2)*.5*(km(1,i,j)+km(2,i,j))
           do k=2,n1-2
              kp1 = k+1
-             sz8(k)=dzt(kp1)*.5*(km(k,i,j)+km(kp1,i,j))
+             sz8(k)=dzi_t(kp1)*.5*(km(k,i,j)+km(kp1,i,j))
              sxz4(indh,k)=w(k,i,j)*(dn0(k)+dn0(kp1))*.5
-             sxz3(indh,k)=-dt*dzm(k)*sz8(k)
-             sxz2(indh,k)=-dt*dzm(k)*sz8(k-1)
+             sxz3(indh,k)=-dt*dzi_m(k)*sz8(k)
+             sxz2(indh,k)=-dt*dzi_m(k)*sz8(k-1)
              sxz1(indh,k)=(dn0(k)+dn0(kp1))*0.5 - sxz2(indh,k) - sxz3(indh,k)
           end do
           sxz2(indh,2)    = 0.
@@ -591,15 +591,15 @@ contains
           flx(n1-1)=flx(n1-1)+tflx(i,j)*dn0(n1-1)
 
           do k=2,n1-1
-             szx5(k,i) = ((u(k+1,i,j)-u(k,i,j))*dzm(k)+(w(k,i+1,j)-w(k,i,j))  &
+             szx5(k,i) = ((u(k+1,i,j)-u(k,i,j))*dzi_m(k)+(w(k,i+1,j)-w(k,i,j))  &
                   *dxi)*(-0.5)*(km(k,i,j)+km(k,i+1,j))
           end do
-          sxz4(indh,2)   =sxz4(indh,2) + dt*dzm(2)*sflx(i,j)*dn0(2)
-          sxz4(indh,n1-2)=sxz4(indh,n1-2)-dt*dzm(n1-2)*tflx(i,j)*dn0(n1-1)
+          sxz4(indh,2)   =sxz4(indh,2) + dt*dzi_m(2)*sflx(i,j)*dn0(2)
+          sxz4(indh,n1-2)=sxz4(indh,n1-2)-dt*dzi_m(n1-2)*tflx(i,j)*dn0(n1-1)
        end do
 
        do k=2,n1-1
-          szx5(k,2) =  ((u(k+1,2,j)-u(k,2,j))*dzm(k) + (w(k,3,j)-w(k,2,j))    &
+          szx5(k,2) =  ((u(k+1,2,j)-u(k,2,j))*dzi_m(k) + (w(k,3,j)-w(k,2,j))    &
                *dxi)*(-0.5)*(km(k,2,j)+km(k,3,j))
        end do
 
@@ -619,7 +619,7 @@ contains
              dfact = 1./((dn0(k)+dn0(k+1))*.5)
              tnd(k,i,j)=tnd(k,i,j) + dti*(sxz1(indh,k)-w(k,i,j))- dfact *     &
                   ((szx5(k,i)-szx5(k,im1))*dxi + (s23(k,i,j)-s23(k,i,jm1))*dyi)
-             flx(k) = flx(k)-dzt(k)*(km(k,i,j)+km(k+1,i,j))*0.5               &
+             flx(k) = flx(k)-dzi_t(k)*(km(k,i,j)+km(k+1,i,j))*0.5               &
                   *(sxz1(indh,k)-sxz1(indh,k-1))
           enddo
        enddo
@@ -631,13 +631,13 @@ contains
   ! subroutine diffsclr: computes the diffusivity of a scalar using
   ! a tri-diagnonal solver in the vertical
   !
-  subroutine diffsclr(n1,n2,n3,dt,dxi,dyi,dzm,dzt,dn0,sflx,tflx,scp,xkh,sct &
+  subroutine diffsclr(n1,n2,n3,dt,dxi,dyi,dzi_m,dzi_t,dn0,sflx,tflx,scp,xkh,sct &
        ,flx)
 
     integer, intent(in) :: n1,n2,n3
     real, intent(in)    :: xkh(n1,n2,n3),scp(n1,n2,n3)
     real, intent(in)    :: sflx(n2,n3),tflx(n2,n3),dn0(n1)
-    real, intent(in)    :: dxi,dyi,dzm(n1),dzt(n1),dt
+    real, intent(in)    :: dxi,dyi,dzi_m(n1),dzi_t(n1),dt
 
     real, intent(inout) :: flx(n1,n2,n3),sct(n1,n2,n3)
     !
@@ -664,16 +664,16 @@ contains
        do i=3,n2-2
           indh=indh+1
           do k=2,n1-1
-             if (k < n1-1) sz7(k)=dt*dzm(k)*xkh(k,i,j)
-             sxz1(indh,k)=-dzt(k)*sz7(k-1)
-             sxz2(indh,k)=-dzt(k)*sz7(k)
+             if (k < n1-1) sz7(k)=dt*dzi_m(k)*xkh(k,i,j)
+             sxz1(indh,k)=-dzi_t(k)*sz7(k-1)
+             sxz2(indh,k)=-dzi_t(k)*sz7(k)
              sxz3(indh,k)=dn0(k)-sxz1(indh,k)-sxz2(indh,k)
              sxz4(indh,k)=scp(k,i,j)*dn0(k)
           enddo
           sxz4(indh,2)=scp(2,i,j)*dn0(2)                                     &
-               + sflx(i,j)*(dn0(1)+dn0(2))     *.5 *dt*dzt(2)
+               + sflx(i,j)*(dn0(1)+dn0(2))     *.5 *dt*dzi_t(2)
           sxz4(indh,n1-1)=scp(n1-1,i,j)*dn0(n1-1)                            &
-               - tflx(i,j)*(dn0(n1-1)+dn0(n1)) *.5 *dt*dzt(n1-1)
+               - tflx(i,j)*(dn0(n1-1)+dn0(n1)) *.5 *dt*dzi_t(n1-1)
        enddo
 
        call tridiff(n2,n1-1,indh,sxz1,sxz3,sxz2,sxz4,sxz5,sxz6)
@@ -694,7 +694,7 @@ contains
                   -scp(k,i,j-1))*dyi*0.25*(xkh(k,i,j-1)+xkh(k,i,j)            &
                   +xkh(k-1,i,j-1)+xkh(k-1,i,j)))*dyi) /dn0(k)
              if (k<n1-1) flx(k,i,j)=-xkh(k,i,j)*(sxz5(indh,k+1)-sxz5(indh,k)) &
-                  *dzm(k)
+                  *dzi_m(k)
           end do
        enddo
     enddo

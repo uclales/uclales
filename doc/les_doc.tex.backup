@@ -476,7 +476,7 @@ to the new timestep is always 0.5.
 
 \subsection{Computational Grid}
 \begin{figure}[htb]
-\centering \leavevmode \includegraphics[width=12cm]{grid2}
+\centering \leavevmode \includegraphics[width=12cm]{grid}
 \caption{Schematic depiction of the model grid and where variables
 locate on it.}
 \label{fig:grid}
@@ -550,6 +550,8 @@ For $N_x = N_y = 2\sqrt{N_p} \gg 1$ this ratio approaches 7, although
 the communication overhead of such a large computation is more likely
 to be the bottleneck. I/O is currently handled by each processor.
 
+***ADD balance between efficiency and total computation time ? 
+
 \paragraph{Communication}
 With the current 2-D parallelization strategy global communications
 are needed to implement boundary conditions, compute domain
@@ -565,6 +567,7 @@ inverse FFT along the strips in the $x$-direction.  This strategy only
 requires four global communications per solve.
 
 \section{The Code}
+
 \subsection{Getting the Code}
 The UCLALES Code is free for all to use, distribute, and call their own,
 following the guidelines of the gnu public license (http://www.gnu.org/licenses/).
@@ -572,7 +575,7 @@ It is distributed through git, a free software source code management project.
 Subsequent developments of the code are available to its community here as well.
 The newest version of UCLALES will always be available at \textbf{http://git.gitorious.org/uclales}.
 To Download the newest UCLALES version make sure you have git installed on your system.
-Typing ``git clone git@gitorious.org:uclales/uclales.git'' in the command line
+Typing ``git clone  http://git.gitorious.org/uclales/uclales.git'' in the command line
 will download the sources. You may want to check for updates by typing ``git pull ''
 in the command line. To check what has been changed since the last commit use
 ``git status'' and ``git diff''. You can also insert your private UCLALES version into git.
@@ -671,6 +674,7 @@ active MPI calls.\\ \hline \hline
 \end{tabular}
 \end{center}
 \end{table}
+
 
 \subsection{Compilation}
 To compile the model type ``make'' (``make mpi'' or ``make seq'' respectively) in the the 
@@ -812,29 +816,27 @@ savg\_intvl& stat & 1800 s    &  statistics averaging interval \\
 \hline
 \end{longtable}
 To run a specific case one can copy the appropriate NAMELIST from
-\emph{misc/initfiles} (see list of available NAMELIST files below).
-One may want to adjust parameters such as e.g. filprf, dtime,
-timmax, iradtype,level and others before running the model.
-Here the use of the NAMELIST allows to change properties
-without recompiling the model. As an example, the parameter
-case\_name in the NAMELIST file can be used to set large scale
-forcings for a specific case. Currently available case\_names
-are: rico, bomex and atex.
-
+\emph{misc/initfiles}. One may want to adjust parameters such as
+e.g. filprf, dtime, timmax, iradtype,level and others before
+running the model. Here the use of the NAMELIST allows to change
+properties without recompiling the model. As an example, the
+parameter case\_name in the NAMELIST file can be used to set
+large scale forcings for a specific case. Currently available
+case\_names are: rico, bomex and atex.
 \begin{itemize}
-\item \textbf{namelist\_astex}: The Astex case.
-\item \textbf{namelist\_cumulus}: Namelist to reproduce the idealized
+\item namelist\_astex: The Astex case.
+\item namelist\_cumulus: Namelist to reproduce the idealized
 cumulus cases reported in Stevens, JAS (2007). Requires the
 generation of a sound\_in file with bstate.f95.
-\item \textbf{namelist\_drycbl}: Idealized dry CBL consisting of a
+\item namelist\_drycbl: Idealized dry CBL consisting of a
 layer with initially uniform stratification and constant forcing.
-\item \textbf{namelist\_dycm01}: The DYCOMS GCSS RF01 case, requires
+\item namelist\_dycm01: The DYCOMS GCSS RF01 case, requires
 the generation of a sound\_in file with bstate.f95.
-\item \textbf{namelist\_dycm02}: The DYCOMS GCSS RF02 case, requires
+\item namelist\_dycm02: The DYCOMS GCSS RF02 case, requires
 the generation of a sound\_in file with bstate.f95, as well as the
 generation of zm\_grid\_in and zt\_grid\_in files uzing zgrid.gcss9.f.
-\item \textbf{namelist\_rico}: The RICO GCSS composite case.
-\item \textbf{namelist\_smoke}: The RICO GCSS smoke case.
+\item namelist\_rico: The RICO GCSS composite case.
+\item namelist\_smoke: The RICO GCSS smoke case.
 \end{itemize}
 
 \subsection{Output}
@@ -984,8 +986,8 @@ precip & '' &  Precipitation flux \\
 dn0    & 1D &  Basic state density, $\rho_0(z).$ \\
 xt, yt, zt & '' & Position of thermodynamic points \\
 xm, ym, zm & '' & position of momentum points \\
-dzi\_t        & '' & $1/(z_m(k) - z_m(k-1)$ \\
-dzi\_m        & '' & $1/(z_t(k+1) - z_t(k)$ \\
+dzt        & '' & $1/(z_m(k) - z_m(k-1)$ \\
+dzm        & '' & $1/(z_t(k+1) - z_t(k)$ \\
 \hline \hline
 \end{longtable}
 
@@ -1059,7 +1061,7 @@ propagation of the smoke layer into the overlying fluid, accompanied
 by the dilution of the smoke layer.  The slight instability at the top
 of the smoke layer ($\theta$ decreasing with height) is the signature
 of the radiative cooling active in this case.
-\newpage
+
 \begin{thebibliography}{8}
 \expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
 \expandafter\ifx\csname url\endcsname\relax
