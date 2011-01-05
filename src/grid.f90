@@ -66,7 +66,7 @@ module grid
 
   integer           :: nz, nxyzp, nxyp, nstep
   real              :: dxi, dyi, dt, psrf
-  real, dimension(:), allocatable :: xt, xm, yt, ym, zt, zm, dzt, dzm,        &
+  real, dimension(:), allocatable :: xt, xm, yt, ym, zt, zm, dzi_t, dzi_m,        &
        u0, v0, pi0, pi1, th0, dn0, rt0, spngt, spngm, wsavex, wsavey,         &
        wfls, dthldtls,dqtdtls                                       !cgils
   !
@@ -412,20 +412,20 @@ contains
   end if
   !    
   ! compute other arrays based on the vertical grid.
-  !   dzm: inverse of distance between thermal points k+1 and k
-  !   dzt: inverse of distance between momentum points k and k-1
+  !   dzi_m: inverse of distance between thermal points k+1 and k
+  !   dzi_t: inverse of distance between momentum points k and k-1
   !
-  allocate (dzm(nzp))
+  allocate (dzi_m(nzp))
   do k=1,nzp-1
-     dzm(k)=1./(zt(k+1)-zt(k))
+     dzi_m(k)=1./(zt(k+1)-zt(k))
   end do
-  dzm(nzp)=dzm(nzp-1)*dzm(nzp-1)/dzm(nzp-2)
+  dzi_m(nzp)=dzi_m(nzp-1)*dzi_m(nzp-1)/dzi_m(nzp-2)
   
-  allocate (dzt(nzp))
+  allocate (dzi_t(nzp))
   do k=2,nzp
-     dzt(k)=1./(zm(k)-zm(k-1))
+     dzi_t(k)=1./(zm(k)-zm(k-1))
   end do
-  dzt(1)=dzt(2)*dzt(2)/dzt(3)
+  dzi_t(1)=dzi_t(2)*dzi_t(2)/dzi_t(3)
   !
   ! set timesteps
   !

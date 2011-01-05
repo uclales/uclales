@@ -1,19 +1,19 @@
-
 #!/bin/bash
 #-----------------------------------------------------------------------------
 # SGE directives
 #
-#$ -N testles
 #$ -S /bin/bash
 #$ -o $JOB_NAME.o$JOB_ID
-#$ -pe orte8 32
 #$ -cwd
-#$ -j y
 #$ -q cluster
+#$ -j n
+#$ -N JOB_NAME
+#$ -M malte.rieck@zmaw.de
+#$ -pe orte8 64
 #-----------------------------------------------------------------------------
 # user command section
 
-export MPIROOT=/sw/sles10-x64/ofed/openmpi-1.3.2-intel11
+export MPIROOT=/sw/sles10-x64/ofed/openmpi-1.4.0-intel11
 export PATH=$MPIROOT/bin:$PATH
 
 echo -n " Job started at: "
@@ -21,11 +21,8 @@ date
 echo -n " Executed by host: "
 hostname
 #-----------------------------------------------------------------------------
-mpiexec -np 32 ./les.mpi
+mpiexec -np 64 ./les.mpi
 #-----------------------------------------------------------------------------
 echo -n " Job completed at: "
 date
 #-----------------------------------------------------------------------------
-
-#cp NAMELIST1 NAMELIST
-#/opt/sge/bin/lx24-amd64/qsub runles.job 

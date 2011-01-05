@@ -532,7 +532,7 @@ do_header
 5 246 M
 (  subroutine poisson) s
 5 230 M
-(    use grid, only : nxp, nyp, nzp, dtlt, dxi, dyi, dzm, dzt, a_up,       &) s
+(    use grid, only : nxp, nyp, nzp, dtlt, dxi, dyi, dzi_m, dzi_t, a_up,       &) s
 5 222 M
 (         a_uc, a_ut, a_vp, a_vc, a_vt, a_wp, a_wc, a_wt, a_press, a_pexnr,&) s
 5 214 M
@@ -578,9 +578,9 @@ do_header
 5 22 M
 (    !) s
 5 14 M
-(    call poiss\(nzp,nxp,nyp,ix,iy,a_up,a_vp,a_wp,a_pexnr,a_press,dn0,th00,dzt &) s
+(    call poiss\(nzp,nxp,nyp,ix,iy,a_up,a_vp,a_wp,a_pexnr,a_press,dn0,th00,dzi_t &) s
 5 6 M
-(         ,dzm,dxi,dyi,dtlt,s1,wsavex,wsavey\)) s
+(         ,dzi_m,dxi,dyi,dtlt,s1,wsavex,wsavey\)) s
 377 510 M
 (    call ae1mm\(nzp,nxp,nyp,a_wp,awpbar\)) s
 377 502 M
@@ -606,13 +606,13 @@ do_header
 377 406 M
 (    if \(sflg\) then) s
 377 398 M
-(       call get_diverg\(nzp,nxp,nyp,ix,iy,s1,a_up,a_vp,a_wp,dn0,dzt,dxi,dyi,  &) s
+(       call get_diverg\(nzp,nxp,nyp,ix,iy,s1,a_up,a_vp,a_wp,dn0,dzi_t,dxi,dyi,  &) s
 377 390 M
 (            dtlt,mxdiv\)) s
 377 382 M
 (       call fill_scalar\(2,mxdiv\)) s
 377 374 M
-(       call prs_cor\(nzp,nxp,nyp,a_pexnr,a_up,a_vp,a_wp,dzm,dxi,dyi,th00\)) s
+(       call prs_cor\(nzp,nxp,nyp,a_pexnr,a_up,a_vp,a_wp,dzi_m,dxi,dyi,th00\)) s
 377 366 M
 (       call chk_tsplt\(nzp,nxp,nyp,a_up,a_vp,a_wp,a_uc,a_vc,a_wc\)) s
 377 358 M
@@ -680,7 +680,7 @@ do_header
 377 46 M
 (  !) s
 377 38 M
-(  subroutine poiss\(n1,n2,n3,ix,iy,u,v,w,pp,pc,dn0,th00,dzt,dzm,dx,dy,  &) s
+(  subroutine poiss\(n1,n2,n3,ix,iy,u,v,w,pp,pc,dn0,th00,dzi_t,dzi_m,dx,dy,  &) s
 377 30 M
 (       dtlt,s1,wsvx,wsvy\)) s
 377 14 M
@@ -711,23 +711,23 @@ do_header
 5 502 M
 (    real    :: u\(n1,n2,n3\),v\(n1,n2,n3\),w\(n1,n2,n3\)) s
 5 494 M
-(    real    :: wsvx\(1:\),wsvy\(1:\),dn0\(n1\),dzt\(n1\),dzm\(n1\),dx,dy,dtlt,th00) s
+(    real    :: wsvx\(1:\),wsvy\(1:\),dn0\(n1\),dzi_t\(n1\),dzi_m\(n1\),dx,dy,dtlt,th00) s
 5 486 M
 (    complex :: s1\(ix,iy,n1\)) s
 5 470 M
-(    call get_diverg\(n1,n2,n3,ix,iy,s1,u,v,w,dn0,dzt,dx,dy,dtlt,dmy\)) s
+(    call get_diverg\(n1,n2,n3,ix,iy,s1,u,v,w,dn0,dzi_t,dx,dy,dtlt,dmy\)) s
 5 454 M
 (    call get_fft_twodim\(ix,iy,n1,s1,wsvx,wsvy,-1\)) s
 5 446 M
 (    ) s
 5 438 M
-(    call trdprs\(n1,ix,iy,s1,dn0,dzt,dzm,dx,dy\)) s
+(    call trdprs\(n1,ix,iy,s1,dn0,dzi_t,dzi_m,dx,dy\)) s
 5 422 M
 (    call get_fft_twodim\(ix,iy,n1,s1,wsvx,wsvy,+1\)) s
 5 406 M
 (    call fll_prs\(n1,n2,n3,ix,iy,pp,s1\)) s
 5 398 M
-(    call prs_grd\(n1,n2,n3,pp,u,v,w,dzm,dx,dy,dtlt\)) s
+(    call prs_grd\(n1,n2,n3,pp,u,v,w,dzi_m,dx,dy,dtlt\)) s
 5 382 M
 (    call velset\(n1,n2,n3,u,v,w\)) s
 5 366 M
@@ -877,7 +877,7 @@ do_header
 377 238 M
 (  !) s
 377 230 M
-(  subroutine trdprs\(n1,ix,iy,s1,dn0,dzt,dzm,dx,dy\)  ) s
+(  subroutine trdprs\(n1,ix,iy,s1,dn0,dzi_t,dzi_m,dx,dy\)  ) s
 377 214 M
 (    use mpi_interface, only : yoffset, nypg, xoffset, wrxid, wryid, nxpg) s
 377 206 M
@@ -885,7 +885,7 @@ do_header
 377 190 M
 (    integer, intent \(in\)    :: n1,ix,iy) s
 377 182 M
-(    real, intent \(in\)       :: dn0\(n1\),dzt\(n1\),dzm\(n1\),dx,dy) s
+(    real, intent \(in\)       :: dn0\(n1\),dzi_t\(n1\),dzi_m\(n1\),dx,dy) s
 377 174 M
 (    complex, intent \(inout\) :: s1\(ix,iy,n1\)) s
 377 158 M
@@ -978,11 +978,11 @@ do_header
 5 374 M
 (          do l=1,ix) s
 5 366 M
-(             ak\(l,k\)=dzt\(k\)*dzm\(k-1\)*af) s
+(             ak\(l,k\)=dzi_t\(k\)*dzi_m\(k-1\)*af) s
 5 358 M
 (             bk\(l,k\)=s1\(l,m,k\)) s
 5 350 M
-(             ck\(l,k\)=dzt\(k\)*dzm\(k\)*cf) s
+(             ck\(l,k\)=dzi_t\(k\)*dzi_m\(k\)*cf) s
 5 342 M
 (             dk\(l,k\)=dn0\(k\)*wv\(l,m\)-\(ak\(l,k\)+ck\(l,k\)\)) s
 5 334 M
@@ -1305,7 +1305,7 @@ do_header
 377 486 M
 (    use grid, only : a_up,a_vp,a_wp,a_uc,a_vc,a_wc,a_pexnr,a_press,           &) s
 377 478 M
-(         nxp, nyp, nzp, dzm) s
+(         nxp, nyp, nzp, dzi_m) s
 377 470 M
 (    use util, only : velset, sclrset) s
 377 454 M
@@ -1313,9 +1313,9 @@ do_header
 377 446 M
 (    call velset\(nzp,nxp,nyp,a_uc,a_vc,a_wc\)) s
 377 438 M
-(    call sclrset\('grad',nzp,nxp,nyp,a_pexnr,dzm\)) s
+(    call sclrset\('grad',nzp,nxp,nyp,a_pexnr,dzi_m\)) s
 377 430 M
-(    call sclrset\('grad',nzp,nxp,nyp,a_press,dzm\)) s
+(    call sclrset\('grad',nzp,nxp,nyp,a_press,dzi_m\)) s
 377 414 M
 (  end subroutine velocity_bcs) s
 377 398 M

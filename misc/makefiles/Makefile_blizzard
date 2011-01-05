@@ -29,9 +29,11 @@ ifeq ($(ARCH),AIX)
   ZLIBINC = -I$(ZLIB)/include
   ARCHIVE   = ar rs
   RANLIB    =:
-  F90       = xlf95_r
+  F90       = xlf95_r 
   MPIF90    = mpxlf95_r
-  FFLAGS    = -qextname -O3 -q64 -qarch=auto -qtune=auto -qmaxmem=-1 -qrealsize=8 $(NCDFINC)
+  FFLAGS    =  -qextname -q64 -qrealsize=8 -O4 -qnoipa -qstrict=none:exceptions $(NCDFINC)
+ 
+#  FFLAGS    = -qextname -qrealsize=8  -qwarn64 -qflttrap=en:ov:zero:inv:imp -qflag=w:e  $(NCDFINC)
   MPIFFLAGS = -qmoddir=$(SRC)/mpi -I$(SRC)/mpi
   SEQFFLAGS = -qmoddir=$(SRC)/seq -I$(SRC)/seq
   LIBS      = $(NCDFLIB) $(HDF5LIB) $(SZIPLIB) $(ZLIBLIB) -lmassv -lmass

@@ -25,7 +25,7 @@
 module mcrp
 
   use defs, only : tmelt,alvl, alvi,rowt,roice, pi, Rm, cp,t_hn 
-  use grid, only : dt,nstep,rkbeta,rkalpha, dxi, dyi ,dzt, nxp, nyp, nzp, a_pexnr, pi0,pi1,a_rp, a_tp, th00, ccn,    &
+  use grid, only : dt,nstep,rkbeta,rkalpha, dxi, dyi ,dzi_t, nxp, nyp, nzp, a_pexnr, pi0,pi1,a_rp, a_tp, th00, ccn,    &
        dn0, pi0,pi1, a_rt, a_tt,a_rpp, a_rpt, a_npp, a_npt, vapor, liquid,       &
        a_theta, a_scr1, a_scr2, a_scr7, precip, &
        a_ninuct,a_ricet,a_nicet,a_rsnowt,a_rgrt,&
@@ -498,7 +498,7 @@ contains
               !
               ! Calculate the mixing length, dissipation rate and Taylor-Reynolds number
               !
-              l = csx*((1/dxi)*(1/dyi)*(1/dzt(k)))**(1./3.)
+              l = csx*((1/dxi)*(1/dyi)*(1/dzi_t(k)))**(1./3.)
               epsilon = min(diss(k),0.06)
               Re = (6./11.)*((l/ce)**(2./3))*((15./(1.5e-5))**0.5)*(epsilon**(1./6) )
               !
@@ -666,8 +666,8 @@ contains
         do k=2,n1-1
           kp1 = min(k+1,n1-1)
           km1 = max(k,2)
-          cn(k) = 0.25*(vn(kp1)+2.*vn(k)+vn(km1))*dzt(k)*dt
-          cr(k) = 0.25*(vr(kp1)+2.*vr(k)+vr(km1))*dzt(k)*dt
+          cn(k) = 0.25*(vn(kp1)+2.*vn(k)+vn(km1))*dzi_t(k)*dt
+          cr(k) = 0.25*(vr(kp1)+2.*vr(k)+vr(km1))*dzi_t(k)*dt
         end do
 
         !...piecewise linear method: get slopes
@@ -703,10 +703,10 @@ contains
           zz  = 0.0
           cc  = min(1.,cn(k))
           do while (cc > 0 .and. kk <= n1-1)
-              tot = tot + dn0(kk)*(np(kk)+nslope(kk)*(1.-cc))*cc/dzt(kk)
-              zz  = zz + 1./dzt(kk)
+              tot = tot + dn0(kk)*(np(kk)+nslope(kk)*(1.-cc))*cc/dzi_t(kk)
+              zz  = zz + 1./dzi_t(kk)
               kk  = kk + 1
-              cc  = min(1.,cn(kk) - zz*dzt(kk))
+              cc  = min(1.,cn(kk) - zz*dzi_t(kk))
           enddo
           nfl(k) = -tot /dt
 
@@ -715,17 +715,17 @@ contains
           zz  = 0.0
           cc  = min(1.,cr(k))
           do while (cc > 0 .and. kk <= n1-1)
-              tot = tot + dn0(kk)*(rp(kk)+rslope(kk)*(1.-cc))*cc/dzt(kk)
-              zz  = zz + 1./dzt(kk)
+              tot = tot + dn0(kk)*(rp(kk)+rslope(kk)*(1.-cc))*cc/dzi_t(kk)
+              zz  = zz + 1./dzi_t(kk)
               kk  = kk + 1
-              cc  = min(1.,cr(kk) - zz*dzt(kk))
+              cc  = min(1.,cr(kk) - zz*dzi_t(kk))
           enddo
           rfl(k) = -tot /dt
 
           kp1=k+1
-          flxdiv = (rfl(kp1)-rfl(k))*dzt(k)/dn0(k)
+          flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)/dn0(k)
           rp(k) = rp(k)-flxdiv*dt
-          np(k) = np(k)-(nfl(kp1)-nfl(k))*dzt(k)/dn0(k)*dt
+          np(k) = np(k)-(nfl(kp1)-nfl(k))*dzi_t(k)/dn0(k)*dt
 
         end do
 
@@ -760,12 +760,12 @@ contains
           do k=n1-1,2,-1
              Xc = rc(k) / (cldw%nr+eps0)
              Dc = ( Xc / prw )**(1./3.)
-             vc = min(c*(Dc*0.5)**2 * exp(4.5*(log(sgg))**2),1./(dzt(k)*dt))
-!               vc = min(c*(Dc*0.5)**2 * exp(5*(log(1.3))**2),1./(dzt(k)*dt))
+             vc = min(c*(Dc*0.5)**2 * exp(4.5*(log(sgg))**2),1./(dzi_t(k)*dt))
+!               vc = min(c*(Dc*0.5)**2 * exp(5*(log(1.3))**2),1./(dzi_t(k)*dt))
              rfl(k) = - rc(k) * vc
              !
              kp1=k+1
-             flxdiv = (rfl(kp1)-rfl(k))*dzt(k)
+             flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)
              rc(k) = rc(k)-flxdiv*dt
              tl(k) = tl(k)+flxdiv*convliq(k)*dt
           end do
@@ -1739,8 +1739,8 @@ contains
     do k=2,n1-1
       kp1 = min(k+1,n1-1)
       km1 = max(k,2)
-      cn(k) = 0.25*(vn(kp1)+2.*vn(k)+vn(km1))*dzt(k)*dt
-      cr(k) = 0.25*(vr(kp1)+2.*vr(k)+vr(km1))*dzt(k)*dt
+      cn(k) = 0.25*(vn(kp1)+2.*vn(k)+vn(km1))*dzi_t(k)*dt
+      cr(k) = 0.25*(vr(kp1)+2.*vr(k)+vr(km1))*dzi_t(k)*dt
     end do
 
         !...piecewise linear method: get slopes
@@ -1776,10 +1776,10 @@ contains
       zz  = 0.0
       cc  = min(1.,cn(k))
       do while (cc > 0 .and. kk <= n1-1)
-          tot = tot + dn0(kk)*(np(kk)+nslope(kk)*(1.-cc))*cc/dzt(kk)
-          zz  = zz + 1./dzt(kk)
+          tot = tot + dn0(kk)*(np(kk)+nslope(kk)*(1.-cc))*cc/dzi_t(kk)
+          zz  = zz + 1./dzi_t(kk)
           kk  = kk + 1
-          cc  = min(1.,cn(kk) - zz*dzt(kk))
+          cc  = min(1.,cn(kk) - zz*dzi_t(kk))
       enddo
       nfl(k) = -tot /dt
 
@@ -1788,18 +1788,18 @@ contains
       zz  = 0.0
       cc  = min(1.,cr(k))
       do while (cc > 0 .and. kk <= n1-1)
-          tot = tot + dn0(kk)*(rp(kk)+rslope(kk)*(1.-cc))*cc/dzt(kk)
-          zz  = zz + 1./dzt(kk)
+          tot = tot + dn0(kk)*(rp(kk)+rslope(kk)*(1.-cc))*cc/dzi_t(kk)
+          zz  = zz + 1./dzi_t(kk)
           kk  = kk + 1
-          cc  = min(1.,cr(kk) - zz*dzt(kk))
+          cc  = min(1.,cr(kk) - zz*dzi_t(kk))
       enddo
       rfl(k) = -tot /dt
 
       kp1=k+1
-      flxdiv = (rfl(kp1)-rfl(k))*dzt(k)/dn0(k)
+      flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)/dn0(k)
       rp(k) = rp(k)-flxdiv*dt
       if(meteor%moments==2) then
-        np(k) = np(k)-(nfl(kp1)-nfl(k))*dzt(k)/dn0(k)*dt
+        np(k) = np(k)-(nfl(kp1)-nfl(k))*dzi_t(k)/dn0(k)*dt
       end if
 
     end do

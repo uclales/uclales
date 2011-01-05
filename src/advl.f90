@@ -33,7 +33,7 @@ contains
   subroutine ladvect
 
     use grid, only : a_ut, a_vt, a_wt, a_scr1, a_scr2, a_up,a_vp,a_wp,      &
-         nxp, nyp, nzp, dzt, dzm, dxi, dyi, dn0
+         nxp, nyp, nzp, dzi_t, dzi_m, dxi, dyi, dn0
     use stat, only : sflg, updtst, acc_tend
     use util, only : get_avg3
 
@@ -54,7 +54,7 @@ contains
     !
     ! prepare density weights for use vertical advection
     !
-    call advl_prep(nzp,nxp,nyp,a_wp,a_scr1,dn0,dzt,dzm,dztri,dzmri)
+    call advl_prep(nzp,nxp,nyp,a_wp,a_scr1,dn0,dzi_t,dzi_m,dztri,dzmri)
     
     !
     ! advection of u by (u,v,w) all at current timelevel.  also when flag
@@ -399,18 +399,18 @@ contains
   ! ADVL_PREP: prepares two scratch arrays with the inverse
   ! densities as they locate on thermo levels (v1) and w-levels (v2)
   !
-  subroutine advl_prep(n1,n2,n3,w,wm,dn0,dzt,dzm,v1,v2)
+  subroutine advl_prep(n1,n2,n3,w,wm,dn0,dzi_t,dzi_m,v1,v2)
 
     integer, intent (in) :: n1,n2,n3
-    real, intent (in)    ::  w(n1,n2,n3),dn0(n1),dzt(n1),dzm(n1)
+    real, intent (in)    ::  w(n1,n2,n3),dn0(n1),dzi_t(n1),dzi_m(n1)
     real, intent (out)   ::  wm(n1,n2,n3),v1(n1),v2(n1)
 
     integer :: k
 
     do k=1,n1-1
        wm(k,:,:)=w(k,:,:)*(dn0(k)+dn0(k+1))*.5
-       v1(k)=dzt(k)/dn0(k)
-       v2(k)=2.*dzm(k)/(dn0(k)+dn0(k+1))
+       v1(k)=dzi_t(k)/dn0(k)
+       v2(k)=2.*dzi_m(k)/(dn0(k)+dn0(k+1))
     end do
 
   end subroutine advl_prep

@@ -389,13 +389,13 @@ real, parameter :: c0_i=0.6114327e+03, c1_i=0.5027041e+02,    &
 ! BRUVAIS:  Cacluates the brunt-vaisaila frequency in accordance with the
 ! thermodynamic level
 ! 
-  subroutine bruvais(n1,n2,n3,level,th,tl,rt,rs,en2,dzm,th00)
+  subroutine bruvais(n1,n2,n3,level,th,tl,rt,rs,en2,dzi_m,th00)
 
   use defs, only : g, R, cp, alvl, ep, ep2
 
   integer, intent (in) ::  n1, n2, n3, level
   real, intent (in)    ::  th(n1,n2,n3), tl(n1,n2,n3), rt(n1,n2,n3),         &
-                           rs(n1,n2,n3), dzm(n1), th00
+                           rs(n1,n2,n3), dzi_m(n1), th00
   real, intent (out)   ::  en2(n1,n2,n3)
 
   integer :: i, k, j, kp1
@@ -410,11 +410,11 @@ real, parameter :: c0_i=0.6114327e+03, c1_i=0.5027041e+02,    &
            c3=alvl/(cp*th(k,i,j))
            select case(level) 
            case (0)
-              en2(k,i,j)=g*dzm(k)*((th(k+1,i,j)-th(k,i,j))/th00)
+              en2(k,i,j)=g*dzi_m(k)*((th(k+1,i,j)-th(k,i,j))/th00)
            case (1)
               tvk=th(k,i,j)*(1.+ep2*rt(k,i,j))
               tvkp1=th(k+1,i,j)*(1.+ep2*rt(k+1,i,j))
-              en2(k,i,j)=g*dzm(k)*(tvkp1-tvk)/th00
+              en2(k,i,j)=g*dzi_m(k)*(tvkp1-tvk)/th00
            case (2)
               rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
               rsbar=0.5*(rs(k,i,j)+rs(k+1,i,j))
@@ -426,7 +426,7 @@ real, parameter :: c0_i=0.6114327e+03, c1_i=0.5027041e+02,    &
                  aa=(1.00 + ep2*rtbar)
                  bb=ep2
               end if
-              en2(k,i,j)=g*dzm(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
+              en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
                    + bb*(rt(k+1,i,j)-rt(k,i,j)))
            case (3,4)
               rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
@@ -439,7 +439,7 @@ real, parameter :: c0_i=0.6114327e+03, c1_i=0.5027041e+02,    &
                  aa=(1.00 + ep2*rtbar)
                  bb=ep2
               end if
-              en2(k,i,j)=g*dzm(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
+              en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
                    + bb*(rt(k+1,i,j)-rt(k,i,j)))
            case default 
               stop 'level not supported in bruvais'

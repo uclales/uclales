@@ -18,7 +18,7 @@ ECHO    = /bin/echo
 RM      = /bin/rm -f
 
 ifeq ($(ARCH),Linux)
-  COMPILER  := 'IFORT'
+  COMPILER  := 'GFORTRAN'
   ARCHIVE   = ar rs
   RANLIB    =:
   ifeq ($(COMPILER),'nagfor')
@@ -36,6 +36,16 @@ ifeq ($(ARCH),Linux)
      FFLAGS   = -O3 -r8   $(NCDFINC)
      SEQFFLAGS = -I$(SRC)/seq -fmod=$(SRC)/seq
      MPIFFLAGS = -I$(SRC)/mpi -fmod=$(SRC)/mpi
+     F77FLAGS = -ffixed-form
+  endif
+  ifeq ($(COMPILER),'GFORTRAN')
+     F90      = gfortran
+     MPIF90   = mpif90
+     NCDF     = /home/thijs
+#      FFLAGS   = -finit-real=nan -W -Wall -fdefault-real-8 -ffree-line-length-none -I/include -I/usr/include -I/usr/local/include-fbounds-check -fbacktrace -fno-f2c -O0 -g -ffpe-trap=invalid,zero,overflow  $(NCDFINC)
+     FFLAGS   = -fno-f2c -O3 -finit-real=nan -W -Wall -fdefault-real-8 -ffree-line-length-none $(NCDFINC)
+#      SEQFFLAGS = -I$(SRC)/seq -fmod=$(SRC)/seq
+#      MPIFFLAGS = -I$(SRC)/mpi -fmod=$(SRC)/mpi
      F77FLAGS = -ffixed-form
   endif
   ifeq ($(COMPILER),'IFORT')

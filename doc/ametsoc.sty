@@ -1,0 +1,142 @@
+\ProvidesPackage{ametsoc}
+
+%LaTeX and BibTeX style files for American Meteorological Society publications.
+%These are not authorized or approved by the AMS in any way. Use at your own
+%risk!
+%  (c) Lakshman, National Severe Storms Laboratory
+%    http://www.cimms.ou.edu/~lakshman/ametsoc/
+% $Id: ametsoc.sty,v 1.10 2007/03/22 18:01:35 lakshman Exp $
+
+% ametsoc.bst is built on top of natbib
+\RequirePackage{natbib}
+
+%use Postscript times if available ... it's better looking than computer roman
+\usepackage{times}
+
+% Check if user has defined the final option or the conf option
+\RequirePackage{ifthen}
+\newboolean{final}
+\DeclareOption{final}{\setboolean{final}{true}}  
+
+\newboolean{conf}
+\DeclareOption{conf}{\setboolean{conf}{true}}
+
+\ProcessOptions
+
+% Set up the environment for conference papers
+\ifthenelse{\boolean{conf}}%
+{\renewcommand\familydefault{\sfdefault}%Helvetica
+\setlength{\oddsidemargin}{-0.25in}%wider page
+\setlength{\textwidth}{7in}%more text
+\usepackage{fix2col}%makes things look better
+}
+{}
+
+% If we are final, then all the figures and tables should be at the
+% end ...
+\ifthenelse{\boolean{final}}
+%{\usepackage[tablesfirst]{endfloat}%
+{\usepackage{endfloat}% put the tables last, not first
+\renewcommand{\processdelayedfloats}{{%  Change of the original endfloat
+  %\def\baselinestretch{1}\normalsize   %<-- do not override setspace ...
+   \renewcommand{\@dotsep}{500}% -- don't put dots after captions in list
+   \let\figure\@bfig
+   \let\table\@btab
+   \processdelayedfloats@hook
+   \pagestyle{empty}
+   \if@tablesfirst \processtables\processfigures
+   \else \processfigures\processtables \fi
+   \processotherdelayedfloats}}
+}
+{}
+
+% Make it do double-spacing for manuscript when you send it out.
+% User will have used \usepackage[final]{ametsoc} to get double-spaced text.
+\ifthenelse{\boolean{final}}
+  {\usepackage{setspace} \doublespacing \setstretch{2.0}}
+  {}
+
+%AMS requires page numbers.
+\pagestyle{plain}
+
+% Article's default is to provide arabic numerals for everything.
+% Change the formatting of section and lower to be the way AMS wants them.
+% --> \makeatletter  is not needed because this is a package file.
+\renewcommand{\@seccntformat}[1]{\bf{\csname the#1\endcsname}.~~}%1. in bold
+
+
+% subsection ...
+\renewcommand{\subsection}{\@startsection
+{subsection}%
+{2}% 2 is the level for subsection
+{0mm}% NO indent, starts immediately
+{-\baselineskip}% skips 1 baseline after end of previous subsection
+{0.5\baselineskip}% half baseline and the first paragraph starts
+{\normalfont\normalsize\itshape}%the style, all italics
+}
+%\renewcommand{\thesubsection}{\thesection\alph{subsection}} % letters
+\renewcommand{\thesubsection}{\alph{subsection}} % letters
+
+% subsubsection ...
+\renewcommand{\subsubsection}{\@startsection
+{subsubsection}%
+{3}  % 3 is the level for subsubsection
+{0mm}% NO indent, starts immediately
+{-\baselineskip}% skips 1 baseline after end of previous subsubsection
+{-2mm}% text starts on the same line
+{\normalfont\normalsize\itshape}%the style, all italics
+}
+% roman numbers;  because this is run-in, we need a couple of spaces too.
+\renewcommand{\thesubsubsection}{\roman{subsubsection}}
+
+
+% Acknowlegments is not a section, but is formatted with run-in headings
+\newenvironment{acknowledgement}
+  {\subsubsection*{\textbf{\emph{Acknowledgement}}}}
+  {}
+
+\if@titlepage
+  \renewenvironment{abstract}{%
+      \titlepage
+      \null\vfil
+      \@beginparpenalty\@lowpenalty
+      \begin{center}%
+        \bfseries \abstractname
+        \@endparpenalty\@M
+      \end{center}}%
+     {\par\vfil\null\endtitlepage}
+\else
+  \renewenvironment{abstract}{%
+      \if@twocolumn
+        \section*{\abstractname}%
+      \else
+%        \small
+        \begin{center}%
+          {\bfseries \abstractname\vspace{-.5em}\vspace{\z@}}%
+        \end{center}%
+        \quotation
+      \fi}
+      {\if@twocolumn\else\endquotation\fi}
+\fi
+
+% No date on conference papers
+\ifthenelse{\boolean{conf}}
+{\date{}}
+{}
+
+% Define the amstitle depending on whether we are final or not
+\newcommand{\amstitle}{
+   %\date{}% title page on final should be dated
+   \maketitle%make the title
+   \thispagestyle{empty}%title page doesn't have page number ...
+   \newpage%title page is separate from rest of article
+   \pagenumbering{arabic}%start numbering from this point ...
+   \newpage%The AMS wants title page separate from article
+}%For final manuscript
+
+\ifthenelse{\boolean{final}}
+{}
+{\renewcommand{\amstitle}{\maketitle}} %no need for separate pages on non-final
+
+%% citations should be of the form ``author year''  not ``author, year''
+\bibpunct{(}{)}{;}{a}{}{,}

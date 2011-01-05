@@ -34,7 +34,7 @@ contains
 !
   subroutine poisson
 
-    use grid, only : nxp, nyp, nzp, dxi, dyi, dzm, dzt, dt, a_up, a_ut,      &
+    use grid, only : nxp, nyp, nzp, dxi, dyi, dzi_m, dzi_t, dt, a_up, a_ut,      &
          a_vp, a_vt, a_wp, a_wt, press, a_pexnr, th00, dn0, wsavex, wsavey
     use stat, only : fill_scalar, sflg
     use util, only : ae1mm
@@ -54,7 +54,7 @@ contains
     !
 
     call poiss(nzp,nxp,nyp,ix,iy,a_ut,a_vt,a_wt,a_up,a_vp,a_wp,a_pexnr,     &
-         press,dn0,th00,dzt,dzm,dxi,dyi,dt,s1,wsavex,wsavey)
+         press,dn0,th00,dzi_t,dzi_m,dxi,dyi,dt,s1,wsavex,wsavey)
     call ae1mm(nzp,nxp,nyp,a_wp,awpbar)
 
     !
@@ -63,9 +63,9 @@ contains
     if (sflg) then
   
        call get_diverg(nzp,nxp,nyp,ix,iy,s1,a_up,a_vp,a_wp, &
-            dn0,dzt,dxi,dyi,dt,mxdiv)
+            dn0,dzi_t,dxi,dyi,dt,mxdiv)
        call fill_scalar(2,mxdiv)
-       call prs_cor(nzp,nxp,nyp,a_pexnr,a_up,a_vp,a_wp,dzm,dxi,dyi,th00)
+       call prs_cor(nzp,nxp,nyp,a_pexnr,a_up,a_vp,a_wp,dzi_m,dxi,dyi,th00)
     end if
    
     deallocate (s1)
@@ -79,7 +79,7 @@ contains
   ! cyclic in x and y.  pp and pc are used as scratch arrays in the
   ! call to trdprs.  pp is filled with its diagnostic value in fll_prs
   !
-  subroutine poiss(n1,n2,n3,ix,iy,ut,vt,wt,u,v,w,pp,pc,dn0,th00,dzt,dzm, &
+  subroutine poiss(n1,n2,n3,ix,iy,ut,vt,wt,u,v,w,pp,pc,dn0,th00,dzi_t,dzi_m, &
        dx,dy,dt,s1,wsvx,wsvy)
 
     use util, only  : get_fft_twodim, velset
@@ -88,12 +88,12 @@ contains
     integer :: n1,n2,n3,ix,iy
     real    :: pp(n1,n2,n3),pc(n1,n2,n3),dmy
     real, dimension(n1,n2,n3)  :: ut, vt, wt, u, v, w
-    real    :: wsvx(1:),wsvy(1:),dn0(n1),dzt(n1),dzm(n1),dx,dy,dt,th00
+    real    :: wsvx(1:),wsvy(1:),dn0(n1),dzi_t(n1),dzi_m(n1),dx,dy,dt,th00
     complex :: s1(ix,iy,n1)
 
-    call get_diverg(n1,n2,n3,ix,iy,s1,u,v,w,dn0,dzt,dx,dy,dt,dmy)
+    call get_diverg(n1,n2,n3,ix,iy,s1,u,v,w,dn0,dzi_t,dx,dy,dt,dmy)
     call get_fft_twodim(ix,iy,n1,s1,wsvx,wsvy,-1)
-    call trdprs(n1,ix,iy,s1,dn0,dzt,dzm,dx,dy)
+    call trdprs(n1,ix,iy,s1,dn0,dzi_t,dzi_m,dx,dy)
     call get_fft_twodim(ix,iy,n1,s1,wsvx,wsvy,+1)
 
     ! The following routines calculate the pressure gradient contribution to the
@@ -102,8 +102,8 @@ contains
     ! poisson solver within the main stepper in step.f90, in fact, they are put to zero at 
     ! the start of the new RK timestep in the call to 'tendencies'
 
-    call prs_grad(n1,n2,n3,ix,iy,s1,pp,u,v,w,dzm,dx,dy,dt)   
-    call get_diverg(n1,n2,n3,ix,iy,s1,u,v,w,dn0,dzt,dx,dy,dt,dmy)
+    call prs_grad(n1,n2,n3,ix,iy,s1,pp,u,v,w,dzi_m,dx,dy,dt)   
+    call get_diverg(n1,n2,n3,ix,iy,s1,u,v,w,dn0,dzi_t,dx,dy,dt,dmy)
 
     pp(:,:,:) = pp(:,:,:)/th00/(rkalpha(nstep)+rkbeta(nstep))
     pc(:,:,:) = pp(:,:,:)
@@ -211,13 +211,13 @@ contains
   ! TRDPRS: solves for the wave number (l,m) component of 
   ! pressure in a vertical column using a tri-diagonal solver.
   !
-  subroutine trdprs(n1,ix,iy,s1,dn0,dzt,dzm,dx,dy)  
+  subroutine trdprs(n1,ix,iy,s1,dn0,dzi_t,dzi_m,dx,dy)  
 
     use mpi_interface, only : yoffset, nypg, xoffset, wrxid, wryid, nxpg
     use util, only          : tridiff
 
     integer, intent (in)    :: n1,ix,iy
-    real, intent (in)       :: dn0(n1),dzt(n1),dzm(n1),dx,dy
+    real, intent (in)       :: dn0(n1),dzi_t(n1),dzi_m(n1),dx,dy
     complex, intent (inout) :: s1(ix,iy,n1)
 
     real    :: ak(ix,n1),dk(ix,n1),bk(ix,n1),ck(ix,n1)
@@ -258,9 +258,9 @@ contains
           if (k == 2   )af=0.
           if (k == n1-1)cf=0.
           do l=1,ix
-             ak(l,k)=dzt(k)*dzm(k-1)*af
+             ak(l,k)=dzi_t(k)*dzi_m(k-1)*af
              bk(l,k)=s1(l,m,k)
-             ck(l,k)=dzt(k)*dzm(k)*cf
+             ck(l,k)=dzi_t(k)*dzi_m(k)*cf
              dk(l,k)=dn0(k)*wv(l,m)-(ak(l,k)+ck(l,k))
           enddo
        enddo
