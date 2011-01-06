@@ -126,7 +126,7 @@ contains
           ! subsidence
           !
 !cgils          
-       if (lstendflg) then
+ !      if (lstendflg) then
 
       do j=3,nyp-2
           do i=3,nxp-2
@@ -135,15 +135,15 @@ contains
  !               if (i.eq.4 .and. j.eq.4) then
  !               print *, k, wfls(k),dthldtls(k),dqtdtls(k)
  !               end if
-                a_tt(k,i,j) = a_tt(k,i,j) - &
-                        wfls(k)*(a_tp(kp1,i,j)-a_tp(k,i,j))*dzi_t(k)+dthldtls(k)
-                a_rt(k,i,j)=a_rt(k,i,j) - &
-                        wfls(k)*(a_rp(kp1,i,j)-a_rp(k,i,j))*dzi_t(k)+dqtdtls(k)
+ !               a_tt(k,i,j) = a_tt(k,i,j) - &
+ !                       wfls(k)*(a_tp(kp1,i,j)-a_tp(k,i,j))*dzi_t(k)+dthldtls(k)
+ !               a_rt(k,i,j)=a_rt(k,i,j) - &
+ !                       wfls(k)*(a_rp(kp1,i,j)-a_rp(k,i,j))*dzi_t(k)+dqtdtls(k)
              end do
           enddo
        enddo
 
-       else 
+!       else 
 !       
        do j=3,nyp-2
           do i=3,nxp-2
@@ -159,7 +159,7 @@ contains
           enddo
        enddo
 !       
-       end if
+!       end if
        else
           if (myid == 0) print *, '  ABORTING: inproper call to radiation'
           call appl_abort(0)

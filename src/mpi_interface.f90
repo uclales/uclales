@@ -322,7 +322,7 @@ contains
 
     integer, intent(in) :: nxp,nyp,nzp
 
-    integer :: nx, ny, i, ii, jj, ierr, typesize,nynzg, nxnzg
+    integer :: nx, ny, i, j, k, ii, jj, ierr, cnt, typesize,nynzg, nxnzg
 
 
     nx = max(1,nxp-4)
@@ -434,7 +434,7 @@ contains
     integer, intent(in) :: n1,n2,n3
     real, intent(inout) :: var(n1,n2,n3)
     integer req(16)
-    integer :: ierror, pxfwd, pxback, pyfwd, pyback!, stats(MPI_STATUS_SIZE,16)
+    integer :: ierror, stats(MPI_STATUS_SIZE,16), pxfwd, pxback, pyfwd, pyback
     integer :: pxyne,pxyse,pxynw,pxysw
 
     if (nypg == 5) then
@@ -615,7 +615,7 @@ contains
 
     real(kind=8), intent(out) :: xxg
     real(kind=8), intent(in) :: xxl
-    integer:: ierror
+    integer:: mpiop,ierror
 
 
     call mpi_allreduce(xxl,xxg,1,MPI_DOUBLE_PRECISION, MPI_MAX, &
@@ -628,7 +628,7 @@ contains
 
     real(kind=8), intent(out) :: xxg
     real(kind=8), intent(in) :: xxl
-    integer:: ierror
+    integer:: mpiop,ierror
 
 
     call mpi_allreduce(xxl,xxg,1,MPI_DOUBLE_PRECISION, MPI_SUM, &
@@ -641,7 +641,7 @@ contains
     integer, intent(in)::n
     real(kind=8), intent(out) :: xxg(n)
     real(kind=8), intent(in) :: xxl(n)
-    integer:: ierror
+    integer:: mpiop,ierror
 
 
     call mpi_allreduce(xxl,xxg,n,MPI_DOUBLE_PRECISION, MPI_SUM, &
@@ -649,8 +649,5 @@ contains
 
   end subroutine double_array_par_sum
 
-  subroutine barrier
-   integer :: ierror
-    call mpi_barrier(mpi_comm_world, ierror)
-  end subroutine barrier
+
 end module mpi_interface

@@ -32,8 +32,6 @@ module init
   real                  :: zrand = 200.
   character  (len=80)   :: hfilin = 'test.'  
 
-
-
 contains
   !
   ! ----------------------------------------------------------------------
@@ -42,19 +40,13 @@ contains
   !
   subroutine initialize
 !irina use lsvarflg
-    use step, only : time, outflg,lsvarflg,case_name
+    use step, only : time, outflg,lsvarflg
     use stat, only : init_stat
     use mpi_interface, only : appl_abort, myid
     use thrm, only : thermo
-!cgils
-    use forc, only : lstendflg
-    
+!
 
     implicit none
-
-
-
-
 
     if (runtype == 'INITIAL') then
        time=0.
@@ -70,16 +62,12 @@ contains
     end if
     call sponge_init
     call init_stat(time+dt,filprf,expnme,nzp)
-   !
+    !
     !irina
        if (lsvarflg) then
        call lsvar_init
        end if
-    !cgils
-       if (lstendflg) then
-       call lstend_init
-       end if
-   !
+    !    
     ! write analysis and history files from restart if appropriate
     ! 
     if (outflg) then
@@ -105,16 +93,13 @@ contains
     use defs, only : alvl, cpr, cp, p00
     use util, only : azero, atob
     use thrm, only : thermo, rslf
-    use mpi_interface,  only : nyprocs, nxprocs
-    use step, only : case_name
 
     implicit none
 
     integer :: i,j,k
     real    :: exner, pres, tk, rc, xran(nzp)
-    real    :: xc,zc,dist
 
-!     call htint(ns,ts,hs,nzp,th0,zt)
+    call htint(ns,ts,hs,nzp,th0,zt)
 
     do j=1,nyp
        do i=1,nxp
@@ -126,20 +111,11 @@ contains
              if (associated (a_rp)) a_rp(k,i,j)   = rt0(k)
              a_theta(k,i,j) = th0(k)
              a_pexnr(k,i,j) = 0.
-             if (case_name == 'bubble') then
-                xc = 1e4
-                zc = 1400
-                if (zt(k)<2*zc) then
-                  dist = (xt(i)**2+yt(j)**2)/xc**2+(zt(k)-zc)**2/zc**2
-  !                 a_rp(k,i,j) = a_rp(k,i,j) + 2e-3*max(0.,(1.-dist))
-                  a_tp(k,i,j) = a_tp(k,i,j) + 0.002*max(0.,(1.-dist))
-                end if
-             end if
           end do
        end do
     end do
-    if ( allocated (vapor) ) vapor = a_rp
 
+    if ( allocated (vapor) ) vapor = a_rp
 
     if ( allocated (liquid) .and. itsflg == 0) then
        do j=1,nyp
@@ -164,6 +140,7 @@ contains
           end do
        end do
     end if
+
     k=1
     do while( zt(k+1) <= zrand .and. k < nzp)
        k=k+1
@@ -215,8 +192,8 @@ contains
        if(myid == 0) then
           print "(//' ',49('-')/)"
           print '(2X,A17)', 'Sponge Layer Init '
-          print '(3X,A12,F9.1,A1)', 'Starting at ', zt(nzp-nfpt), 'm'
-          print '(3X,A18,F9.1,A1)', 'Minimum timescale ', 1/spngm(nfpt),'s'
+          print '(3X,A12,F6.1,A1)', 'Starting at ', zt(nzp-nfpt), 'm'
+          print '(3X,A18,F6.1,A1)', 'Minimum timescale ', 1/spngm(nfpt),'s'
        end if
     end if
 
@@ -233,7 +210,6 @@ contains
     use defs, only          : p00,p00i,cp,cpr,rcp,r,g,ep2,alvl,Rm,ep
     use thrm, only          : rslf
     use mpi_interface, only : appl_abort, myid
-    use step, only          : case_name
 
     implicit none
 
@@ -260,14 +236,10 @@ contains
     ns=1
     do while (ps(ns) /= 0. .and. ns <= nns)
        !
-       ! irsflg = 1:
        ! filling relative humidity array only accepts sounding in mixing
        ! ratio (g/kg) converts to (kg/kg)
-       ! irsflg = 0:
-       ! use relative humidity sounding
-       
-       
-       
+       !
+       rts(ns)=rts(ns)*1.e-3
        !
        ! filling pressure array:
        ! ipsflg = 0 :pressure in millibars
@@ -277,6 +249,7 @@ contains
        case (0)
           ps(ns)=ps(ns)*100.
        case default
+          xs(ns)=(1.+ep2*rts(ns))
           if (ns == 1)then
              ps(ns)=ps(ns)*100.
              zold2=0.
@@ -290,13 +263,6 @@ contains
              ps(ns)=(ps(ns-1)**rcp-g*(zold2-zold1)*(p00**rcp)/(cp*tavg))**cpr
           end if
        end select
-          if (irsflg == 0) then
-          print *,ns,rts(ns)
-            xs(ns) = rts(ns)*1.e-2
-          else
-            rts(ns)=rts(ns)*1.e-3
-            xs(ns)=(1.+ep2*rts(ns))
-          end if
        !
        ! filling temperature array:
        ! itsflg = 0 :potential temperature in kelvin
@@ -327,14 +293,9 @@ contains
           if (myid == 0) print *, '  ABORTING: itsflg not supported'
           call appl_abort(0)
        end select
-       if (irsflg == 0) then
-         rts(ns) = xs(ns)*rslf(ps(ns),tks(ns))
-       end if
        ns = ns+1
     end do
     ns=ns-1
-
-
     !                                  
     ! compute height levels of input sounding.
     !
@@ -366,7 +327,6 @@ contains
 
 604 format('    input sounding needs to go higher ! !', /,                &
          '      sounding top (m) = ',f12.2,'  model top (m) = ',f12.2)
-    
     return
   end subroutine arrsnd
   !
@@ -606,67 +566,6 @@ contains
  
     return
   end subroutine lsvar_init
-
-!cgils
-  !----------------------------------------------------------------------
-  ! Lstend_init if lstendflg is true reads the lstend  from the respective
-  ! file lstend_in
-  ! 
-  subroutine lstend_init
-
-   use grid,only   : wfls,dqtdtls,dthldtls
-   use defs, only  : cp,cpr,p00
-    use mpi_interface, only : myid
-   
-
-   implicit none
-   
-   real     :: lowdthldtls,highdthldtls,lowdqtdtls,highdqtdtls,lowwfls,highwfls,highheight,lowheight,fac,sgn
-   integer :: k
-   real :: height(nzp)
-
-    ! reads the time varying lscale forcings
-    !
- !   print *, wfls
-    if (ipsflg ==0) then
-      do k=1,nzp
-!         exner = (pi0(k) + pi1(k))/cp
-!         v1db(k)=p00*(exner)**cpr      ! pressure
-        height(k)=1e-2*p00*(pi0(k)/cp)**cpr  ! pressure associated with pi0
-      end do
-!       height = press(:,2,2)
-      sgn = -1
-    else
-      height = zt
-      sgn = 1
-    end if
- !         print *, 'lstend_init '                 
-        open (1,file='lstend_in',status='old',form='formatted')
-        read (1,*,end=100) lowheight,lowwfls,lowdqtdtls,lowdthldtls
-        read (1,*,end=100) highheight,highwfls,highdqtdtls,highdthldtls
-        if(myid == 0)  print *, 'lstend_init read'                 
-        do  k=1,nzp-1
-          if (sgn*highheight<sgn*height(k)) then
-            lowheight = highheight
-            lowwfls = highwfls
-            lowdqtdtls = highdqtdtls
-            lowdthldtls = highdthldtls
-            read (1,*) highheight,highwfls,highdqtdtls,highdthldtls
-          end if
-         fac = (highheight-height(k))/(highheight - lowheight)
-          wfls(k) = fac*lowwfls + (1-fac)*highwfls
-          if(ipsflg==0 .and. k>2) wfls(k) = wfls(k)*(height(k)-height(k-1))/(zt(k)-zt(k-1))
-          dqtdtls(k) = fac*lowdqtdtls + (1-fac)*highdqtdtls
-          dthldtls(k) = fac*lowdthldtls + (1-fac)*highdthldtls
-          if(myid == 0)  print *, k,height(k),zt(k),wfls(k),dqtdtls(k),dthldtls(k)
-        end do
-       
-       close (1)
-100 continue
- 
-    return
-  end subroutine lstend_init
-
 
   !
 

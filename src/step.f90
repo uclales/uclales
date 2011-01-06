@@ -61,7 +61,7 @@ contains
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
 
-    real, parameter    :: peak_cfl = 1, peak_peclet = 0.5
+    real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
     real    :: t1,t2,tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax
     integer :: istp, iret
@@ -96,7 +96,7 @@ a_ninucp = 0.
        call peclet(pecletmax)
        call double_scalar_par_max(pecletmax,gpecletmax)
        pecletmax = gpecletmax
-       dt = min(dtlong,dt*peak_cfl/(cflmax+epsilon(1.)),dt*peak_peclet/(pecletmax+epsilon(1.)))
+       dt = min(dtlong,dt*peak_cfl/(cflmax+epsilon(1.)))
        !
        ! output control
        !
