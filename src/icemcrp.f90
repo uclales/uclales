@@ -418,7 +418,7 @@ contains
     integer             :: k
     real                :: Xp, Dp, G, S, cerpt, cenpt
     do k=2,n1
-      if (rp(k) > 0 .and. rl(k)<=0.) then
+      if (rp(k) > 0) then
           Xp = rp(k)/ (np(k)+eps0)
           Dp = ( Xp / prw )**(1./3.)
           G = 1. / (1. / (dn0(k)*rs(k)*Dv) + &
