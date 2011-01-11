@@ -386,7 +386,7 @@ contains
 
         tlt(2:n1,i,j) =  tlt(2:n1,i,j)+      (tl(2:n1) - thl(2:n1,i,j))/dt
         rtt(2:n1,i,j) = rtt(2:n1,i,j) +(dn0(2:n1)*qv(2:n1) - rv(2:n1,i,j))/dt + (dn0(2:n1)*qc(2:n1) - rc(2:n1,i,j))/dt
-        rpt(2:n1,i,j) = max(rpt(2:n1,i,j) +(dn0(2:n1)*qrain - rp(2:n1,i,j))/dt,-rp(2:n1,i,j)/dt)
+        rpt(2:n1,i,j) = max(rpt(2:n1,i,j) +(dn0(2:n1)*qrain(2:n1) - rp(2:n1,i,j))/dt,-rp(2:n1,i,j)/dt)
         npt(2:n1,i,j) = max(npt(2:n1,i,j) +(nrain(2:n1) - np(2:n1,i,j))/dt,-np(2:n1,i,j)/dt)
         
         if (level == 4) then
