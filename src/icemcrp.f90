@@ -429,7 +429,7 @@ contains
             cerpt = 2. * pi * Dp * G * S * np(k)
             cenpt = c_Nevap*cerpt * np(k) / rp(k)
             np(k)=np(k) + cenpt*dt
-            rl(k)=rl(k) + cerpt*dt
+            rp(k)=rp(k) + cerpt*dt
             rv(k)=rv(k) - cerpt*dt
             tl(k)=tl(k) + convliq(k)*cerpt*dt
           end if
