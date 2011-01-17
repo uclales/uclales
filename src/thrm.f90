@@ -40,14 +40,20 @@ contains
        call drythrm(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,   &
             pi1,th00,a_rp,vapor)
     case (2)
-       call satadjst(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
+!        call satadjst(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
+!             pi1,th00,a_rp,vapor,liquid,a_scr2)
+       call satadjst_unified(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
             pi1,th00,a_rp,vapor,liquid,a_scr2)
     case (3)
-       call satadjst3(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0, &
+       call satadjst_unified(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
             pi1,th00,a_rp,vapor,liquid,a_scr2,a_rpp)
+!        call satadjst3(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0, &
+!             pi1,th00,a_rp,vapor,liquid,a_scr2,a_rpp)
     case (4)
-       call satadjst4(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
-            pi1,th00,a_rp,vapor,liquid,a_scr2,rsup,a_rpp,a_ricep,a_rsnowp,a_rgrp)
+       call satadjst_unified(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
+            pi1,th00,a_rp,vapor,liquid,a_scr2,a_rpp,a_ricep+a_rsnowp+a_rgrp,rsup)
+!        call satadjst4(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
+!             pi1,th00,a_rp,vapor,liquid,a_scr2,rsup,a_rpp,a_ricep,a_rsnowp,a_rgrp)
     end select
 !     if (level ==4) call satpart(nzp,nxp,nyp,vapor,liquid,rsup,a_scr1)
   end subroutine thermo
@@ -119,36 +125,108 @@ contains
     real, intent (out), dimension (n1,n2,n3)   :: rc,rv,rs,th,tk,p
 
     integer :: k, i, j, iterate
-    real    :: exner,til,x1,xx,yy,zz
+    real    :: exner,tli,txi,tx,rsx,rcx,epsln,dtx,tx1
 
     do j=3,n3-2
        do i=3,n2-2
           do k=1,n1
              exner = (pi0(k)+pi1(k)+pp(k,i,j))/cp
              p(k,i,j) = p00 * (exner)**cpr
-             til=(tl(k,i,j)+th00)*exner
-             xx=til
-             yy=rslf(p(k,i,j),xx)
-             zz=max(rt(k,i,j)-yy,0.)
-             if (zz > 0.) then
-                do iterate=1,3
-                   x1=alvl/(cp*xx)
-                   xx=xx - (xx - til*(1.+x1*zz))/(1. + x1*til                &
-                        *(zz/xx+(1.+yy*ep)*yy*alvl/(Rm*xx*xx)))
-                   yy=rslf(p(k,i,j),xx)
-                   zz=max(rt(k,i,j)-yy,0.)
+             tli=(tl(k,i,j)+th00)*exner
+             tx=tli
+             rsx=rslf(p(k,i,j),tx)
+             rcx=max(rt(k,i,j)-rsx,0.)
+             if (rcx > 0.) then
+                do while (dtx > epsln .and. iterate < 10)
+                   txi=alvl/(cp*tx)
+                   tx1=tx - (tx - tli*(1.+txi*rcx))/(1. + txi*tli                &
+                        *(rcx/tx+(1.+rsx*ep)*rsx*alvl/(Rm*tx*tx)))
+                       dtx = abs(tx1-tx)
+                      tx  = tx1
+                      iterate = iterate+1
+                  rsx=rslf(p(k,i,j),tx)
+                   rcx=max(rt(k,i,j)-rsx,0.)
                 enddo
              endif
-             rc(k,i,j)=zz
+             rc(k,i,j)=rcx
              rv(k,i,j)=rt(k,i,j)-rc(k,i,j)
-             rs(k,i,j)=yy
-             tk(k,i,j)=xx
+             rs(k,i,j)=rsx
+             tk(k,i,j)=tx
              th(k,i,j)=tk(k,i,j)/exner
           enddo
        enddo
     enddo
 
   end subroutine satadjst
+! 
+! -------------------------------------------------------------------------
+! SATADJST:  this routine calculates theta, and pressure and diagnoses
+! liquid water using a saturation adjustment for warm-phase systems
+! 
+  subroutine satadjst_unified(level,n1,n2,n3,pp,p,tl,th,tk,pi0,pi1,th00,rt,rv,rc,rs,rr,ri,rsup)
+
+    use defs, only : cp, cpr, alvl, ep, Rm, p00,t_hn,tmelt
+
+    integer, intent (in) ::  n1,n2,n3,level
+
+    real, intent (in), dimension (n1,n2,n3)    :: pp, tl, rt
+    real, intent (in), dimension (n1)          :: pi0, pi1
+    real, intent (in)                          :: th00
+    real, intent (out), dimension (n1,n2,n3)   :: rc,rv,rs,th,tk,p
+    real, intent (in), optional, dimension (n1,n2,n3) :: rr,ri
+    real, intent (out), optional, dimension (n1,n2,n3) :: rsup
+
+    integer :: k, i, j, iterate
+    real    :: exner,tli,txi,tx1,tx,rsx,rix,rcx,ravail,dtx,epsln,part
+
+    do j=3,n3-2
+       do i=3,n2-2
+          do k=1,n1
+             exner = (pi0(k)+pi1(k)+pp(k,i,j))/cp
+             p(k,i,j) = p00 * (exner)**cpr
+             tli=(tl(k,i,j)+th00)*exner
+             tx=tli
+             rsx=rslf(p(k,i,j),tx)
+             rcx=max(rt(k,i,j)-rsx,0.)
+             ravail = rt(k,i,j)
+             if(level>2) then
+               ravail = ravail - rr(k,i,j)
+             end if
+             part = 1.
+             if (rcx > 0.) then
+                do while (dtx > epsln .and. iterate < 10)
+                   txi=alvl/(cp*tx)
+                   tx1=tx - (tx - tli*(1.+txi*rcx))/(1. + txi*tli                &
+                        *(rcx/tx+(1.+rsx*ep)*rsx*alvl/(Rm*tx*tx)))
+                       dtx = abs(tx1-tx)
+                      tx  = tx1
+                      iterate = iterate+1
+                   rsx=rslf(p(k,i,j),tx)
+                   if (level>3) then
+                    rix=rsif(p(k,i,j),tx)
+                    part = max(0.,min(1.,(tx-t_hn)/(tmelt-t_hn)))
+                    ravail = ravail - max(ri(k,i,j)-(rix-rsx),0.)
+                   end if
+                   rcx = part*max(ravail-rsx,0.)
+                end do
+                if (dtx > epsln) then
+                    print *, '  ABORTING: thrm', dtx, epsln
+                   call appl_abort(0)
+                endif
+
+             endif
+             
+             rc(k,i,j)=rcx
+             rv(k,i,j)=rt(k,i,j)-rc(k,i,j)
+             rs(k,i,j)  = rsx
+             if (level>3) rsup(k,i,j)= rv(k,i,j) - rix 
+             tk(k,i,j)=tx
+             th(k,i,j)=tk(k,i,j)/exner
+          enddo
+       enddo
+    enddo
+
+  end subroutine satadjst_unified
 ! 
 ! -------------------------------------------------------------------------
 ! SATADJST3:  this routine calculates theta, and pressure and diagnoses
