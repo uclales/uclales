@@ -177,11 +177,14 @@ contains
     real, intent (out), optional, dimension (n1,n2,n3) :: rsup
 
     integer :: k, i, j, iterate
-    real    :: exner,tli,txi,tx1,tx,rsx,rix,rcx,ravail,dtx,epsln,part
+    real    :: exner,tli,txi,tx1,tx,rsx,rix,rcx,ravail,dtx,part
+    real, parameter :: epsln = 1.e-4
 
     do j=3,n3-2
        do i=3,n2-2
           do k=1,n1
+             dtx = 2*epsln
+             iterate = 1
              exner = (pi0(k)+pi1(k)+pp(k,i,j))/cp
              p(k,i,j) = p00 * (exner)**cpr
              tli=(tl(k,i,j)+th00)*exner
@@ -198,14 +201,14 @@ contains
                    txi=alvl/(cp*tx)
                    tx1=tx - (tx - tli*(1.+txi*rcx))/(1. + txi*tli                &
                         *(rcx/tx+(1.+rsx*ep)*rsx*alvl/(Rm*tx*tx)))
-                       dtx = abs(tx1-tx)
-                      tx  = tx1
-                      iterate = iterate+1
+                   dtx = abs(tx1-tx)
+                   tx  = tx1
+                   iterate = iterate+1
                    rsx=rslf(p(k,i,j),tx)
                    if (level>3) then
-                    rix=rsif(p(k,i,j),tx)
-                    part = max(0.,min(1.,(tx-t_hn)/(tmelt-t_hn)))
-                    ravail = ravail - max(ri(k,i,j)-(rix-rsx),0.)
+                     rix=rsif(p(k,i,j),tx)
+                     part = max(0.,min(1.,(tx-t_hn)/(tmelt-t_hn)))
+                     ravail = ravail - max(ri(k,i,j)-(rix-rsx),0.)
                    end if
                    rcx = part*max(ravail-rsx,0.)
                 end do
