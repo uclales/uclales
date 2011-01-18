@@ -634,20 +634,20 @@ contains
        do j=3,n3-2
           do i=3,n2-2
              scr1(i,j) = 0.
-             if (rr(k,i,j) > 0.001e-3) then
+            ! if (rr(k,i,j) > 0.001e-3) then
                 aflg = .true.
                 scr1(i,j) = 1.
                 nrsum = nrsum + (nr(k,i,j)*dn0(k)/1000.)  ! Nr in dm^-3 (1/liter)
                 nrcnt = nrcnt + 1.
-             end if
+            ! end if
           end do
        end do
        svctr(k,84)=svctr(k,84) + CCN*dn0(k)/1000. ! Nc in dm^-3 (1/liter)
        svctr(k,86)=svctr(k,86) + a1(k)*1000.
-       if (aflg) then
+      ! if (aflg) then
           svctr(k,85)=svctr(k,85)+get_csum(n1,n2,n3,k,nr*dn0(k)/1000.,scr1) ! Nr in dm^-3 (1/liter)
           svctr(k,91)=svctr(k,91)+get_avg(1,n2,n3,1,scr1)
-       end if
+      ! end if
     end do
     !
     ! conditionally average precip fluxes
