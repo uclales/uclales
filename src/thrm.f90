@@ -166,6 +166,7 @@ contains
   subroutine satadjst_unified(level,n1,n2,n3,pp,p,tl,th,tk,pi0,pi1,th00,rt,rv,rc,rs,rr,ri,rsup)
 
     use defs, only : cp, cpr, alvl, ep, Rm, p00,t_hn,tmelt
+    use mpi_interface, only : appl_abort
 
     integer, intent (in) ::  n1,n2,n3,level
 
@@ -193,7 +194,7 @@ contains
              rcx=max(rt(k,i,j)-rsx,0.)
              ravail = rt(k,i,j)
              if(level>2) then
-               ravail = ravail - rr(k,i,j)
+ !              ravail = ravail - rr(k,i,j)
              end if
              part = 1.
              if (rcx > 0.) then
@@ -206,9 +207,9 @@ contains
                    iterate = iterate+1
                    rsx=rslf(p(k,i,j),tx)
                    if (level>3) then
-                     rix=rsif(p(k,i,j),tx)
-                     part = max(0.,min(1.,(tx-t_hn)/(tmelt-t_hn)))
-                     ravail = ravail - max(ri(k,i,j)-(rix-rsx),0.)
+!                     rix=rsif(p(k,i,j),tx)
+!                     part = max(0.,min(1.,(tx-t_hn)/(tmelt-t_hn)))
+!                     ravail = ravail - max(ri(k,i,j)-(rix-rsx),0.)
                    end if
                    rcx = part*max(ravail-rsx,0.)
                 end do
