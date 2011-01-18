@@ -27,9 +27,11 @@ module mcrp
   use defs, only : tmelt,alvl, alvi,rowt,roice, pi, Rm, cp,t_hn 
   use grid, only : dt,nstep,rkbeta,rkalpha, dxi, dyi ,dzi_t, nxp, nyp, nzp, a_pexnr, pi0,pi1,a_rp, a_tp, th00, ccn,    &
        dn0, pi0,pi1, a_rt, a_tt,a_rpp, a_rpt, a_npp, a_npt, vapor, liquid,       &
-       a_theta, a_scr1, a_scr2, a_scr7, precip, &
+       a_theta, a_scr1, a_scr2, a_scr7, &
        a_ninuct,a_ricet,a_nicet,a_rsnowt,a_rgrt,&
-       a_ninucp,a_ricep,a_nicep,a_rsnowp,a_rgrp,rsup
+       a_ninucp,a_ricep,a_nicep,a_rsnowp,a_rgrp,rsup, &
+       prc_c, prc_r, prc_i, prc_s, prc_g
+
   use thrm, only : thermo, fll_tkrs
   use stat, only : sflg, updtst
   use util, only : get_avg3, azero
@@ -157,21 +159,20 @@ contains
   ! MICRO: sets up call to microphysics
   !
   subroutine micro(level)
-
     integer, intent (in) :: level
     call fll_tkrs(nzp,nxp,nyp,a_theta,a_pexnr,pi0,pi1,dn0,th00,a_scr1,rs=a_scr2)
     select case (level) 
     case(2)
-!        if (droplet_sedim) call sedim_cd(level,nzp,nxp,nyp,dn0,dt,a_theta,a_scr1,      &
-!             liquid,precip,a_rt,a_tt)     
+       if (droplet_sedim) call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c)
     case(3)
-       call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_scr1,vapor,a_scr2,liquid,a_rpp, &
-              a_npp,precip,a_rt,a_tt,a_rpt,a_npt,a_scr7)
+       call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
+              a_npp,a_rt,a_rpt,a_npt,a_scr7, prc_r)
     case(4)
-       call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_scr1,vapor,a_scr2,liquid,a_rpp, &
-              a_npp,precip,a_rt,a_tt,a_rpt,a_npt,a_scr7,&
+       call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
+              a_npp,a_rt,a_rpt,a_npt,a_scr7, prc_r, &
               a_ninuct,a_ricet,a_nicet,a_rsnowt,a_rgrt,&
-              a_ninucp,a_ricep,a_nicep,a_rsnowp,a_rgrp,rsup)
+              a_ninucp,a_ricep,a_nicep,a_rsnowp,a_rgrp,rsup, &
+              prc_i, prc_s, prc_g)
     end select
 
   end subroutine micro
@@ -180,35 +181,38 @@ contains
   ! MCRPH: calls microphysical parameterization 
   !
 
-  subroutine mcrph(level,n1,n2,n3,dn0,exner,pi0,pi1,thl,tk,rv,rs,rc,rp,np,         &
-       rrate, rtt,tlt,rpt,npt,dissip,    &
-       ninuct,ricet,nicet,rsnowt,rgrt,ninucp,ricep,nicep,rsnowp,rgrp,rsup)
+  subroutine mcrph(level,n1,n2,n3,dn0,exner,pi0,pi1,thl,tlt,tk,rv,rs,rc,prc_c, &
+                   rp, np, rtt,rpt,npt,dissip, prc_r, &
+                   ninuct,ricet,nicet,rsnowt,rgrt,ninucp,ricep,nicep,rsnowp,rgrp,rsup, &
+                   prc_i, prc_s, prc_g)
 
     integer, intent (in) :: level,n1,n2,n3
     real, dimension(n1)      , intent (in)             :: dn0,pi0,pi1  !Density and mean pressures
     real, dimension(n1,n2,n3), intent (inout)          :: exner, & !exner function
                                                           thl,& !Theta_l
                                                           tk, & !temperature
+                                                          tlt,&! theta_l tendency
                                                           rv, & !water vapor
                                                           rs, & !saturation mixing ration
-                                                          rc,& !Condensate/cloud water
-                                                          np,&!rain drop number
+                                                          rc, &  !Condensate/cloud water
+                                                          prc_c
+    real, dimension(n1,n2,n3), intent (inout),optional :: np,&!rain drop number
                                                           rp, &!rain water
                                                           rtt,& !Total water tendency
-                                                          tlt,&! theta_l tendency
                                                           rpt,&!rain water tendency
                                                           npt,&!rain droplet number tendency
-                                                          dissip
-    real, intent (out)                                 :: rrate(n1,n2,n3)
+                                                          dissip, &
+                                                          prc_r
+    
     real, dimension(n1,n2,n3), intent (inout),optional :: ninuct,ricet,nicet,rsnowt,rgrt,&
                                                           ninucp,ricep,nicep,rsnowp,rgrp,&
                                                           rsup
-
+    real, dimension(n1,n2,n3), intent (inout),optional :: prc_i, prc_s, prc_g
+    
     real, dimension(n1) :: tl,temp,qv,qc,nrain,qrain,ninuc,nice, nin_active,si,qice,nsnow,qsnow,ngrp,qgrp,qsat,qsup,q1 !dummy-arrays for conversion between mixing rate
     integer :: i, j,n,k
     logical,save  :: firsttime = .true.
     real :: dtrk
-    rrate = 0.
 
     if(firsttime) call initmcrp(level,firsttime)
     allocate(convice(n1),convliq(n1))
@@ -283,12 +287,12 @@ contains
           case(isedimrd)
             call resetvar(rain,qrain,nrain)
             qrain = qrain*dn0
-            call sedim_rd(n1,dt,dn0,qrain,nrain)
+            call sedim_rd(n1,dt,dn0,qrain,nrain,prc_r)
             qrain = qrain/dn0
           case(isedimcd)
             call resetvar(cldw,qc)
             qc = qc*dn0
-            call sedim_cd(n1,dt,tl,qc)
+            call sedim_cd(n1,dt,tl,qc,prc_c)
             qc = qc/dn0
           case(iicenucnr)
             where (qsup<0.) qsup = 0.
@@ -370,9 +374,12 @@ contains
             call resetvar(ice,qice,nice)
             call resetvar(snow,qsnow)
             call resetvar(graupel,qgrp)
-            call sedimentation (n1,ice, qice,nice)
-            call sedimentation (n1,snow, qsnow)
-            call sedimentation (n1,graupel, qgrp)
+            call sedimentation (n1,ice, qice,nice,rrate = prc_i)
+            call sedimentation (n1,snow, qsnow, rrate = prc_s)
+            call sedimentation (n1,graupel, qgrp, rrate = prc_g)
+            prc_i(1:n1,i,j) = prc_i(1:n1,i,j)*dn0
+            prc_s(1:n1,i,j) = prc_s(1:n1,i,j)*dn0
+            prc_g(1:n1,i,j) = prc_g(1:n1,i,j)*dn0            
           case default
           end select
         end do
@@ -602,7 +609,7 @@ contains
       end do
 
   end subroutine accr_SB
-  subroutine sedim_rd(n1,dt,dn0,rp,np)
+  subroutine sedim_rd(n1,dt,dn0,rp,np,rrate)
    !
    ! ---------------------------------------------------------------------
    ! SEDIM_RD: calculates the sedimentation of the rain drops and its
@@ -616,6 +623,7 @@ contains
      real, intent (in)                         :: dt
      real, intent (in),    dimension(n1)       :: dn0
      real, intent (inout), dimension(n1) :: rp,np
+     real, intent (out)  , dimension(n1) :: rrate
      real, parameter :: a2 = 9.65       ! in SI [m/s]
      real, parameter :: c2 = 6e2        ! in SI [1/m]
      real, parameter :: Dv = 25.0e-6    ! in SI [m/s]
@@ -726,11 +734,12 @@ contains
           flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)/dn0(k)
           rp(k) = rp(k)-flxdiv*dt
           np(k) = np(k)-(nfl(kp1)-nfl(k))*dzi_t(k)/dn0(k)*dt
+          rrate(k)    = -rfl(k) * alvl*0.5*(dn0(k)+dn0(kp1))
 
         end do
 
    end subroutine sedim_rd
-  subroutine sedim_cd(n1,dt,tl,rc)
+  subroutine sedim_cd(n1,dt,tl,rc,rrate)
   !
   ! ---------------------------------------------------------------------
   ! SEDIM_CD: calculates the cloue-droplet sedimentation flux and its effect
@@ -744,6 +753,7 @@ contains
     !irina
     !
     real, intent (inout),dimension(n1) :: rc,tl
+    real, intent (out)  , dimension(n1) :: rrate
 
     real, parameter :: c = 1.19e8 ! Stokes fall velocity coef [m^-1 s^-1]
     real, parameter :: sgg = 1.2  ! geometric standard dev of cloud droplets
@@ -768,6 +778,7 @@ contains
              flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)
              rc(k) = rc(k)-flxdiv*dt
              tl(k) = tl(k)+flxdiv*convliq(k)*dt
+             rrate(k)    = -rfl(k) * alvl*0.5*(dn0(k)+dn0(kp1))
           end do
 
   end subroutine sedim_cd
@@ -1046,7 +1057,7 @@ contains
         
           gi = 4.0*pi / ( alvi**2 / (K_T * Rm * tk(k)**2) + Rm * tk(k) / (D_v * e_es(tk(k))) )
           !si = 1-(qv(k)+qsup(k))/rsif(p,tk(k))
-	  ndep  = min(gi * n_g * c_g * d_g * qsup(k)/qv(k) * dt * f_n / x_g,ninuc(k))
+          ndep  = min(gi * n_g * c_g * d_g * qsup(k)/qv(k) * dt * f_n / x_g,ninuc(k))
           !dep = gi * n_g * c_g * d_g * f_v * qsup(k)/qv(k) * dt 
           dep   = ndep *x_g*f_v/f_n
           qice(k) = qice(k) + dep
@@ -1683,11 +1694,12 @@ contains
 
   end subroutine ice_collection
   
-  subroutine sedimentation(n1,meteor,rp,nr)
+  subroutine sedimentation(n1,meteor,rp,nr, rrate)
     integer, intent(in) :: n1
     real, dimension(n1), intent(inout) :: rp
     type(particle),  intent(in) :: meteor
     real, dimension(n1), intent(inout),optional :: nr
+     real, intent (out)  , dimension(n1) :: rrate
 ! 
 !     ! .. local variables ..
     integer  :: k,kk,km1,kp1
@@ -1801,6 +1813,7 @@ contains
       if(meteor%moments==2) then
         np(k) = np(k)-(nfl(kp1)-nfl(k))*dzi_t(k)/dn0(k)*dt
       end if
+      rrate(k)    = -rfl(k) * alvl*0.5*(dn0(k)+dn0(kp1))
 
     end do
 
@@ -2339,6 +2352,10 @@ contains
   logical, intent(inout) :: firsttime
 
   firsttime = .false.
+  if (level>=2) then
+    nprocess = 1
+    microseq = isedimcd
+  end if
  if (level>=3)      nprocess = nprocwarm
 !  if (droplet_sedim) nprocess = nprocess + 1
  if (level==4)      nprocess = nprocess + nprocice

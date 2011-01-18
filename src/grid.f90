@@ -78,9 +78,10 @@ module grid
   ! 3D Arrays 
   !irina
   real, dimension (:,:,:), allocatable ::                                     &
-       a_theta, a_pexnr, press, vapor, liquid, a_rflx, a_sflx, precip,rsup,   &
+       a_theta, a_pexnr, press, vapor, liquid, a_rflx, a_sflx,rsup,   &
        a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7,                &
-       a_lflxu, a_lflxd, a_sflxu, a_sflxd,a_km
+       a_lflxu, a_lflxd, a_sflxu, a_sflxd,a_km, &
+       prc_c, prc_r, prc_i, prc_s, prc_g 
   !
   ! Named pointers (to 3D arrays) 
   !
@@ -226,14 +227,21 @@ contains
     allocate (uw_sfc(nxp,nyp),vw_sfc(nxp,nyp),ww_sfc(nxp,nyp))
     allocate (wt_sfc(nxp,nyp),wq_sfc(nxp,nyp))
 
+    if (level >= 2) then
+       allocate(prc_c(nzp,nxp,nyp))
+       memsize = memsize + nxyzp
+    end if
     if (level >= 3) then
-       allocate(precip(nzp,nxp,nyp))
+       allocate(prc_r(nzp,nxp,nyp))
        memsize = memsize + nxyzp
     end if
     if (level >= 4) then
+       allocate(prc_i(nzp,nxp,nyp))
+       allocate(prc_s(nzp,nxp,nyp))
+       allocate(prc_g(nzp,nxp,nyp))
        allocate(rsup(nzp,nxp,nyp))
        rsup = 0.
-       memsize = memsize + nxyzp
+       memsize = memsize + 3*nxyzp
     end if
 
     a_ustar(:,:) = 0.

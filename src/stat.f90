@@ -28,7 +28,7 @@ module stat
   private
 
 !irina
-  integer, parameter :: nvar1 = 43, nvar2 = 103
+  integer, parameter :: nvar1 = 43, nvar2 = 107
 
   integer, save      :: nrec1, nrec2, ncid1, ncid2, nv1=nvar1, nv2=nvar2
   real, save         :: fsttm, lsttm, nsmp = 0
@@ -62,9 +62,10 @@ module stat
        'tl_cs1 ','tv_cs1 ','rt_cs1 ','rl_cs1 ','wt_cs1 ','wv_cs1 ', & !67
        'wr_cs1 ','cs2    ','cnt_cs2','w_cs2  ','tl_cs2 ','tv_cs2 ', & !73
        'rt_cs2 ','rl_cs2 ','wt_cs2 ','wv_cs2 ','wr_cs2 ','Nc     ', & !79  
-       'Nr     ','rr     ','precip ','evap   ','frc_prc','prc_prc', & !85
+       'Nr     ','rr     ','prc_r  ','evap   ','frc_prc','prc_prc', & !85
        'frc_ran','hst_srf','lflxu  ','lflxd  ','sflxu  ','sflxd  ',& !91
-       'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel','rsup   '/)
+       'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel',& !97
+       'rsup   ','prc_c  ','prc_i  ','prc_s  ','prc_g  '/)           !103
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:), svctr(:,:), ssclr(:)
@@ -150,7 +151,7 @@ contains
 !irina
     use grid, only : a_up, a_vp, a_wp, liquid, a_theta, a_scr1, a_scr2       &
          , a_rp, a_tp, press, nxp, nyp, nzp, dzi_m, dzi_t, zm, zt, th00, umean &
-         , vmean, dn0, precip, a_rpp, a_npp, albedo, CCN, iradtyp, a_rflx    &
+         , vmean, dn0, prc_c,prc_g,prc_i,prc_r,prc_s, a_rpp, a_npp, albedo, CCN, iradtyp, a_rflx    &
          , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa &
          , a_ricep, a_rsnowp, a_rgrp,a_ninucp,a_nicep,vapor,rsup
     real, intent (in) :: time
@@ -179,12 +180,12 @@ contains
 
     if (level >=1) call accum_lvl1(nzp, nxp, nyp, a_rp)
     if (level >=2) call accum_lvl2(nzp, nxp, nyp, th00, dn0, zm, a_wp,       &
-         a_scr1, a_theta, a_tp, liquid, a_scr2, a_rp)
+         a_scr1, a_theta, a_tp, liquid, a_scr2, a_rp,prc_c)
 
     if (level >=3) call accum_lvl3(nzp, nxp, nyp, dn0, zm, liquid, a_rpp,    &
-         a_npp, precip, CCN)
+         a_npp, prc_r, CCN)
 
-    if (level >=4) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, rsup,a_ricep, a_rsnowp, a_rgrp,a_ninucp,a_nicep)
+    if (level >=4) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, rsup,a_ricep, a_rsnowp, a_rgrp,a_ninucp,a_nicep,prc_i,prc_s,prc_g)
     !
     ! scalar statistics
     !
@@ -479,14 +480,14 @@ contains
   ! on level 3 variables.
   !
   subroutine accum_lvl2(n1, n2, n3, th00, dn0, zm, w, tv, th, tl, &
-       rl, rs, rt)
+       rl, rs, rt, rrate)
 
     use defs, only : ep2
 
     integer, intent (in) :: n1,n2,n3
     real, intent (in)                       :: th00
     real, intent (in), dimension(n1)        :: zm, dn0
-    real, intent (in), dimension(n1,n2,n3)  :: w, th, tl, rl, rs, rt
+    real, intent (in), dimension(n1,n2,n3)  :: w, th, tl, rl, rs, rt, rrate
     real, intent (out), dimension(n1,n2,n3) :: tv
 
     integer                   :: k, i, j, km1
@@ -584,7 +585,8 @@ contains
           svctr(k,83)=svctr(k,83)+get_csum(1,n2,n3,1,scr,xy2)
        end if
     end do
-    !
+    call get_avg3(n1,n2,n3,rrate,a1)
+    svctr(:,104)=svctr(:,104) + a1
     ! water paths
     !
     do j=3,n3-2
@@ -654,6 +656,9 @@ contains
     !
     ssclr(24) = 0.
     unit = 1./real((n2-4)*(n3-4))
+    call get_avg3(n1,n2,n3,rrate,a1)
+    svctr(k,86)=svctr(k,86) + a1(k)
+
     do k=2,n1-2
        rrsum = 0.
        rrcnt = 0.
@@ -724,19 +729,19 @@ contains
   ! SUBROUTINE ACCUM_LVL4: Accumulates specialized statistics that depend
   ! on level 4 variables.
   !
-  subroutine accum_lvl4(n1, n2, n3,  dn0, zm, rv, rsup,rice, rsnow, rgrp,ninuc,nice)
+  subroutine accum_lvl4(n1, n2, n3,  dn0, zm, rv, rsup,rice, rsnow, rgrp,ninuc,nice, rrate_i, rrate_s, rrate_g)
     use grid, only : a_pexnr,pi0,pi1
     use defs, only : alvi,cp
     integer, intent (in) :: n1,n2,n3
     real, intent (in), dimension(n1)        :: zm, dn0
-    real, intent (in), dimension(n1,n2,n3)  :: rv,rsup,rice,rsnow,rgrp,ninuc,nice
+    real, intent (in), dimension(n1,n2,n3)  :: rv,rsup,rice,rsnow,rgrp,ninuc,nice, rrate_i, rrate_s, rrate_g
     integer                   :: k, i, j, km1
     real, dimension(n2,n3)    :: scr
 
-    real                   :: nrsum, nrcnt,convice
+    real                   :: convice
     real, dimension(n1)    :: a1
-    real, dimension(n2,n3) :: scr1
-    logical                :: aflg
+!     real, dimension(n2,n3) :: scr1
+!     logical                :: aflg
  
 
     !
@@ -820,6 +825,12 @@ contains
     end do
     ssclr(42) = get_avg(1,n2,n3,1,scr)
     ssclr(43) = get_cor(1,n2,n3,1,scr,scr)
+    call get_avg3(n1,n2,n3,rrate_i,a1)
+    svctr(:,105)=svctr(:,105) + a1
+    call get_avg3(n1,n2,n3,rrate_s,a1)
+    svctr(:,106)=svctr(:,106) + a1
+    call get_avg3(n1,n2,n3,rrate_g,a1)
+    svctr(:,107)=svctr(:,107) + a1
 
   end subroutine accum_lvl4
 

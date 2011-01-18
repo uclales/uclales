@@ -793,8 +793,28 @@ contains
        if (itype==0) ncinfo = 'Graupel'
        if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
-    case('precip')
-       if (itype==0) ncinfo = 'Precipitation Flux (positive downward'
+    case('prc_c')
+       if (itype==0) ncinfo = 'Cloud water Precipitation Flux (positive downward)'
+       !irina
+       if (itype==1) ncinfo = 'kg/kg m/s'
+       if (itype==2) ncinfo = 'ttmt'
+    case('prc_r')
+       if (itype==0) ncinfo = 'Rain Precipitation Flux (positive downward)'
+       !irina
+       if (itype==1) ncinfo = 'kg/kg m/s'
+       if (itype==2) ncinfo = 'ttmt'
+    case('prc_i')
+       if (itype==0) ncinfo = 'Ice Precipitation Flux (positive downward)'
+       !irina
+       if (itype==1) ncinfo = 'kg/kg m/s'
+       if (itype==2) ncinfo = 'ttmt'
+    case('prc_s')
+       if (itype==0) ncinfo = 'Snow Precipitation Flux (positive downward)'
+       !irina
+       if (itype==1) ncinfo = 'kg/kg m/s'
+       if (itype==2) ncinfo = 'ttmt'
+    case('prc_g')
+       if (itype==0) ncinfo = 'Graupel Precipitation Flux (positive downward)'
        !irina
        if (itype==1) ncinfo = 'kg/kg m/s'
        if (itype==2) ncinfo = 'ttmt'
