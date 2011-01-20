@@ -287,12 +287,12 @@ contains
           case(isedimrd)
             call resetvar(rain,qrain,nrain)
             qrain = qrain*dn0
-            call sedim_rd(n1,dt,dn0,qrain,nrain,prc_r)
+            call sedim_rd(n1,dt,dn0,qrain,nrain,prc_r(1:n1,i,j))
             qrain = qrain/dn0
           case(isedimcd)
             call resetvar(cldw,qc)
             qc = qc*dn0
-            call sedim_cd(n1,dt,tl,qc,prc_c)
+            call sedim_cd(n1,dt,tl,qc,prc_c(1:n1,i,j))
             qc = qc/dn0
           case(iicenucnr)
             where (qsup<0.) qsup = 0.
@@ -374,9 +374,9 @@ contains
             call resetvar(ice,qice,nice)
             call resetvar(snow,qsnow)
             call resetvar(graupel,qgrp)
-            call sedimentation (n1,ice, qice,nice,rrate = prc_i)
-            call sedimentation (n1,snow, qsnow, rrate = prc_s)
-            call sedimentation (n1,graupel, qgrp, rrate = prc_g)
+            call sedimentation (n1,ice, qice,nice,rrate = prc_i(1:n1,i,j))
+            call sedimentation (n1,snow, qsnow, rrate = prc_s(1:n1,i,j))
+            call sedimentation (n1,graupel, qgrp, rrate = prc_g(1:n1,i,j))
             prc_i(1:n1,i,j) = prc_i(1:n1,i,j)*dn0
             prc_s(1:n1,i,j) = prc_s(1:n1,i,j)*dn0
             prc_g(1:n1,i,j) = prc_g(1:n1,i,j)*dn0            
@@ -668,7 +668,6 @@ contains
               vn(k) = max(0.,an * Dp + bn)
               vr(k) = max(0.,aq * Dp + bq)
           end if
-
         end do
 
         do k=2,n1-1
@@ -2352,7 +2351,7 @@ contains
   logical, intent(inout) :: firsttime
 
   firsttime = .false.
-  if (level>=2) then
+  if (level==2) then
     nprocess = 1
     microseq = isedimcd
   end if

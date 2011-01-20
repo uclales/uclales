@@ -657,7 +657,7 @@ contains
     ssclr(24) = 0.
     unit = 1./real((n2-4)*(n3-4))
     call get_avg3(n1,n2,n3,rrate,a1)
-    svctr(k,86)=svctr(k,86) + a1(k)
+    svctr(:,87)=svctr(:,87) + a1
 
     do k=2,n1-2
        rrsum = 0.
