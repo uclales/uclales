@@ -181,9 +181,9 @@ contains
   ! MCRPH: calls microphysical parameterization 
   !
 
-  subroutine mcrph(level,n1,n2,n3,dn0,exner,pi0,pi1,thl,tlt,tk,rv,rs,rc,prc_c, &
+  subroutine mcrph(level,n1,n2,n3,dn0,exner,pi0,pi1,thl,tlt,tk,vapor,rsat,rcld,prc_c, &
                    rp, np, rtt,rpt,npt,dissip, prc_r, &
-                   ninuct,ricet,nicet,rsnowt,rgrt,ninucp,ricep,nicep,rsnowp,rgrp,rsup, &
+                   ninuct,ricet,nicet,rsnowt,rgrpt,ninucp,ricep,nicep,rsnowp,rgrpp,si, &
                    prc_i, prc_s, prc_g)
 
     integer, intent (in) :: level,n1,n2,n3
@@ -192,9 +192,9 @@ contains
                                                           thl,& !Theta_l
                                                           tk, & !temperature
                                                           tlt,&! theta_l tendency
-                                                          rv, & !water vapor
-                                                          rs, & !saturation mixing ration
-                                                          rc, &  !Condensate/cloud water
+                                                          vapor, & !water vapor
+                                                          rsat, & !saturation mixing ration
+                                                          rcld, &  !Cloud water
                                                           prc_c
     real, dimension(n1,n2,n3), intent (inout),optional :: np,&!rain drop number
                                                           rp, &!rain water
@@ -204,16 +204,16 @@ contains
                                                           dissip, &
                                                           prc_r
     
-    real, dimension(n1,n2,n3), intent (inout),optional :: ninuct,ricet,nicet,rsnowt,rgrt,&
-                                                          ninucp,ricep,nicep,rsnowp,rgrp,&
-                                                          rsup
+    real, dimension(n1,n2,n3), intent (inout),optional :: ninuct,ricet,nicet,rsnowt,rgrpt,&
+                                                          ninucp,ricep,nicep,rsnowp,rgrpp,&
+                                                          si
     real, dimension(n1,n2,n3), intent (inout),optional :: prc_i, prc_s, prc_g
     
-    real, dimension(n1) :: tl,temp,qv,qc,nrain,qrain,ninuc,nice, nin_active,si,qice,nsnow,qsnow,ngrp,qgrp,qsat,qsup,q1 !dummy-arrays for conversion between mixing rate
-    integer :: i, j,n,k
+    real, dimension(n1) :: tl,temp,rv,rc,nrain,rrain,ninuc,nice, nin_active,rice,nsnow,rsnow,ngrp,rgrp,rs,rsup,r1 
+    integer :: i, j,n
     logical,save  :: firsttime = .true.
-    real :: dtrk
-
+!     real :: dtrk
+! 
     if(firsttime) call initmcrp(level,firsttime)
     allocate(convice(n1),convliq(n1))
 
@@ -222,31 +222,31 @@ contains
         call resetvar(rain,rp(1:n1,i,j),np(1:n1,i,j))
         tl = thl(1:n1,i,j)
         temp = tk(1:n1,i,j)
-        qv = rv(1:n1,i,j)/dn0
-        qc = rc(1:n1,i,j)/dn0
-        qsat = rs(1:n1,i,j)/dn0
-        qrain = rp(1:n1,i,j)/dn0
+        rv = vapor(1:n1,i,j)
+        rc = rcld(1:n1,i,j)
+        rs = rsat(1:n1,i,j)
+        rrain = rp(1:n1,i,j)
         nrain = np(1:n1,i,j)
         convliq = alvl/cp*(pi0+pi1+exner(1:n1,i,j))/cp
         if (level == 4) then
           call resetvar(ice,ricep(1:n1,i,j),nicep(1:n1,i,j))
           call resetvar(snow,rsnowp(1:n1,i,j))
-          call resetvar(graupel,rgrp(1:n1,i,j))
+          call resetvar(graupel,rgrpp(1:n1,i,j))
 
-          qsup = rsup(1:n1,i,j)/dn0
+          rsup = si(1:n1,i,j)
 
           ninuc = ninucp(1:n1,i,j)
 
-          qice = ricep(1:n1,i,j)/dn0
+          rice = ricep(1:n1,i,j)
           nice = nicep(1:n1,i,j)
-          qsnow = rsnowp(1:n1,i,j)/dn0
-          where (qsnow>0)
+          rsnow = rsnowp(1:n1,i,j)
+          where (rsnow>0)
             nsnow = snow%nr
           elsewhere
             nsnow = 0
           end where 
-          qgrp = rgrp(1:n1,i,j)/dn0
-          where (qgrp>0)
+          rgrp = rgrpp(1:n1,i,j)
+          where (rgrp>0)
             ngrp = graupel%nr
           elsewhere
             ngrp = 0
@@ -259,157 +259,135 @@ contains
          do n=1,nprocess
           select case(microseq(n))
           case(iwtrdff)
-            call resetvar(cldw,qc)
-            call resetvar(rain,qrain,nrain)
-            qv = qv*dn0
-            qc = qc*dn0
-            qrain = qrain*dn0
-            call wtr_dff_SB(n1,dn0,qrain,nrain,qc,qsat,qv,tl,temp)
-            qv = qv/dn0
-            qc = qc/dn0
-            qrain = qrain/dn0
+            call resetvar(cldw,rc)
+            call resetvar(rain,rrain,nrain)
+            call wtr_dff_SB(n1,dn0,rrain,nrain,rsat,rv,tl,temp)
           case(iauto)
-            call resetvar(cldw,qc)
-            call resetvar(rain,qrain,nrain)
-            qc = qc*dn0
-            qrain = qrain*dn0
-            call auto_SB(n1,dn0,qc,qrain,nrain,tl,dissip(1:n1,i,j))
-            qc = qc/dn0
-            qrain = qrain/dn0
+            call resetvar(cldw,rc)
+            call resetvar(rain,rrain,nrain)
+            call auto_SB(n1,dn0,rc,rrain,nrain,tl,dissip(1:n1,i,j))
           case(iaccr)
-            call resetvar(cldw,qc)
-            call resetvar(rain,qrain,nrain)
-            qc = qc*dn0
-            qrain = qrain*dn0
-            call accr_SB(n1,dn0,qc,qrain,nrain,tl,dissip(1:n1,i,j))
-            qc = qc/dn0
-            qrain = qrain/dn0
+            call resetvar(cldw,rc)
+            call resetvar(rain,rrain,nrain)
+            call accr_SB(n1,dn0,rc,rrain,nrain,tl,dissip(1:n1,i,j))
           case(isedimrd)
-            call resetvar(rain,qrain,nrain)
-            qrain = qrain*dn0
-            call sedim_rd(n1,dt,dn0,qrain,nrain,prc_r(1:n1,i,j))
-            qrain = qrain/dn0
+            call resetvar(rain,rrain,nrain)
+            call sedim_rd(n1,dt,dn0,rrain,nrain,prc_r(1:n1,i,j))
           case(isedimcd)
-            call resetvar(cldw,qc)
-            qc = qc*dn0
-            call sedim_cd(n1,dt,tl,qc,prc_c(1:n1,i,j))
-            qc = qc/dn0
+            call resetvar(cldw,rc)
+            call sedim_cd(n1,dt,tl,rc,prc_c(1:n1,i,j))
           case(iicenucnr)
-            where (qsup<0.) qsup = 0.
-            call n_icenuc(n1,ninuc,nin_active,temp,qv,qsup)
+            where (rsup<0.) rsup = 0.
+            call n_icenuc(n1,ninuc,nin_active,temp,rv,rsup)
           case(iicenuc)
             where (ninuc<0.) ninuc = 0.
-            where (qsup<0.) qsup = 0.
-            call ice_nucleation(n1,ninuc,qice,nice,qsup,tl,temp)
+            where (rsup<0.) rsup = 0.
+            call ice_nucleation(n1,ninuc,rice,nice,rsup,tl,temp)
 
           case(ifreez)
-            call resetvar(cldw,qc)
-            call resetvar(rain,qrain,nrain)
+            call resetvar(cldw,rc)
+            call resetvar(rain,rrain,nrain)
 
-            call cloud_freeze(n1,qc,ninuc,qice,nice,tl,temp)
-            call rain_freeze(n1,qrain,nrain,ninuc,qice,nice,qgrp,temp)
+            call cloud_freeze(n1,rc,ninuc,rice,nice,tl,temp)
+            call rain_freeze(n1,rrain,nrain,ninuc,rice,nice,rgrp,temp)
           case(idep)
-            where (qsup<0.) qsup = 0.
-            call deposition(n1,ice,ninuc,qice,nice,qv,tl,temp,qsup)
-            where (qsup<0.) qsup = 0.
-            call deposition(n1,snow,ninuc,qsnow,nsnow,qv,tl,temp,qsup)
-            where (qsup<0.) qsup = 0.
-            call deposition(n1,graupel,ninuc,qgrp,ngrp,qv,tl,temp,qsup)
+            where (rsup<0.) rsup = 0.
+            call deposition(n1,ice,ninuc,rice,nice,rv,tl,temp,rsup)
+            where (rsup<0.) rsup = 0.
+            call deposition(n1,snow,ninuc,rsnow,nsnow,rv,tl,temp,rsup)
+            where (rsup<0.) rsup = 0.
+            call deposition(n1,graupel,ninuc,rgrp,ngrp,rv,tl,temp,rsup)
           case(imelt_ice)
-            call resetvar(ice,qice,nice)
-            call melting(n1,ice,qice,tl,nice,qc,qrain,nrain,temp)
+            call resetvar(ice,rice,nice)
+            call melting(n1,ice,rice,tl,nice,rc,rrain,nrain,temp)
           case(imelt_snow)
-            call resetvar(snow,qsnow)
-            call melting(n1,snow,qsnow,tl,nsnow,qc,qrain,nrain,temp)
+            call resetvar(snow,rsnow)
+            call melting(n1,snow,rsnow,tl,nsnow,rc,rrain,nrain,temp)
           case(imelt_grp)
-            call resetvar(graupel,qgrp)
-            call melting(n1,graupel,qgrp,tl,ngrp,qc,qrain,nrain,temp)
-          case(iself_ice)
-            call resetvar(ice,qice,nice)
-            call ice_selfcollection(n1,ice,snow,qice,qsnow,nice,temp,d_conv_is,q_crit_is,d_crit_is)
-          case(icoll_ice_snow)
-            call resetvar(ice,qice,nice)
-            call resetvar(snow,qsnow)
-            call ice_collection(n1,ice,snow,qice,nice,qsnow,temp,q_crit_is)
-          case(icoll_ice_grp)
-            call resetvar(ice,qice,nice)
-            call resetvar(graupel,qgrp)
-            call ice_collection(n1,ice,graupel,qice,nice,qgrp,temp,q_crit_is)
-      
-          case(icoll_snow_grp)
-            call resetvar(ice,qice,nice)
-            call resetvar(snow,qsnow)
-            call resetvar(graupel,qgrp)
-            call ice_collection(n1,snow,graupel,qsnow,nsnow,qgrp,temp,q_crit_is)
-          case(iriming_ice_cloud)
-            call resetvar(cldw,qc)
-            call resetvar(ice,qice,nice)
-            call ice_cloud_riming(n1,cldw,ice,qc,qice,nice,qgrp,tl,temp,d_coll_c,q_crit_c,d_crit_c,q_crit_ic,d_crit_ic,d_conv_ig,e_ic)
-          case(iriming_snow_cloud)
-            call resetvar(snow,qsnow)
-            call resetvar(cldw,qc)
-            call ice_cloud_riming(n1,cldw,snow,qc,qsnow,nsnow,qgrp,tl,temp,d_coll_c,q_crit_c,d_crit_c,q_crit_sc,d_crit_sc,d_conv_sg,e_sc)
-          case(iriming_grp_cloud)
-            call resetvar(graupel,qgrp)
-            call resetvar(cldw,qc)
-            q1 = 0.
-            call ice_cloud_riming(n1,cldw,graupel,qc,qgrp,ngrp,q1,tl,temp,d_coll_c,q_crit_c,d_crit_c,q_crit_gc,d_crit_gc,d_conv_sg,e_gc)
-            qgrp = qgrp + q1
-          case(iriming_ice_rain)
-            call resetvar(ice,qice,nice)
-            call resetvar(rain,qrain,nrain)
-            call ice_rain_riming(n1,rain,ice    ,qrain,nrain,qice ,nice ,qgrp,temp,q_crit,d_crit_r, q_crit_ir,d_crit_ir)
-!             call ice_rain_riming(n1,rain,ice    ,qrain,nrain,qice ,nice ,qgrp,temp,d_crit_r,1e-2,1e-2,1e-2)
-          case(iriming_snow_rain)
-            call resetvar(snow,qsnow)
-            call resetvar(rain,qrain,nrain)
-            call ice_rain_riming(n1,rain,snow   ,qrain,nrain,qsnow,nsnow,qgrp,temp,q_crit,d_crit_r, q_crit_sr,d_crit_sr)
-          case(iriming_grp_rain)
-            call resetvar(graupel,qgrp)
-            call resetvar(rain,qrain,nrain)
-            q1 = 0.
-            call ice_rain_riming(n1,rain,graupel,qrain,nrain,qgrp ,ngrp,q1,temp,q_crit,d_crit_r, q_crit,0.)
-            qgrp = qgrp + q1
+            call resetvar(graupel,rgrp)
+            call melting(n1,graupel,rgrp,tl,ngrp,rc,rrain,nrain,temp)
+!           case(iself_ice)
+!             call resetvar(ice,rice,nice)
+!             call ice_selfcollection(n1,ice,snow,rice,rsnow,nice,temp,d_conv_is,q_crit_is,d_crit_is)
+!           case(icoll_ice_snow)
+!             call resetvar(ice,rice,nice)
+!             call resetvar(snow,rsnow)
+!             call ice_collection(n1,ice,snow,rice,nice,rsnow,temp,q_crit_is)
+!           case(icoll_ice_grp)
+!             call resetvar(ice,rice,nice)
+!             call resetvar(graupel,rgrp)
+!             call ice_collection(n1,ice,graupel,rice,nice,rgrp,temp,q_crit_is)
+!       
+!           case(icoll_snow_grp)
+!             call resetvar(ice,rice,nice)
+!             call resetvar(snow,rsnow)
+!             call resetvar(graupel,rgrp)
+!             call ice_collection(n1,snow,graupel,rsnow,nsnow,rgrp,temp,q_crit_is)
+!           case(iriming_ice_cloud)
+!             call resetvar(cldw,rc)
+!             call resetvar(ice,rice,nice)
+!             call ice_cloud_riming(n1,cldw,ice,rc,rice,nice,rgrp,tl,temp,d_coll_c,q_crit_c,d_crit_c,q_crit_ic,d_crit_ic,d_conv_ig,e_ic)
+!           case(iriming_snow_cloud)
+!             call resetvar(snow,rsnow)
+!             call resetvar(cldw,rc)
+!             call ice_cloud_riming(n1,cldw,snow,rc,rsnow,nsnow,rgrp,tl,temp,d_coll_c,q_crit_c,d_crit_c,q_crit_sc,d_crit_sc,d_conv_sg,e_sc)
+!           case(iriming_grp_cloud)
+!             call resetvar(graupel,rgrp)
+!             call resetvar(cldw,rc)
+!             r1 = 0.
+!             call ice_cloud_riming(n1,cldw,graupel,rc,rgrp,ngrp,r1,tl,temp,d_coll_c,q_crit_c,d_crit_c,q_crit_gc,d_crit_gc,d_conv_sg,e_gc)
+!             rgrp = rgrp + r1
+!           case(iriming_ice_rain)
+!             call resetvar(ice,rice,nice)
+!             call resetvar(rain,rrain,nrain)
+!             call ice_rain_riming(n1,rain,ice    ,rrain,nrain,rice ,nice ,rgrp,temp,q_crit,d_crit_r, q_crit_ir,d_crit_ir)
+! !             call ice_rain_riming(n1,rain,ice    ,rrain,nrain,rice ,nice ,rgrp,temp,d_crit_r,1e-2,1e-2,1e-2)
+!           case(iriming_snow_rain)
+!             call resetvar(snow,rsnow)
+!             call resetvar(rain,rrain,nrain)
+!             call ice_rain_riming(n1,rain,snow   ,rrain,nrain,rsnow,nsnow,rgrp,temp,q_crit,d_crit_r, q_crit_sr,d_crit_sr)
+!           case(iriming_grp_rain)
+!             call resetvar(graupel,rgrp)
+!             call resetvar(rain,rrain,nrain)
+!             r1 = 0.
+!             call ice_rain_riming(n1,rain,graupel,rrain,nrain,rgrp ,ngrp,r1,temp,q_crit,d_crit_r, q_crit,0.)
+!             rgrp = rgrp + r1
           case(ised_ice)
-            call resetvar(ice,qice,nice)
-            call resetvar(snow,qsnow)
-            call resetvar(graupel,qgrp)
-            call sedimentation (n1,ice, qice,nice,rrate = prc_i(1:n1,i,j))
-            call sedimentation (n1,snow, qsnow, rrate = prc_s(1:n1,i,j))
-            call sedimentation (n1,graupel, qgrp, rrate = prc_g(1:n1,i,j))
-            prc_i(1:n1,i,j) = prc_i(1:n1,i,j)*dn0
-            prc_s(1:n1,i,j) = prc_s(1:n1,i,j)*dn0
-            prc_g(1:n1,i,j) = prc_g(1:n1,i,j)*dn0            
+            call resetvar(ice,rice,nice)
+            call resetvar(snow,rsnow)
+            call resetvar(graupel,rgrp)
+            call sedimentation (n1,ice, rice,nice,rrate = prc_i(1:n1,i,j))
+            call sedimentation (n1,snow, rsnow, rrate = prc_s(1:n1,i,j))
+            call sedimentation (n1,graupel, rgrp, rrate = prc_g(1:n1,i,j))
           case default
           end select
         end do
-        call resetvar(cldw,qc)
-        call resetvar(rain,qrain,nrain)
+        call resetvar(cldw,rc)
+        call resetvar(rain,rrain,nrain)
         if (level==4) then
-          call resetvar(ice,qice,nice)
-          call resetvar(snow,qsnow)
-          call resetvar(graupel,qgrp)
+          call resetvar(ice,rice,nice)
+          call resetvar(snow,rsnow)
+          call resetvar(graupel,rgrp)
         end if
 
         tlt(2:n1,i,j) =  tlt(2:n1,i,j)+      (tl(2:n1) - thl(2:n1,i,j))/dt
-        rtt(2:n1,i,j) = rtt(2:n1,i,j) +(dn0(2:n1)*qv(2:n1) - rv(2:n1,i,j))/dt + (dn0(2:n1)*qc(2:n1) - rc(2:n1,i,j))/dt
-        rpt(2:n1,i,j) = max(rpt(2:n1,i,j) +(dn0(2:n1)*qrain(2:n1) - rp(2:n1,i,j))/dt,-rp(2:n1,i,j)/dt)
+        rtt(2:n1,i,j) = rtt(2:n1,i,j) +(rv(2:n1) - vapor(2:n1,i,j))/dt + (rc(2:n1) - rcld(2:n1,i,j))/dt
+        rpt(2:n1,i,j) = max(rpt(2:n1,i,j) +(rrain(2:n1) - rp(2:n1,i,j))/dt,-rp(2:n1,i,j)/dt)
         npt(2:n1,i,j) = max(npt(2:n1,i,j) +(nrain(2:n1) - np(2:n1,i,j))/dt,-np(2:n1,i,j)/dt)
         
         if (level == 4) then
           ninuct(2:n1,i,j) = ninuct(2:n1,i,j) + (ninuc(2:n1)-ninucp(2:n1,i,j))/dt !max(ninuct(2:n1,i,j) + (ninuc(2:n1) - ninucp(2:n1,i,j))/dtrk,-ninucp(2:n1,i,j)/dt)
-          ricet(2:n1,i,j)  = max(ricet(2:n1,i,j)  + (dn0(2:n1)*qice(2:n1) - ricep(2:n1,i,j))/dt,-ricep(2:n1,i,j)/dt)
+          ricet(2:n1,i,j)  = max(ricet(2:n1,i,j)  + (rice(2:n1) - ricep(2:n1,i,j))/dt,-ricep(2:n1,i,j)/dt)
           nicet(2:n1,i,j)  = nicet(2:n1,i,j)  + (nice(2:n1) - nicep(2:n1,i,j))/dt
-          rsnowt(2:n1,i,j) = max(rsnowt(2:n1,i,j) + (dn0(2:n1)*qsnow(2:n1) - rsnowp(2:n1,i,j))/dt,-rsnowp(2:n1,i,j)/dt)
-          rgrt(2:n1,i,j)   = max(rgrt(2:n1,i,j)   + (dn0(2:n1)*qgrp(2:n1) - rgrp(2:n1,i,j))/dt,-rp(2:n1,i,j)/dt)
+          rsnowt(2:n1,i,j) = max(rsnowt(2:n1,i,j) + (rsnow(2:n1) - rsnowp(2:n1,i,j))/dt,-rsnowp(2:n1,i,j)/dt)
+          rgrpt(2:n1,i,j)   = max(rgrpt(2:n1,i,j)   + (rgrp(2:n1) - rgrpp(2:n1,i,j))/dt,-rgrpp(2:n1,i,j)/dt)
         end if
 
      end do
     end do
     deallocate(convice,convliq)
-!print *,maxval(rsup),maxloc(rsup)
   end subroutine mcrph
-  subroutine wtr_dff_SB(n1,dn0,rp,np,rl,rs,rv,tl,tk)
+  subroutine wtr_dff_SB(n1,dn0,rp,np,rs,rv,tl,tk)
  !
  ! ---------------------------------------------------------------------
  ! WTR_DFF_SB: calculates the evolution of the both number- and
@@ -419,7 +397,7 @@ contains
 
     integer, intent (in) :: n1
     real, intent (in)    :: tk(n1),rs(n1), dn0(n1)
-    real, intent (inout) :: rp(n1), np(n1),tl(n1),rv(n1),rl(n1)
+    real, intent (inout) :: rp(n1), np(n1),tl(n1),rv(n1)
 
     real, parameter     :: c_Nevap = 0.7
     integer             :: k
@@ -781,78 +759,77 @@ contains
           end do
 
   end subroutine sedim_cd
-  subroutine n_icenuc(n1,nin,nin_active,tk,qv,qsup)
+  subroutine n_icenuc(n1,nin,nin_active,tk,rv,rsup)
     integer, intent(in) :: n1
     real, intent(inout), dimension (n1) :: nin
-    real, intent(in) , dimension(n1) :: tk,qsup,qv,nin_active
+    real, intent(in) , dimension(n1) :: tk,rsup,rv,nin_active
     integer :: k
-!     real :: fact
-    real :: nineq
-!     fact = (1-exp(-dt/timenuc))
+    real :: fact
+    real :: niner
+    fact = (1-exp(-dt/timenuc))
 
     do k=1,n1
-!       nineq = n_ice_meyers_contact(tk(k),min(qsup(k),0.25))
-!       nineq = 
-!       nin(k)  = nin(k) + (n_ice_meyers_contact(tk(k),min(qsup(k),0.25))-nin(k))*fact
-!       nin(k) = min(nin(k) + nineq*dt/timenuc,nineq)
-!       nin(k)  = n_ice_meyers_contact(tk(k),min(qsup(k),0.25))
-      if (qsup(k)/qv(k)>0.05) then
-        nin(k) = max(0.,nin_set -max(nin_active(k),0.))
-      else
-        nin(k) = 0.
-      end if
+      niner = n_ice_meyers_contact(tk(k),min(rsup(k),0.25))
+      nin(k)  = nin(k) + (n_ice_meyers_contact(tk(k),min(rsup(k),0.25))-nin(k))*fact
+      nin(k) = min(nin(k) + niner*dt/timenuc,niner)
+      nin(k)  = n_ice_meyers_contact(tk(k),min(rsup(k),0.25))
+!       if (rsup(k)/rv(k)>0.05) then
+!         nin(k) = max(0.,nin_set -max(nin_active(k),0.))
+!       else
+!         nin(k) = 0.
+!       end if
     end do
 
   end subroutine n_icenuc
 
-  subroutine ice_nucleation(n1,nin,qice,nice,qsup,tl,tk)
+  subroutine ice_nucleation(n1,nin,rice,nice,rsup,tl,tk)
     integer,intent(in) :: n1
-    real, intent(inout),dimension(n1) :: nin,nice, qice, tl,qsup
+    real, intent(inout),dimension(n1) :: nin,nice, rice, tl,rsup
     real,intent(in), dimension(n1) :: tk
-    real :: nuc_n, nuc_q
+    real :: nuc_n, nuc_r
     integer :: k
     
     do k=2,n1
-      if (tk(k) < tmelt .and. qsup(k) > 0.0) then
+      if (tk(k) < tmelt .and. rsup(k) > 0.0) then
         nuc_n = nin(k) 
 
         if (nuc_n>eps0) then
-!          nuc_q = min(nuc_n * ice%x_min, qsup(k))
-          nuc_n = nuc_q / ice%x_min                !axel 20040416
+!          nuc_r = min(nuc_n * ice%x_min, rsup(k))
+          nuc_n   = nuc_r / ice%x_min                !axel 20040416
           nin(k)  = nin(k)  - nuc_n
-          qsup(k) = qsup(k) - nuc_q
+          rsup(k) = rsup(k) - nuc_r
           nice(k) = nice(k) + nuc_n
-          qice(k) = qice(k) + nuc_q
-          tl(k)   = tl(k)   + convice(k)*nuc_q
+          rice(k) = rice(k) + nuc_r
+          tl(k)   = tl(k)   + convice(k)*nuc_r
         end if
       endif
     end do
   end subroutine
-  subroutine cloud_freeze (n1,qcloud,ninuc,qice,nice,tl,tk)
+  subroutine cloud_freeze (n1,rcloud,ninuc,rice,nice,tl,tk)
 !
 
     integer, intent(in) :: n1
-    real, intent(inout), dimension(n1) :: qice,nice,ninuc,qcloud,tl
+    real, intent(inout), dimension(n1) :: rice,nice,ninuc,rcloud,tl
     real, intent(in), dimension(n1) :: tk
 !     real, intent(in) :: nc
 !         ! .. local variables ..
         integer          ::  k
-        real :: frq, frn,qc,xc,jhet,jhom,jtot,tc
+        real :: frr, frn,rc,xc,jhet,jhom,jtot,tc
         real, parameter :: ahet = 6.5e-1 ! 1/k,      messung nach barklie and gokhale
         real, parameter :: bhet = 2.0e+2 ! 1/(m3 s), messung nach barklie and gokhale
         real,save       :: facg
           facg = moment_gamma(cldw,2)    ! <hn
         do k = 1, n1
-          if (tk(k) < tmelt .and. qcloud(k) > 0.) then
+          if (tk(k) < tmelt .and. rcloud(k) > 0.) then
 
 
-            qc = qcloud(k)
+            rc = rcloud(k)
             tc = tk(k) - tmelt
             if (tc < -50.0) then
-              frq = qc                                               !..komplettes hom. gefrieren
+              frr = rc                                               !..komplettes hom. gefrieren
               frn = cldw%nr                                               !..unterhalb -50 c
             else
-              xc = min(max(qc/(cldw%nr+eps0),cldw%x_min),cldw%x_max)    !..mean masse
+              xc = min(max(rc/(cldw%nr+eps0),cldw%x_min),cldw%x_max)    !..mean masse
 
               !..hom. gefrieren nach jeffrey und austin (1997), siehe auch cotton und field (2001)
               if (tc > -30.0) then
@@ -867,19 +844,19 @@ contains
 
               !..umwandlungsraten fuer anzahl- und massendichte
               jtot = (jhom + jhet) / rowt * dt                     !..j*dt in 1/kg
-              frn  = min(jtot * qc,ninuc(k))
-              frq  = frn * xc * facg
+              frn  = min(jtot * rc,ninuc(k))
+              frr  = frn * xc * facg
             end if
-            frq  = min(frq,qc)
+            frr  = min(frr,rc)
 !             if (frq>eps0)  frn  = cldw%nr*frq/qc
             !..berechnung der h2o-komponenten
-            qcloud(k) = qcloud(k) - frq
-            tl(k) = tl(k)+ (convice(k)-convliq(k))*frq
+            rcloud(k) = rcloud(k) - frr
+            tl(k) = tl(k)+ (convice(k)-convliq(k))*frr
 
 ! 
-            frn  = max(frn,frq/cldw%x_max)
+            frn  = max(frn,frr/cldw%x_max)
             ninuc(k) = ninuc(k)   - frn
-            qice(k)   = qice(k)   + frq
+            rice(k)   = rice(k)   + frr
             nice(k)   = nice(k)   + frn
 
             ! ub<<
@@ -889,49 +866,49 @@ contains
 
       end subroutine cloud_freeze
 
-      subroutine rain_freeze (n1,qrain,nrain,ninuc,qice,nice,qgrp,tk)
+      subroutine rain_freeze (n1,rrain,nrain,ninuc,rice,nice,rgrp,tk)
         integer, intent(in) :: n1
-        real, dimension(n1), intent(inout) :: qrain,nrain,qice,nice,qgrp,ninuc
+        real, dimension(n1), intent(inout) :: rrain,nrain,rice,nice,rgrp,ninuc
         real, dimension(n1), intent(in) :: tk
         ! .. local variables ..
         integer                     :: k
-        real            :: fr_q,fr_n,q_r,x_r,n_r,j_het,&
-            &  fr_q_i,fr_n_i,fr_q_g,fr_n_g,n_0,lam!,fr_q_tmp,fr_n_tmp
+        real            :: fr_r,fr_n,r_r,x_r,n_r,j_het,&
+            &  fr_r_i,fr_n_i,fr_r_g,fr_n_g,n_0,lam!,fr_r_tmp,fr_n_tmp
         real, save      :: coeff_z,xmax_ice
         real, parameter :: a_het = 6.5e-1 ! messung nach barklie and gokhale (pk s.350)
         real, parameter :: b_het = 2.0e+2 ! messung nach barklie and gokhale (pk s.350)
-        real, parameter :: q_crit_fr = 1.000e-6 ! q-schwellenwert fuer rain_freeze
+        real, parameter :: r_crit_fr = 1.000e-6 ! r-schwellenwert fuer rain_freeze
         real, parameter :: d_rainfrz_ig = 0.50e-3 !  rain --> ice oder graupel
           coeff_z = moment_gamma(rain,2)
   !
           xmax_ice = (d_rainfrz_ig/rain%a_geo)**(1.0e0/rain%b_geo)
-        fr_q_g = 0.0
+        fr_r_g = 0.0
         do k = 1, n1
-              q_r = qrain(k)
+              r_r = rrain(k)
               n_r = nrain(k)
 
               if (tk(k) < tmelt) then
-                if (q_r <= q_crit_fr) then
+                if (r_r <= r_crit_fr) then
                   if (tk(k) < t_hn) then
-                    fr_q = q_r                  !  ausfrieren unterhalb t_hn \approx -40 c
+                    fr_r = r_r                  !  ausfrieren unterhalb t_hn \approx -40 c
                     fr_n = n_r
                     fr_n_i= n_r
-                    fr_q_i= q_r
+                    fr_r_i= r_r
                     fr_n_g= 0.0
-                    fr_q_g= 0.0
+                    fr_r_g= 0.0
                   else
-                    fr_q = 0.0
+                    fr_r = 0.0
                     fr_n = 0.0
                     fr_n_i= 0.0
-                    fr_q_i= 0.0
+                    fr_r_i= 0.0
                     fr_n_g= 0.0
-                    fr_q_g= 0.0
+                    fr_r_g= 0.0
                   end if
                 else
-                  x_r = min(max(q_r/(n_r+eps0),rain%x_min),rain%x_max)
-                  n_r = q_r / x_r
+                  x_r = min(max(r_r/(n_r+eps0),rain%x_min),rain%x_max)
+                  n_r = r_r / x_r
                  if (tk(k) < t_hn) then            !..nur eis
-                    fr_q = q_r                  !  ausfrieren unterhalb t_hn \approx -40 c
+                    fr_r = r_r                  !  ausfrieren unterhalb t_hn \approx -40 c
                     fr_n = n_r
 
                     ! ub>> je nach groesse werden die gefrorenen regentropfen dem wolkeneis zugeschlagen
@@ -943,11 +920,11 @@ contains
                     n_0 = rain%mu * n_r * lam**((rain%nu+1.0)/rain%mu) / gfct((rain%nu+1.0)/rain%mu)
                     fr_n_i = n_0/(rain%mu*lam**((rain%nu+1.0)/rain%mu))* &
                         incgfct_lower((rain%nu+1.0)/rain%mu, lam*xmax_ice**rain%mu)
-                    fr_q_i = n_0/(rain%mu*lam**((rain%nu+2.0)/rain%mu))* &
+                    fr_r_i = n_0/(rain%mu*lam**((rain%nu+2.0)/rain%mu))* &
                         incgfct_lower((rain%nu+2.0)/rain%mu, lam*xmax_ice**rain%mu)
 
                     fr_n_g = fr_n - fr_n_i
-                    fr_q_g = fr_q - fr_q_i
+                    fr_r_g = fr_r - fr_r_i
 
                   else                           !..heterogenes gefrieren
                     j_het = max(b_het * ( exp( a_het * (tmelt - tk(k))) - 1.0 ),0.) / rowt * dt
@@ -957,41 +934,41 @@ contains
                     !      und von xmax_gr bis unendlich (--> hagel).
 
                     if (j_het >= 1-20) then
-                      fr_n  = min(j_het * q_r,ninuc(k))
-                      fr_q  = fr_n * x_r * coeff_z
+                      fr_n  = min(j_het * r_r,ninuc(k))
+                      fr_r  = fr_n * x_r * coeff_z
 
                       lam = ( gfct((rain%nu+1.0)/rain%mu) / gfct((rain%nu+2.0)/rain%mu) * x_r)**(-rain%mu)
                       n_0 = min(ninuc(k),rain%mu * n_r * lam**((rain%nu+1.0)/rain%mu) / gfct((rain%nu+1.0)/rain%mu))
                       fr_n_i = j_het * n_0/(rain%mu*lam**((rain%nu+2.0)/rain%mu))* &
                           incgfct_lower((rain%nu+2.0)/rain%mu, lam*xmax_ice**rain%mu)
-                      fr_q_i = j_het * n_0/(rain%mu*lam**((rain%nu+3.0)/rain%mu))* &
+                      fr_r_i = j_het * n_0/(rain%mu*lam**((rain%nu+3.0)/rain%mu))* &
                           incgfct_lower((rain%nu+3.0)/rain%mu, lam*xmax_ice**rain%mu)
                       fr_n = min(fr_n,n_r)
-                      fr_q = min(fr_q,q_r)
+                      fr_r = min(fr_r,r_r)
                     else
                       fr_n= 0.0
-                      fr_q= 0.0
+                      fr_r= 0.0
                       fr_n_i= 0.0
-                      fr_q_i= 0.0
-                      fr_q_g= 0.0
+                      fr_r_i= 0.0
+                      fr_r_g= 0.0
                     end if
 
                   end if
 
                   fr_n = fr_n
-                  fr_q = fr_q
+                  fr_r = fr_r
 
                   fr_n_i = fr_n_i
-                  fr_q_i = fr_q_i
-                  fr_q_g = fr_q_g 
+                  fr_r_i = fr_r_i
+                  fr_r_g = fr_r_g 
                 end if
                 !..berechnung der h2o-komponenten
-                qrain(k) = qrain(k) - fr_q
+                rrain(k) = rrain(k) - fr_r
                 nrain(k) = n_r - fr_n
 
-                if (qrain(k) < 0.0) then
-                  write (*,*) 'seifert rain_freeze: qrain < 0.0, ', k, tk(k), q_r, j_het, fr_q
-                  qrain(k) = 0.0e0
+                if (rrain(k) < 0.0) then
+                  write (*,*) 'seifert rain_freeze: rrain < 0.0, ', k, tk(k), r_r, j_het, fr_r
+                  rrain(k) = 0.0e0
                   stop
                 end if
                 if (nrain(k) < 0.0) then
@@ -999,26 +976,26 @@ contains
                   nrain(k) = 0.0e0
                   stop
                 end if
-              qice(k) = qice(k)  + fr_q_i
+              rice(k) = rice(k)  + fr_r_i
               nice(k) = nice(k)  + fr_n_i
-              qgrp(k) = qgrp(k)  + fr_q_g
+              rgrp(k) = rgrp(k)  + fr_r_g
 
               end if
         end do
 
       end subroutine rain_freeze
 
-      subroutine deposition(n1,meteor,ninuc,qice,nice,qv,tl,tk,qsup)
+      subroutine deposition(n1,meteor,ninuc,rice,nice,rv,tl,tk,rsup)
       integer, intent(in) :: n1
       type(particle), intent(in) :: meteor
-      real, dimension(n1), intent(inout) :: ninuc,qice,nice,qv,tl,qsup
+      real, dimension(n1), intent(inout) :: ninuc,rice,nice,rv,tl,rsup
       
       real, dimension(n1), intent(in)    :: tk
 
     
       ! locale variablen
       integer                     :: k
-      real        :: q_g,n_g,x_g,d_g,v_g,f_v,f_n,n_re,f_v_fakt,vent_fakt
+      real        :: r_g,n_g,x_g,d_g,v_g,f_v,f_n,n_re,f_v_fakt,vent_fakt
       real        :: c_g                 !..koeff. fuer mean kapazitaet
       real        :: a_f,b_f,a_n,b_n     !..koeff. fuer meann ventilationkoeff.
       real :: dep,ndep,gi
@@ -1032,13 +1009,13 @@ contains
       vent_fakt = b_n / b_f
       do k = 1, n1
 
-        ! hn: in case q_garupel=0, dep_graupel has to be zero too
+        ! hn: in case r_garupel=0, dep_graupel has to be zero too
 
-        if (qice(k)> 0.0) then
+        if (rice(k)> 0.0) then
           n_g = nice(k)                                     !..anzahldichte
-          q_g = qice(k)                                     !..massendichte
+          r_g = rice(k)                                     !..massendichte
 
-          x_g = min(max(q_g/(n_g+eps0),max(meteor%x_min,eps0)),meteor%x_max)  !..mean masse
+          x_g = min(max(r_g/(n_g+eps0),max(meteor%x_min,eps0)),meteor%x_max)  !..mean masse
           ! x_g**b_geo durch exp(b_geo*log(x_g)) ersetzen, da x_g == 0 nicht mehr vorkommen kann; 20 % schneller:
           d_g = meteor%a_geo * exp(meteor%b_geo*log(x_g))          !..mean durchmesser
           v_g = meteor%a_vel * exp(meteor%b_vel*log(x_g)) * dn0(k)  !..mean sedimentationsgeschw.
@@ -1055,13 +1032,13 @@ contains
 !           e_si = e_es(tk(k))
         
           gi = 4.0*pi / ( alvi**2 / (K_T * Rm * tk(k)**2) + Rm * tk(k) / (D_v * e_es(tk(k))) )
-          !si = 1-(qv(k)+qsup(k))/rsif(p,tk(k))
-          ndep  = min(gi * n_g * c_g * d_g * qsup(k)/qv(k) * dt * f_n / x_g,ninuc(k))
-          !dep = gi * n_g * c_g * d_g * f_v * qsup(k)/qv(k) * dt 
+          !si = 1-(rv(k)+rsup(k))/rsif(p,tk(k))
+          ndep  = min(gi * n_g * c_g * d_g * rsup(k)/rv(k) * dt * f_n / x_g,ninuc(k))
+          !dep = gi * n_g * c_g * d_g * f_v * rsup(k)/rv(k) * dt 
           dep   = ndep *x_g*f_v/f_n
-          qice(k) = qice(k) + dep
-          qsup(k) = qsup(k) - dep
-          qv(k) = qv(k) - dep
+          rice(k) = rice(k) + dep
+          rsup(k) = rsup(k) - dep
+          rv(k) = rv(k) - dep
           tl(k) = tl(k) + convice(k)*dep
           if (meteor%moments==2) then
 !            nice(k) = nice(k) + ndep 
@@ -1074,44 +1051,44 @@ contains
     end subroutine deposition
 
 
-  subroutine melting(n1,meteor,q,thl,nr,qcld,qrain,nrain,tk)
+  subroutine melting(n1,meteor,r,thl,nr,rcld,rrain,nrain,tk)
     integer, intent(in) :: n1
     real,dimension(n1),intent(in) :: tk
     type(particle), intent(in) :: meteor
-    real,dimension(n1),intent(inout)  ::q,nr,qrain,nrain,qcld,thl
+    real,dimension(n1),intent(inout)  ::r,nr,rrain,nrain,rcld,thl
 
     integer                     :: k
 
     real            :: x_m,d_m,v_m,t_a,n_re,d_t,e_a
-    real            :: melt,melt_v,melt_h,melt_n,melt_q
-    real            :: fh_q,fv_q
+    real            :: melt,melt_v,melt_h,melt_n,melt_r
+    real            :: fh_r,fv_r
     real            :: a_melt_n,b_melt_n
-    real            :: a_melt_q,b_melt_q
+    real            :: a_melt_r,b_melt_r
 
 
 
       a_melt_n = vent_coeff_a(meteor,0)
       b_melt_n = vent_coeff_b(meteor,0)
-      a_melt_q = vent_coeff_a(meteor,1)
-      b_melt_q = vent_coeff_b(meteor,1)
+      a_melt_r = vent_coeff_a(meteor,1)
+      b_melt_r = vent_coeff_b(meteor,1)
 
     do k = 2,n1
           t_a = tk(k) !wrf!+ t(k) + t_g(k)
           e_a = e_ws(T_a)                                     !..Saettigungsdampfdruck
                    
-          if (t_a > tmelt .and. q(k) > 0.0) then
+          if (t_a > tmelt .and. r(k) > 0.0) then
 
-            x_m = min(max(q(k)/(nr(k)+eps0),meteor%x_min),meteor%x_max)  !..mean qe in si
+            x_m = min(max(r(k)/(nr(k)+eps0),meteor%x_min),meteor%x_max)  !..mean re in si
 
             D_m = meteor%a_geo * x_m**meteor%b_geo                   !..mean Durchmesser
             v_m = meteor%a_vel * x_m**meteor%b_vel * rho_0  !..mean Sedimentationsgeschw.
 
             N_re = v_m * D_m / nu_l                             !..mean Reynoldszahl
-            fv_q = a_melt_q + b_melt_q * N_sc**n_f * N_re**m_f  !..mean Vent.Koeff. Wasserdampf
+            fv_r = a_melt_r + b_melt_r * N_sc**n_f * N_re**m_f  !..mean Vent.Koeff. Wasserdampf
   !          fv_n = a_melt_n + b_melt_n * N_sc**n_f * N_re**m_f  !..mean Vent.Koeff. Wasserdampf
 
             D_T  = Kt / (cp * rho_0)!WRF!+rho_g(i,j,k)))
-            fh_q = D_T / D_v * fv_q
+            fh_r = D_T / D_v * fv_r
  !           fh_n = D_T / D_v * fv_n
 
             melt   = 2.0*pi / (alvi-alvl) * D_m * nr(k) * dt
@@ -1119,27 +1096,27 @@ contains
             melt_h = melt * Kt * (T_a - tmelt)
             melt_v = melt * D_v*alvl/Rm * (e_a/T_a - e_3/tmelt)
 
-            melt_q = (melt_h * fh_q + melt_v * fv_q)
+            melt_r = (melt_h * fh_r + melt_v * fv_r)
 !            melt_n = (melt_h * fh_n + melt_v * fv_n) / x_m
 
 ! ub>> setzte melt_n so, dass x_h beim Schmelzvorgang erhalten bleibt:
-            melt_n = MIN(MAX( (melt_q - q(k)) / x_m + nr(k), 0.0e0), nr(k))
+            melt_n = MIN(MAX( (melt_r - r(k)) / x_m + nr(k), 0.0e0), nr(k))
 
-            melt_q = MIN(q(k),melt_q)
+            melt_r = MIN(r(k),melt_r)
             melt_n = MIN(nr(k),melt_n)
 
-            melt_q = MAX(0.e0,melt_q)
+            melt_r = MAX(0.e0,melt_r)
             melt_n = MAX(0.e0,melt_n)
-            q(k) = q(k) - melt_q
+            r(k) = r(k) - melt_r
             if (meteor%nr==2) then
               nr(k) = nr(k) - melt_n
             end if
             if(x_m<cldw%x_max) then
-              qcld(k)    = qcld(k)    + melt_q
-              thl(k)      = thl(k)      - convice(k)*melt_q
+              rcld(k)    = rcld(k)    + melt_r
+              thl(k)      = thl(k)      - convice(k)*melt_r
 ! 
             else
-              qrain(k)    = qrain(k)    + melt_q
+              rrain(k)    = rrain(k)    + melt_r
               nrain(k)    = nrain(k)    + melt_n
             end if
           endif
