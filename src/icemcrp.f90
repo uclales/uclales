@@ -2335,15 +2335,21 @@ contains
     end do
   end subroutine
 
-  subroutine resetvar(meteor,mass,number)
+  subroutine resetvar(meteor,mass,num)
     type(particle),intent(in)        :: meteor
     real, dimension(:), intent(inout) :: mass
-    real, dimension(:), intent(inout), optional :: number
+    real, dimension(:), intent(inout), optional :: num
     where (mass < qthres)
       mass = 0.
     end where
-    if (present(number)) then
-      number = max(0.,max(min(number,mass/meteor%x_min),mass/meteor%x_max))
+    if (present(num)) then
+      where (meteor%x_max*num < mass)
+        num = mass/meteor%x_max
+      end where
+      
+      where (meteor%x_min*num > mass)
+        num = mass/meteor%x_min
+      end where
     end if
   end subroutine resetvar
   subroutine initmcrp(level,firsttime)
