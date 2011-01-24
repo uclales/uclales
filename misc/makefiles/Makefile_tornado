@@ -7,49 +7,60 @@ ROOT      = ..
 BIN       = $(ROOT)/bin
 ARCH      := $(shell uname)
 #
-# Note that so far I have only been able to use the Intel compiler on
-# tornado. You need the netcdf libraries installed with the intel compiler
-# using the f90 interface.
+# Note that on the Linux systems of any mpipc, the software environment
+# is such that it requires the additional netcdf flag -l netcdff, in order
+# for all netcdf libraries to be found
 #
-# Generic Variables
+#
 #
 SRC     =$(ROOT)/src
-
 ECHO    = /bin/echo
 RM      = /bin/rm -f
 
 ifeq ($(ARCH),Linux)
-  COMPILER  := 'IFORT'
+  COMPILER  := 'GFORTRAN'
   ARCHIVE   = ar rs
-  RANLIB    =: 
-  ifeq ($(COMPILER),'NAG')
-     F90      = f95
-     NCDF     = /sw/nag/netcdf
+  RANLIB    =:
+  ifeq ($(COMPILER),'nagfor')
+     F90      = nagfor
+     NCDF     = /sw/etch-ia32/netcdf-3.6.2-nag
      DEBUG    = -C=all -gline -nan
-     FFLAGS   = $(DEBUG) -O4 -r8 -kind=byte $(NCDFINC) -Oassumed=always_contig
-     SEQFFLAGS = -I$(SRC)/seq -mdir $(SRC)/seq 
+     FFLAGS   = $(DEBUG) -O3 -kind=byte $(NCDFINC) -Oassumed=always_contig
+     SEQFFLAGS = -I$(SRC)/seq -mdir $(SRC)/seq
      MPIFFLAGS = -I$(SRC)/mpi -mdir $(SRC)/mpi
      F77FLAGS = -fixed -dusty
   endif
   ifeq ($(COMPILER),'G95')
      F90      = g95
      NCDF     = /sw/g95/netcdf
-     FFLAGS   = -O3 -r8   $(NCDFINC) 
-     SEQFFLAGS = -I$(SRC)/seq -fmod=$(SRC)/seq 
-     MPIFFLAGS = -I$(SRC)/mpi -fmod=$(SRC)/mpi 
+     FFLAGS   = -O3 -r8   $(NCDFINC)
+     SEQFFLAGS = -I$(SRC)/seq -fmod=$(SRC)/seq
+     MPIFFLAGS = -I$(SRC)/mpi -fmod=$(SRC)/mpi
+     F77FLAGS = -ffixed-form
+  endif
+  ifeq ($(COMPILER),'GFORTRAN')
+     F90      = gfortran
+     MPIF90   = mpif90
+     NCDF     = /home/thijs
+#      FFLAGS   = -finit-real=nan -W -Wall -fdefault-real-8 -ffree-line-length-none -I/include -I/usr/include -I/usr/local/include-fbounds-check -fbacktrace -fno-f2c -O0 -g -ffpe-trap=invalid,zero,overflow  $(NCDFINC)
+     FFLAGS   = -fno-f2c -O3 -finit-real=nan -W -Wall -fdefault-real-8 -ffree-line-length-none $(NCDFINC)
+#      SEQFFLAGS = -I$(SRC)/seq -fmod=$(SRC)/seq
+#      MPIFFLAGS = -I$(SRC)/mpi -fmod=$(SRC)/mpi
      F77FLAGS = -ffixed-form
   endif
   ifeq ($(COMPILER),'IFORT')
      F90      = ifort
-     MPIF90    = /sw/sles10-x64/ofed/openmpi-1.4.0-intel11/bin/mpif90
-     NCDF     = /sw/sles10-x64/netcdf-3.6.3-intel/
+     MPIF90    = /sw/etch-ia32/mpich2-1.0.8-intel
+     NCDF     = /sw/etch-ia32/netcdf-3.6.2-intel
      SEQFFLAGS = -I$(SRC)/seq -module $(SRC)/seq
      MPIFFLAGS = -I$(SRC)/mpi -module $(SRC)/mpi
-     FFLAGS   = -O3 -r8 -diag-disable remark $(NCDFINC) 
+     FFLAGS   = -O3 -r8 -diag-disable remark $(NCDFINC)
+     FFLAGS   = -g -r8 -diag-disable remark $(NCDFINC)
      F77FLAGS = -fixed
+     NCDFF    = netcdff
   endif
-  NCDFLIB   = -L$(NCDF)/lib  -lnetcdf
-  NCDFINC   = -I$(NCDF)/include
+  NCDFLIB   = -L$(NCDF)/lib -static -lnetcdf $(NCDFF)
+  NCDFINC   = -I$(NCDF)/include 
   LIBS      = $(NCDFLIB)
   MPILIBS   = $(LIBS)
 endif
