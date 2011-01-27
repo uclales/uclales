@@ -68,9 +68,9 @@ module mcrp
   real, parameter :: d_v  = 3.000e-5     !..diff. of water vapor
   real, parameter :: k_t  = 2.500e-2     !..heat conductivity
 
-  real, parameter :: n_sc = 0.710        !..schmidt-number(pk, s.541)
-  real, parameter :: n_f  = 0.333        !..exponent of n_sc in the vent-coeff. (pk, s.541)
-  real, parameter :: m_f  = 0.500        !..exponent of n_re in the vent-coeff. (pk, s.541)
+  real, parameter :: n_sc = 0.710        !..schmidt-number(pk, p.541)
+  real, parameter :: n_f  = 0.333        !..exponent of n_sc in the vent-coeff. (pk, p.541)
+  real, parameter :: m_f  = 0.500        !..exponent of n_re in the vent-coeff. (pk, p.541)
 ! 
   real, parameter :: a_e  = 2.18745584e1 !..const. in saturation pressure wrt ice
   real, parameter :: a_w  = 1.72693882e1 !..const. in saturation pressure wrt water
@@ -240,7 +240,7 @@ contains
           case(iwtrdff)
             call resetvar(cldw,rc)
             call resetvar(rain,rrain,nrain)
-            call wtr_dff_SB(n1,dn0,rrain,nrain,rsat,rv,tl,temp)
+            call wtr_dff_SB(n1,dn0,rrain,nrain,rc,rs,rv,tl,temp)
           case(iauto)
             call resetvar(cldw,rc)
             call resetvar(rain,rrain,nrain)
@@ -338,6 +338,9 @@ contains
             call sedimentation (n1,ice, rice,nice,rrate = prc_i(1:n1,i,j))
             call sedimentation (n1,snow, rsnow, rrate = prc_s(1:n1,i,j))
             call sedimentation (n1,graupel, rgrp, rrate = prc_g(1:n1,i,j))
+            prc_i(1:n1,i,j) = prc_i(1:n1,i,j)
+            prc_s(1:n1,i,j) = prc_s(1:n1,i,j)
+            prc_g(1:n1,i,j) = prc_g(1:n1,i,j)            
           case default
           end select
         end do
@@ -362,12 +365,12 @@ contains
           rgrpt(2:n1,i,j)   = max(rgrpt(2:n1,i,j)   + (rgrp(2:n1) - rgrpp(2:n1,i,j))/dt,-rgrpp(2:n1,i,j)/dt)
         end if
 
-      end do
+     end do
     end do
     deallocate(convice,convliq)
+!print *,maxval(rsup),maxloc(rsup)
   end subroutine mcrph
-  
-  subroutine wtr_dff_SB(n1,dn0,rp,np,rs,rv,tl,tk)
+  subroutine wtr_dff_SB(n1,dn0,rp,np,rl,rs,rv,tl,tk)
  !
  ! ---------------------------------------------------------------------
  ! WTR_DFF_SB: calculates the evolution of the both number- and
@@ -377,9 +380,9 @@ contains
 
     integer, intent (in) :: n1
     real, intent (in)    :: tk(n1),rs(n1), dn0(n1)
-    real, intent (inout) :: rp(n1), np(n1),tl(n1),rv(n1)
+    real, intent (inout) :: rp(n1), np(n1),tl(n1),rv(n1),rl(n1)
 
-    real, parameter     :: c_Nevap = 0.7
+    real, parameter     :: c_Nevap = 1.
     integer             :: k
     real                :: Xp, Dp, G, S, cerpt, cenpt
     do k=2,n1
@@ -402,7 +405,6 @@ contains
     end do
   
   end subroutine wtr_dff_SB
-  
   subroutine auto_SB(n1,dn0,rc,rp,np,tl,diss)
   !
   ! ---------------------------------------------------------------------
@@ -450,66 +452,65 @@ contains
 
 
     do k=2,n1-1
-      if (rc(k) > 0.) then
-        Xc = rc(k)/(cldw%nr+eps0)
-        k_c = kc_0
-        nu_c = cldw%nu!1*dn0(k)*rc(k)+cldw%nu2
+        if (rc(k) > 0.) then
+          Xc = rc(k)/(cldw%nr+eps0)
+          k_c = kc_0
+          nu_c = cldw%nu!1*dn0(k)*rc(k)+cldw%nu2
 
-        if (turbulence) then
-          kc_alf = ( kc_a1 + kc_a2 * nu_c )/ ( 1. + kc_a3 * nu_c )
-          kc_rad = ( kc_b1 + kc_b2 * nu_c )/ ( 1. + kc_b3 * nu_c )
-          kc_sig = ( kc_c1 + kc_c2 * nu_c )/ ( 1. + kc_c3 * nu_c )
-          call azero(n1,Recnt,Resum)
-          Dc = ( Xc / prw )**(1./3.)  ! mass mean diameter cloud droplets in m
-            !
-            ! Calculate the mixing length, dissipation rate and Taylor-Reynolds number
-            !
-            l = csx*((1/dxi)*(1/dyi)*(1/dzi_t(k)))**(1./3.)
-            epsilon = min(diss(k),0.06)
-            Re = (6./11.)*((l/ce)**(2./3))*((15./(1.5e-5))**0.5)*(epsilon**(1./6) )
-            !
-            ! Dissipation needs to be converted to cm^2/s^3, which explains the factor
-            ! 1.e4 with which diss(k) is multiplied
-            !
-            k_c = k_c * (1. + epsilon *1.e4* (Re*1.e-3)**(0.25) &
-                  * (kc_bet + kc_alf * exp( -1.* ((((Dc/2.)*1.e+6-kc_rad)/kc_sig)**2) )))
-            !print *,'enhancement factor = ', k_c/(9.44e+9)
-            !
-            ! Calculate conditional average of Re i.e., conditioned on cloud/rain water
-            !
-            Resum(k) = Resum(k)+ Re
-            Recnt(k) = Recnt(k)+ 1
-        end if
+          if (turbulence) then
+            kc_alf = ( kc_a1 + kc_a2 * nu_c )/ ( 1. + kc_a3 * nu_c )
+            kc_rad = ( kc_b1 + kc_b2 * nu_c )/ ( 1. + kc_b3 * nu_c )
+            kc_sig = ( kc_c1 + kc_c2 * nu_c )/ ( 1. + kc_c3 * nu_c )
+            call azero(n1,Recnt,Resum)
+            Dc = ( Xc / prw )**(1./3.)  ! mass mean diameter cloud droplets in m
+              !
+              ! Calculate the mixing length, dissipation rate and Taylor-Reynolds number
+              !
+              l = csx*((1/dxi)*(1/dyi)*(1/dzi_t(k)))**(1./3.)
+              epsilon = min(diss(k),0.06)
+              Re = (6./11.)*((l/ce)**(2./3))*((15./(1.5e-5))**0.5)*(epsilon**(1./6) )
+              !
+              ! Dissipation needs to be converted to cm^2/s^3, which explains the factor
+              ! 1.e4 with which diss(k) is multiplied
+              !
+              k_c = k_c * (1. + epsilon *1.e4* (Re*1.e-3)**(0.25) &
+                    * (kc_bet + kc_alf * exp( -1.* ((((Dc/2.)*1.e+6-kc_rad)/kc_sig)**2) )))
+              !print *,'enhancement factor = ', k_c/(9.44e+9)
+              !
+              ! Calculate conditional average of Re i.e., conditioned on cloud/rain water
+              !
+              Resum(k) = Resum(k)+ Re
+              Recnt(k) = Recnt(k)+ 1
+          end if
 
-        k_au  = k_c / (20.*cldw%x_max) * (nu_c+2.)*(nu_c+4.)/(nu_c+1.)**2
-        au = k_au * dn0(k) * rc(k)**2 * Xc**2
-        !
-        ! small threshold that should not influence the result
-        !
-        if (rc(k) > 1.e-6) then
-            tau = 1.0-rc(k)/(rc(k)+rp(k)+eps0)
-            tau = MIN(MAX(tau,eps0),0.9)
-            phi = k_1 * tau**k_2 * (1.0 - tau**k_2)**3
-            au  = au * (1.0 + phi/(1.0 - tau)**2)
-        endif
-        !
-        ! Khairoutdinov and Kogan
-        !
-        if (khairoutdinov) then
-            Dc = ( Xc / prw )**(1./3.)
-            au = Cau * (Dc * mmt / 2.)**Eau
+          k_au  = k_c / (20.*cldw%x_max) * (nu_c+2.)*(nu_c+4.)/(nu_c+1.)**2
+          au = k_au * dn0(k) * rc(k)**2 * Xc**2
+          !
+          ! small threshold that should not influence the result
+          !
+          if (rc(k) > 1.e-6) then
+              tau = 1.0-rc(k)/(rc(k)+rp(k)+eps0)
+              tau = MIN(MAX(tau,eps0),0.9)
+              phi = k_1 * tau**k_2 * (1.0 - tau**k_2)**3
+              au  = au * (1.0 + phi/(1.0 - tau)**2)
+          endif
+          !
+          ! Khairoutdinov and Kogan
+          !
+          if (khairoutdinov) then
+              Dc = ( Xc / prw )**(1./3.)
+              au = Cau * (Dc * mmt / 2.)**Eau
+          end if
+        else
+          au = 0.
         end if
-      else
-        au = 0.
-      end if
-      rp(k) = rp(k) + au*dt
-      rc(k) = rc(k) - au*dt
-      tl(k) = tl(k) + convliq(k)*au*dt
-      np(k) = np(k) + au/cldw%x_max*dt
+          rp(k) = rp(k) + au*dt
+          rc(k) = rc(k) - au*dt
+          tl(k) = tl(k) + convliq(k)*au*dt
+          np(k) = np(k) + au/cldw%x_max*dt
     end do
 
   end subroutine auto_SB
-  
   subroutine accr_SB(n1,dn0,rc,rp,np,tl,diss)
   !
   ! ---------------------------------------------------------------------
@@ -531,42 +532,42 @@ contains
     integer :: k
     real    :: tau, phi, ac, sc, k_r, epsilon
 
-    do k=2,n1-1
-      if (rp(k) > 0.) then
+      do k=2,n1-1
+          if (rp(k) > 0.) then
 
-        k_r = k_r0
+           k_r = k_r0
 
-        !
-        ! Simulate the effect of turbulence on the collision kernel
-        ! (dissipation needs to be converted to cm^2/s^3)
-        !
-        if (turbulence) then
-          epsilon = min(600.,diss(k)*1.e4)   ! put an upper limit to the dissipation rate used
-          k_r = k_r*(1+(0.05*epsilon**0.25))
-        end if
-        if (rc(k) > 0.) then
-          tau = 1.0-rc(k)/(rc(k)+rp(k)+eps0)
-          tau = MIN(MAX(tau,eps0),1.)
-          phi = (tau/(tau+k_1))**4
+            !
+            ! Simulate the effect of turbulence on the collision kernel
+            ! (dissipation needs to be converted to cm^2/s^3)
+            !
+            if (turbulence) then
+                epsilon = min(600.,diss(k)*1.e4)   ! put an upper limit to the dissipation rate used
+                k_r = k_r*(1+(0.05*epsilon**0.25))
+            end if
+          if (rc(k) > 0.) then
+            tau = 1.0-rc(k)/(rc(k)+rp(k)+eps0)
+            tau = MIN(MAX(tau,eps0),1.)
+            phi = (tau/(tau+k_1))**4
 
 
-          ac  = k_r * rc(k) * rp(k) * phi * sqrt(rho_0*dn0(k))
-          !
-          ! Khairoutdinov and Kogan
-          !
-          if (khairoutdinov) then
+            ac  = k_r * rc(k) * rp(k) * phi * sqrt(rho_0*dn0(k))
+            !
+            ! Khairoutdinov and Kogan
+            !
+            if (khairoutdinov) then
             ac = Cac * (rc(k) * rp(k))**Eac
-          end if
-          !
-          rp(k) = rp(k) + ac*dt
-          rc(k) = rc(k) - ac*dt
-          tl(k) = tl(k) + convliq(k)*ac*dt
+            end if
+            !
+            rp(k) = rp(k) + ac*dt
+            rc(k) = rc(k) - ac*dt
+            tl(k) = tl(k) + convliq(k)*ac*dt
 
-        end if
-        sc = k_r * np(k) * rp(k) * sqrt(rho_0*dn0(k))
-        np(k) = np(k) - sc*dt
-      end if
-    end do
+          end if
+          sc = k_r * np(k) * rp(k) * sqrt(rho_0*dn0(k))
+          np(k) = np(k) - sc*dt
+          end if
+      end do
 
   end subroutine accr_SB
   subroutine sedim_rd(n1,dt,dn0,rp,np,rrate)
@@ -602,20 +603,20 @@ contains
 
      b2 = a2*exp(c2*Dv)
  
-     nfl(n1) = 0.
-     rfl(n1) = 0.
-     do k=n1-1,2,-1
-       
-       Xp = rp(k) / (np(k)+eps0)
-       !
-       ! Adjust Dm and mu-Dm and Dp=1/lambda following Milbrandt & Yau
-       !
-       Dm = ( 6. / (rowt*pi) * Xp )**(1./3.)
-       mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))
-       Dp = (Dm**3/((mu+3.)*(mu+2.)*(mu+1.)))**(1./3.)
+        nfl(n1) = 0.
+        rfl(n1) = 0.
+        do k=n1-1,2,-1
+          
+          Xp = rp(k) / (np(k)+eps0)
+          !
+          ! Adjust Dm and mu-Dm and Dp=1/lambda following Milbrandt & Yau
+          !
+          Dm = ( 6. / (rowt*pi) * Xp )**(1./3.)
+          mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))
+          Dp = (Dm**3/((mu+3.)*(mu+2.)*(mu+1.)))**(1./3.)
 
-       vn(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
-       vr(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
+          vn(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
+          vr(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
           !
           ! Set fall speeds following Khairoutdinov and Kogan
 
@@ -624,77 +625,78 @@ contains
 !                 vr(k) = max(0.,aq * Dp + bq)
 !              end if
 !irina-olivier
-       if (khairoutdinov) then
-           vn(k) = max(0.,an * Dp + bn)
-           vr(k) = max(0.,aq * Dp + bq)
-       end if
-     end do
+          if (khairoutdinov) then
+              vn(k) = max(0.,an * Dp + bn)
+              vr(k) = max(0.,aq * Dp + bq)
+          end if
+        end do
 
-     do k=2,n1-1
-       kp1 = min(k+1,n1-1)
-       km1 = max(k,2)
-       cn(k) = 0.25*(vn(kp1)+2.*vn(k)+vn(km1))*dzi_t(k)*dt
-       cr(k) = 0.25*(vr(kp1)+2.*vr(k)+vr(km1))*dzi_t(k)*dt
-     end do
+        do k=2,n1-1
+          kp1 = min(k+1,n1-1)
+          km1 = max(k,2)
+          cn(k) = 0.25*(vn(kp1)+2.*vn(k)+vn(km1))*dzi_t(k)*dt
+          cr(k) = 0.25*(vr(kp1)+2.*vr(k)+vr(km1))*dzi_t(k)*dt
+        end do
 
-     !...piecewise linear method: get slopes
-     do k=n1-1,2,-1
-       dn(k) = np(k+1)-np(k)
-       dr(k) = rp(k+1)-rp(k)
-     enddo
-     dn(1)  = dn(2)
-     dn(n1) = dn(n1-1)
-     dr(1)  = dr(2)
-     dr(n1) = dr(n1-1)
-     do k=n1-1,2,-1
-       !...slope with monotone limiter for np
-       sk = 0.5 * (dn(k-1) + dn(k))
-       mini = min(np(k-1),np(k),np(k+1))
-       maxi = max(np(k-1),np(k),np(k+1))
-       nslope(k) = 0.5 * sign(1.,sk)*min(abs(sk), 2.*(np(k)-mini), &
-             &                                     2.*(maxi-np(k)))
-       !...slope with monotone limiter for rp
-       sk = 0.5 * (dr(k-1) + dr(k))
-       mini = min(rp(k-1),rp(k),rp(k+1))
-       maxi = max(rp(k-1),rp(k),rp(k+1))
-       rslope(k) = 0.5 * sign(1.,sk)*min(abs(sk), 2.*(rp(k)-mini), &
-             &                                     2.*(maxi-rp(k)))
-     enddo
+        !...piecewise linear method: get slopes
+        do k=n1-1,2,-1
+          dn(k) = np(k+1)-np(k)
+          dr(k) = rp(k+1)-rp(k)
+        enddo
+        dn(1)  = dn(2)
+        dn(n1) = dn(n1-1)
+        dr(1)  = dr(2)
+        dr(n1) = dr(n1-1)
+        do k=n1-1,2,-1
+          !...slope with monotone limiter for np
+          sk = 0.5 * (dn(k-1) + dn(k))
+          mini = min(np(k-1),np(k),np(k+1))
+          maxi = max(np(k-1),np(k),np(k+1))
+          nslope(k) = 0.5 * sign(1.,sk)*min(abs(sk), 2.*(np(k)-mini), &
+                &                                     2.*(maxi-np(k)))
+          !...slope with monotone limiter for rp
+          sk = 0.5 * (dr(k-1) + dr(k))
+          mini = min(rp(k-1),rp(k),rp(k+1))
+          maxi = max(rp(k-1),rp(k),rp(k+1))
+          rslope(k) = 0.5 * sign(1.,sk)*min(abs(sk), 2.*(rp(k)-mini), &
+                &                                     2.*(maxi-rp(k)))
+        enddo
 
-     rfl(n1-1) = 0.
-     nfl(n1-1) = 0.
-     do k=n1-2,2,-1
-       kk = k
-       tot = 0.0
-       zz  = 0.0
-       cc  = min(1.,cn(k))
-       do while (cc > 0 .and. kk <= n1-1)
-         tot = tot + dn0(kk)*(np(kk)+nslope(kk)*(1.-cc))*cc/dzi_t(kk)
-         zz  = zz + 1./dzi_t(kk)
-         kk  = kk + 1
-         cc  = min(1.,cn(kk) - zz*dzi_t(kk))
-       enddo
-       nfl(k) = -tot /dt
+        rfl(n1-1) = 0.
+        nfl(n1-1) = 0.
+        do k=n1-2,2,-1
 
-       kk = k
-       tot = 0.0
-       zz  = 0.0
-       cc  = min(1.,cr(k))
-       do while (cc > 0 .and. kk <= n1-1)
-         tot = tot + dn0(kk)*(rp(kk)+rslope(kk)*(1.-cc))*cc/dzi_t(kk)
-         zz  = zz + 1./dzi_t(kk)
-         kk  = kk + 1
-         cc  = min(1.,cr(kk) - zz*dzi_t(kk))
-       enddo
-       rfl(k) = -tot /dt
+          kk = k
+          tot = 0.0
+          zz  = 0.0
+          cc  = min(1.,cn(k))
+          do while (cc > 0 .and. kk <= n1-1)
+              tot = tot + dn0(kk)*(np(kk)+nslope(kk)*(1.-cc))*cc/dzi_t(kk)
+              zz  = zz + 1./dzi_t(kk)
+              kk  = kk + 1
+              cc  = min(1.,cn(kk) - zz*dzi_t(kk))
+          enddo
+          nfl(k) = -tot /dt
 
-       kp1=k+1
-       flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)/dn0(k)
-       rp(k) = rp(k)-flxdiv*dt
-       np(k) = np(k)-(nfl(kp1)-nfl(k))*dzi_t(k)/dn0(k)*dt
-       rrate(k)    = -rfl(k) * alvl*0.5*(dn0(k)+dn0(kp1))
+          kk = k
+          tot = 0.0
+          zz  = 0.0
+          cc  = min(1.,cr(k))
+          do while (cc > 0 .and. kk <= n1-1)
+              tot = tot + dn0(kk)*(rp(kk)+rslope(kk)*(1.-cc))*cc/dzi_t(kk)
+              zz  = zz + 1./dzi_t(kk)
+              kk  = kk + 1
+              cc  = min(1.,cr(kk) - zz*dzi_t(kk))
+          enddo
+          rfl(k) = -tot /dt
 
-     end do
+          kp1=k+1
+          flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)/dn0(k)
+          rp(k) = rp(k)-flxdiv*dt
+          np(k) = np(k)-(nfl(kp1)-nfl(k))*dzi_t(k)/dn0(k)*dt
+          rrate(k)    = -rfl(k) 
+
+        end do
 
    end subroutine sedim_rd
   subroutine sedim_cd(n1,dt,tl,rc,rrate)
@@ -724,20 +726,20 @@ contains
     !
     ! calculate the precipitation flux and its effect on r_t and theta_l
     !
-    rfl(n1) = 0.
-    do k=n1-1,2,-1
-       Xc = rc(k) / (cldw%nr+eps0)
-       Dc = ( Xc / prw )**(1./3.)
-       vc = min(c*(Dc*0.5)**2 * exp(4.5*(log(sgg))**2),1./(dzi_t(k)*dt))
-!         vc = min(c*(Dc*0.5)**2 * exp(5*(log(1.3))**2),1./(dzi_t(k)*dt))
-       rfl(k) = - rc(k) * vc
-       !
-       kp1=k+1
-       flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)
-       rc(k) = rc(k)-flxdiv*dt
-       tl(k) = tl(k)+flxdiv*convliq(k)*dt
-       rrate(k)    = -rfl(k) * alvl*0.5*(dn0(k)+dn0(kp1))
-    end do
+          rfl(n1) = 0.
+          do k=n1-1,2,-1
+             Xc = rc(k) / (cldw%nr+eps0)
+             Dc = ( Xc / prw )**(1./3.)
+             vc = min(c*(Dc*0.5)**2 * exp(4.5*(log(sgg))**2),1./(dzi_t(k)*dt))
+!               vc = min(c*(Dc*0.5)**2 * exp(5*(log(1.3))**2),1./(dzi_t(k)*dt))
+             rfl(k) = - rc(k) * vc
+             !
+             kp1=k+1
+             flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)
+             rc(k) = rc(k)-flxdiv*dt
+             tl(k) = tl(k)+flxdiv*convliq(k)*dt
+             rrate(k)    = -rfl(k)
+          end do
 
   end subroutine sedim_cd
   subroutine n_icenuc(n1,nin,nin_active,tk,rv,rsup)
@@ -829,7 +831,7 @@ contains
           frr  = frn * xc * facg
         end if
         frr  = min(frr,rc)
-!         if (frq>eps0)  frn  = cldw%nr*frq/qc
+!         if (frq>eps0)  frn  = cldw%nr*frq/rc
         rcloud(k) = rcloud(k) - frr
         tl(k) = tl(k)+ (convice(k)-convliq(k))*frr
 
@@ -852,8 +854,8 @@ contains
     real            :: fr_r,fr_n,r_r,x_r,n_r,j_het,&
         &  fr_r_i,fr_n_i,fr_r_g,fr_n_g,n_0,lam!,fr_r_tmp,fr_n_tmp
     real, save      :: coeff_z,xmax_ice
-    real, parameter :: a_het = 6.5e-1 !  after barklie and gokhale (pk s.350)
-    real, parameter :: b_het = 2.0e+2 !  after barklie and gokhale (pk s.350)
+    real, parameter :: a_het = 6.5e-1 !  after barklie and gokhale (pk p.350)
+    real, parameter :: b_het = 2.0e+2 !  after barklie and gokhale (pk p.350)
     real, parameter :: r_crit_fr = 1.000e-6 ! r-critical value for rain_freeze
     real, parameter :: d_rainfrz_ig = 0.50e-3 !  rain --> ice or graupel distinction
       coeff_z = moment_gamma(rain,2)
@@ -1640,7 +1642,7 @@ contains
       if(meteor%moments==2) then
         np(k) = np(k)-(nfl(kp1)-nfl(k))*dzi_t(k)/dn0(k)*dt
       end if
-      rrate(k)    = -rfl(k) * alvl*0.5*(dn0(k)+dn0(kp1))
+      rrate(k)    = -rfl(k)
     end do
 
 
@@ -2084,10 +2086,10 @@ contains
   end function e_ws
 
   function gen_sequence(nprocess)
-    integer, intent(in) :: nprocess
-    integer, dimension(nprocess) :: gen_sequence
-    integer :: i
-    i=0
+  integer, intent(in) :: nprocess
+  integer, dimension(nprocess) :: gen_sequence
+  integer :: i
+  i=0
     gen_sequence = (/(i,i=1,nprocess)/)
     if (.not. droplet_sedim) then
       where (gen_sequence==isedimcd)
@@ -2143,90 +2145,90 @@ contains
     if (level==4)      nprocess = nprocess + nprocice
 
 
-    !Cloudwater properties
+  !Cloudwater properties
     cldw = PARTICLE('cloudw', &! HN: made variable for seeding experiments
-            1, & !number of moments
-            CCN, & !Number of droplets
-            0.333333, & !.nu.....width parameter of distribution
-            0.666666, & !.mu.....Exp.-parameter of distribution
-            2.60e-10, & !.x_max..max. particle mass D=80e-6m
-            4.20e-15, & !.x_min..min. particle mass D=2.e-6m
-            1.24e-01, & !.a_geo..coeff. geometry
-            0.333333, & !.b_geo..coeff. geometry = 1/3
-            3.75e+05, & !.a_vel..coeff. fall velocity
-            0.666667, & !.b_vel..coeff. fall velocity
-            0.25     , &!.s_vel...Dispersion of fall velocity
-            0.780000, & !.a_ven..coeff. ventilation (PK, S.541)
-            0.308000, & !.b_ven..coeff. ventilation (PK, S.541)
-            2.0)        !.cap....coeff. Capacity
+           1, & !number of moments
+           CCN, & !Number of droplets
+           0.333333, & !.nu.....Width parameter of the distribution
+           0.666666, & !.mu.....exponential parameter of the distribution
+           2.60e-10, & !.x_max..maximum particle mass D=80e-6m
+           4.20e-15, & !.x_min..minimale particler mass D=2.e-6m
+           1.24e-01, & !.a_geo..coefficient of meteor geometry
+           0.333333, & !.b_geo..coefficient of meteor geometry = 1/3
+           3.75e+05, & !.a_vel..coefficient of fall velocity
+           0.666667, & !.b_vel..coefficient of fall velocity
+           0.25     , &!.s_vel...dispersion of the fall velocity
+           0.780000, & !.a_ven..ventilation coefficient (PK, p.541)
+           0.308000, & !.b_ven..ventilation coefficient (PK, p.541)
+           2.0)        !.cap....capacity coefficient
 
-    !Rainwater properties
+  !Rainwater properties
     rain = PARTICLE('rain', &! HN: made variable for seeding experiments
-            2, & !number of moments
-            0, & !Number of droplets
-            0.333333, & !.nu.....width parameter of distribution
-            0.666666, & !.mu.....Exp.-parameter of distribution
-            2.60e-10, & !.x_max..max. particle mass D=80e-6m
-            4.20e-15, & !.x_min..min. particle mass D=2.e-6m
-            1.24e-01, & !.a_geo..coeff. geometry
-            0.333333, & !.b_geo..coeff. geometry = 1/3
-            3.75e+05, & !.a_vel..coeff. fall velocity
-            0.666667, & !.b_vel..coeff. fall velocity
-            0.25     , &!.s_vel...Dispersion of fall velocity
-            0.780000, & !.a_ven..coeff. ventilation (PK, S.541)
-            0.308000, & !.b_ven..coeff. ventilation (PK, S.541)
-            2.0)        !.cap....coeff. Capacity
-    !Cloud ice properties
+           2, & !number of moments
+           0, & !Number of droplets
+           1.000000, & !.nu.....Width parameter of the distribution
+           0.333333, & !.mu.....exponential parameter of the distribution
+           3.00e-06, & !.x_max..maximum particle mass
+           2.60e-10, & !.x_min..minimale particler mass D=80.e-6m
+           1.24e-01, & !.a_geo..coefficient of meteor geometry
+           0.333333, & !.b_geo..coefficient of meteor geometry = 1/3
+           1.59e+02, & !.a_vel..coefficient of fall velocity
+           0.266667, & !.b_vel..coefficient of fall velocity
+           0.25    , & !.s_vel...dispersion of the fall velocity
+           0.780000, & !.a_ven..ventilation coefficient (PK, p.541)
+           0.308000, & !.b_ven..ventilation coefficient (PK, p.541)
+           2.0)        !.cap....capacity coefficient
+  !Cloud ice properties
     ice = PARTICLE('ice', &
-            2, & !number of moments
-            0, & !
-            0.000000, & !.nu.....width parameter of distribution
-            0.333333, & !.mu.....Exp.-parameter of distribution
-            1.00e-07, & !.x_max..max. particle mass D=???e-2m
-            1.00e-12, & !.x_min..min. particle mass D=200e-6m
-            3.303633, & !.a_geo..coeff. geometry
-            0.476191, & !.b_geo..coeff. geometry = 1/2.1
-            2.77e+01, & !.a_vel..coeff. fall velocity
-            0.215790, & !.b_vel..coeff. fall velocity = 0.41/1.9
-            0.25     , &!.s_vel...Dispersion of fall velocity
-            0.780000, & !.a_ven..coeff. ventilation (PK, S.541)
-            0.308000, & !.b_ven..coeff. ventilation (PK, S.541)
-            2.0)        !.cap....coeff. Capacity
+          2, & !number of moments
+          0, & !Number of droplets
+          0.000000, & !.nu.....Width parameter of the distribution
+          0.333333, & !.mu.....exponential parameter of the distribution
+          1.00e-07, & !.x_max..maximum particle mass D=???e-2m
+          1.00e-12, & !.x_min..minimale particler mass D=200e-6m
+          3.303633, & !.a_geo..coefficient of meteor geometry
+          0.476191, & !.b_geo..coefficient of meteor geometry = 1/2.1
+          2.77e+01, & !.a_vel..coefficient of fall velocity
+          0.215790, & !.b_vel..coefficient of fall velocity = 0.41/1.9
+          0.25    , & !.s_vel...dispersion of the fall velocity
+          0.780000, & !.a_ven..ventilation coefficient (PK, p.541)
+          0.308000, & !.b_ven..ventilation coefficient (PK, p.541)
+          2.0)        !.cap....capacity coefficient
 
-    !Snow properties
+  !Snow properties
 
     snow =  PARTICLE('snow', & ! after Andy Heymsfield (CRYSTAL-FACE)
-            1,  & !number of moments
-            1e2, &
-            0.000000, & !.nu.....width parameter of distribution
-            0.333333, & !.mu.....Exp.-parameter of distribution
-            1.00e-07, & !.x_max..max. particle mass D=???e-2m
-            1.00e-12, & !.x_min..min. particle mass D=200e-6m
-            3.303633, & !.a_geo..coeff. geometry
-            0.476191, & !.b_geo..coeff. geometry = 1/2.1
-            2.47e+02, & !.a_vel..coeff. fall velocity
-            0.333333, & !.b_vel..coeff. fall velocity
-            0.25     , &!.s_vel...Dispersion of fall velocity
-            0.780000, & !.a_ven..coeff. ventilation (PK, S.541)
-            0.308000, & !.b_ven..coeff. ventilation (PK, S.541)
-            2.0)        !.cap....coeff. Capacity
+          1,  & !number of moments
+          1e2, & !Number of droplets
+          0.000000, & !.nu.....Width parameter of the distribution
+          0.333333, & !.mu.....exponential parameter of the distribution
+          1.00e-07, & !.x_max..maximum particle mass D=???e-2m
+          1.00e-12, & !.x_min..minimale particler mass D=200e-6m
+          3.303633, & !.a_geo..coefficient of meteor geometry
+          0.476191, & !.b_geo..coefficient of meteor geometry = 1/2.1
+          2.47e+02, & !.a_vel..coefficient of fall velocity
+          0.333333, & !.b_vel..coefficient of fall velocity
+          0.25    , & !.s_vel...dispersion of the fall velocity
+          0.780000, & !.a_ven..ventilation coefficient (PK, p.541)
+          0.308000, & !.b_ven..ventilation coefficient (PK, p.541)
+          2.0)        !.cap....capacity coefficient
 
-    !Graupel properties
-    graupel = PARTICLE('graupel', & ! 'graupel std'
-            1,  & !number of moments
-            1e2, &
-            1.000000, & !.nu.....width parameter of distribution
-            0.166666, & !.mu.....Exp.-parameter of distribution
-            1.00e-04, & !.x_max..max. particle mass
-            2.60e-10, & !.x_min..min. particle mass
-            1.10e-01, & !.a_geo..coeff. geometry
-            0.300000, & !.b_geo..coeff. geometry = 1/3.10
-            7.64e+01,& !.a_vel..coeff. fall velocity
-            0.255200, & !.b_vel..coeff. fall velocity
-            0.25     , &!.s_vel...Dispersion of fall velocity
-            0.780000, & !.a_ven..coeff. ventilation (PK, S.541)
-            0.308000, & !.b_ven..coeff. ventilation (PK, S.541)
-            2.0)        !.cap....coeff. Capacity
-         
+!Graupel properties
+    graupel = PARTICLE('graupel', & ! 'graupel'
+          1,  & !number of moments
+          1e2, &      !Number of droplets
+          1.000000, & !.nu.....Width parameter of the distribution
+          0.166666, & !.mu.....exponential parameter of the distribution
+          1.00e-04, & !.x_max..maximum particle mass
+          2.60e-10, & !.x_min..minimale particler mass
+          1.10e-01, & !.a_geo..coefficient of meteor geometry
+          0.300000, & !.b_geo..coefficient of meteor geometry = 1/3.10
+          7.64e+01, & !.a_vel..coefficient of fall velocity
+          0.255200, & !.b_vel..coefficient of fall velocity
+          0.25    , & !.s_vel...dispersion of the fall velocity
+          0.780000, & !.a_ven..ventilation coefficient (PK, p.541)
+          0.308000, & !.b_ven..ventilation coefficient (PK, p.541)
+          2.0)        !.cap....capacity coefficient
+
   end subroutine initmcrp
 end module mcrp
