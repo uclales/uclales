@@ -68,9 +68,9 @@ module mcrp
   real, parameter :: d_v  = 3.000e-5     !..diff. of water vapor
   real, parameter :: k_t  = 2.500e-2     !..heat conductivity
 
-  real, parameter :: n_sc = 0.710        !..schmidt-number(pk, s.541)
-  real, parameter :: n_f  = 0.333        !..exponent of n_sc in the vent-coeff. (pk, s.541)
-  real, parameter :: m_f  = 0.500        !..exponent of n_re in the vent-coeff. (pk, s.541)
+  real, parameter :: n_sc = 0.710        !..schmidt-number(pk, p.541)
+  real, parameter :: n_f  = 0.333        !..exponent of n_sc in the vent-coeff. (pk, p.541)
+  real, parameter :: m_f  = 0.500        !..exponent of n_re in the vent-coeff. (pk, p.541)
 ! 
   real, parameter :: a_e  = 2.18745584e1 !..const. in saturation pressure wrt ice
   real, parameter :: a_w  = 1.72693882e1 !..const. in saturation pressure wrt water
@@ -201,10 +201,10 @@ contains
         call resetvar(rain,rp(1:n1,i,j),np(1:n1,i,j))
         tl = thl(1:n1,i,j)
         temp = tk(1:n1,i,j)
-        rv = vapor(1:n1,i,j)/dn0
-        rc = rcld(1:n1,i,j)/dn0
-        rs = rsat(1:n1,i,j)/dn0
-        rrain = rp(1:n1,i,j)/dn0
+        rv = vapor(1:n1,i,j)
+        rc = rcld(1:n1,i,j)
+        rs = rsat(1:n1,i,j)
+        rrain = rp(1:n1,i,j)
         nrain = np(1:n1,i,j)
         convliq = alvl/cp*(pi0+pi1+exner(1:n1,i,j))/cp
         if (level == 4) then
@@ -240,39 +240,21 @@ contains
           case(iwtrdff)
             call resetvar(cldw,rc)
             call resetvar(rain,rrain,nrain)
-            rv = rv*dn0
-            rc = rc*dn0
-            rrain = rrain*dn0
             call wtr_dff_SB(n1,dn0,rrain,nrain,rc,rs,rv,tl,temp)
-            rv = rv/dn0
-            rc = rc/dn0
-            rrain = rrain/dn0
           case(iauto)
             call resetvar(cldw,rc)
             call resetvar(rain,rrain,nrain)
-            rc = rc*dn0
-            rrain = rrain*dn0
             call auto_SB(n1,dn0,rc,rrain,nrain,tl,dissip(1:n1,i,j))
-            rc = rc/dn0
-            rrain = rrain/dn0
           case(iaccr)
             call resetvar(cldw,rc)
             call resetvar(rain,rrain,nrain)
-            rc = rc*dn0
-            rrain = rrain*dn0
             call accr_SB(n1,dn0,rc,rrain,nrain,tl,dissip(1:n1,i,j))
-            rc = rc/dn0
-            rrain = rrain/dn0
           case(isedimrd)
             call resetvar(rain,rrain,nrain)
-            rrain = rrain*dn0
             call sedim_rd(n1,dt,dn0,rrain,nrain,prc_r(1:n1,i,j))
-            rrain = rrain/dn0
           case(isedimcd)
             call resetvar(cldw,rc)
-            rc = rc*dn0
             call sedim_cd(n1,dt,tl,rc,prc_c(1:n1,i,j))
-            rc = rc/dn0
           case(iicenucnr)
             where (rsup<0.) rsup = 0.
             call n_icenuc(n1,ninuc,nin_active,temp,rv,rsup)
@@ -371,8 +353,8 @@ contains
         end if
 
         tlt(2:n1,i,j) =  tlt(2:n1,i,j)+      (tl(2:n1) - thl(2:n1,i,j))/dt
-        rtt(2:n1,i,j) = rtt(2:n1,i,j) +(dn0(2:n1)*rv(2:n1) - vapor(2:n1,i,j))/dt + (dn0(2:n1)*rc(2:n1) - rcld(2:n1,i,j))/dt
-        rpt(2:n1,i,j) = max(rpt(2:n1,i,j) +(dn0(2:n1)*rrain(2:n1) - rp(2:n1,i,j))/dt,-rp(2:n1,i,j)/dt)
+        rtt(2:n1,i,j) = rtt(2:n1,i,j) +(rv(2:n1) - vapor(2:n1,i,j))/dt + (rc(2:n1) - rcld(2:n1,i,j))/dt
+        rpt(2:n1,i,j) = max(rpt(2:n1,i,j) +(rrain(2:n1) - rp(2:n1,i,j))/dt,-rp(2:n1,i,j)/dt)
         npt(2:n1,i,j) = max(npt(2:n1,i,j) +(nrain(2:n1) - np(2:n1,i,j))/dt,-np(2:n1,i,j)/dt)
         
         if (level == 4) then
@@ -712,7 +694,7 @@ contains
           flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)/dn0(k)
           rp(k) = rp(k)-flxdiv*dt
           np(k) = np(k)-(nfl(kp1)-nfl(k))*dzi_t(k)/dn0(k)*dt
-          rrate(k)    = -rfl(k) * alvl*0.5*(dn0(k)+dn0(kp1))
+          rrate(k)    = -rfl(k) 
 
         end do
 
@@ -756,7 +738,7 @@ contains
              flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)
              rc(k) = rc(k)-flxdiv*dt
              tl(k) = tl(k)+flxdiv*convliq(k)*dt
-             rrate(k)    = -rfl(k) * alvl*0.5*(dn0(k)+dn0(kp1))
+             rrate(k)    = -rfl(k)
           end do
 
   end subroutine sedim_cd
@@ -872,8 +854,8 @@ contains
     real            :: fr_r,fr_n,r_r,x_r,n_r,j_het,&
         &  fr_r_i,fr_n_i,fr_r_g,fr_n_g,n_0,lam!,fr_r_tmp,fr_n_tmp
     real, save      :: coeff_z,xmax_ice
-    real, parameter :: a_het = 6.5e-1 !  after barklie and gokhale (pk s.350)
-    real, parameter :: b_het = 2.0e+2 !  after barklie and gokhale (pk s.350)
+    real, parameter :: a_het = 6.5e-1 !  after barklie and gokhale (pk p.350)
+    real, parameter :: b_het = 2.0e+2 !  after barklie and gokhale (pk p.350)
     real, parameter :: r_crit_fr = 1.000e-6 ! r-critical value for rain_freeze
     real, parameter :: d_rainfrz_ig = 0.50e-3 !  rain --> ice or graupel distinction
       coeff_z = moment_gamma(rain,2)
@@ -1660,7 +1642,7 @@ contains
       if(meteor%moments==2) then
         np(k) = np(k)-(nfl(kp1)-nfl(k))*dzi_t(k)/dn0(k)*dt
       end if
-      rrate(k)    = -rfl(k) * alvl*0.5*(dn0(k)+dn0(kp1))
+      rrate(k)    = -rfl(k)
     end do
 
 
@@ -2149,104 +2131,104 @@ contains
       end where
     end if
   end subroutine resetvar
+  
   subroutine initmcrp(level,firsttime)
-  integer , intent(in) :: level
-  logical, intent(inout) :: firsttime
+    integer , intent(in) :: level
+    logical, intent(inout) :: firsttime
 
-  firsttime = .false.
-  if (level==2) then
-    nprocess = 1
-    microseq = isedimcd
-  end if
- if (level>=3)      nprocess = nprocwarm
-!  if (droplet_sedim) nprocess = nprocess + 1
- if (level==4)      nprocess = nprocess + nprocice
+    firsttime = .false.
+    if (level==2) then
+      nprocess = 1
+      microseq = isedimcd
+    end if
+    if (level>=3)      nprocess = nprocwarm
+    if (level==4)      nprocess = nprocess + nprocice
 
 
-!Cloudwater properties
- cldw = PARTICLE('cloudw', &! HN: made variable for seeding experiments
-         1, & !number of moments
-         CCN, & !Number of droplets
-         0.333333, & !.nu.....Breiteparameter der Verteil.
-         0.666666, & !.mu.....Exp.-parameter der Verteil.
-         2.60e-10, & !.x_max..maximale Teilchenmasse D=80e-6m
-         4.20e-15, & !.x_min..minimale Teilchenmasse D=2.e-6m
-         1.24e-01, & !.a_geo..Koeff. Geometrie
-         0.333333, & !.b_geo..Koeff. Geometrie = 1/3
-         3.75e+05, & !.a_vel..Koeff. Fallgesetz
-         0.666667, & !.b_vel..Koeff. Fallgesetz
-         0.25     , &!.s_vel...Dispersion der Fallgeschw.
-         0.780000, & !.a_ven..Koeff. Ventilation (PK, S.541)
-         0.308000, & !.b_ven..Koeff. Ventilation (PK, S.541)
-         2.0)        !.cap....Koeff. Kapazitaet
+  !Cloudwater properties
+    cldw = PARTICLE('cloudw', &! HN: made variable for seeding experiments
+           1, & !number of moments
+           CCN, & !Number of droplets
+           0.333333, & !.nu.....Width parameter of the distribution
+           0.666666, & !.mu.....exponential parameter of the distribution
+           2.60e-10, & !.x_max..maximum particle mass D=80e-6m
+           4.20e-15, & !.x_min..minimale particler mass D=2.e-6m
+           1.24e-01, & !.a_geo..coefficient of meteor geometry
+           0.333333, & !.b_geo..coefficient of meteor geometry = 1/3
+           3.75e+05, & !.a_vel..coefficient of fall velocity
+           0.666667, & !.b_vel..coefficient of fall velocity
+           0.25     , &!.s_vel...dispersion of the fall velocity
+           0.780000, & !.a_ven..ventilation coefficient (PK, p.541)
+           0.308000, & !.b_ven..ventilation coefficient (PK, p.541)
+           2.0)        !.cap....capacity coefficient
 
-!Rainwater properties
- rain = PARTICLE('rain', &! HN: made variable for seeding experiments
-         2, & !number of moments
-         0, & !Number of droplets
-         1.000000, & !.nu.....Breiteparameter der Verteil.
-       &                              0.333333, & !.mu.....Exp.-parameter der Verteil.
-       &                              3.00d-06, & !.x_max..maximale Teilchenmasse
-       &                              2.60d-10, & !.x_min..minimale Teilchenmasse D=80.e-6m
-       &                              1.24d-01, & !.a_geo..Koeff. Geometrie
-       &                              0.333333, & !.b_geo..Koeff. Geometrie = 1/3
-       &                              1.59d+02, & !.a_vel..Koeff. Fallgesetz
-       &                              0.266667, & !.b_vel..Koeff. Fallgesetz
-         0.25     , &!.s_vel...Dispersion der Fallgeschw.
-       &                              0.780000, & !.a_ven..Koeff. Ventilation (PK, S.541)
-       &                              0.308000, & !.b_ven..Koeff. Ventilation (PK, S.541)
-       &                              2.0)        !.cap....Koeff. Kapazitaet
-!Cloud ice properties
- ice = PARTICLE('ice', &
-        2, & !number of moments
-        0, & !
-        0.000000, & !.nu.....Breiteparameter der Verteil.
-        0.333333, & !.mu.....Exp.-parameter der Verteil.
-        1.00e-07, & !.x_max..maximale Teilchenmasse D=???e-2m
-        1.00e-12, & !.x_min..minimale Teilchenmasse D=200e-6m
-        3.303633, & !.a_geo..Koeff. Geometrie
-        0.476191, & !.b_geo..Koeff. Geometrie = 1/2.1
-        2.77e+01, & !.a_vel..Koeff. Fallgesetz
-        0.215790, & !.b_vel..Koeff. Fallgesetz = 0.41/1.9
-         0.25     , &!.s_vel...Dispersion der Fallgeschw.
-        0.780000, & !.a_ven..Koeff. Ventilation (PK, S.541)
-        0.308000, & !.b_ven..Koeff. Ventilation (PK, S.541)
-        2.0)        !.cap....Koeff. Kapazitaet
+  !Rainwater properties
+    rain = PARTICLE('rain', &! HN: made variable for seeding experiments
+           2, & !number of moments
+           0, & !Number of droplets
+           1.000000, & !.nu.....Width parameter of the distribution
+           0.333333, & !.mu.....exponential parameter of the distribution
+           3.00e-06, & !.x_max..maximum particle mass
+           2.60e-10, & !.x_min..minimale particler mass D=80.e-6m
+           1.24e-01, & !.a_geo..coefficient of meteor geometry
+           0.333333, & !.b_geo..coefficient of meteor geometry = 1/3
+           1.59e+02, & !.a_vel..coefficient of fall velocity
+           0.266667, & !.b_vel..coefficient of fall velocity
+           0.25    , & !.s_vel...dispersion of the fall velocity
+           0.780000, & !.a_ven..ventilation coefficient (PK, p.541)
+           0.308000, & !.b_ven..ventilation coefficient (PK, p.541)
+           2.0)        !.cap....capacity coefficient
+  !Cloud ice properties
+    ice = PARTICLE('ice', &
+          2, & !number of moments
+          0, & !Number of droplets
+          0.000000, & !.nu.....Width parameter of the distribution
+          0.333333, & !.mu.....exponential parameter of the distribution
+          1.00e-07, & !.x_max..maximum particle mass D=???e-2m
+          1.00e-12, & !.x_min..minimale particler mass D=200e-6m
+          3.303633, & !.a_geo..coefficient of meteor geometry
+          0.476191, & !.b_geo..coefficient of meteor geometry = 1/2.1
+          2.77e+01, & !.a_vel..coefficient of fall velocity
+          0.215790, & !.b_vel..coefficient of fall velocity = 0.41/1.9
+          0.25    , & !.s_vel...dispersion of the fall velocity
+          0.780000, & !.a_ven..ventilation coefficient (PK, p.541)
+          0.308000, & !.b_ven..ventilation coefficient (PK, p.541)
+          2.0)        !.cap....capacity coefficient
 
-!Snow properties
+  !Snow properties
 
- snow =  PARTICLE('snow', & ! nach Andy Heymsfield (CRYSTAL-FACE)
-         1,  & !number of moments
-         1e2, &
-        0.000000, & !.nu.....Breiteparameter der Verteil.
-        0.333333, & !.mu.....Exp.-parameter der Verteil.
-        1.00e-07, & !.x_max..maximale Teilchenmasse D=???e-2m
-        1.00e-12, & !.x_min..minimale Teilchenmasse D=200e-6m
-        3.303633, & !.a_geo..Koeff. Geometrie
-        0.476191, & !.b_geo..Koeff. Geometrie = 1/2.1
-        2.47e+02, & !.a_vel..Koeff. Fallgesetz
-        0.333333, & !.b_vel..Koeff. Fallgesetz
-         0.25     , &!.s_vel...Dispersion der Fallgeschw.
-        0.780000, & !.a_ven..Koeff. Ventilation (PK, S.541)
-        0.308000, & !.b_ven..Koeff. Ventilation (PK, S.541)
-        2.0)        !.cap....Koeff. Kapazitaet
+    snow =  PARTICLE('snow', & ! after Andy Heymsfield (CRYSTAL-FACE)
+          1,  & !number of moments
+          1e2, & !Number of droplets
+          0.000000, & !.nu.....Width parameter of the distribution
+          0.333333, & !.mu.....exponential parameter of the distribution
+          1.00e-07, & !.x_max..maximum particle mass D=???e-2m
+          1.00e-12, & !.x_min..minimale particler mass D=200e-6m
+          3.303633, & !.a_geo..coefficient of meteor geometry
+          0.476191, & !.b_geo..coefficient of meteor geometry = 1/2.1
+          2.47e+02, & !.a_vel..coefficient of fall velocity
+          0.333333, & !.b_vel..coefficient of fall velocity
+          0.25    , & !.s_vel...dispersion of the fall velocity
+          0.780000, & !.a_ven..ventilation coefficient (PK, p.541)
+          0.308000, & !.b_ven..ventilation coefficient (PK, p.541)
+          2.0)        !.cap....capacity coefficient
 
 !Graupel properties
-graupel = PARTICLE('graupel', & ! 'graupel im standard'
-         1,  & !number of moments
-         1e2, &
-         1.000000, & !.nu.....Breiteparameter der Verteil.
-         0.166666, & !.mu.....Exp.-parameter der Verteil.
-         1.00e-04, & !.x_max..maximale Teilchenmasse
-         2.60e-10, & !.x_min..minimale Teilchenmasse
-         1.10e-01, & !.a_geo..Koeff. Geometrie
-         0.300000, & !.b_geo..Koeff. Geometrie = 1/3.10
-         7.64e+01,& !.a_vel..Koeff. Fallgesetz
-         0.255200, & !.b_vel..Koeff. Fallgesetz
-         0.25     , &!.s_vel...Dispersion der Fallgeschw.
-         0.780000, & !.a_ven..Koeff. Ventilation (PK, S.541)
-         0.308000, & !.b_ven..Koeff. Ventilation (PK, S.541)
-         2.0)        !.cap....Koeff. Kapazitaet
-         
+    graupel = PARTICLE('graupel', & ! 'graupel'
+          1,  & !number of moments
+          1e2, &      !Number of droplets
+          1.000000, & !.nu.....Width parameter of the distribution
+          0.166666, & !.mu.....exponential parameter of the distribution
+          1.00e-04, & !.x_max..maximum particle mass
+          2.60e-10, & !.x_min..minimale particler mass
+          1.10e-01, & !.a_geo..coefficient of meteor geometry
+          0.300000, & !.b_geo..coefficient of meteor geometry = 1/3.10
+          7.64e+01, & !.a_vel..coefficient of fall velocity
+          0.255200, & !.b_vel..coefficient of fall velocity
+          0.25    , & !.s_vel...dispersion of the fall velocity
+          0.780000, & !.a_ven..ventilation coefficient (PK, p.541)
+          0.308000, & !.b_ven..ventilation coefficient (PK, p.541)
+          2.0)        !.cap....capacity coefficient
+
   end subroutine initmcrp
 end module mcrp
