@@ -180,13 +180,14 @@ a_ninucp = 0.
     use forc, only : forcings
     use lsvar, only : varlscale
     use util, only : velset,get_avg
+    use modtimedep, only : timedep
 
 !     integer :: k
     real :: xtime
 !     character (len=11)    :: fname = 'debugXX.dat'
 
     xtime = time/86400. + strtim
-
+    call timedep(time,timmax)
     do nstep = 1,3
 
        ! Add additional criteria to ensure that some profile statistics that are  

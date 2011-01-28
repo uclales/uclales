@@ -121,45 +121,7 @@ contains
              xref2 = xref2 + a_sflx(nzp,3,3)
              albedo(3,3) = xref2/xref1
           end select
-!irina 
-          !
-          ! subsidence
-          !
-!cgils          
- !      if (lstendflg) then
 
-      do j=3,nyp-2
-          do i=3,nxp-2
-             do k=2,nzp-2
-                kp1 = k+1
- !               if (i.eq.4 .and. j.eq.4) then
- !               print *, k, wfls(k),dthldtls(k),dqtdtls(k)
- !               end if
- !               a_tt(k,i,j) = a_tt(k,i,j) - &
- !                       wfls(k)*(a_tp(kp1,i,j)-a_tp(k,i,j))*dzi_t(k)+dthldtls(k)
- !               a_rt(k,i,j)=a_rt(k,i,j) - &
- !                       wfls(k)*(a_rp(kp1,i,j)-a_rp(k,i,j))*dzi_t(k)+dqtdtls(k)
-             end do
-          enddo
-       enddo
-
-!       else 
-!       
-       do j=3,nyp-2
-          do i=3,nxp-2
-           if (div /= 0.) then
-             do k=2,nzp-2
-                kp1 = k+1
-                a_tt(k,i,j) = a_tt(k,i,j) + &
-                        div*zt(k)*(a_tp(kp1,i,j)-a_tp(k,i,j))*dzi_t(k)
-                a_rt(k,i,j)=a_rt(k,i,j) + &
-                        div*zt(k)*(a_rp(kp1,i,j)-a_rp(k,i,j))*dzi_t(k)
-             end do
-           end if
-          enddo
-       enddo
-!       
-!       end if
        else
           if (myid == 0) print *, '  ABORTING: inproper call to radiation'
           call appl_abort(0)
@@ -168,6 +130,20 @@ contains
     end select 
 !cgils: Nudging
     call nudge(time_in)
+    if (lstendflg) then
+
+      do j=3,nyp-2
+          do i=3,nxp-2
+             do k=2,nzp-2
+                kp1 = k+1
+               a_tt(k,i,j) = a_tt(k,i,j) - &
+                       wfls(k)*(a_tp(kp1,i,j)-a_tp(k,i,j))*dzi_t(k)+dthldtls(k)
+               a_rt(k,i,j)=a_rt(k,i,j) - &
+                       wfls(k)*(a_rp(kp1,i,j)-a_rp(k,i,j))*dzi_t(k)+dqtdtls(k)
+             end do
+          enddo
+       enddo
+    end if
 
     
   end subroutine forcings

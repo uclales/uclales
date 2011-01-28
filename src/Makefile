@@ -24,6 +24,7 @@ $(LES_ARC)(stat.o)   \
 $(LES_ARC)(thrm.o)   \
 $(LES_ARC)(rad_gcss.o)   \
 $(LES_ARC)(modnudge.o)   \
+$(LES_ARC)(modtimedep.o)   \
 $(LES_ARC)(forc.o)   \
 $(LES_ARC)(lsvar.o)   \
 $(LES_ARC)(advf.o)   \

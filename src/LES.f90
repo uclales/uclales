@@ -95,6 +95,7 @@ contains
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
     use modnudge, only : lnudge,tnudgefac
+    use modtimedep, only : ltimedep
     use mcrp, only : microseq,lrandommicro,timenuc,nin_set
 
     implicit none
@@ -127,7 +128,7 @@ contains
          lsvarflg,                  & !irina:flag for time bvarying large scale forcing  
          lstendflg,                  & !irina:flag for time large scale advective tendencies  
          div,  &                       !irina: divergence
-         lnudge, tnudgefac, &             !thijs: Nudging
+         lnudge, tnudgefac, ltimedep, &             !thijs: Nudging
          SolarConstant, & ! SolarConstant (In case of prescribed TOA radiation
          lrandommicro, microseq,timenuc ,nin_set   !thijs: sequence of variables for microphysics
 
