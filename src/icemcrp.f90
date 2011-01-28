@@ -2118,9 +2118,11 @@ contains
     type(particle),intent(in)        :: meteor
     real, dimension(:), intent(inout) :: mass
     real, dimension(:), intent(inout), optional :: num
+    
     where (mass < rthres)
       mass = 0.
     end where
+    mass(1) = 0.
     if (present(num)) then
       where (meteor%x_max*num < mass)
         num = mass/meteor%x_max
