@@ -57,7 +57,7 @@ contains
          ,wspd(nxp,nyp), bfct(nxp,nyp)
 
     integer :: i, j, iterate
-    real    :: zs, bflx, ffact, sst1, bflx1, Vbulk, Vzt, usum
+    real    :: zs, bflx0,bflx, ffact, sst1, bflx1, Vbulk, Vzt, usum
     real (kind=8) :: bfl(2), bfg(2)
 
 
@@ -88,6 +88,8 @@ contains
        usum = 0.
        do j=3,nyp-2
           do i=3,nxp-2
+!irina
+ !      print *,'input sf fluxes',i,j,a_theta(2,i,j),vapor(2,i,j), sst, rslf(psrf,sst), wspd(i,j)
              dtdz(i,j) = a_theta(2,i,j) - sst*(p00/psrf)**rcp
              drdz(i,j) = vapor(2,i,j) - rslf(psrf,sst)
              bfct(i,j) = g*zt(2)/(a_theta(2,i,j)*wspd(i,j)**2)
@@ -111,11 +113,16 @@ contains
           do i=3,nxp-2
              dtdz(i,j) = a_theta(2,i,j) - sst*(p00/psrf)**rcp
              drdz(i,j) = vapor(2,i,j) - rslf(psrf,sst)
+   !cgils
+            ! drdz(i,j) = vapor(2,i,j) - 0.98*rslf(psrf,sst)
              if (ubmin > 0.) then
                 a_ustar(i,j) = sqrt(zrough)* wspd(i,j)
              else
                 a_ustar(i,j) = abs(ubmin)
              end if
+   !cgils  : drag coeff C = 0.0012*6.75 m/s = 0.0081 m/s
+             !a_tstar(i,j) =  0.0081*dtdz(i,j)/a_ustar(i,j)
+             !a_rstar(i,j) =  0.0081*drdz(i,j)/a_ustar(i,j)
              a_tstar(i,j) =  dthcon * wspd(i,j)*dtdz(i,j)/a_ustar(i,j)
              a_rstar(i,j) =  drtcon * wspd(i,j)*drdz(i,j)/a_ustar(i,j)
              bfct(i,j) = g*zt(2)/(a_theta(2,i,j)*wspd(i,j)**2)
@@ -170,6 +177,50 @@ contains
              a_tstar(i,j) = wt_sfc(i,j)/a_ustar(i,j)
           end do
        end do   
+case(5)
+       Vbulk = 0.01
+
+       bfl(:) = 0.
+       do j=3,nyp-2
+          do i=3,nxp-2
+             bfl(1) = bfl(1)+a_theta(2,i,j)
+             bfl(2) = bfl(2)+vapor(2,i,j)
+          end do
+       end do
+       call double_array_par_sum(bfl,bfg,2)
+
+       bfg(2) = bfg(2)/real((nxpg-4)*(nypg-4))
+       bfg(1) = bfg(1)/real((nxpg-4)*(nypg-4))
+       sst=289.
+       iterate=0
+       bflx0=0.0007
+       bflx=g/bfg(1)*Vbulk*((sst-bfg(1))+ep2*bfg(1)*(rslf(psrf,sst)-bfg(2)))
+       do while (abs(bflx-bflx0)>0.00001.and.iterate<800)
+        sst=sst+0.01
+        bflx=g/bfg(1)*Vbulk*((sst-bfg(1))+ep2*bfg(1)*(rslf(psrf,sst)-bfg(2)))
+        iterate=iterate+1
+       end do
+       if (iterate.eq.799) print*,'WARNING'
+       if (sst.lt.289) print*,'WRONG SST'
+       do j=3,nyp-2
+          do i=3,nxp-2
+             wt_sfc(i,j) = Vbulk * (sst -a_theta(2,i,j))
+             wq_sfc(i,j) = Vbulk * (rslf(psrf,sst) - vapor(2,i,j))
+             wspd(i,j)    = max(0.1,                                    &
+                  sqrt((a_up(2,i,j)+umean)**2+(a_vp(2,i,j)+vmean)**2))
+             bflx         = wt_sfc(i,j)*g/bfg(1) + g*ep2*wq_sfc(i,j)
+             a_ustar(i,j) = diag_ustar(zt(2),zrough,bflx,wspd(i,j))
+             uw_sfc(i,j)  = -a_ustar(i,j)*a_ustar(i,j)                  &
+                  *(a_up(2,i,j)+umean)/wspd(i,j)
+             vw_sfc(i,j)  = -a_ustar(i,j)*a_ustar(i,j)                  &
+                  *(a_vp(2,i,j)+vmean)/wspd(i,j)
+             ww_sfc(i,j)  = 0.
+             a_rstar(i,j) = wq_sfc(i,j)/a_ustar(i,j)
+             a_tstar(i,j) = wt_sfc(i,j)/a_ustar(i,j)
+          end do
+       end do   
+
+
        !
        ! fix thermodynamic fluxes at surface given values in energetic 
        ! units and calculate  momentum fluxes from winds
@@ -371,12 +422,16 @@ contains
              zeta  = z/lmo
              ustar(i,j) =  vonk*u(i,j)  /(lnz + am*zeta)
              tstar(i,j) = (vonk*dtv/(lnz + ah*zeta))/pr
+!irina
+ !            print *,"stable", i,j, ustar(i,j), tstar(i,j), (lnz + am*zeta), (lnz + ah*zeta), pr
              !
              ! Neutral case
              ! 
           elseif (dtv == 0.) then
              ustar =  vonk*u(i,j)  /lnz
              tstar =  vonk*dtv/(pr*lnz)
+!irina
+ !            print *,"neutral", i,j, ustar, tstar, lnz , pr
              !
              ! ustable case, start iterations from values at previous tstep, 
              ! unless the sign has changed or if it is the first call, then 
@@ -386,6 +441,8 @@ contains
              if (first_call .or. tstar(i,j)*dtv <= 0.) then
                 ustar(i,j) = u(i,j)*klnz
                 tstar(i,j) = (dtv*klnz/pr)
+!irina
+ !            print *,"unstable", i,j, ustar(i,j), tstar(i,j),klnz,pr
              end if
 
              do iterate = 1,3
@@ -399,6 +456,8 @@ contains
                 tstar(i,j) = (dtv*vonk/pr)/(lnz - psi2)
              end do
           end if
+!irina
+ !            print *,"finval", i,j, ustar(i,j), tstar(i,j), (lnz - psi1), (lnz - psi2)
 
           rstar(i,j) = tstar(i,j)*drt(i,j)/(dtv + eps)
           tstar(i,j) = tstar(i,j)*dth(i,j)/(dtv + eps)
