@@ -173,7 +173,7 @@ contains
 
   end subroutine inittimedep
 
-  subroutine timedep(time, time_end)
+  subroutine timedep(time, time_end, sst)
 
 !-----------------------------------------------------------------|
 !                                                                 |
@@ -197,11 +197,12 @@ contains
 !-----------------------------------------------------------------|
     
     real, intent(in) :: time, time_end
+    real, intent(inout) :: sst
     
     if (.not. ltimedep) return
     if (firsttime) call inittimedep(time,time_end)
     call timedepz(time)
-    call timedepsurf(time)
+    call timedepsurf(time, sst)
   end subroutine timedep
 
   subroutine timedepz(time)
@@ -231,15 +232,17 @@ contains
 
   end subroutine timedepz
 
-  subroutine timedepsurf(time)
+  subroutine timedepsurf(time, sst)
     use grid, only : psrf, wt_sfc, wq_sfc
-    use step, only : sst
+    
 !     use modglobal,   only : rtimee, lmoist
 !     use modsurfdata, only : wtsurf,wqsurf,thls,qts,ps
 !     use modsurface,  only : qtsurf
 
     implicit none
     real, intent(in) :: time
+    real, intent(inout) :: sst
+
     integer t
     real fac
 
