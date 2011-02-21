@@ -15,11 +15,11 @@
 ############################
 INCLUDE(CMakeForceCompiler) #Necessary to change between MPI/parallel/profiler compilers, without having to do a make clean
 cmake_minimum_required (VERSION 2.8.1)
-project (microhh Fortran)
+project (uclales Fortran)
 
 # Set the name of the executable, and build it into the build directory
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
-set(target_name microhh)
+set(target_name uclales)
 
 # Set the default paths for libraries
 set (CMAKE_PREFIX_PATH $ENV{HOME} /usr
