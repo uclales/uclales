@@ -395,6 +395,7 @@ contains
 
           if (S < 0) then
             cerpt = 2. * pi * Dp * G * S * np(k)
+            cerpt = min (cerpt, rv(k)/dt)
             cenpt = c_Nevap*cerpt * np(k) / rp(k)
             np(k)=np(k) + cenpt*dt
             rp(k)=rp(k) + cerpt*dt
@@ -501,13 +502,12 @@ contains
               Dc = ( Xc / prw )**(1./3.)
               au = Cau * (Dc * mmt / 2.)**Eau
           end if
-        else
-          au = 0.
-        end if
+          au    = min(au,rc(k)/dt)
           rp(k) = rp(k) + au*dt
           rc(k) = rc(k) - au*dt
           tl(k) = tl(k) + convliq(k)*au*dt
           np(k) = np(k) + au/cldw%x_max*dt
+        end if
     end do
 
   end subroutine auto_SB
@@ -559,12 +559,14 @@ contains
             ac = Cac * (rc(k) * rp(k))**Eac
             end if
             !
+            ac    = min(ac, rc(k)/dt)
             rp(k) = rp(k) + ac*dt
             rc(k) = rc(k) - ac*dt
             tl(k) = tl(k) + convliq(k)*ac*dt
 
           end if
           sc = k_r * np(k) * rp(k) * sqrt(rho_0*dn0(k))
+          sc = min(sc, np(k)/dt)
           np(k) = np(k) - sc*dt
           end if
       end do
@@ -778,7 +780,7 @@ contains
 
         if (nuc_n>eps0) then
 !          nuc_r = min(nuc_n * ice%x_min, rsup(k))
-          nuc_n   = nuc_r / ice%x_min                !axel 20040416
+          nuc_n   = nuc_r / ice%x_min        
           nin(k)  = nin(k)  - nuc_n
           rsup(k) = rsup(k) - nuc_r
           nice(k) = nice(k) + nuc_n
@@ -940,12 +942,12 @@ contains
         nrain(k) = n_r - fr_n
 
         if (rrain(k) < 0.0) then
-          write (*,*) 'seifert rain_freeze: rrain < 0.0, ', k, tk(k), r_r, j_het, fr_r
+          write (*,*) 'rain_freeze: rrain < 0.0, ', k, tk(k), r_r, j_het, fr_r
           rrain(k) = 0.0e0
           stop
         end if
         if (nrain(k) < 0.0) then
-          write (*,*) 'seifert rain_freeze: nrain < 0.0, ', k, tk(k), n_r, j_het, fr_n
+          write (*,*) 'rain_freeze: nrain < 0.0, ', k, tk(k), n_r, j_het, fr_n
           nrain(k) = 0.0e0
           stop
         end if
@@ -997,7 +999,8 @@ contains
   !       e_si = e_es(tk(k))
       
         gi = 4.0*pi / ( alvi**2 / (K_T * Rm * tk(k)**2) + Rm * tk(k) / (D_v * e_es(tk(k))) )
-        ndep  = min(gi * n_g * c_g * d_g * rsup(k)/rv(k) * dt * f_n / x_g,ninuc(k))
+        ndep  = gi * n_g * c_g * d_g * rsup(k)/rv(k) * dt * f_n / x_g
+        ndep  = min(min(ndep,ninuc(k)), rsup(k) / x_g * f_n / f_v)
         !dep = gi * n_g * c_g * d_g * f_v * rsup(k)/rv(k) * dt 
         dep   = ndep *x_g*f_v/f_n
         rice(k) = rice(k) + dep
@@ -1262,7 +1265,7 @@ contains
           end if
         endif
         
-        r_i(k)     = r_i(k)     - conv_r
+        r_i(k) = r_i(k) - conv_r
         r_g(k) = r_g(k) + conv_r
 
         if (ice%moments == 2) n_i(k)     = n_i(k)     - conv_n
@@ -1810,7 +1813,7 @@ contains
     real :: gammcf, gamser
 
     if (x.lt.0.0e0 .or. a .le. 0.0e0) then
-      write(*,*) 'error in gammq: bad arguments (module gamma_functions, src_seifert.f90)'
+      write(*,*) 'error in gammq: bad arguments (module gamma_functions)'
       gammq = 0.0e0
       return
     end if
@@ -1909,7 +1912,7 @@ contains
     end do
 
     if (abs(del-1.).ge.eps) then
-      write (*,*) 'error in gcf: a too large, itmax too small (module gamma_functions, src_seifert.f90)'
+      write (*,*) 'error in gcf: a too large, itmax too small (module gamma_functions)'
       gammcf = 0.0e0
       return
     end if
@@ -1929,7 +1932,7 @@ contains
     gln=gammln(a)
     if (x.le.0.) then
       if (x.lt.0.) then
-        write (*,*) 'error in gser: x < 0 (module gamma_functions, src_seifert.f90)'
+        write (*,*) 'error in gser: x < 0 (module gamma_functions)'
       end if
       gamser=0.0e0
       return
@@ -1947,7 +1950,7 @@ contains
 
     if (abs(del).ge.abs(sum)*eps) then
       write (*,*) 'error in gser: a too large, itmax too small'
-      write (*,*) '  (module gamma_functions, src_seifert.f90)'
+      write (*,*) '  (module gamma_functions)'
       gamser = 0.0e0
       return
     end if
