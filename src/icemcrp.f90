@@ -2207,8 +2207,8 @@ contains
           1e2, & !Number of droplets
           0.000000, & !.nu.....Width parameter of the distribution
           0.333333, & !.mu.....exponential parameter of the distribution
-          1.00e-07, & !.x_max..maximum particle mass D=???e-2m
-          1.00e-12, & !.x_min..minimale particler mass D=200e-6m
+          1.00e-9, & !.x_max..maximum particle mass D=???e-2m
+          1.00e-9, & !.x_min..minimale particler mass D=200e-6m
           3.303633, & !.a_geo..coefficient of meteor geometry
           0.476191, & !.b_geo..coefficient of meteor geometry = 1/2.1
           2.47e+02, & !.a_vel..coefficient of fall velocity
@@ -2224,8 +2224,8 @@ contains
           1e2, &      !Number of droplets
           1.000000, & !.nu.....Width parameter of the distribution
           0.166666, & !.mu.....exponential parameter of the distribution
-          1.00e-04, & !.x_max..maximum particle mass
-          2.60e-10, & !.x_min..minimale particler mass
+          1.00e-06, & !.x_max..maximum particle mass
+          1.00e-06, & !.x_min..minimale particler mass
           1.10e-01, & !.a_geo..coefficient of meteor geometry
           0.300000, & !.b_geo..coefficient of meteor geometry = 1/3.10
           7.64e+01, & !.a_vel..coefficient of fall velocity
