@@ -24,6 +24,7 @@ module step
   integer :: istpfl = 1
   real    :: timmax = 18000.
   real    :: timrsm = 86400.
+  real    :: wctime = 1e10
   logical :: corflg = .false.
   logical :: rylflg = .true.
 
@@ -65,7 +66,6 @@ contains
 
     real    :: t1,t2,tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax
     integer :: istp, iret
-
     !
     ! Timestep loop for program
     !
@@ -77,9 +77,8 @@ contains
   ! print *, 'time timrsm',time, timrsm
   !  timmax = min(timmax,timrsm)
   ! print *, 'timmax',timmax
-
-    do while (time + 0.1*dt < timmax)
-a_ninucp = 0.
+    t2 = 0.
+    do while (time + 0.1*dt < timmax .and. t2 < wctime)
        call cpu_time(t1)           !t1=timing()
 
        istp = istp+1

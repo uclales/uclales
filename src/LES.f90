@@ -62,7 +62,6 @@ contains
     call define_vars
 
     call initialize
-
     call stepper
 
     call appl_finalize(ierror)
@@ -84,7 +83,7 @@ contains
     !use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon, sst
     use step, only : timmax, timrsm, istpfl, corflg, outflg, frqanl, frqhis,          &
          strtim, radfrq, cntlat,& 
-         case_name,lsvarflg, sst, div                   !irina
+         case_name,lsvarflg, sst, div, wctime                   !irina
 !cgils         
     use forc, only : lstendflg, sfc_albedo     
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
@@ -113,7 +112,7 @@ contains
          nxp    , nyp    , nzp   ,  & ! number of x, y, z points
          deltax , deltay , deltaz , & ! delta x, y, z (meters)
          dzrat  , dzmax  , igrdtyp, & ! stretched grid parameters
-         timmax , dtlong , istpfl , timrsm, & ! timestep control
+         timmax , dtlong , istpfl , timrsm, wctime, & ! timestep control
          runtype, hfilin , filprf , & ! type of run (INITIAL or HISTORY)
          frqhis , frqanl , outflg , & ! freq of history/anal writes, output flg
          iradtyp, radfrq , strtim , sfc_albedo, & ! radiation type flag
