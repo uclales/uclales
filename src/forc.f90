@@ -100,7 +100,7 @@ contains
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,   &
                   dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt,&
                   a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
-                  rr=a_rpp,ice=a_ricep,nice=a_nicep,grp=a_rgrp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
+                  rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
                   lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
             !old      
             ! call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
