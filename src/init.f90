@@ -117,7 +117,7 @@ contains
 
     if ( allocated (vapor) ) vapor = a_rp
 
-    if ( allocated (liquid) .and. itsflg == 0) then
+    if ( allocated (liquid)) then
        do j=1,nyp
           do i=1,nxp
              do k=1,nzp
