@@ -1573,12 +1573,12 @@ contains
       vr(k) = alfq(metnr) * lam
       vr(k) = max(vr(k),0.1e+0)
       vr(k) = min(vr(k),30.e0)
-      vr(k) = -vr(k)
+!      vr(k) = -vr(k)
 
       vn(k) = alfn(metnr) * lam
       vn(k) = max(vn(k),0.1e+0)
       vn(k) = min(vn(k),30.e0)
-      vn(k) = -vn(k)
+!      vn(k) = -vn(k)
     end do
     do k=2,n1-1
       kp1 = min(k+1,n1-1)
@@ -1586,7 +1586,6 @@ contains
       cn(k) = 0.25*(vn(kp1)+2.*vn(k)+vn(km1))*dzi_t(k)*dt
       cr(k) = 0.25*(vr(kp1)+2.*vr(k)+vr(km1))*dzi_t(k)*dt
     end do
-
         !...piecewise linear method: get slopes
     do k=n1-1,2,-1
       dn(k) = np(k+1)-np(k)
@@ -1631,6 +1630,7 @@ contains
       tot = 0.0
       zz  = 0.0
       cc  = min(1.,cr(k))
+
       do while (cc > 0 .and. kk <= n1-1)
           tot = tot + dn0(kk)*(rp(kk)+rslope(kk)*(1.-cc))*cc/dzi_t(kk)
           zz  = zz + 1./dzi_t(kk)
