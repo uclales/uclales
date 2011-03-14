@@ -296,7 +296,7 @@ contains
 
 !irina
     use grid, only : a_xp, a_xt1, a_xt2, a_up, a_vp, a_wp, a_sp, dzi_t, dt,  &
-         nscl, nxp, nyp, nzp, newvar,level, a_rpp,a_npp,rkalpha,rkbeta
+         nscl, nxp, nyp, nzp, newvar,level, a_rpp,a_ninucp,a_ricep,a_nicep,a_rsnowp,a_rgrp,a_npp,rkalpha,rkbeta
     use util, only : sclrset,velset
 
     integer, intent (in) :: nstep
@@ -314,12 +314,40 @@ contains
 
 !irina
    if (level >= 3) then
-   where (a_rpp < 0.) 
-    a_rpp=0.
+    a_rpp(1,:,:) = 0.
+    a_npp(1,:,:) = 0.
+    where (a_rpp < 0.) 
+      a_rpp=0.
     end where
-   where (a_npp < 0.) 
-    a_npp=0.
+    where (a_npp < 0.) 
+      a_npp=0.
     end where
+   end if
+   if (level >= 4) then
+    a_ninucp(1,:,:) = 0.
+    a_ricep(1,:,:) = 0.
+    a_nicep(1,:,:) = 0.
+    a_rsnowp(1,:,:) = 0. 
+    a_rgrp(1,:,:) = 0.
+    where (a_ninucp < 0.) 
+      a_ninucp=0.
+    end where
+    where (a_ricep < 0.) 
+      a_ricep=0.
+    end where
+    where (a_ricep < 0.) 
+      a_ricep=0.
+    end where
+    where (a_nicep < 0.) 
+      a_nicep=0.
+    end where
+    where (a_rsnowp < 0.) 
+      a_rsnowp=0.
+    end where
+    where (a_rgrp < 0.) 
+      a_rgrp=0.
+    end where
+   
    end if
 
 
