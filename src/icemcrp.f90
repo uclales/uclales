@@ -46,7 +46,7 @@ module mcrp
                         iriming_ice_cloud=18, iriming_snow_cloud=19, iriming_grp_cloud=20, &
                         iriming_ice_rain=21, iriming_snow_rain=22,iriming_grp_rain=23
   real, dimension(:),allocatable :: convice,convliq
-  integer, dimension(23) :: microseq = (/1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,22/)
+  integer, dimension(23) :: microseq = (/1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23/)
   logical :: lrandommicro = .false.
   real :: timenuc = 60
   real :: nin_set = 1.7e3
