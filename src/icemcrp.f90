@@ -25,7 +25,7 @@
 module mcrp
 
   use defs, only : tmelt,alvl, alvi,rowt,roice, pi, Rm, cp,t_hn 
-  use grid, only : dt,nstep,rkbeta,rkalpha, dxi, dyi ,dzi_t, nxp, nyp, nzp, a_pexnr, pi0,pi1,a_rp, a_tp, th00, ccn,    &
+  use grid, only : dt,nstep,rkbeta,rkalpha, dxi, dyi ,dzi_t, nxp, nyp, nzp,nfpt, a_pexnr, pi0,pi1,a_rp, a_tp, th00, ccn,    &
        dn0, pi0,pi1, a_rt, a_tt,a_rpp, a_rpt, a_npp, a_npt, vapor, liquid,       &
        a_theta, a_scr1, a_scr2, a_scr7, &
        a_ninuct,a_ricet,a_nicet,a_rsnowt,a_rgrt,&
@@ -352,17 +352,17 @@ contains
           call resetvar(graupel,rgrp)
         end if
 
-        tlt(2:n1,i,j) =  tlt(2:n1,i,j)+      (tl(2:n1) - thl(2:n1,i,j))/dt
-        rtt(2:n1,i,j) = rtt(2:n1,i,j) +(rv(2:n1) - vapor(2:n1,i,j))/dt + (rc(2:n1) - rcld(2:n1,i,j))/dt
-        rpt(2:n1,i,j) = max(rpt(2:n1,i,j) +(rrain(2:n1) - rp(2:n1,i,j))/dt,-rp(2:n1,i,j)/dt)
-        npt(2:n1,i,j) = max(npt(2:n1,i,j) +(nrain(2:n1) - np(2:n1,i,j))/dt,-np(2:n1,i,j)/dt)
+        tlt(2:n1-nfpt,i,j) =  tlt(2:n1-nfpt,i,j)+      (tl(2:n1-nfpt) - thl(2:n1-nfpt,i,j))/dt
+        rtt(2:n1-nfpt,i,j) = rtt(2:n1-nfpt,i,j) +(rv(2:n1-nfpt) - vapor(2:n1-nfpt,i,j))/dt + (rc(2:n1-nfpt) - rcld(2:n1-nfpt,i,j))/dt
+        rpt(2:n1-nfpt,i,j) = max(rpt(2:n1-nfpt,i,j) +(rrain(2:n1-nfpt) - rp(2:n1-nfpt,i,j))/dt,-rp(2:n1-nfpt,i,j)/dt)
+        npt(2:n1-nfpt,i,j) = max(npt(2:n1-nfpt,i,j) +(nrain(2:n1-nfpt) - np(2:n1-nfpt,i,j))/dt,-np(2:n1-nfpt,i,j)/dt)
         
         if (level == 4) then
-          ninuct(2:n1,i,j) = ninuct(2:n1,i,j) + (ninuc(2:n1)-ninucp(2:n1,i,j))/dt !max(ninuct(2:n1,i,j) + (ninuc(2:n1) - ninucp(2:n1,i,j))/dtrk,-ninucp(2:n1,i,j)/dt)
-          ricet(2:n1,i,j)  = max(ricet(2:n1,i,j)  + (rice(2:n1) - ricep(2:n1,i,j))/dt,-ricep(2:n1,i,j)/dt)
-          nicet(2:n1,i,j)  = nicet(2:n1,i,j)  + (nice(2:n1) - nicep(2:n1,i,j))/dt
-          rsnowt(2:n1,i,j) = max(rsnowt(2:n1,i,j) + (rsnow(2:n1) - rsnowp(2:n1,i,j))/dt,-rsnowp(2:n1,i,j)/dt)
-          rgrpt(2:n1,i,j)   = max(rgrpt(2:n1,i,j)   + (rgrp(2:n1) - rgrpp(2:n1,i,j))/dt,-rgrpp(2:n1,i,j)/dt)
+          ninuct(2:n1-nfpt,i,j) = ninuct(2:n1,i,j) + (ninuc(2:n1)-ninucp(2:n1,i,j))/dt !max(ninuct(2:n1,i,j) + (ninuc(2:n1) - ninucp(2:n1,i,j))/dtrk,-ninucp(2:n1,i,j)/dt)
+          ricet(2:n1-nfpt,i,j)  = max(ricet(2:n1-nfpt,i,j)  + (rice(2:n1-nfpt) - ricep(2:n1-nfpt,i,j))/dt,-ricep(2:n1-nfpt,i,j)/dt)
+          nicet(2:n1-nfpt,i,j)  = nicet(2:n1-nfpt,i,j)  + (nice(2:n1-nfpt) - nicep(2:n1-nfpt,i,j))/dt
+          rsnowt(2:n1-nfpt,i,j) = max(rsnowt(2:n1-nfpt,i,j) + (rsnow(2:n1-nfpt) - rsnowp(2:n1-nfpt,i,j))/dt,-rsnowp(2:n1-nfpt,i,j)/dt)
+          rgrpt(2:n1-nfpt,i,j)   = max(rgrpt(2:n1-nfpt,i,j)   + (rgrp(2:n1-nfpt) - rgrpp(2:n1-nfpt,i,j))/dt,-rgrpp(2:n1-nfpt,i,j)/dt)
         end if
 
      end do
@@ -385,7 +385,7 @@ contains
     real, parameter     :: c_Nevap = 1.
     integer             :: k
     real                :: Xp, Dp, G, S, cerpt, cenpt
-    do k=2,n1
+    do k=2,n1-nfpt
       if (rp(k) > 0) then
           Xp = rp(k)/ (np(k)+eps0)
           Dp = ( Xp / prw )**(1./3.)
@@ -452,7 +452,7 @@ contains
     !
 
 
-    do k=2,n1-1
+    do k=2,n1-nfpt-1
         if (rc(k) > 0.) then
           Xc = rc(k)/(cldw%nr+eps0)
           k_c = kc_0
@@ -532,7 +532,7 @@ contains
     integer :: k
     real    :: tau, phi, ac, sc, k_r, epsilon
 
-      do k=2,n1-1
+      do k=2,n1-nfpt-1
           if (rp(k) > 0.) then
 
            k_r = k_r0
@@ -633,8 +633,8 @@ contains
           end if
         end do
 
-        do k=2,n1-1
-          kp1 = min(k+1,n1-1)
+        do k=2,n1-nfpt-1
+          kp1 = min(k+1,n1-nfpt-1)
           km1 = max(k,2)
           cn(k) = 0.25*(vn(kp1)+2.*vn(k)+vn(km1))*dzi_t(k)*dt
           cr(k) = 0.25*(vr(kp1)+2.*vr(k)+vr(km1))*dzi_t(k)*dt
@@ -753,7 +753,7 @@ contains
     real :: niner
     fact = (1-exp(-dt/timenuc))
 
-    do k=1,n1
+    do k=1,n1-nfpt
       niner = n_ice_meyers_contact(tk(k),min(rsup(k),0.25))
       nin(k)  = nin(k) + (n_ice_meyers_contact(tk(k),min(rsup(k),0.25))-nin(k))*fact
       nin(k) = min(nin(k) + niner*dt/timenuc,niner)
@@ -774,7 +774,7 @@ contains
     real :: nuc_n, nuc_r
     integer :: k
     
-    do k=2,n1
+    do k=2,n1-nfpt
       if (tk(k) < tmelt .and. rsup(k) > 0.0) then
         nuc_n = nin(k) 
 
@@ -804,7 +804,7 @@ contains
     real,save       :: facg
     
     facg = moment_gamma(cldw,2)    ! <hn
-    do k = 1, n1
+    do k = 1, n1-nfpt
       if (tk(k) < tmelt .and. rcloud(k) > 0.) then
 
 
@@ -864,7 +864,7 @@ contains
   
       xmax_ice = (d_rainfrz_ig/rain%a_geo)**(1.0e0/rain%b_geo)
     fr_r_g = 0.0
-    do k = 1, n1
+    do k = 1, n1-nfpt
       r_r = rrain(k)
       n_r = nrain(k)
 
@@ -978,7 +978,7 @@ contains
 
     f_v_fakt = n_sc**n_f
     vent_fakt = b_n / b_f
-    do k = 1, n1
+    do k = 1, n1-nfpt
 
       ! hn: in case r_garupel=0, dep_graupel has to be zero too
 
@@ -1038,7 +1038,7 @@ contains
     a_melt_r = vent_coeff_a(meteor,1)
     b_melt_r = vent_coeff_b(meteor,1)
 
-    do k = 2,n1
+    do k = 2,n1-nfpt
       t_a = tk(k) !wrf!+ t(k) + t_g(k)
       e_a = e_ws(T_a)                                     !..Saturation pressure
                
@@ -1122,7 +1122,7 @@ contains
 
     end if
 
-    do k = 1, n1
+    do k = 1, n1-nfpt
       r_i = r_in(k)                                   
       n_i = n_in(k)                                   
       x_i = min(max(r_i/(n_i+eps0),metin%x_min),metin%x_max)    
@@ -1210,7 +1210,7 @@ contains
     const3 = 1/(t_mult_opt - t_mult_min)
     const4 = 1/(t_mult_opt - t_mult_max)
     const5 = alpha_spacefilling * rowt/roice
-    do k = 1, n1
+    do k = 1, n1-nfpt
       x_c = min(max(r_c(k)/(cloud%nr+eps0),cloud%x_min),cloud%x_max) 
       d_c = cloud%a_geo * x_c**cloud%b_geo                   
 
@@ -1339,7 +1339,7 @@ contains
     theta_r_ir =  theta_r(1,2,metnr)
     theta_r_rr =  theta_r(2,2,metnr)
 
-    do k = 1, n1
+    do k = 1, n1-nfpt
 
       x_r = min(max(r_r(k)/(n_r(k)+eps0),rain%x_min),rain%x_max)  
       d_r = rain%a_geo * x_r**rain%b_geo                   
@@ -1485,7 +1485,7 @@ contains
     theta_r_si =  theta_r(1,2,metnr1,metnr2)
     theta_r_ii =  theta_r(2,2,metnr1,metnr2)
 
-    do k = 1, n1
+    do k = 1, n1-nfpt
 
       if (r_i(k) > r_crit .and. r_g(k) > r_crit) then
 
@@ -1580,8 +1580,8 @@ contains
       vn(k) = min(vn(k),30.e0)
 !      vn(k) = -vn(k)
     end do
-    do k=2,n1-1
-      kp1 = min(k+1,n1-1)
+    do k=2,n1-nfpt-1
+      kp1 = min(k+1,n1-nfpt-1)
       km1 = max(k,2)
       cn(k) = 0.25*(vn(kp1)+2.*vn(k)+vn(km1))*dzi_t(k)*dt
       cr(k) = 0.25*(vr(kp1)+2.*vr(k)+vr(km1))*dzi_t(k)*dt

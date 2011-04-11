@@ -145,7 +145,7 @@ contains
                    rsx=rslf(p(k,i,j),tx)
                    if (level>3) then
                      rix=rsif(p(k,i,j),tx)
-                     part = max(0.,min(1.,(tx-t_hn)/(tmelt-t_hn)))
+!                     part = max(0.,min(1.,(tx-t_hn)/(tmelt-t_hn)))
                    end if
                    rcx = part*max(ravail-rsx,0.)
                 end do
