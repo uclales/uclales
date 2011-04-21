@@ -1541,7 +1541,7 @@ contains
     real :: cc, flxdiv,maxi,mini
     logical, save :: firsttime(3) = .true.
     integer :: metnr = 0
-    select case (ice%name)
+    select case (meteor%name)
     case('ice')
       metnr = 1
     case('snow')
