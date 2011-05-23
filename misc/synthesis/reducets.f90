@@ -7,9 +7,9 @@
 ! -I/sw/sles9-x64/netcdf-3.6.2-intel/include on tornado
 ! Assume number of time steps nt smaller than 10000 and number of variables nv smaller than 35 ! otherwise need to be changes
         
-        integer, parameter :: nv=35,nma=7,nmi=2,nsu=28
+        integer, parameter :: nv=50,nma=7,nmi=2,nsu=28
         integer :: nt
-        character(100) dirin,nm,nm2
+        character(100) stem,nm,nm2
         character(20) pref,name,dimname
         character(4) xsuf,ysuf
         character(1) dum1
@@ -31,16 +31,19 @@
 !* maxnms contains the names where we take max, minnms where we take min, summns where we take !*sum; if nothing specified will take the mean; list can be extended if needed
 
 !* Ask to get filenames
-        print*,'Directory where files are'
-        read*,dirin
-        print*,'Files prefix'
-        read*,pref
-        print*,'Processors in x'
-        read*,nx
-        print*,'Processors iny'
-        read*,ny
+        call get_command_argument(1,stem)
+        call get_command_argument(2,nx)
+        call get_command_argument(3,ny)
+!         print*,'Directory where files are'
+!         read*,dirin
+!         print*,'Files prefix'
+!         read*,pref
+!         print*,'Processors in x'
+!         read*,nx
+!         print*,'Processors in y'
+!         read*,ny
 ! Open the first file to check the amoutn of timesteps; allocate the arrays
-        nm=trim(dirin)//trim(pref)//".ts.00000000.nc"
+        nm=trim(stem)//".ts.00000000.nc"
         print*,trim(nm)
         status=nf90_open(nm,nf90_nowrite,ncid)
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
@@ -113,7 +116,7 @@
            write(dum2,'(I2.1)') i-1
            xsuf="00"//dum2
           end if
-          nm=trim(dirin)//trim(pref)//".ts."//ysuf//xsuf//".nc"
+          nm=trim(stem)//".ts."//ysuf//xsuf//".nc"
           print*,trim(nm)
            
 !*Open file
@@ -195,7 +198,7 @@
 !---------------------------------
 
 !* Enter define mode
-      nm2=trim(dirin)//trim(pref)//".ts.nc"
+      nm2=trim(stem)//".ts.nc"
       print*,nm2
       status=nf90_create(nm2, nf90_CLOBBER,ncidw)
        if (status.ne.nf90_noerr) print*,nf90_strerror(status)

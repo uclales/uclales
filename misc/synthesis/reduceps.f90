@@ -7,10 +7,10 @@
 ! -I/sw/sles9-x64/netcdf-3.6.2-intel/include on tornado
 ! Assume number of time steps nt smaller than 10000, number of levels nlev smaller than 150
 ! and number of variables nv smaller than 100 ! otherwise need to be changed
-        integer, parameter :: nv=100,nma=7,nmi=2,nsu=28
+        integer, parameter :: nv=200,nma=7,nmi=2,nsu=28
 	integer :: nt, nlev, zid
 
-        character(100) dirin,nm,nm2
+        character(100) stem,nm,nm2
         character(20) pref,name,dimname
         character(4) xsuf,ysuf
         character(1) dum1
@@ -70,16 +70,19 @@
         sumnms(28)="discnt2   "
 
 !* Ask to get filenames
-        print*,'Directory where files are'
-        read*,dirin
-        print*,'Files prefix'
-        read*,pref
-        print*,'Processors in x'
-        read*,nx
-        print*,'Processors in y'
-        read*,ny
+        call get_command_argument(1,stem)
+        call get_command_argument(2,nx)
+        call get_command_argument(3,ny)
+!         print*,'Directory where files are'
+!         read*,dirin
+!         print*,'Files prefix'
+!         read*,pref
+!         print*,'Processors in x'
+!         read*,nx
+!         print*,'Processors in y'
+!         read*,ny
 ! Open the first file to check the amoutn of timesteps; allocate the arrays
-        nm=trim(dirin)//trim(pref)//".ps.00000000.nc"
+        nm=trim(stem)//".ts.00000000.nc"
         print*,trim(nm)
         status=nf90_open(nm,nf90_nowrite,ncid)
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
@@ -116,7 +119,7 @@
            write(dum2,'(I2.1)') i-1
            xsuf="00"//dum2
           end if
-          nm=trim(dirin)//trim(pref)//".ps."//ysuf//xsuf//".nc"
+          nm=trim(stem)//".ps."//ysuf//xsuf//".nc"
           print*,trim(nm)
            
 !*Open file
@@ -233,7 +236,7 @@
 !---------------------------------
 
 !* Enter define mode
-      nm2=trim(dirin)//trim(pref)//".ps.nc"
+      nm2=trim(stem)//".ps.nc"
       print*,nm2
       status=nf90_create(nm2, nf90_CLOBBER,ncidw)
        if (status.ne.nf90_noerr) print*,nf90_strerror(status)
