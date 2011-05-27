@@ -98,7 +98,7 @@ module mcrp
   real, parameter :: d_crit_sr = 100.0e-6 ! e-critical value for snow_rain_riming
   real, parameter :: r_crit_gc = 1.000e-6 ! r-critical value for graupel_cloud_riming
   real, parameter :: d_crit_gc = 100.0e-6 ! e-critical value for graupel_cloud_riming
-  real, parameter :: r_crit_c  = 1.000e-6 ! r-critical value else
+  real, parameter :: r_crit_c  = 1.000e-4 ! r-critical value else
   real, parameter :: r_crit    = 1.000e-9 ! r-critical value else
   real, parameter :: d_conv_sg = 200.0e-5 ! e-critical value
   real, parameter :: d_conv_ig = 200.0e-6 ! e-critical value
