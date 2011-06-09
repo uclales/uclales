@@ -54,7 +54,7 @@ contains
   ! 
   subroutine stepper
 
-    use mpi_interface, only : myid, double_scalar_par_max
+    use mpi_interface, only : myid, broadcast, double_scalar_par_max
 
     use grid, only : dt, dtlong, zt, zm, nzp, dn0, u0, v0, level, &
          write_hist, write_anal, close_anal ,a_ninucp
@@ -142,13 +142,14 @@ contains
           call write_anal(time)
        end if
 
-       call cpu_time(t2)           !t1=timing()
        if(myid == 0) then
+          call cpu_time(t2)           !t1=timing()
           if (mod(istp,istpfl) == 0 ) print "('   Timestep # ',i5," //     &
               "'   Model time(sec)=',f10.2,3x,'CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2)",     &
               istp, time, t2-t1, t2*(timmax/time-1)
        endif
-
+       call broadcast(t2, 0)
+        
     enddo
 
     call write_hist(1, time)

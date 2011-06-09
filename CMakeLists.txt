@@ -24,12 +24,11 @@ set(target_name uclales)
 # Set the default paths for libraries
 set (CMAKE_PREFIX_PATH $ENV{HOME} /usr
     CACHE STRING "Root dirs of the include and lib directories")
-set (CMAKE_LIBRARY_PATH $ENV{SARA_NETCDF_LIB} $ENV{NETCDF_LIB}
+set (CMAKE_LIBRARY_PATH /usr/lib64 $ENV{SARA_NETCDF_LIB} $ENV{NETCDF_LIB}
     CACHE STRING "Specific library directories")
 set (CMAKE_INCLUDE_PATH $ENV{SARA_NETCDF_INCLUDE} $ENV{NETCDF_INCLUDE}
     CACHE STRING "Specific include directories")
 set (FIND_LIBRARY_USE_LIB64_PATHS TRUE)
-
 
 #  make sure that the default is a RELEASE
 if (NOT CMAKE_BUILD_TYPE)
