@@ -93,11 +93,12 @@ contains
     use defs, only : alvl, cpr, cp, p00
     use util, only : azero, atob
     use thrm, only : thermo, rslf
+    use step, only : case_name
 
     implicit none
 
     integer :: i,j,k
-    real    :: exner, pres, tk, rc, xran(nzp)
+    real    :: exner, pres, tk, rc, xran(nzp), zc, dist, xc
 
     call htint(ns,ts,hs,nzp,th0,zt)
 
@@ -111,6 +112,14 @@ contains
              if (associated (a_rp)) a_rp(k,i,j)   = rt0(k)
              a_theta(k,i,j) = th0(k)
              a_pexnr(k,i,j) = 0.
+              if (case_name == 'bubble') then
+                xc = 1e4
+                zc = 1400
+                if (zt(k)< 2 * zc) then
+                  dist = (xt(i)**2 + yt(j)**2)/xc**2 + (zt(k) - zc)**2/zc**2
+                  a_tp(k,i,j) = a_tp(k,i,j) + 2e-3 *max(0.,(1-dist))
+                end if
+              end if
           end do
        end do
     end do
