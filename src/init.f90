@@ -201,8 +201,8 @@ contains
        if(myid == 0) then
           print "(//' ',49('-')/)"
           print '(2X,A17)', 'Sponge Layer Init '
-          print '(3X,A12,F6.1,A1)', 'Starting at ', zt(nzp-nfpt), 'm'
-          print '(3X,A18,F6.1,A1)', 'Minimum timescale ', 1/spngm(nfpt),'s'
+          print '(3X,A12,F9.1,A1)', 'Starting at ', zt(nzp-nfpt), 'm'
+          print '(3X,A18,F9.1,A1)', 'Minimum timescale ', 1/spngm(nfpt),'s'
        end if
     end if
 
@@ -245,10 +245,14 @@ contains
     ns=1
     do while (ps(ns) /= 0. .and. ns <= nns)
        !
+       ! irsflg = 1:
        ! filling relative humidity array only accepts sounding in mixing
        ! ratio (g/kg) converts to (kg/kg)
-       !
-       rts(ns)=rts(ns)*1.e-3
+       ! irsflg = 0:
+       ! use relative humidity sounding
+       
+       
+       
        !
        ! filling pressure array:
        ! ipsflg = 0 :pressure in millibars
@@ -258,7 +262,6 @@ contains
        case (0)
           ps(ns)=ps(ns)*100.
        case default
-          xs(ns)=(1.+ep2*rts(ns))
           if (ns == 1)then
              ps(ns)=ps(ns)*100.
              zold2=0.
@@ -272,6 +275,13 @@ contains
              ps(ns)=(ps(ns-1)**rcp-g*(zold2-zold1)*(p00**rcp)/(cp*tavg))**cpr
           end if
        end select
+          if (irsflg == 0) then
+          print *,ns,rts(ns)
+            xs(ns) = rts(ns)*1.e-2
+          else
+            rts(ns)=rts(ns)*1.e-3
+            xs(ns)=(1.+ep2*rts(ns))
+          end if
        !
        ! filling temperature array:
        ! itsflg = 0 :potential temperature in kelvin
@@ -302,6 +312,9 @@ contains
           if (myid == 0) print *, '  ABORTING: itsflg not supported'
           call appl_abort(0)
        end select
+       if (irsflg == 0) then
+         rts(ns) = xs(ns)*rslf(ps(ns),tks(ns))
+       end if
        ns = ns+1
     end do
     ns=ns-1
