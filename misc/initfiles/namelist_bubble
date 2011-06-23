@@ -33,6 +33,7 @@
   sst=300  
   zrough = 0.0002
   case_name='bubble'
+  irsflg = 1
   div=0.0
   lnudge = .false.
  /
