@@ -1,5 +1,5 @@
  &model
-  nzp =   28
+  nzp =   36
   nxp =   36 
   nyp =   36
   nxpart = .True.
@@ -19,21 +19,24 @@
   CCN = 100.e6
   filprf = 'bubble'
   hfilin = 'bubble.rst'
+  frqanl = 60.
   savg_intvl = 600.
   ssam_intvl = 60.
   corflg = .false.
   prndtl = -0.3333333
   iradtyp = 0
   strtim= 196.58 
-  th00 = 289.  
+  th00 = 300.  
   umean = 5.
   vmean = 0.
   cntlat=32.
-  isfctyp=3  
+  isfctyp=2  
   sst=300  
   zrough = 0.0002
   case_name='bubble'
-  irsflg = 1
+  irsflg = 0
+  itsflg = 0
   div=0.0
   lnudge = .false.
- /
+  microseq = 1 2 3 4 5 6 7 0 0 13*0!11 12 13 14 15 16 17 0 0 0 0 0 0                     
+  /
