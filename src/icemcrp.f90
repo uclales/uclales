@@ -256,11 +256,9 @@ contains
             call resetvar(cldw,rc)
             call sedim_cd(n1,dt,tl,rc,prc_c(1:n1,i,j))
           case(iicenucnr)
-            where (rsup<0.) rsup = 0.
             call n_icenuc(n1,ninuc,nin_active,temp,rv,rsup)
           case(iicenuc)
             where (ninuc<0.) ninuc = 0.
-            where (rsup<0.) rsup = 0.
             call ice_nucleation(n1,ninuc,rice,nice,rsup,tl,temp)
 
           case(ifreez)
@@ -270,11 +268,8 @@ contains
             call cloud_freeze(n1,rc,ninuc,rice,nice,tl,temp)
             call rain_freeze(n1,rrain,nrain,ninuc,rice,nice,rgrp,temp)
           case(idep)
-!             where (rsup<0.) rsup = 0.
             call deposition(n1,ice,ninuc,rice,nice,rv,tl,temp,rsup)
-!             where (rsup<0.) rsup = 0.
             call deposition(n1,snow,ninuc,rsnow,nsnow,rv,tl,temp,rsup)
-!             where (rsup<0.) rsup = 0.
             call deposition(n1,graupel,ninuc,rgrp,ngrp,rv,tl,temp,rsup)
           case(imelt_ice)
             call resetvar(ice,rice,nice)
