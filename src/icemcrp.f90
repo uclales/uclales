@@ -270,11 +270,11 @@ contains
             call cloud_freeze(n1,rc,ninuc,rice,nice,tl,temp)
             call rain_freeze(n1,rrain,nrain,ninuc,rice,nice,rgrp,temp)
           case(idep)
-            where (rsup<0.) rsup = 0.
+!             where (rsup<0.) rsup = 0.
             call deposition(n1,ice,ninuc,rice,nice,rv,tl,temp,rsup)
-            where (rsup<0.) rsup = 0.
+!             where (rsup<0.) rsup = 0.
             call deposition(n1,snow,ninuc,rsnow,nsnow,rv,tl,temp,rsup)
-            where (rsup<0.) rsup = 0.
+!             where (rsup<0.) rsup = 0.
             call deposition(n1,graupel,ninuc,rgrp,ngrp,rv,tl,temp,rsup)
           case(imelt_ice)
             call resetvar(ice,rice,nice)
@@ -982,7 +982,7 @@ contains
 
       ! hn: in case r_garupel=0, dep_graupel has to be zero too
 
-      if (rice(k)> 0.0) then
+      if (rice(k)> 0.0 .and. rsup(k) > 0.0) then
         n_g = nice(k)                                     !..number density
         r_g = rice(k)                                     !..mass density
 
