@@ -977,7 +977,7 @@ contains
 
       ! hn: in case r_garupel=0, dep_graupel has to be zero too
 
-      if (rice(k)> 0.0 .and. rsup(k) > 0.0) then
+      if (rice(k)> 0.0 ) then
         n_g = nice(k)                                     !..number density
         r_g = rice(k)                                     !..mass density
 
@@ -995,7 +995,11 @@ contains
       
         gi = 4.0*pi / ( alvi**2 / (K_T * Rm * tk(k)**2) + Rm * tk(k) / (D_v * e_es(tk(k))) )
         ndep  = gi * n_g * c_g * d_g * rsup(k)/rv(k) * dt * f_n / x_g
-        ndep  = min(min(ndep,ninuc(k)), rsup(k) / x_g * f_n / f_v)
+        if (ndep>0) then
+          ndep  = min(min(ndep,ninuc(k)), rsup(k) / x_g * f_n / f_v, rv(k) / x_g * f_n / f_v)
+        else
+          ndep = max(max(ndep, -nice(k)),-rice(k) / x_g * f_n / f_v)
+        end if
         !dep = gi * n_g * c_g * d_g * f_v * rsup(k)/rv(k) * dt 
         dep   = ndep *x_g*f_v/f_n
         rice(k) = rice(k) + dep
@@ -1003,8 +1007,8 @@ contains
         rv(k) = rv(k) - dep
         tl(k) = tl(k) + convice(k)*dep
         if (meteor%moments==2) then
-  !        nice(k) = nice(k) + ndep 
-  !	       ninuc(k) = ninuc(k) - ndep
+          nice(k) = nice(k) + ndep
+  	      ninuc(k) = ninuc(k) - ndep
         end if
       endif
     enddo
