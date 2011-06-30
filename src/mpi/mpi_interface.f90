@@ -648,6 +648,13 @@ contains
          MPI_COMM_WORLD, ierror)
 
   end subroutine double_array_par_sum
+  
+  subroutine broadcast(val, procsend)
+   integer, intent(in) :: procsend
+   real(kind=8), intent(inout) :: val
+   integer :: ierror
+   call mpi_bcast(val, 1, mpi_double_precision, procsend, mpi_comm_world, ierror)
+  end subroutine broadcast
 
 
 end module mpi_interface

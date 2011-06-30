@@ -24,12 +24,11 @@ set(target_name uclales)
 # Set the default paths for libraries
 set (CMAKE_PREFIX_PATH $ENV{HOME} /usr
     CACHE STRING "Root dirs of the include and lib directories")
-set (CMAKE_LIBRARY_PATH $ENV{SARA_NETCDF_LIB} $ENV{NETCDF_LIB}
+set (CMAKE_LIBRARY_PATH /usr/lib64 $ENV{SARA_NETCDF_LIB} $ENV{NETCDF_LIB}
     CACHE STRING "Specific library directories")
 set (CMAKE_INCLUDE_PATH $ENV{SARA_NETCDF_INCLUDE} $ENV{NETCDF_INCLUDE}
     CACHE STRING "Specific include directories")
 set (FIND_LIBRARY_USE_LIB64_PATHS TRUE)
-
 
 #  make sure that the default is a RELEASE
 if (NOT CMAKE_BUILD_TYPE)
@@ -56,7 +55,7 @@ if (Fortran_COMPILER_NAME STREQUAL "GNU")
   if(MPI)
     set (COMPILER_WRAPPER mpif90)
   endif()
-  set (CMAKE_Fortran_FLAGS "-pedantic -fopenmp -finit-real=nan -W -Wall -fdefault-real-8 -ffree-line-length-none")
+  set (CMAKE_Fortran_FLAGS "-fopenmp -finit-real=nan -W -Wall -fdefault-real-8 -ffree-line-length-none")
   set (CMAKE_Fortran_FLAGS_RELEASE "-funroll-all-loops -fno-f2c -O3")
   set (CMAKE_Fortran_FLAGS_DEBUG   " -Wuninitialized -O -fbounds-check -fbacktrace -fno-f2c -O0 -g -ffpe-trap=invalid,zero,overflow")
 elseif (Fortran_COMPILER_NAME STREQUAL "Intel")

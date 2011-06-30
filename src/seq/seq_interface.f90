@@ -313,6 +313,12 @@ contains
     xxg=xxl
 
   end subroutine double_array_par_sum
+  
+  subroutine broadcast(val, n, procsend)
+   integer, intent(in) :: n, procsend
+   real(kind=8), intent(inout) :: val(n)
+   
+  end subroutine broadcast
 
 
 end module mpi_interface
