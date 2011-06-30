@@ -10,7 +10,7 @@
         integer, parameter :: nv=50,nma=7,nmi=2,nsu=28
         integer :: nt
         character(100) stem,nm,nm2
-        character(20) pref,name,dimname
+        character(20) pref,name,dimname,cnx,cny
         character(4) xsuf,ysuf
         character(1) dum1
         character(2) dum2
@@ -27,14 +27,16 @@
 
 
 !0. Some preparations
-!--------------------
+!-------------------,cnx,cny-
 !* maxnms contains the names where we take max, minnms where we take min, summns where we take !*sum; if nothing specified will take the mean; list can be extended if needed
 
 !* Ask to get filenames
         call get_command_argument(1,stem)
-        call get_command_argument(2,nx)
-        call get_command_argument(3,ny)
-!         print*,'Directory where files are'
+        call get_command_argument(2,cnx)
+        call get_command_argument(3,cny)
+        read (cnx,*) nx
+        read (cny,*) ny
+!!         print*,'Directory where files are'
 !         read*,dirin
 !         print*,'Files prefix'
 !         read*,pref
@@ -213,7 +215,7 @@
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
        status=nf90_put_att(ncidw,varid,'longname',trim(lname(k)))
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
-       status=nf90_put_att(ncidw,varid,'_FillValue',-999.0)
+!       status=nf90_put_att(ncidw,varid,'_FillValue',-999.0)
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
        status=nf90_put_att(ncidw,varid,'units',trim(uname(k)))
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
@@ -226,7 +228,6 @@
       end do
        status=nf90_enddef(ncid)
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
-
 !* Close file
        status=nf90_close(ncid)
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)

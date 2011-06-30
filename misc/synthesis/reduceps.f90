@@ -11,7 +11,7 @@
 	integer :: nt, nlev, zid
 
         character(100) stem,nm,nm2
-        character(20) pref,name,dimname
+        character(20) pref,name,dimname,cnx,cny
         character(4) xsuf,ysuf
         character(1) dum1
         character(2) dum2
@@ -71,18 +71,20 @@
 
 !* Ask to get filenames
         call get_command_argument(1,stem)
-        call get_command_argument(2,nx)
-        call get_command_argument(3,ny)
+        call get_command_argument(2,cnx)
+        call get_command_argument(3,cny)
+        read (cnx,*) nx
+        read (cny,*) ny
 !         print*,'Directory where files are'
 !         read*,dirin
-!         print*,'Files prefix'
+         print*,'Files prefix', stem
 !         read*,pref
-!         print*,'Processors in x'
+         print*,'Processors in x',nx
 !         read*,nx
-!         print*,'Processors in y'
+         print*,'Processors in y',ny
 !         read*,ny
 ! Open the first file to check the amoutn of timesteps; allocate the arrays
-        nm=trim(stem)//".ts.00000000.nc"
+        nm=trim(stem)//".ps.00000000.nc"
         print*,trim(nm)
         status=nf90_open(nm,nf90_nowrite,ncid)
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
@@ -237,7 +239,7 @@
 
 !* Enter define mode
       nm2=trim(stem)//".ps.nc"
-      print*,nm2
+      print *,'a',nm2
       status=nf90_create(nm2, nf90_CLOBBER,ncidw)
        if (status.ne.nf90_noerr) print*,nf90_strerror(status)
 
@@ -248,7 +250,6 @@
        if (status.ne.nf90_noerr) print*,nf90_strerror(status)
       status=nf90_def_dim(ncidw,'zm',nlevr,zmid)
        if (status.ne.nf90_noerr) print*,nf90_strerror(status)
-
 !* Define and store variable
 !* Care has to be taken for the first nine variables as they are one-dimensional
 !* Assume the first nines are time,zt,zm,dn0,u0,v0,fsstm,lsttm,nsmp
@@ -275,7 +276,7 @@
       end if
        status=nf90_put_att(ncidw,varid,'longname',trim(lname(k)))
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
-       status=nf90_put_att(ncidw,varid,'_FillValue',-999.0)
+!       status=nf90_put_att(ncidw,varid,'_FillValue',-999.0)
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
        status=nf90_put_att(ncidw,varid,'units',trim(uname(k)))
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
