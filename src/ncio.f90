@@ -285,9 +285,25 @@ contains
        if (itype==0) ncinfo = 'Snow mixing ratio'
        if (itype==1) ncinfo = 'kg/kg'
        if (itype==2) ncinfo = 'tttt'
+    case('nsnow')
+       if (itype==0) ncinfo = 'Number of snow particles'
+       if (itype==1) ncinfo = '#/kg'
+       if (itype==2) ncinfo = 'tttt'
     case('rgrp')
        if (itype==0) ncinfo = 'Graupel mixing ratio'
        if (itype==1) ncinfo = 'kg/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('ngrp')
+       if (itype==0) ncinfo = 'Number of graupel particles'
+       if (itype==1) ncinfo = '#/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('rhail')
+       if (itype==0) ncinfo = 'Hail mixing ratio'
+       if (itype==1) ncinfo = 'kg/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('nhail')
+       if (itype==0) ncinfo = 'Number of hail particles'
+       if (itype==1) ncinfo = '#/kg'
        if (itype==2) ncinfo = 'tttt'
     case('rsup')
        if (itype==0) ncinfo = 'Supersaturation wrt ice'
@@ -793,6 +809,10 @@ contains
        if (itype==0) ncinfo = 'Graupel'
        if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
+    case('hail')
+       if (itype==0) ncinfo = 'hail mixing ratio'
+       if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
     case('prc_c')
        if (itype==0) ncinfo = 'Cloud water Precipitation Flux (positive downward)'
        !irina
@@ -816,6 +836,10 @@ contains
     case('prc_g')
        if (itype==0) ncinfo = 'Graupel Precipitation Flux (positive downward)'
        !irina
+       if (itype==1) ncinfo = 'kg/kg m/s'
+       if (itype==2) ncinfo = 'ttmt'
+    case('prc_h')
+       if (itype==0) ncinfo = 'Hail Precipitation Flux (positive downward)'
        if (itype==1) ncinfo = 'kg/kg m/s'
        if (itype==2) ncinfo = 'ttmt'
     case('evap')
@@ -888,6 +912,18 @@ contains
     case('gwp_var')
        if (itype==0) ncinfo = 'Graupel path variance'
        !irina
+       if (itype==1) ncinfo = 'g/m^2'
+       !if (itype==1) ncinfo = 'kg/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('hwp_bar')
+       if (itype==0) ncinfo = 'Hail path'
+       ! units may be wrong here
+       if (itype==1) ncinfo = 'g/m^2'
+       !if (itype==1) ncinfo = 'kg/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('hwp_var')
+       if (itype==0) ncinfo = 'Hail path variance'
+       ! units may be wrong here
        if (itype==1) ncinfo = 'g/m^2'
        !if (itype==1) ncinfo = 'kg/m^2'
        if (itype==2) ncinfo = 'time'

@@ -42,7 +42,7 @@ contains
     case (2,3)
        call satadjst(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
             pi1,th00,a_rp,vapor,liquid,a_scr2)
-    case (4)
+    case (4,5)
        call satadjst(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
             pi1,th00,a_rp,vapor,liquid,a_scr2,rsup)
     end select
@@ -119,7 +119,7 @@ contains
 
     integer :: k, i, j, iterate
     real    :: exner,tli,txi,tx1,tx,rsx,rix,rcx,ravail,dtx,part
-    real, parameter :: epsln = 1.e-4
+    real, parameter :: epsln = 1.e-3
 
     do j=3,n3-2
        do i=3,n2-2
@@ -145,14 +145,14 @@ contains
                    rsx=rslf(p(k,i,j),tx)
                    if (level>3) then
                      rix=rsif(p(k,i,j),tx)
-                     part = max(0.,min(1.,(tx-t_hn)/(tmelt-t_hn)))
+!axel                part = max(0.,min(1.,(tx-t_hn)/(tmelt-t_hn)))
                    end if
                    rcx = part*max(ravail-rsx,0.)
                 end do
-                if (dtx > epsln) then
-                    print *, '  ABORTING: thrm', dtx, epsln
-                   call appl_abort(0)
-                endif
+!                if (dtx > epsln) then
+!                    print *, '  ABORTING: thrm', dtx, epsln
+!                   call appl_abort(0)
+!                endif
 
              endif
              
@@ -322,7 +322,7 @@ real, parameter :: c0_i=0.6114327e+03, c1_i=0.5027041e+02,    &
               end if
               en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
                    + bb*(rt(k+1,i,j)-rt(k,i,j)))
-           case (3,4)
+           case (3,4,5)
               rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
               rsbar=0.5*(rs(k,i,j)+rs(k+1,i,j))
               kp1=min(n1-1,k+2)
@@ -336,7 +336,8 @@ real, parameter :: c0_i=0.6114327e+03, c1_i=0.5027041e+02,    &
               en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
                    + bb*(rt(k+1,i,j)-rt(k,i,j)))
            case default 
-              stop 'level not supported in bruvais'
+              WRITE (*,*) 'level=',level,', not supported in bruvais'
+              stop 
            end select
         end do
         en2(n1,i,j)=en2(n1-1,i,j)

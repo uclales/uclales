@@ -1,5 +1,5 @@
 # Generated automatically from Makefile.in by configure.
-.SUFFIXES : .f .o .a .f90
+.SUFFIXES : .f .o .a .f90 .F90
 .PRECIOUS : $(LES_ARC)
 #
 #     Define model archive file name.
@@ -32,6 +32,7 @@ $(LES_ARC)(advl.o)   \
 $(LES_ARC)(srfc.o)   \
 $(LES_ARC)(prss.o)   \
 $(LES_ARC)(sgsm.o)   \
+$(LES_ARC)(ice_sb.o)   \
 $(LES_ARC)(icemcrp.o)   \
 $(LES_ARC)(step.o)   \
 $(LES_ARC)(init.o)   \
@@ -51,6 +52,12 @@ endif
 	$(ARCHIVE)  $@ $%
 	$(RM) $%
 
+
+.F90.a:
+	$(F90) -c $(FFLAGS) $(%:.o=.F90)
+	$(ARCHIVE)  $@ $%
+	$(RM) $%
+
 .f.a:
 	$(F90) -c $(FFLAGS) $(F77FLAGS) $<
 	$(ARCHIVE)  $@ $%
@@ -66,11 +73,19 @@ $(LES_ARC): $(ARCOBJ_f)
 # Dependencies
 # --------------------
 #
-rad_rndnmb.o: rad_rndnmb.f90
-rad_solver.o: rad_solver.f90 defs.f90
-rad_corkds.o: rad_corkds.f90 defs.f90
-rad_cldwtr.o: rad_cldwtr.f90 defs.f90 rad_corkds.f90
-rad_d4strm.o: rad_d4strm.f90 defs.f90 rad_solver.f90 rad_rndnmb.f90
-	rad_corkds.f90 rad_cldwtr.f90
-rad_driver.o: rad_driver.f90 defs.f90 rad_d4strm.f90
-forc.o: forc.f90 rad_gcss.f90 
+
+ncio.o:		mpi_interface.o
+grid.o:		ncio.o
+advf.o:		grid.o stat.o util.o
+rad_rndnmb.o:	defs.o
+rad_solver.o:	defs.o
+rad_corkds.o:	defs.o mpi_interface.o
+rad_cldwtr.o:	defs.o rad_corkds.o
+rad_d4strm.o:	defs.o rad_solver.o rad_rndnmb.orad_corkds.o rad_cldwtr.o
+rad_driver.o:	defs.o rad_d4strm.o
+forc.o: 	defs.o grid.o rad_gcss.o 
+icemcrp.o: 	defs.o grid.o ice_sb.o
+util.o: 	defs.o grid.o ice_sb.o
+step.o:		icemcrp.o mpi_interface.o
+init.o:		step.o
+

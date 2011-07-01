@@ -28,7 +28,7 @@ module init
   integer               :: itsflg = 1
   integer               :: irsflg = 1
 !  integer, dimension(1) :: seed
-  real, dimension(nns)  :: us,vs,ts,thds,ps,hs,rts,rss,tks,xs
+  real, dimension(nns)  :: us,vs,ts,thds,ps,hs,rts,rss,tks,xs,xsi
   real                  :: zrand = 200.
   character  (len=80)   :: hfilin = 'test.'  
 
@@ -208,19 +208,19 @@ contains
   subroutine arrsnd
 
     use defs, only          : p00,p00i,cp,cpr,rcp,r,g,ep2,alvl,Rm,ep
-    use thrm, only          : rslf
+    use thrm, only          : rslf,rsif
     use mpi_interface, only : appl_abort, myid
 
     implicit none
 
     integer :: k, iterate
     real    :: tavg, zold2, zold1, x1, xx, yy, zz, til
-    character (len=245) :: fm0 = &
+    character (len=260) :: fm0 = &
          "(/,' -------------------------------------------------',/,"       //&
          "'  Sounding Input: ',//,7x,'ps',9x,'hs',7x,'ts',6x ,'thds',6x," // &
-         "'us',7x,'vs',7x,'rts',5x,'rel hum',/,6x,'(Pa)',7X,'(m)',6X,'(K)'"// &
-         ",6X,'(K)',6X,'(m/s)',4X,'(m/s)',3X,'(kg/kg)',5X,'(%)',/,1x/)"
-    character (len=36) :: fm1 = "(f11.1,f10.1,2f9.2,2f9.2,f10.5,f9.1)"
+         "'us',7x,'vs',7x,'rts',5x,'rel hum',5x,'rhi'/,6x,'(Pa)',7X,'(m)',6X,'(K)'"// &
+         ",6X,'(K)',6X,'(m/s)',4X,'(m/s)',3X,'(kg/kg)',5X,'(%)',5X,'(%)'/,1x/)"
+    character (len=37) :: fm1 = "(f11.1,f10.1,2f9.2,2f9.2,f10.5,2f9.1)"
     !
     ! arrange the input sounding
     !
@@ -320,9 +320,13 @@ contains
        xs(k)=100.*rts(k)/rslf(ps(k),tks(k))
     end do
 
+    do k=1,ns
+       xsi(k)=100.*rts(k)/rsif(ps(k),tks(k))
+    end do
+
     if(myid == 0) then
        write(6,fm0)
-       write(6,fm1)(ps(k),hs(k),tks(k),thds(k),us(k),vs(k),rts(k),xs(k),k=1,ns)
+       write(6,fm1)(ps(k),hs(k),tks(k),thds(k),us(k),vs(k),rts(k),xs(k),xsi(k),k=1,ns)
     endif
 
 604 format('    input sounding needs to go higher ! !', /,                &

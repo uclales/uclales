@@ -145,7 +145,7 @@ contains
     open  (1,status='old',file='NAMELIST')
     read  (1, nml=model)
     close (1)
-    write (*,model)
+    write (0,model)
     !
     ! write file variable control to standard output
     !

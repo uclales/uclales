@@ -81,14 +81,22 @@ module grid
        a_theta, a_pexnr, press, vapor, liquid, a_rflx, a_sflx,rsup,   &
        a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7,                &
        a_lflxu, a_lflxd, a_sflxu, a_sflxd,a_km, &
-       prc_c, prc_r, prc_i, prc_s, prc_g 
+       prc_c, prc_r, prc_i, prc_s, prc_g, prc_h 
   !
   ! Named pointers (to 3D arrays) 
   !
   real, dimension (:,:,:), pointer :: a_up, a_ut, a_vp, a_vt, a_wp, a_wt,     &
        a_sp, a_st, a_tp, a_tt, a_rp, a_rt, a_rpp, a_rpt, a_npp, a_npt,        &
-       a_ninuct , a_ricet , a_nicet , a_rsnowt , a_rgrt,     &
-       a_ninucp , a_ricep , a_nicep , a_rsnowp , a_rgrp 
+       a_ninucp, a_ninuct , & ! ice nuclei concentration 
+       a_ricep , a_ricet  , & ! ice mixing ratio
+       a_nicep , a_nicet  , & ! ice number concentration
+       a_rsnowp, a_rsnowt , & ! snow
+       a_nsnowp, a_nsnowt , &
+       a_rgrp,   a_rgrt,    & ! graupel
+       a_ngrp,   a_ngrt,    &
+       a_rhailp, a_rhailt,  & ! hail
+       a_nhailp, a_nhailt
+ 
   !
   ! Memory for prognostic variables
   !
@@ -194,9 +202,10 @@ contains
     memsize = memsize + 7.*nxyzp
 
     nscl = nscl+naddsc
-    if (level   > 0) nscl = nscl+1
-    if (level   > 2) nscl = nscl+2
-    if (level   > 3) nscl = nscl+5
+    if (level   > 0) nscl = nscl+1  ! qt only
+    if (level   > 2) nscl = nscl+2  ! nr,qr
+    if (level   > 3) nscl = nscl+5  ! ni,qi,qs,qg,ninuc
+    if (level   > 4) nscl = nscl+4  ! ns,ng,qh,nh (for Axel's two-moment scheme)
 
     allocate (a_xp(nzp,nxp,nyp,nscl), a_xt1(nzp,nxp,nyp,nscl),        &
          a_xt2(nzp,nxp,nyp,nscl))         
@@ -210,17 +219,26 @@ contains
     a_wp =>a_xp (:,:,:,3)
     a_tp =>a_xp(:,:,:,4)
 
-    if (level >= 0) a_rp =>a_xp (:,:,:,5)
-    if (level >= 3) then
+    if (level >= 0) a_rp =>a_xp (:,:,:,5)    
+    ! warm rain with number and mass of rain
+    if (level >= 3) then 
       a_rpp =>a_xp(:,:,:,6)
       a_npp =>a_xp(:,:,:,7)
     end if
+    ! ice microphysics
     if (level >= 4) then
       a_ninucp =>a_xp(:,:,:, 8)
       a_ricep  =>a_xp(:,:,:, 9)
       a_nicep  =>a_xp(:,:,:,10)
       a_rsnowp =>a_xp(:,:,:,11)
       a_rgrp   =>a_xp(:,:,:,12)
+    end if
+    ! SB2006 two-moment scheme with hail
+    if (level == 5) then
+      a_nsnowp =>a_xp(:,:,:,13)
+      a_ngrp   =>a_xp(:,:,:,14)
+      a_rhailp =>a_xp(:,:,:,15)
+      a_nhailp =>a_xp(:,:,:,16)
     end if
 
     allocate (a_ustar(nxp,nyp),a_tstar(nxp,nyp),a_rstar(nxp,nyp))
@@ -242,6 +260,10 @@ contains
        allocate(rsup(nzp,nxp,nyp))
        rsup = 0.
        memsize = memsize + 3*nxyzp
+    end if
+    if (level >= 5) then
+       allocate(prc_h(nzp,nxp,nyp))
+       memsize = memsize + nxyzp
     end if
 
     a_ustar(:,:) = 0.
