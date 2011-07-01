@@ -2655,9 +2655,9 @@ contains
        IF (isIO()) WRITE (*,*) "mcrph_sb: init_dmin_wetgrowth"
 
        unitnr = 11
-       CALL init_dmin_wetgrowth('/c1a/tmp/ms/de/dei0/UCLA-WORK/dmin_wetgrowth_lookup.dat', unitnr)
+       CALL init_dmin_wetgrowth('datafiles/dmin_wetgrowth_lookup.dat', unitnr)
        CALL init_dmin_wg_gr_ltab_equi(&
-            '/c1a/tmp/ms/de/dei0/UCLA-WORK/dmin_wetgrowth_lookup.dat', &
+            'datafiles/dmin_wetgrowth_lookup.dat', &
             unitnr, 61, ltabdminwgg)
        IF (debug.and.isIO()) WRITE (*,*) "mcrph_sb: finished init_dmin_wetgrowth"
 
