@@ -93,11 +93,12 @@ contains
     use defs, only : alvl, cpr, cp, p00
     use util, only : azero, atob
     use thrm, only : thermo, rslf
+    use step, only : case_name
 
     implicit none
 
     integer :: i,j,k
-    real    :: exner, pres, tk, rc, xran(nzp)
+    real    :: exner, pres, tk, rc, xran(nzp), zc, dist, xc
 
     call htint(ns,ts,hs,nzp,th0,zt)
 
@@ -140,6 +141,20 @@ contains
           end do
        end do
     end if
+    if (case_name == 'bubble') then
+      xc = 1e4
+      zc = 1400
+      do j=1,nyp
+        do i=1,nxp
+          do k=1,nzp
+            if (zt(k)>0 .and. zt(k)< 2 * zc) then
+              dist = (xt(i)**2 + yt(j)**2)/xc**2 + (zt(k) - zc)**2/zc**2
+              a_tp(k,i,j) = a_tp(k,i,j) + 2. *max(0.,(1-dist))
+            end if
+          end do
+        end do
+      end do
+    end if
 
     k=1
     do while( zt(k+1) <= zrand .and. k < nzp)
@@ -156,13 +171,11 @@ contains
        end do
        call random_pert(nzp,nxp,nyp,zt,a_rp,xran,k) 
     end if
-
     call azero(nxyzp,a_wp)
     !    
     ! initialize thermodynamic fields
     !
     call thermo (level)
-
     call atob(nxyzp,a_pexnr,press)
 
     return
@@ -192,8 +205,8 @@ contains
        if(myid == 0) then
           print "(//' ',49('-')/)"
           print '(2X,A17)', 'Sponge Layer Init '
-          print '(3X,A12,F6.1,A1)', 'Starting at ', zt(nzp-nfpt), 'm'
-          print '(3X,A18,F6.1,A1)', 'Minimum timescale ', 1/spngm(nfpt),'s'
+          print '(3X,A12,F9.1,A1)', 'Starting at ', zt(nzp-nfpt), 'm'
+          print '(3X,A18,F9.1,A1)', 'Minimum timescale ', 1/spngm(nfpt),'s'
        end if
     end if
 
@@ -213,7 +226,7 @@ contains
 
     implicit none
 
-    integer :: k, iterate
+    integer :: k, iterate, iterate1
     real    :: tavg, zold2, zold1, x1, xx, yy, zz, til
     character (len=260) :: fm0 = &
          "(/,' -------------------------------------------------',/,"       //&
@@ -236,10 +249,21 @@ contains
     ns=1
     do while (ps(ns) /= 0. .and. ns <= nns)
        !
+       ! irsflg = 1:
        ! filling relative humidity array only accepts sounding in mixing
        ! ratio (g/kg) converts to (kg/kg)
-       !
-       rts(ns)=rts(ns)*1.e-3
+       ! irsflg = 0:
+       ! use relative humidity sounding
+          if (irsflg == 0) then
+            xs(ns)  = rts(ns)
+            if (ns > 1) then
+              rts(ns) = xs(ns)*rslf(ps(ns-1),tks(ns-1))  !cheat a tiny bit - fix it later.
+            end if
+          else
+            rts(ns) = rts(ns)*1.e-3
+          end if       
+       
+       
        !
        ! filling pressure array:
        ! ipsflg = 0 :pressure in millibars
@@ -249,7 +273,6 @@ contains
        case (0)
           ps(ns)=ps(ns)*100.
        case default
-          xs(ns)=(1.+ep2*rts(ns))
           if (ns == 1)then
              ps(ns)=ps(ns)*100.
              zold2=0.
@@ -258,11 +281,12 @@ contains
              hs(ns) = ps(ns)
              zold1=zold2
              zold2=ps(ns)
-             tavg=(ts(ns)*xs(ns)+ts(ns-1)*xs(ns-1)*(p00**rcp)             &
+             tavg=(ts(ns)*(1.+ep2*rts(ns))+ts(ns-1)*(1.+ep2*rts(ns-1))*(p00**rcp)             &
                   /ps(ns-1)**rcp)*.5
              ps(ns)=(ps(ns-1)**rcp-g*(zold2-zold1)*(p00**rcp)/(cp*tavg))**cpr
           end if
        end select
+
        !
        ! filling temperature array:
        ! itsflg = 0 :potential temperature in kelvin
@@ -293,10 +317,43 @@ contains
           if (myid == 0) print *, '  ABORTING: itsflg not supported'
           call appl_abort(0)
        end select
+       
+       do iterate1 = 1,1  
+         if (irsflg == 0) then
+           rts(ns) = xs(ns)*rslf(ps(ns),tks(ns))
+         end if
+         if (ipsflg == 1 .and. ns > 1) then
+              tavg=(ts(ns)*(1.+ep2*rts(ns))+ts(ns-1)*(1.+ep2*rts(ns-1))*(p00**rcp)             &
+                    /ps(ns-1)**rcp)*.5
+              ps(ns)=(ps(ns-1)**rcp-g*(hs(ns)-hs(ns-1))*(p00**rcp)/(cp*tavg))**cpr
+         end if
+          select case (itsflg)
+          case (0)
+              tks(ns)=ts(ns)*(ps(ns)*p00i)**rcp
+          case (1)
+              til=ts(ns)*(ps(ns)*p00i)**rcp
+              xx=til
+              yy=rslf(ps(ns),xx)
+              zz=max(rts(ns)-yy,0.)
+              if (zz > 0.) then
+                do iterate=1,3
+                    x1=alvl/(cp*xx)
+                    xx=xx - (xx - til*(1.+x1*zz))/(1. + x1*til                &
+                        *(zz/xx+(1.+yy*ep)*yy*alvl/(Rm*xx*xx)))
+                    yy=rslf(ps(ns),xx)
+                    zz=max(rts(ns)-yy,0.)
+                enddo
+              endif
+              tks(ns)=xx
+          case default
+          end select
+         
+       end do
        ns = ns+1
+      
     end do
     ns=ns-1
-    !                                  
+!                                  
     ! compute height levels of input sounding.
     !
     if (ipsflg == 0) then
@@ -344,11 +401,12 @@ contains
 
     use defs, only : cp, rcp, cpr, r, g, p00, p00i, ep2
     use mpi_interface, only : myid
+    use thrm, only :rslf
 
     implicit none
 
     integer k
-    real :: v1da(nzp), v1db(nzp), v1dc(nzp), exner
+    real :: v1da(nzp), v1db(nzp), v1dc(nzp),x0(nzp), exner
 
     character (len=305) :: fmt =  &
          "(/,' -------------------------------------------------',/,"     //&
@@ -410,12 +468,16 @@ contains
        exner = (pi0(k) + pi1(k))/cp
        v1db(k)=p00*(exner)**cpr      ! pressure
        v1da(k)=p00*(pi0(k)/cp)**cpr  ! pressure associated with pi0
-    end do
-
+       if(irsflg==0) then
+         call htint(ns,xs,hs,nzp,x0,zt)
+         rt0(k) = 1e-2*x0(k)*rslf(v1db(k),exner*th0(k))
+       end if
+     end do
+   
     u0(1) = u0(2)
     v0(1) = v0(2)
     psrf  = ps(1)
-
+    
     if(myid == 0) write (*,fmt) (zt(k),u0(k),v0(k),dn0(k),v1da(k),v1db(k), &
          th0(k),v1dc(k),rt0(k)*1000.,k=1,nzp)
 

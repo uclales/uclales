@@ -505,7 +505,7 @@ contains
 
     integer :: ierror, stats(MPI_STATUS_SIZE,16)
     integer :: req(16),n1,n2,n3
-    real :: var(n1,n2,n3)
+    real    :: var(n1,n2,n3)
 
     call mpi_waitall(16,req,stats,ierror)
 
@@ -611,6 +611,20 @@ contains
   !---------------------------------------------------------------------------
   ! get maximum across processors
   !
+  subroutine real_scalar_par_max(rxl,xxg)
+
+    real, intent(in) :: rxl
+    real(kind=8), intent(out) :: xxg
+    real(kind=8) :: xxl
+    integer:: mpiop,ierror
+
+    xxl = rxl
+
+    call mpi_allreduce(xxl,xxg,1,MPI_DOUBLE_PRECISION, MPI_MAX, &
+         MPI_COMM_WORLD, ierror)
+
+  end subroutine real_scalar_par_max
+
   subroutine double_scalar_par_max(xxl,xxg)
 
     real(kind=8), intent(out) :: xxg
@@ -623,6 +637,17 @@ contains
 
   end subroutine double_scalar_par_max
 
+  subroutine double_scalar_par_min(xxl,xxg)
+
+    real(kind=8), intent(out) :: xxg
+    real(kind=8), intent(in) :: xxl
+    integer:: mpiop,ierror
+
+
+    call mpi_allreduce(xxl,xxg,1,MPI_DOUBLE_PRECISION, MPI_MIN, &
+         MPI_COMM_WORLD, ierror)
+
+  end subroutine double_scalar_par_min
 
   subroutine double_scalar_par_sum(xxl,xxg)
 
@@ -648,6 +673,12 @@ contains
          MPI_COMM_WORLD, ierror)
 
   end subroutine double_array_par_sum
+  subroutine broadcast(val, procsend)
+   integer, intent(in) :: procsend
+   real(kind=8), intent(inout) :: val
+   integer :: ierror
+   call mpi_bcast(val, 1, mpi_double_precision, procsend, mpi_comm_world, ierror)
+  end subroutine broadcast
 
 
 end module mpi_interface

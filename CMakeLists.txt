@@ -24,12 +24,11 @@ set(target_name uclales)
 # Set the default paths for libraries
 set (CMAKE_PREFIX_PATH $ENV{HOME} /usr
     CACHE STRING "Root dirs of the include and lib directories")
-set (CMAKE_LIBRARY_PATH $ENV{SARA_NETCDF_LIB} $ENV{NETCDF_LIB}
+set (CMAKE_LIBRARY_PATH /usr/lib64 $ENV{SARA_NETCDF_LIB} $ENV{NETCDF_LIB}
     CACHE STRING "Specific library directories")
 set (CMAKE_INCLUDE_PATH $ENV{SARA_NETCDF_INCLUDE} $ENV{NETCDF_INCLUDE}
     CACHE STRING "Specific include directories")
 set (FIND_LIBRARY_USE_LIB64_PATHS TRUE)
-
 
 #  make sure that the default is a RELEASE
 if (NOT CMAKE_BUILD_TYPE)
@@ -56,7 +55,7 @@ if (Fortran_COMPILER_NAME STREQUAL "GNU")
   if(MPI)
     set (COMPILER_WRAPPER mpif90)
   endif()
-  set (CMAKE_Fortran_FLAGS "-pedantic -fopenmp -finit-real=nan -W -Wall -fdefault-real-8 -ffree-line-length-none")
+  set (CMAKE_Fortran_FLAGS "-fopenmp -finit-real=nan -W -Wall -fdefault-real-8 -ffree-line-length-none")
   set (CMAKE_Fortran_FLAGS_RELEASE "-funroll-all-loops -fno-f2c -O3")
   set (CMAKE_Fortran_FLAGS_DEBUG   " -Wuninitialized -O -fbounds-check -fbacktrace -fno-f2c -O0 -g -ffpe-trap=invalid,zero,overflow")
 elseif (Fortran_COMPILER_NAME STREQUAL "Intel")
@@ -93,6 +92,12 @@ MESSAGE(STATUS "Compiler " ${CMAKE_Fortran_COMPILER})
 # FIND NETCDF
 find_path(NETCDF_INCLUDE_DIR netcdf.mod NETCDF.mod
   DOC "NetCDF include directory (must contain netcdf.mod)"
+  PATHS
+  $ENV{NETCDF_INCLUDE}
+  $ENV{HOME}/include
+  /usr/include
+  /usr/lib64/gfortran/modules
+  $ENV{SARA_NETCDF_INCLUDE}
 )
 if(NETCDF_INCLUDE_DIR)
   MESSAGE(STATUS "NETCDF module found in " ${NETCDF_INCLUDE_DIR})
@@ -100,7 +105,16 @@ else()
   MESSAGE(STATUS "WARNING: No NETCDF bindings are found.")
 endif()
 
-find_library(NETCDF_C_LIB netcdf)
+find_library(NETCDF_C_LIB netcdf
+  DOC "NetCDF C library"
+  PATHS
+  $ENV{NETCDF_LIB}
+#   $ENV{HOME}/lib
+#   $ENV{HOME}/lib64
+  /usr/lib
+  /usr/lib64
+  $ENV{SARA_NETCDF_LIB}
+)
 if(NETCDF_C_LIB)
   set(NETCDF_LIBS ${NETCDF_C_LIB})
   MESSAGE(STATUS "NETCDF C library: " ${NETCDF_C_LIB})
@@ -110,6 +124,13 @@ endif()
 
 find_library(NETCDF_FORTRAN_LIB netcdff
   DOC "NetCDF Fortran library"
+  PATHS
+  $ENV{NETCDF_LIB}
+#   $ENV{HOME}/lib
+#   $ENV{HOME}/lib64
+  /usr/lib
+  /usr/lib64
+  $ENV{SARA_NETCDF_LIB}
 )
 if(NETCDF_FORTRAN_LIB)
   set(NETCDF_LIBS ${NETCDF_LIBS} ${NETCDF_FORTRAN_LIB})
@@ -119,6 +140,22 @@ else()
 endif()
 
 
+if(NETCDF_INCLUDE_DIR)
+else(NETCDF_INCLUDE_DIR)
+  MESSAGE(STATUS "WARNING: No NETCDF bindings are found.")
+endif(NETCDF_INCLUDE_DIR)
+
+if(NETCDF_C_LIB)
+  set(NETCDF_LIBS ${NETCDF_C_LIB})
+else(NETCDF_C_LIB)
+  MESSAGE(STATUS "WARNING: No NETCDF bindings are found.")
+endif(NETCDF_C_LIB)
+
+if(NETCDF_FORTRAN_LIB)
+  set(NETCDF_LIBS ${NETCDF_LIBS} ${NETCDF_FORTRAN_LIB})
+else(NETCDF_FORTRAN_LIB)
+  MESSAGE(STATUS "WARNING: No Fortran NETCDF bindings are found.")
+endif(NETCDF_FORTRAN_LIB)
 
 #####################
 # CONCATENATE INCLUDE DIRECTORIES
