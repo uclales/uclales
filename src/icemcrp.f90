@@ -2643,8 +2643,6 @@ contains
     kte = ke-1
     loc_ix = (jte-jts+1)*(kte-kts+1)*(ite-its+1)
 
-    cloud_type = 2603 ! level
-
     IF (isIO().and.debug_maxval) &
          & WRITE (*,'(1X,A,I4,A,E12.4)') "mcrph_sb: cloud_type = ",cloud_type,", CCN = ",qnc_const
 

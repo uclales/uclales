@@ -294,6 +294,18 @@ contains
   end subroutine double_scalar_par_max
   !
   !---------------------------------------------------------------------------
+  ! get maximum across processors
+  !
+  subroutine double_scalar_par_min(xxl,xxg)
+
+    real(kind=8), intent(out) :: xxg
+    real(kind=8), intent(in) :: xxl
+
+    xxg=xxl
+
+  end subroutine double_scalar_par_min
+  !
+  !---------------------------------------------------------------------------
   subroutine double_scalar_par_sum(xxl,xxg)
 
     real(kind=8), intent(out) :: xxg

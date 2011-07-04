@@ -2056,7 +2056,7 @@ MODULE wolken_driver
 
   ! ... Parameter fuer Wolken ...
   LOGICAL          :: wolke
-  INTEGER          :: wolke_typ,ccn_typ
+  INTEGER          :: wolke_typ=2603,ccn_typ
 
   ! ub>>
   ! Schalter fuer die Ausgabe von horizontal gemittelten Umwandlungsraten 
