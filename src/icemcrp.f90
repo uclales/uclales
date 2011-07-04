@@ -24,6 +24,8 @@
 
 module mcrp
 
+  use wolken_driver,     only: cloud_type => wolke_typ
+
   use mpi_interface,  only : myid, double_scalar_par_max
   use defs, only : tmelt,alvl, alvi,rowt,roice, pi, Rm, cp,t_hn 
   use grid, only : dt,nstep,rkbeta,rkalpha, dxi, dyi ,dzi_t, nxp, nyp, nzp,nfpt, a_pexnr, pi0,pi1,a_rp, a_tp, th00, ccn,    &
@@ -2489,8 +2491,7 @@ contains
 
     ! KAMM2 modules
 
-    USE wolken_driver,     ONLY: cloud_type => wolke_typ,          &
-         &                       loc_ix, loc_iy, loc_iz,           &
+    USE wolken_driver,     ONLY: loc_ix, loc_iy, loc_iz,           &
          &                       dt_kamm2 => dt,                   &
          &                       dz_kamm2 => dz3d,                 &
          &                       w_kamm2 => w,                     &
@@ -2642,7 +2643,7 @@ contains
     kte = ke-1
     loc_ix = (jte-jts+1)*(kte-kts+1)*(ite-its+1)
 
-    cloud_type = 0603 ! level
+    cloud_type = 2603 ! level
 
     IF (isIO().and.debug_maxval) &
          & WRITE (*,'(1X,A,I4,A,E12.4)') "mcrph_sb: cloud_type = ",cloud_type,", CCN = ",qnc_const
