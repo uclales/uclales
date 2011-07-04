@@ -131,6 +131,7 @@ contains
              tli=(tl(k,i,j)+th00)*exner
              tx=tli
              rsx=rslf(p(k,i,j),tx)
+             if (level>3) rix=rsif(p(k,i,j),tx)
              rcx=max(rt(k,i,j)-rsx,0.)
              ravail = rt(k,i,j)
              part = 1.
@@ -143,10 +144,10 @@ contains
                    tx  = tx1
                    iterate = iterate+1
                    rsx=rslf(p(k,i,j),tx)
-!                    if (level>3) then
-!                      rix=rsif(p(k,i,j),tx)
+                   if (level>3) then
+                     rix=rsif(p(k,i,j),tx)
 ! !                     part = max(0.,min(1.,(tx-t_hn)/(tmelt-t_hn)))
-!                    end if
+                   end if
                    rcx = part*max(ravail-rsx,0.)
                 end do
                 if (dtx > epsln) then
@@ -161,6 +162,10 @@ contains
              if (level>3) rsup(k,i,j)= rv(k,i,j) - rix
              tk(k,i,j)=tx
              th(k,i,j)=tk(k,i,j)/exner
+! if (i == 15 .and. j == 15) then
+!   print *, k,tx, exner
+! 
+! end if
           enddo
        enddo
     enddo
@@ -218,7 +223,6 @@ contains
 
     esi  = e_3 * exp (a_i * (t - tmelt) / (t - b_i))
     rsif=.622*esi/(p-esi)
-
   end function rsif
 ! ! 
 ! ! ---------------------------------------------------------------------
