@@ -441,8 +441,8 @@ contains
     real, dimension (nzp) :: awtbar
     rl = 0.
     if (level>1) rl = liquid
-    if (level>2) rl = rl + a_rpp
-    if (level>3) rl = rl + a_ricep + a_rsnowp + a_rgrp
+!    if (level>2) rl = rl + a_rpp
+!    if (level>3) rl = rl + a_ricep + a_rsnowp + a_rgrp
     
     
     call boyanc(nzp,nxp,nyp,level,a_wt,a_theta,vapor,rl,th00,a_scr1)
