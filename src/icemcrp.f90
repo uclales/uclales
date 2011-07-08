@@ -267,6 +267,9 @@ contains
             call cloud_freeze(n1,rc,ninuc,rice,nice,tl,temp)
             call rain_freeze(n1,rrain,nrain,ninuc,rice,nice,rgrp,temp)
           case(idep)
+if (i==15 .and. j==15) then
+!   print *, rsup(10:17)
+end if
             call deposition(n1,ice,ninuc,rice,nice,rv,tl,temp,rsup)
             call deposition(n1,snow,ninuc,rsnow,nsnow,rv,tl,temp,rsup)
             call deposition(n1,graupel,ninuc,rgrp,ngrp,rv,tl,temp,rsup)
@@ -1004,13 +1007,12 @@ contains
         gi = 4.0*pi / ( alvi**2 / (K_T * Rm * tk(k)**2) + Rm * tk(k) / (D_v * esi(tk(k))) )
         ndep  = gi * n_g * c_g * d_g * rsup(k)/rv(k) * dt * f_n / x_g
         if (ndep>0) then
-          dep  = min(min(ndep,ninuc(k)) *x_g*f_v/f_n, rsup(k), rv(k))
-          ndep = 0.
+          ndep  = min(min(ndep,ninuc(k)), rsup(k) / x_g * f_n / f_v, rv(k) / x_g * f_n / f_v)
         else
           ndep = max(max(ndep, -nice(k)),-rice(k) / x_g * f_n / f_v)
-          dep   = ndep *x_g*f_v/f_n
         end if
         !dep = gi * n_g * c_g * d_g * f_v * rsup(k)/rv(k) * dt 
+        dep   = ndep *x_g*f_v/f_n
         rice(k) = rice(k) + dep
         rsup(k) = rsup(k) - dep
         rv(k) = rv(k) - dep

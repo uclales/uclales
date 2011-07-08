@@ -8,7 +8,7 @@
   deltaz = 350.
   dzrat = 1.04
   dzmax = 100.
-  zrand = 3000
+  zrand = -3000
   nfpt = 5
   dtlong = 20.
   distim = 100.
