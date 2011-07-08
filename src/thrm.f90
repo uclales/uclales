@@ -136,7 +136,7 @@ contains
              ravail = rt(k,i,j)
              part = 1.
              if (rcx > 0.) then
-                do while (dtx > epsln .and. iterate < 10)
+                do while (dtx > epsln .and. iterate < 20)
                    txi=alvl/(cp*tx)
                    tx1=tx - (tx - tli*(1.+txi*rcx))/(1. + txi*tli                &
                         *(rcx/tx+(1.+rsx*ep)*rsx*alvl/(Rm*tx*tx)))

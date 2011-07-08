@@ -831,7 +831,7 @@ end if
 
 
           jtot = (jhom + jhet) / rowt * dt                     !..j*dt in 1/kg
-          frn  = min(jtot * rc,ninuc(k))
+          frn  = jtot * rc
           frr  = frn * xc * facg
         end if
         frr  = min(frr,rc)
@@ -840,7 +840,7 @@ end if
         tl(k) = tl(k)+ (convice(k)-convliq(k))*frr
 
         frn  = max(frn,frr/cldw%x_max)
-        ninuc(k) = ninuc(k)   - frn
+!         ninuc(k) = ninuc(k)   - frn
         rice(k)   = rice(k)   + frr
         nice(k)   = nice(k)   + frn
 ! print *, 'cfr',k, tk(k), rcloud(k), rice(k),frr
@@ -913,11 +913,11 @@ end if
 
 
             if (j_het >= 1-20) then
-              fr_n  = min(j_het * r_r,ninuc(k))
+!               fr_n  = min(j_het * r_r,ninuc(k))
               fr_r  = fr_n * x_r * coeff_z
 
               lam = ( gfct((rain%nu+1.0)/rain%mu) / gfct((rain%nu+2.0)/rain%mu) * x_r)**(-rain%mu)
-              n_0 = min(ninuc(k),rain%mu * n_r * lam**((rain%nu+1.0)/rain%mu) / gfct((rain%nu+1.0)/rain%mu))
+              n_0 = rain%mu * n_r * lam**((rain%nu+1.0)/rain%mu) / gfct((rain%nu+1.0)/rain%mu)
               fr_n_i = j_het * n_0/(rain%mu*lam**((rain%nu+2.0)/rain%mu))* &
                   incgfct_lower((rain%nu+2.0)/rain%mu, lam*xmax_ice**rain%mu)
               fr_r_i = j_het * n_0/(rain%mu*lam**((rain%nu+3.0)/rain%mu))* &
@@ -1007,7 +1007,7 @@ end if
         gi = 4.0*pi / ( alvi**2 / (K_T * Rm * tk(k)**2) + Rm * tk(k) / (D_v * esi(tk(k))) )
         ndep  = gi * n_g * c_g * d_g * rsup(k)/rv(k) * dt * f_n / x_g
         if (ndep > 0.) then
-          ndep  = min(min(ndep,ninuc(k)), rsup(k) / x_g * f_n / f_v, rv(k) / x_g * f_n / f_v)
+          ndep  = min(ndep, rsup(k) / x_g * f_n / f_v, rv(k) / x_g * f_n / f_v)
         else
           ndep = max(max(ndep, -nice(k)),-rice(k) / x_g * f_n / f_v)
         end if
@@ -1019,7 +1019,7 @@ end if
         tl(k) = tl(k) + convice(k)*dep
         if (meteor%moments==2 .and. ndep < 0.) then
           nice(k) = nice(k) + ndep
-  	      ninuc(k) = ninuc(k) - ndep
+!   	      ninuc(k) = ninuc(k) - ndep
         end if
       endif
     enddo
