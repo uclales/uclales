@@ -8,14 +8,14 @@
   deltaz = 350.
   dzrat = 1.04
   dzmax = 100.
-  zrand = 3000
+  zrand = -3000
   nfpt = 5
   dtlong = 20.
   distim = 100.
   timmax = 7200.
   runtype = "INITIAL"
   igrdtyp = 1
-  level = 4
+  level = 5
   CCN = 100.e6
   filprf = 'bubble'
   hfilin = 'bubble.rst'
