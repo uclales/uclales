@@ -1006,7 +1006,7 @@ end if
       
         gi = 4.0*pi / ( alvi**2 / (K_T * Rm * tk(k)**2) + Rm * tk(k) / (D_v * esi(tk(k))) )
         ndep  = gi * n_g * c_g * d_g * rsup(k)/rv(k) * dt * f_n / x_g
-        if (ndep>0) then
+        if (ndep > 0.) then
           ndep  = min(min(ndep,ninuc(k)), rsup(k) / x_g * f_n / f_v, rv(k) / x_g * f_n / f_v)
         else
           ndep = max(max(ndep, -nice(k)),-rice(k) / x_g * f_n / f_v)
@@ -1017,7 +1017,7 @@ end if
         rsup(k) = rsup(k) - dep
         rv(k) = rv(k) - dep
         tl(k) = tl(k) + convice(k)*dep
-        if (meteor%moments==2) then
+        if (meteor%moments==2 .and. ndep < 0.) then
           nice(k) = nice(k) + ndep
   	      ninuc(k) = ninuc(k) - ndep
         end if
