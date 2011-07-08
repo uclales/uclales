@@ -121,6 +121,26 @@ module mcrp
   real, parameter :: r_crit_is = 1.000e-4 ! r-critical value for ice_selfcollection
   real, parameter :: d_crit_is = 50.00e-6 ! e-critical value for ice_selfcollection
   real, parameter :: d_conv_is = 75.00e-6 ! e-critical value for ice_selfcollection
+  real :: &
+    na_dust    = 162.e3,   & ! initial number density of dust [1/m³], phillips08 value 162e3
+    na_soot    =  15.e6,   & ! initial number density of soot [1/m³], phillips08 value 15e6
+    na_orga    = 177.e6,   & ! initial number density of organics [1/m3], phillips08 value 177e6
+    ni_het_max = 100.0d3,   & ! max number of in between 1-10 per liter, i.e. 1d3-10d3
+    ni_hom_max = 5000.0d3     ! number of liquid aerosols between 100-5000 per liter
+
+  ! look-up table for phillips et al. nucleation
+  integer, parameter :: &
+    ttmax  = 30,      &  ! sets limit for temperature in look-up table
+    ssmax  = 60,      &  ! sets limit for ice supersaturation in look-up table
+    ttstep = 2,       &  ! increment for temperature in look-up table
+    ssstep = 1           ! increment for ice supersaturation in look-up table
+
+  real, dimension(0:100,0:100), save :: &
+    afrac_dust, &  ! look-up table of activated fraction of dust particles acting as ice nuclei
+    afrac_soot, &  ! ... of soot particles
+    afrac_orga     ! ... of organic material
+
+  include 'phillips_nucleation_2010.incf'
 
   type particle
      character(10) :: name
@@ -421,10 +441,12 @@ contains
                 call resetvar(cldw,rc)
                 call sedim_cd(n1,dt,tl,rc,prc_c(1:n1,i,j))
              case(iicenucnr)
-                call n_icenuc(n1,ninuc,nin_active,temp,rv,rsup)
+!                 call n_icenuc(n1,ninuc,nin_active,temp,rv,rsup)
              case(iicenuc)
                 where (ninuc<0.) ninuc = 0.
-                call ice_nucleation(n1,ninuc,rice,nice,rsup,tl,temp)
+!                 call ice_nucleation(n1,ninuc,rice,nice,rsup,tl,temp)
+                 call ice_nucleation_homhet(n1,ice,rv,rc,rice,nice,rsnow, nsnow,rsup,tl,temp)
+                 
 
              case(ifreez)
                 call resetvar(cldw,rc)
@@ -977,6 +999,239 @@ end if
        endif
     end do
   end subroutine ice_nucleation
+
+  subroutine ice_nucleation_homhet(n1,ice,rv,rcloud,rice,nice,rsnow, nsnow,rsup,tl,tk)
+  !*******************************************************************************
+  !                                                                              *
+  ! berechnung der nukleation der wolkeneispartikel                              *
+  !                                                                              *
+  ! nucleation scheme is based on the papers:                                    *
+  !                                                                              *
+  ! "a parametrization of cirrus cloud formation: homogenous                     *
+  ! freezing of supercooled aerosols" by b. kaercher and                         *
+  ! u. lohmann 2002 (kl02 hereafter)                                             *
+  !                                                                              *
+  ! "physically based parameterization of cirrus cloud formation                 *
+  ! for use in global atmospheric models" by b. kaercher, j. hendricks           *
+  ! and u. lohmann 2006 (khl06 hereafter)                                        *
+  !                                                                              *
+  !*******************************************************************************
+! 
+!   use globale_variablen,  only: loc_ix, loc_iy, loc_iz, t, p, q,                &
+!     &                           q_cloud,q_ice,q_rain,q_snow,q_graupel,          &
+!     &                           n_ice, n_snow, p_g, t_g, rho_g,w,rho,dz3d,dt,   &
+!     &                           s_i,s_w,dsidz,dt0dz,                            &
+!     &                           dqdt,speichere_dqdt,                &
+!     &                           cond_neu_sb, evap_neu_sb, speichere_precipstat
+!   use konstanten,         only: pi,r,cv,cp,wolke_typ
+!   use parallele_umgebung, only: isio,abortparallel
+!   use initialisierung,    only: t_0,p_0,rho_0,dichte
+!   use geometrie,          only: x3_x3
+
+  implicit none
+    integer,intent(in) :: n1
+    type(particle), intent(in) :: ice
+    real, intent(inout),dimension(n1) :: rv,rcloud, nice, rice, nsnow, rsnow, tl,rsup
+    real,intent(in), dimension(n1) :: tk
+    real :: nuc_n, nuc_r
+    integer :: k
+
+  ! locale variablen
+  real            :: t_a,p_a,rho_a,q_d,e_d
+  real            :: q_i,n_i,x_i,r_i
+  real            :: ndiag, n_m, n_f
+
+  real, parameter :: eps  = 1.d-20
+
+
+  ! coeffs of meyer formula
+  real, parameter :: a_md = -0.639
+  real, parameter :: b_md = 12.960
+  real, parameter :: n_m0 = 1.0d+3
+
+  ! some constants needed for kaercher and lohmann approach
+  real, parameter :: &
+    r_0     = 0.25e-6          , &    ! aerosol particle radius prior to freezing
+    alpha_d = 0.5              , &    ! deposition coefficient (kl02; spichtinger & gierens 2009)
+    k_b     = 1.38065e-23      , &    ! boltzmann constant [j/k]
+    m_w     = 18.01528e-3      , &    ! molecular mass of water [kg/mol]
+    m_a     = 28.96e-3         , &    ! molecular mass of air [kg/mol]
+    n_avo   = 6.022e23         , &    ! avogadro number [1/mol]
+    ma_w    = m_w / n_avo      , &    ! mass of water molecule [kg]
+    grav    = 9.81             , &    ! acceleration of gravity [m/s2]
+    p0      = 1013.25e2        , &
+    svol    = ma_w / roice          ! specific volume of a water molecule in ice
+
+  real(kind=8)  :: si, e_si
+  real(kind=8)  :: ni_hom,ri_hom,mi_hom
+  real(kind=8)  :: v_th,n_sat,flux,phi,d_v,cool,tau,delta,w_p,scr
+  real(kind=8)  :: ctau, tau_g,acoeff(3),bcoeff(2), ri_dot
+  real(kind=8)  :: kappa,sqrtkap,ren,r_imfc,r_im,r_ik,ri_0
+  real(kind=8)  :: tgrow,ri_max,beta,xj,dxj,xmid,fmid,nimax
+  real(kind=8)  :: xt,xs
+  integer       :: jj,ss,tt
+
+  logical :: use_hetnuc, use_homnuc, use_wp
+
+  real(kind=8), dimension(3) :: infrac
+
+!   real, allocatable :: nuc_n(:), nuc_q(:)
+!   allocate (nuc_n(1:n1))
+!   allocate (nuc_q(1:n1))
+
+!   nuc_n = 0.0d0
+!   nuc_q = 0.0d0
+
+  ! with an upper limit of n_het_max
+
+!         if (nuc_typ.eq.4) then
+          na_dust    = 162.e4 ! number density of dust [1/m³], phillips08 value 162e3
+          na_soot    =  15.e6 ! number density of soot [1/m³], phillips08 value 15e6
+          na_orga    = 177.e5 ! number density of organics [1/m3], phillips08 value 177e6
+!         if (nuc_typ.eq.6) then
+!           ! increase dust by factor 100, reduce organics by factor of 10
+!           na_dust    = 162.e5 ! number density of dust [1/m³], phillips08 value 162e3
+!           na_soot    =  15.e6 ! number density of soot [1/m³], phillips08 value 15e6
+!           na_orga    = 177.e5 ! number density of organics [1/m3], phillips08 value 177e6
+
+      do k = 2, n1
+        if (tk(k) < t_hn .and. rsup(k) > 0.0  &
+          & .and. ( nice(k) + nsnow(k) < ni_het_max ) )then
+          if (rcloud(k) > 0.0) then
+
+            ! immersion freezing at water saturation
+            xt = (274. - tk(k))  / ttstep
+            xt = min(xt,ttmax-1.)
+            tt = int(xt)
+            infrac(1) = (tt+1-xt) * afrac_dust(tt,99) + (xt-tt) * afrac_dust(tt+1,99)
+            infrac(2) = (tt+1-xt) * afrac_soot(tt,99) + (xt-tt) * afrac_soot(tt+1,99)
+            infrac(3) = (tt+1-xt) * afrac_orga(tt,99) + (xt-tt) * afrac_orga(tt+1,99)
+
+          else
+
+            ! calculate indices used for look-up tables
+            xt = (274. - tk(k))  / ttstep
+            xs = (100*rsup(k)/rv(k)) / ssstep
+            xt = min(xt,ttmax-1.)
+            xs = min(xs,ssmax-1.)
+            tt = int(xt)
+            ss = int(xs)
+
+            ! bi-linear interpolation in look-up tables
+            infrac(1) = (tt+1-xt) * (ss+1-xs) * afrac_dust(tt,ss  ) +  (xt-tt)*(ss+1-xs) * afrac_dust(tt+1,ss  ) &
+                      + (tt+1-xt) * (xs-ss)   * afrac_dust(tt,ss+1) +  (xt-tt)*(xs-ss)   * afrac_dust(tt+1,ss+1)
+            infrac(2) = (tt+1-xt) * (ss+1-xs) * afrac_soot(tt,ss  ) +  (xt-tt)*(ss+1-xs) * afrac_soot(tt+1,ss  ) &
+                      + (tt+1-xt) * (xs-ss)   * afrac_soot(tt,ss+1) +  (xt-tt)*(xs-ss)   * afrac_soot(tt+1,ss+1)
+            infrac(3) = (tt+1-xt) * (ss+1-xs) * afrac_orga(tt,ss  ) +  (xt-tt)*(ss+1-xs) * afrac_orga(tt+1,ss  ) &
+                      + (tt+1-xt) * (xs-ss)   * afrac_orga(tt,ss+1) +  (xt-tt)*(xs-ss)   * afrac_orga(tt+1,ss+1)
+          endif !end if ql>0
+
+          ndiag = na_dust * infrac(1) + na_soot * infrac(2) + na_orga * infrac(3)
+          ndiag = min(ndiag,ni_het_max)
+
+          nuc_n = max( ndiag - (nice(k)+nsnow(k)),0.)
+
+          nuc_r = min(nuc_n * ice%x_min, rv(k))
+
+          nice(k) = nice(k) + nuc_n
+          rice(k) = rice(k) + nuc_r
+          rv(k)    = rv(k)     - nuc_r
+          tl(k) = tl(k)+ convice(k) * nuc_r
+
+        endif !if temp & supersaturation OK
+
+      end do
+
+  ! homogeneous nucleation using khl06 approach
+!   if (use_homnuc) then
+!     do k = 1, loc_iz
+!       do j = 1, loc_iy
+!         do i = 0, loc_ix
+! 
+!           p_a  = p_0(i,j,k)
+!           t_a  = t_0(i,j,k)
+!           e_si = e_es(t_a)
+!           si   = q(i,j,k) * r_d * t_a / e_si
+! 
+!           ! critical supersaturation for homogenous nucleation, cf. eq. (1) of kb08
+!           scr  = 2.349 - t_a / 259.00
+! 
+!           if (si > scr  &
+!             .and. n_ice(i,j,k) < ni_hom_max ) then
+! 
+!             n_i = n_ice(i,j,k) ! + n_snow(i,j,k)
+!             q_i = q_ice(i,j,k) ! + q_snow(i,j,k)
+!             x_i = min(max(q_i/(n_i+eps),ice%x_min),ice%x_max)
+!             !r_i = 0.5 * ice%a_geo * x_i**ice%b_geo
+!             r_i = (x_i/(4./3.*pi*rho_ice))**(1./3.)
+! 
+!             d_v     = 0.211e-4 * (t_a/t_3)**1.94 * (p0/p_a)
+!             v_th    = sqrt( 8.*k_b*t_a/(pi*ma_w) )
+!             flux    = alpha_d * v_th/4.
+!             n_sat   = e_si / (k_b*t_a)
+! 
+!             ! coeffs of supersaturation equation
+!             acoeff(1) = (l_ed * grav) / (cp * r_d * t_a**2) - grav/(r_l * t_a)
+!             acoeff(2) = 1.0/n_sat
+!             acoeff(3) = (l_ed**2 * m_w * ma_w)/(cp * p_a * t_a * m_a)
+! 
+!             ! coeffs of depositional growth equation
+!             bcoeff(1) = flux * svol * n_sat * (si - 1.)
+!             bcoeff(2) = flux / d_v
+! 
+!             if (use_wp) then
+!               ! pre-existing ice crystals included as reduced updraft speed
+!               ri_dot = bcoeff(1) / (1. + bcoeff(2) * r_i)
+!               r_ik   = (4 * pi) / svol * n_i * r_i**2 * ri_dot
+!               w_p    = (acoeff(2) + acoeff(3) * si)/(acoeff(1) * si) * r_ik  ! khl06 eq. 19
+!               w_p    = max(dble(w_p),0.d0)
+!             else
+!               w_p    = 0.d0
+!             end if
+! 
+!             if (w(i,j,k) > w_p) then   ! homogenous nucleation event
+! 
+!               ! timescales of freezing event (see kl02, rm05, khl06)
+!               cool    = grav / cp * w(i,j,k)
+!               ctau    = t_a * ( 0.004*t_a - 2. ) + 304.4
+!               tau     = 1.0 / (ctau * cool)                       ! freezing timescale, eq. (5)
+!               delta   = (bcoeff(2) * r_0)                         ! dimless aerosol radius, eq.(4)
+!               tau_g   = (bcoeff(1) / r_0) / (1 + delta)           ! timescale for initial growth, eq.(4)
+!               phi     = acoeff(1)*si / ( acoeff(2) + acoeff(3)*si) * (w(i,j,k) - w_p)
+! 
+!               ! monodisperse approximation following khl06
+!               kappa   = 2. * bcoeff(1) * bcoeff(2) * tau / (1.+ delta)**2  ! kappa, eq. 8 khl06
+!               sqrtkap = sqrt(kappa)                                        ! root of kappa
+!               ren     = 3. * sqrtkap / ( 2. + sqrt(1.+9.*kappa/pi) )       ! analy. approx. of erfc by rm05
+!               r_imfc  = 4. * pi * bcoeff(1)/bcoeff(2)**2 / svol
+!               r_im    = r_imfc / (1.+ delta) * ( delta**2 - 1. &
+!                 & + (1.+0.5*kappa*(1.+ delta)**2) * ren/sqrtkap)           ! rim eq. 6 khl06
+! 
+!               ! number concentration and radius of ice particles
+!               ni_hom  = phi / r_im                                         ! ni eq.9 khl06
+!               ri_0    = 1. + 0.5 * sqrtkap * ren                           ! for eq. 3 khl06
+!               ri_hom  = (ri_0 * (1. + delta) - 1. ) / bcoeff(2)            ! eq. 3 khl06 * ren = eq.23 khl06
+!               mi_hom  = (4./3. * pi * rho_ice) * ni_hom * ri_hom**3
+!               mi_hom  = max(dble(mi_hom),ice%x_min)
+! 
+!               nuc_n(i,j,k) = max(min(dble(ni_hom), ni_hom_max), 0.d0)
+!               nuc_q(i,j,k) = min(nuc_n(i,j,k) * mi_hom, q(i,j,k))
+! 
+!               n_ice(i,j,k) = n_ice(i,j,k) + nuc_n(i,j,k)
+!               q_ice(i,j,k) = q_ice(i,j,k) + nuc_q(i,j,k)
+!               q(i,j,k)     = q(i,j,k)     - nuc_q(i,j,k)
+! 
+!             end if
+!           end if
+! 
+!         enddo
+!       enddo
+!     enddo
+!   end if
+! 
+!   deallocate(nuc_n, nuc_q)
+
+  end subroutine ice_nucleation_homhet
 
   subroutine cloud_freeze (n1,rcloud,ninuc,rice,nice,tl,tk)
     integer, intent(in) :: n1
