@@ -2585,7 +2585,9 @@ contains
     INTEGER, DIMENSION(:), AllOCATABLE     :: ilm,jlm,klm
     REAL(KIND=8), DIMENSION(:,:,:), ALLOCATABLE :: ssi 
 
-    REAL,    PARAMETER :: eps = 1e-10
+    ! using eps=0 increases runtime, but may remove artifacts
+    REAL,    PARAMETER :: eps = 0.0
+    !REAL,    PARAMETER :: eps = 1e-10
     LOGICAL, PARAMETER :: debug = .false.
     LOGICAL            :: debug_maxval = .true.
     LOGICAL            :: debug_timing = .true.
@@ -3014,19 +3016,20 @@ contains
 
        deallocate(ilm,jlm,klm)
 
-       WHERE (qv < 0.0) qv = 0.0
-       WHERE (qc < 0.0) qc = 0.0
-       WHERE (qr < 0.0) qr = 0.0
-       WHERE (qi < 0.0) qi = 0.0
-       WHERE (qs < 0.0) qs = 0.0
-       WHERE (qg < 0.0) qg = 0.0
-       WHERE (qh < 0.0) qh = 0.0
-       WHERE (qnr < 0.0) qnr = 0.0
-       WHERE (qni < 0.0) qni = 0.0
-       WHERE (qns < 0.0) qns = 0.0
-       WHERE (qng < 0.0) qng = 0.0
-       WHERE (qnh < 0.0) qnh = 0.0
-
+       if (debug) then
+          WHERE (qv < 0.0) qv = 0.0
+          WHERE (qc < 0.0) qc = 0.0
+          WHERE (qr < 0.0) qr = 0.0
+          WHERE (qi < 0.0) qi = 0.0
+          WHERE (qs < 0.0) qs = 0.0
+          WHERE (qg < 0.0) qg = 0.0
+          WHERE (qh < 0.0) qh = 0.0
+          WHERE (qnr < 0.0) qnr = 0.0
+          WHERE (qni < 0.0) qni = 0.0
+          WHERE (qns < 0.0) qns = 0.0
+          WHERE (qng < 0.0) qng = 0.0
+          WHERE (qnh < 0.0) qnh = 0.0
+       end if
 
        ! ... deallocation
        IF (debug.and.isIO()) WRITE (*,*) "mcrph_sb: calling deallocation_driver"
