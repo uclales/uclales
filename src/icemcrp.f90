@@ -267,9 +267,6 @@ contains
             call cloud_freeze(n1,rc,ninuc,rice,nice,tl,temp)
             call rain_freeze(n1,rrain,nrain,ninuc,rice,nice,rgrp,temp)
           case(idep)
-if (i==15 .and. j==15) then
-!   print *, rsup(10:17)
-end if
             call deposition(n1,ice,ninuc,rice,nice,rv,tl,temp,rsup)
             call deposition(n1,snow,ninuc,rsnow,nsnow,rv,tl,temp,rsup)
             call deposition(n1,graupel,ninuc,rgrp,ngrp,rv,tl,temp,rsup)
@@ -965,6 +962,7 @@ end if
   end subroutine rain_freeze
 
   subroutine deposition(n1,meteor,ninuc,rice,nice,rv,tl,tk,rsup)
+    use thrm, only : esi
     integer, intent(in) :: n1
     type(particle), intent(in) :: meteor
     real, dimension(n1), intent(inout) :: ninuc,rice,nice,rv,tl,rsup
@@ -1001,17 +999,18 @@ end if
         ! ub<<
 !         f_v  = max(f_v,1.e0) 
 !         f_n  = max(f_n,1.e0) 
-  !       e_si = e_es(tk(k))
+  !       e_si = esi(tk(k))
       
-        gi = 4.0*pi / ( alvi**2 / (K_T * Rm * tk(k)**2) + Rm * tk(k) / (D_v * e_es(tk(k))) )
+        gi = 4.0*pi / ( alvi**2 / (K_T * Rm * tk(k)**2) + Rm * tk(k) / (D_v * esi(tk(k))) )
         ndep  = gi * n_g * c_g * d_g * rsup(k)/rv(k) * dt * f_n / x_g
         if (ndep>0) then
-          ndep  = min(min(ndep,ninuc(k)), rsup(k) / x_g * f_n / f_v, rv(k) / x_g * f_n / f_v)
+          dep  = min(min(ndep,ninuc(k)) *x_g*f_v/f_n, rsup(k), rv(k))
+          ndep = 0.
         else
           ndep = max(max(ndep, -nice(k)),-rice(k) / x_g * f_n / f_v)
+          dep   = ndep *x_g*f_v/f_n
         end if
         !dep = gi * n_g * c_g * d_g * f_v * rsup(k)/rv(k) * dt 
-        dep   = ndep *x_g*f_v/f_n
         rice(k) = rice(k) + dep
         rsup(k) = rsup(k) - dep
         rv(k) = rv(k) - dep
@@ -1027,6 +1026,7 @@ end if
 
 
   subroutine melting(n1,meteor,r,thl,nr,rcld,rrain,nrain,tk)
+    use thrm, only : esl
     integer, intent(in) :: n1
     real,dimension(n1),intent(in) :: tk
     type(particle), intent(in) :: meteor
@@ -1049,7 +1049,7 @@ end if
 
     do k = 2,n1-nfpt
       t_a = tk(k) !wrf!+ t(k) + t_g(k)
-      e_a = e_ws(T_a)                                     !..Saturation pressure
+      e_a = esl(T_a)                                     !..Saturation pressure
                
       if (t_a > tmelt .and. r(k) > 0.0) then
 

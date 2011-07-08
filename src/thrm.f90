@@ -194,58 +194,61 @@ contains
 
   end subroutine satpart
 
-! !
+
 ! ---------------------------------------------------------------------
-! This function calculates the liquid saturation vapor mixing ratio as
-! a function of temperature and pressure
-! 
-  real function rslf(p,t)
-  use defs, only : tmelt
+! This function calculates the water saturation vapor mixing ratio as a
+! function of temperature and pressure
+!
+   real elemental function rslf(p,t)
 
-  real, intent (in) :: p, t
-  real, parameter :: a_w  = 1.72693882e1 !..const. in saturation pressure wrt water
-  real, parameter :: b_w  = 3.58600000e1 !..const. in saturation pressure wrt water
-  real, parameter :: e_3  = 6.10780000e2 !..saturation pressure at melting temp.
-  real :: esl
+    real, intent (in) :: p, t
+    rslf=.622*esl(t)/(p-esl(t))
 
-    esl  = e_3 * exp (a_w * (t - tmelt) / (t - b_w))
-    rslf=.622*esl/(p-esl)
+   end function rslf
 
-  end function rslf
-  real function rsif(p,t)
-  use defs, only : tmelt
+   real elemental function esl(t)
+    use defs, only : tmelt
+    real, intent (in) :: t
+    real, parameter :: c0=0.6105851e+03, c1=0.4440316e+02,    &
+                      c2=0.1430341e+01, c3=0.2641412e-01,    &
+                      c4=0.2995057e-03, c5=0.2031998e-05,    &
+                      c6=0.6936113e-08, c7=0.2564861e-11,    &
+                      c8=-.3704404e-13
+    real  :: x
 
-  real, intent (in) :: p, t
-  real, parameter :: a_i  = 2.18745584e1 !..const. in saturation pressure wrt ice
-  real, parameter :: b_i  = 7.66000000e0 !..const. in saturation pressure wrt ice
-  real, parameter :: e_3  = 6.10780000e2 !..saturation pressure at melting temp.
-  real :: esi
+    x=max(-80.,t-tmelt)
 
-    esi  = e_3 * exp (a_i * (t - tmelt) / (t - b_i))
-    rsif=.622*esi/(p-esi)
-  end function rsif
-! ! 
-! ! ---------------------------------------------------------------------
-! ! ! This function calculates the ice saturation vapor mixing ratio as a 
-! ! ! function of temperature and pressure
-! ! ! 
-!    real function rsif(p,t)
-!  
-!    real, intent (in) :: p, t
-!    real, parameter :: c0_i=0.6114327e+03, c1_i=0.5027041e+02,    &
-!                       c2_i=0.1875982e+01, c3_i=0.4158303e-01,    &
-!                       c4_i=0.5992408e-03, c5_i=0.5743775e-05,    &
-!                       c6_i=0.3566847e-07, c7_i=0.1306802e-09,    &
-!                       c8_i=0.2152144e-12
-!  
-!    real  :: esi, x
-!  
-!    x=max(-80.,t-273.16)
-!     esi=c0_i+x*(c1_i+x*(c2_i+x*(c3_i+x*(c4_i+x*(c5_i+x*(c6_i+x*(c7_i+x*c8_i)))))))
-!    rsif=.622*esi/(p-esi)
-!  
-!    end function rsif
-! 
+    esl=c0+x*(c1+x*(c2+x*(c3+x*(c4+x*(c5+x*(c6+x*(c7+x*c8)))))))
+
+   end function esl
+
+! ---------------------------------------------------------------------
+! This function calculates the ice saturation vapor mixing ratio as a
+! function of temperature and pressure
+!
+   real elemental function rsif(p,t)
+
+    real, intent (in) :: p, t
+    rsif=.622*esi(t)/(p-esi(t))
+
+   end function rsif
+
+   real elemental function esi(t)
+    use defs, only : tmelt
+    real, intent (in) :: t
+    real, parameter   :: c0_i=0.6114327e+03, c1_i=0.5027041e+02,    &
+                         c2_i=0.1875982e+01, c3_i=0.4158303e-01,    &
+                         c4_i=0.5992408e-03, c5_i=0.5743775e-05,    &
+                         c6_i=0.3566847e-07, c7_i=0.1306802e-09,    &
+                         c8_i=0.2152144e-12
+    real  :: x
+
+    x=max(-80.,t-tmelt)
+
+    esi=c0_i+x*(c1_i+x*(c2_i+x*(c3_i+x*(c4_i+x*(c5_i+x*(c6_i+x*(c7_i+x*c8_i)))))))
+
+   end function esi
+
 ! -------------------------------------------------------------------------
 ! FLL_TKRS: Updates scratch arrays with temperature and saturation mixing
 ! ratio
