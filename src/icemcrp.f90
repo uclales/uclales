@@ -361,7 +361,6 @@ contains
     ! 
     if(firsttime) call initmcrp(level,firsttime)
     allocate(convice(n1),convliq(n1))
-
     do j=3,n3-2
        do i=3,n2-2
           call resetvar(rain,rp(1:n1,i,j),np(1:n1,i,j))
@@ -434,6 +433,9 @@ contains
                 call cloud_freeze(n1,rc,ninuc,rice,nice,tl,temp)
                 call rain_freeze(n1,rrain,nrain,ninuc,rice,nice,rgrp,temp)
              case(idep)
+if (i==15 .and. j==15) then
+!   print *, rsup(10:17)
+end if
                 call deposition(n1,ice,ninuc,rice,nice,rv,tl,temp,rsup)
                 call deposition(n1,snow,ninuc,rsnow,nsnow,rv,tl,temp,rsup)
                 call deposition(n1,graupel,ninuc,rgrp,ngrp,rv,tl,temp,rsup)
@@ -929,20 +931,24 @@ contains
     real, intent(inout), dimension (n1) :: nin
     real, intent(in) , dimension(n1) :: tk,rsup,rv,nin_active
     integer :: k
-    real :: fact
+    real :: fact, supsat
     real :: niner
     fact = (1-exp(-dt/timenuc))
 
     do k=1,n1
-       niner = n_ice_meyers_contact(tk(k),min(rsup(k),0.25))
-       nin(k)  = nin(k) + (n_ice_meyers_contact(tk(k),min(rsup(k),0.25))-nin(k))*fact
-       nin(k) = min(nin(k) + niner*dt/timenuc,niner)
-       nin(k)  = n_ice_meyers_contact(tk(k),min(rsup(k),0.25))
-       !       if (rsup(k)/rv(k)>0.05) then
-       !         nin(k) = max(0.,nin_set -max(nin_active(k),0.))
-       !       else
-       !         nin(k) = 0.
-       !       end if
+      if (rsup(k) > 0) then
+        supsat = rsup(k)/rv(k)*100.
+!         niner = n_ice_meyers_contact(tk(k),min(supsat,0.25))
+!         nin(k)  = nin(k) + (n_ice_meyers_contact(tk(k),min(supsat,0.25))-nin(k))*fact
+!         nin(k) = min(nin(k) + niner*dt/timenuc,niner)
+        nin(k)  = n_ice_meyers_contact(tk(k),min(supsat,0.25))
+! print *, 'nicenuc',k,nin(k)
+!         if (rsup(k)/rv(k)>0.05) then
+!           nin(k) = max(0.,nin_set -max(nin_active(k),0.))
+!         else
+!           nin(k) = 0.
+!         end if
+      end if
     end do
 
   end subroutine n_icenuc
@@ -959,13 +965,14 @@ contains
           nuc_n = nin(k) 
 
           if (nuc_n>eps0) then
-             !          nuc_r = min(nuc_n * ice%x_min, rsup(k))
+         nuc_r = min(nuc_n * ice%x_min, rsup(k))
              nuc_n   = nuc_r / ice%x_min        
              nin(k)  = nin(k)  - nuc_n
              rsup(k) = rsup(k) - nuc_r
              nice(k) = nice(k) + nuc_n
              rice(k) = rice(k) + nuc_r
              tl(k)   = tl(k)   + convice(k)*nuc_r
+! print *, 'icen',k, tk(k), nin(k), rsup(k), nuc_r, nuc_n
           end if
        endif
     end do
@@ -1009,7 +1016,7 @@ contains
 
 
              jtot = (jhom + jhet) / rowt * dt                     !..j*dt in 1/kg
-             frn  = min(jtot * rc,ninuc(k))
+          frn  = jtot * rc
              frr  = frn * xc * facg
           end if
           frr  = min(frr,rc)
@@ -1018,9 +1025,10 @@ contains
           tl(k) = tl(k)+ (convice(k)-convliq(k))*frr
 
           frn  = max(frn,frr/cldw%x_max)
-          ninuc(k) = ninuc(k)   - frn
+!         ninuc(k) = ninuc(k)   - frn
           rice(k)   = rice(k)   + frr
           nice(k)   = nice(k)   + frn
+! print *, 'cfr',k, tk(k), rcloud(k), rice(k),frr
 
        end if
     end do
@@ -1090,15 +1098,16 @@ contains
 
 
                 if (j_het >= 1-20) then
-                   fr_n  = min(j_het * r_r,ninuc(k))
+!               fr_n  = min(j_het * r_r,ninuc(k))
                    fr_r  = fr_n * x_r * coeff_z
 
                    lam = ( gfct((rain%nu+1.0)/rain%mu) / gfct((rain%nu+2.0)/rain%mu) * x_r)**(-rain%mu)
-                   n_0 = min(ninuc(k),rain%mu * n_r * lam**((rain%nu+1.0)/rain%mu) / gfct((rain%nu+1.0)/rain%mu))
+              n_0 = rain%mu * n_r * lam**((rain%nu+1.0)/rain%mu) / gfct((rain%nu+1.0)/rain%mu)
                    fr_n_i = j_het * n_0/(rain%mu*lam**((rain%nu+2.0)/rain%mu))* &
                         incgfct_lower((rain%nu+2.0)/rain%mu, lam*xmax_ice**rain%mu)
                    fr_r_i = j_het * n_0/(rain%mu*lam**((rain%nu+3.0)/rain%mu))* &
                         incgfct_lower((rain%nu+3.0)/rain%mu, lam*xmax_ice**rain%mu)
+! print *,'a'   ,fr_r, r_r,ninuc(k)
                    fr_n = min(fr_n,n_r)
                    fr_r = min(fr_r,r_r)
                 else
@@ -1134,12 +1143,14 @@ contains
           rice(k) = rice(k)  + fr_r_i
           nice(k) = nice(k)  + fr_n_i
           rgrp(k) = rgrp(k)  + fr_r_g
+! if (r_r > r_crit_fr) print *, 'rfr',k, tk(k), rrain(k), rice(k),rgrp(k), j_het,fr_r
 
        end if
     end do
   end subroutine rain_freeze
 
   subroutine deposition(n1,meteor,ninuc,rice,nice,rv,tl,tk,rsup)
+    use thrm, only : esi
     integer, intent(in) :: n1
     type(particle), intent(in) :: meteor
     real, dimension(n1), intent(inout) :: ninuc,rice,nice,rv,tl,rsup
@@ -1176,12 +1187,12 @@ contains
           ! ub<<
           !         f_v  = max(f_v,1.e0) 
           !         f_n  = max(f_n,1.e0) 
-          !       e_si = e_es(tk(k))
+  !       e_si = esi(tk(k))
 
-          gi = 4.0*pi / ( alvi**2 / (K_T * Rm * tk(k)**2) + Rm * tk(k) / (D_v * e_es(tk(k))) )
+        gi = 4.0*pi / ( alvi**2 / (K_T * Rm * tk(k)**2) + Rm * tk(k) / (D_v * esi(tk(k))) )
           ndep  = gi * n_g * c_g * d_g * rsup(k)/rv(k) * dt * f_n / x_g
-        if (ndep>0) then
-          ndep  = min(min(ndep,ninuc(k)), rsup(k) / x_g * f_n / f_v, rv(k) / x_g * f_n / f_v)
+        if (ndep > 0.) then
+          ndep  = min(ndep, rsup(k) / x_g * f_n / f_v, rv(k) / x_g * f_n / f_v)
         else
           ndep = max(max(ndep, -nice(k)),-rice(k) / x_g * f_n / f_v)
         end if
@@ -1191,9 +1202,9 @@ contains
           rsup(k) = rsup(k) - dep
           rv(k) = rv(k) - dep
           tl(k) = tl(k) + convice(k)*dep
-          if (meteor%moments==2) then
+        if (meteor%moments==2 .and. ndep < 0.) then
           nice(k) = nice(k) + ndep
-  	      ninuc(k) = ninuc(k) - ndep
+!   	      ninuc(k) = ninuc(k) - ndep
           end if
        endif
     enddo
@@ -1202,6 +1213,7 @@ contains
 
 
   subroutine melting(n1,meteor,r,thl,nr,rcld,rrain,nrain,tk)
+    use thrm, only : esl
     integer, intent(in) :: n1
     real,dimension(n1),intent(in) :: tk
     type(particle), intent(in) :: meteor
@@ -1224,7 +1236,7 @@ contains
 
     do k = 2,n1
        t_a = tk(k) !wrf!+ t(k) + t_g(k)
-       e_a = e_ws(T_a)                                     !..Saturation pressure
+      e_a = esl(T_a)                                     !..Saturation pressure
 
        if (t_a > tmelt .and. r(k) > 0.0) then
 
