@@ -1017,8 +1017,8 @@ end if
         rv(k) = rv(k) - dep
         tl(k) = tl(k) + convice(k)*dep
         if (meteor%moments==2) then
-!          nice(k) = nice(k) + ndep
-!  	      ninuc(k) = ninuc(k) - ndep
+          nice(k) = nice(k) + ndep
+  	      ninuc(k) = ninuc(k) - ndep
         end if
       endif
     enddo
