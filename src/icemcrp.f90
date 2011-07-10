@@ -652,7 +652,6 @@ contains
           ! which one is correct here?
           !au = k_au * rc(k)**2 * Xc**2
           au = k_au * dn0(k) * rc(k)**2 * Xc**2
-          !au = k_au * rho_0 * dn0(k) * rc(k)**2 * Xc**2
           !
           ! small threshold that should not influence the result
           !
@@ -725,7 +724,6 @@ contains
 
              ! correct??
              ac  = k_r * rc(k) * rp(k) * phi * sqrt(rho_0*dn0(k))
-             !ac  = k_r * rho_0*dn0(k) * rc(k) * rp(k) * phi * sqrt(rho_0*dn0(k))
 
              !
              ! Khairoutdinov and Kogan
@@ -2706,7 +2704,7 @@ contains
           DO kk = kts, kte
              ! supersaturation w.r.t. ice
              ssi(kk,jj,ii) =  R_d & 
-                  & * rho_0 * dn0(kk) * qv(kk,jj,ii) &
+                  & * dn0(kk) * qv(kk,jj,ii) &
                   & * tk(kk,jj,ii) &
                   & / e_es(dble(tk(kk,jj,ii))) - 1.0
           ENDDO
@@ -2797,7 +2795,7 @@ contains
           ! ... dynamics
           T_0(i,j,k)      = tk(kk,jj,ii)
           p_0(i,j,k)      = p00 * ((pi0(kk)+pi1(kk)+exner(kk,jj,ii))/cp)**cpr
-          rho_k(i,j,k)    = rho_0 * dn0(kk)
+          rho_k(i,j,k)    = dn0(kk)
 
           ! .. the ice supersaturation
           S_i(i,j,k)   = ssi(kk,jj,ii)

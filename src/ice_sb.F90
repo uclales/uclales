@@ -279,6 +279,7 @@ MODULE wolken_konstanten
     afrac_orga     ! ... of organic material
 
   INCLUDE 'phillips_nucleation_2010.incf'
+  !INCLUDE 'phillips_nucleation_2008.incf'
 
   ! rain_freeze: der Teil des Regenspektrums kleiner als D_rainfrz_ig
   ! wird nach Gefrieren dem Eis zugeschlagen, der Teil von dort bis zu D_rainfrz_gh dem Graupel
@@ -1087,7 +1088,7 @@ CONTAINS
     END IF
 
     !mu_Dm_rain_typ = mod(cloud_typ,10)
-    mu_Dm_rain_typ = 2
+    mu_Dm_rain_typ = 1
 
     IF (mu_Dm_rain_typ.EQ.0) THEN
       !..constant mue value
@@ -2056,7 +2057,7 @@ MODULE wolken_driver
 
   ! ... Parameter fuer Wolken ...
   LOGICAL          :: wolke
-  INTEGER          :: wolke_typ=2603,ccn_typ
+  INTEGER          :: wolke_typ,ccn_typ
 
   ! ub>>
   ! Schalter fuer die Ausgabe von horizontal gemittelten Umwandlungsraten 
@@ -14140,8 +14141,7 @@ CONTAINS
     mu    = cloud%mu
     x_s   = cloud%x_max                     !..Trennmasse
 
-    IF (.true.) THEN 
-    !IF (mu == 1.0) THEN 
+    IF (mu == 1.0) THEN 
       k_au  = k_c / (2.0d1*x_s) * (nu+2.0d0)*(nu+4.0d0)/(nu+1.0d0)**2
       k_sc  = k_c * (nu+2.0d0)/(nu+1.0d0)
     ELSE
@@ -14180,8 +14180,8 @@ CONTAINS
             end if
 
             !..Berechnung der Autokonversionsrate nach SB2000
-            au  =  k_au * q_c**2 * x_c**2 * dt 
-            !au  = k_au * q_c**2 * x_c**2 * dt * rrho_c(i,j,k)
+            !au  =  k_au * q_c**2 * x_c**2 * dt 
+            au  = k_au * q_c**2 * x_c**2 * dt * rrho_c(i,j,k)
             IF (q_c > 1.0d-6) THEN
               tau = MIN(MAX(1.0-q_c/(q_c+q_r+eps),eps),0.9d0)
               phi = k_1 * tau**k_2 * (1.0 - tau**k_2)**3
@@ -14189,8 +14189,8 @@ CONTAINS
             ENDIF
             au = MAX(MIN(q_c,au),0d0)
 
-            sc = k_sc * q_c**2 * dt 
-            !sc = k_sc * q_c**2 * dt * rrho_c(i,j,k)
+            !sc = k_sc * q_c**2 * dt 
+            sc = k_sc * q_c**2 * dt * rrho_c(i,j,k)
 
             rate_q(i,j,k)  = au
             rate_nr(i,j,k) = au / x_s
