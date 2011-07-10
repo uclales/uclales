@@ -299,7 +299,7 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('rhail')
        if (itype==0) ncinfo = 'Hail mixing ratio'
-       if (itype==1) ncinfo = 'kg/kg'
+       if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
     case('nhail')
        if (itype==0) ncinfo = 'Number of hail particles'
