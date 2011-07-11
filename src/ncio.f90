@@ -2,6 +2,7 @@
 
   use netcdf
   use mpi_interface, only : appl_abort, myid, pecount, wrxid, wryid
+  use mcrp, only : cldw,rain,ice,snow,graupel,hail
 
   implicit none
   private
@@ -77,7 +78,7 @@ contains
     integer, intent (in)           :: nVar, ncID
     integer, optional, intent (in) :: n1, n2, n3
     integer, intent (inout)        :: nRec
-    character (len=7), intent (in) :: sx(nVar)
+    character (len=7), intent (in) :: sx(nVar)   ! table with var names
 
     integer, save :: timeID=0, ztID=0, zmID=0, xtID=0, xmID=0, ytID=0, ymID=0,&
          dim_mttt(4) = 0, dim_tmtt(4) = 0, dim_ttmt(4) = 0, dim_tttt(4) = 0  ,&
@@ -128,6 +129,66 @@ contains
                 iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tttt,VarID)
              else
                 iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tt,VarID)
+             end if
+             if (sx(n).eq."l") then
+                iret=nf90_put_att(ncID,VarID,'nu',cldw%nu)
+                iret=nf90_put_att(ncID,VarID,'mu',cldw%mu)
+                iret=nf90_put_att(ncID,VarID,'a_geo',cldw%a_geo)
+                iret=nf90_put_att(ncID,VarID,'b_geo',cldw%b_geo)
+                iret=nf90_put_att(ncID,VarID,'a_vel',cldw%a_vel)
+                iret=nf90_put_att(ncID,VarID,'b_vel',cldw%b_vel)
+                iret=nf90_put_att(ncID,VarID,'x_min',cldw%x_min)
+                iret=nf90_put_att(ncID,VarID,'x_max',cldw%x_max)
+             end if
+             if (sx(n).eq."r") then
+                iret=nf90_put_att(ncID,VarID,'nu',rain%nu)
+                iret=nf90_put_att(ncID,VarID,'mu',rain%mu)
+                iret=nf90_put_att(ncID,VarID,'a_geo',rain%a_geo)
+                iret=nf90_put_att(ncID,VarID,'b_geo',rain%b_geo)
+                iret=nf90_put_att(ncID,VarID,'a_vel',rain%a_vel)
+                iret=nf90_put_att(ncID,VarID,'b_vel',rain%b_vel)
+                iret=nf90_put_att(ncID,VarID,'x_min',rain%x_min)
+                iret=nf90_put_att(ncID,VarID,'x_max',rain%x_max)
+             end if
+             if (sx(n).eq."rice") then
+                iret=nf90_put_att(ncID,VarID,'nu',ice%nu)
+                iret=nf90_put_att(ncID,VarID,'mu',ice%mu)
+                iret=nf90_put_att(ncID,VarID,'a_geo',ice%a_geo)
+                iret=nf90_put_att(ncID,VarID,'b_geo',ice%b_geo)
+                iret=nf90_put_att(ncID,VarID,'a_vel',ice%a_vel)
+                iret=nf90_put_att(ncID,VarID,'b_vel',ice%b_vel)
+                iret=nf90_put_att(ncID,VarID,'x_min',ice%x_min)
+                iret=nf90_put_att(ncID,VarID,'x_max',ice%x_max)
+             end if
+             if (sx(n).eq."rsnow") then
+                iret=nf90_put_att(ncID,VarID,'nu',snow%nu)
+                iret=nf90_put_att(ncID,VarID,'mu',snow%mu)
+                iret=nf90_put_att(ncID,VarID,'a_geo',snow%a_geo)
+                iret=nf90_put_att(ncID,VarID,'b_geo',snow%b_geo)
+                iret=nf90_put_att(ncID,VarID,'a_vel',snow%a_vel)
+                iret=nf90_put_att(ncID,VarID,'b_vel',snow%b_vel)
+                iret=nf90_put_att(ncID,VarID,'x_min',snow%x_min)
+                iret=nf90_put_att(ncID,VarID,'x_max',snow%x_max)
+             end if
+             if (sx(n).eq."rgrp") then
+                iret=nf90_put_att(ncID,VarID,'nu',graupel%nu)
+                iret=nf90_put_att(ncID,VarID,'mu',graupel%mu)
+                iret=nf90_put_att(ncID,VarID,'a_geo',graupel%a_geo)
+                iret=nf90_put_att(ncID,VarID,'b_geo',graupel%b_geo)
+                iret=nf90_put_att(ncID,VarID,'a_vel',graupel%a_vel)
+                iret=nf90_put_att(ncID,VarID,'b_vel',graupel%b_vel)
+                iret=nf90_put_att(ncID,VarID,'x_min',graupel%x_min)
+                iret=nf90_put_att(ncID,VarID,'x_max',graupel%x_max)
+             end if
+             if (sx(n).eq."rhail") then
+                iret=nf90_put_att(ncID,VarID,'nu',hail%nu)
+                iret=nf90_put_att(ncID,VarID,'mu',hail%mu)
+                iret=nf90_put_att(ncID,VarID,'a_geo',hail%a_geo)
+                iret=nf90_put_att(ncID,VarID,'b_geo',hail%b_geo)
+                iret=nf90_put_att(ncID,VarID,'a_vel',hail%a_vel)
+                iret=nf90_put_att(ncID,VarID,'b_vel',hail%b_vel)
+                iret=nf90_put_att(ncID,VarID,'x_min',hail%x_min)
+                iret=nf90_put_att(ncID,VarID,'x_max',hail%x_max)
              end if
           case ('mttt')
              if (present(n2) .and. present(n3)) then
@@ -299,7 +360,7 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('rhail')
        if (itype==0) ncinfo = 'Hail mixing ratio'
-       if (itype==1) ncinfo = 'kg/kg'
+       if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
     case('nhail')
        if (itype==0) ncinfo = 'Number of hail particles'

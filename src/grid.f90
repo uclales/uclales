@@ -478,13 +478,14 @@ contains
     use mpi_interface, only :myid
 
 !irina
-    integer, parameter :: nnames = 28
+    integer, parameter :: nnames = 32
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,&
          'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,&  
          'w      ','t      ','p      ','q      ','l      ','r      '   ,'n      ',&
          'inuc   ','rice   ','nice   ','rsnow  ','rgrp   ',&
-         'stke   ','rflx   ', 'lflxu  ','lflxd  '/)
+         'nsnow  ','ngrp   ','rhail  ','nhail  ',          &
+         'stke   ','rflx   ','lflxu  ','lflxd  '/)
 
     real, intent (in) :: time
     integer           :: nbeg, nend
@@ -494,6 +495,7 @@ contains
     if (level  >= 2) nvar0 = nvar0+1
     if (level  >= 3) nvar0 = nvar0+2
     if (level  >= 4) nvar0 = nvar0+5
+    if (level  >= 5) nvar0 = nvar0+4
     if (iradtyp > 1) nvar0 = nvar0+3
 
     allocate (sanal(nvar0))
@@ -535,15 +537,23 @@ contains
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(nbase+9)
     end if
-    !irina
-    if (iradtyp > 1) then
+    if (level >= 5) then
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(nbase+10)
-    !irina
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(nbase+11)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(nbase+12)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+13)
+    end if
+    if (iradtyp > 1) then
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+14)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+15)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+16)
     end if
 
 
