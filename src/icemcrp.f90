@@ -455,9 +455,9 @@ contains
                 call cloud_freeze(n1,rc,ninuc,rice,nice,tl,temp)
                 call rain_freeze(n1,rrain,nrain,ninuc,rice,nice,rgrp,temp)
              case(idep)
-if (i==15 .and. j==15) then
+! if (i==15 .and. j==15) then
 !   print *, rsup(10:17)
-end if
+! end if
                 call deposition(n1,ice,ninuc,rice,nice,rv,tl,temp,rsup)
                 call deposition(n1,snow,ninuc,rsnow,nsnow,rv,tl,temp,rsup)
                 call deposition(n1,graupel,ninuc,rgrp,ngrp,rv,tl,temp,rsup)
@@ -1093,12 +1093,10 @@ end if
 !           na_dust    = 162.e5 ! number density of dust [1/m³], phillips08 value 162e3
 !           na_soot    =  15.e6 ! number density of soot [1/m³], phillips08 value 15e6
 !           na_orga    = 177.e5 ! number density of organics [1/m3], phillips08 value 177e6
-
       do k = 2, n1
-        if (tk(k) < t_hn .and. rsup(k) > 0.0  &
-          & .and. ( nice(k) + nsnow(k) < ni_het_max ) )then
+        if (tk(k) < tmelt .and. rsup(k) > 0.0  &
+          & .and. ( nice(k) < ni_het_max ) )then
           if (rcloud(k) > 0.0) then
-
             ! immersion freezing at water saturation
             xt = (274. - tk(k))  / ttstep
             xt = min(xt,ttmax-1.)
@@ -1271,7 +1269,7 @@ end if
 
 
              jtot = (jhom + jhet) / rowt * dt                     !..j*dt in 1/kg
-          frn  = jtot * rc
+             frn  = jtot * rc
              frr  = frn * xc * facg
           end if
           frr  = min(frr,rc)
@@ -1279,7 +1277,7 @@ end if
           rcloud(k) = rcloud(k) - frr
           tl(k) = tl(k)+ (convice(k)-convliq(k))*frr
 
-          frn  = max(frn,frr/cldw%x_max)
+          frn  = min(frn,frr/cldw%x_max)
 !         ninuc(k) = ninuc(k)   - frn
           rice(k)   = rice(k)   + frr
           nice(k)   = nice(k)   + frn
