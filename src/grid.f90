@@ -537,7 +537,7 @@ contains
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(nbase+9)
     end if
-    if (level >= 4) then
+    if (level >= 5) then
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(nbase+10)
        nvar0 = nvar0+1

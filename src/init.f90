@@ -44,6 +44,7 @@ contains
     use stat, only : init_stat
     use mpi_interface, only : appl_abort, myid
     use thrm, only : thermo
+    use mcrp, only : initmcrp
 !
 
     implicit none
@@ -61,6 +62,9 @@ contains
        call appl_abort(0)
     end if
     call sponge_init
+
+    call initmcrp(level)
+
     call init_stat(time+dt,filprf,expnme,nzp)
     !
     !irina
