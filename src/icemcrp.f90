@@ -40,7 +40,7 @@ module mcrp
        a_ngrp,   a_ngrt,    & ! graupel number
        a_rhailp, a_rhailt,  & ! hail mass
        a_nhailp, a_nhailt,  & ! hail number
-       rsup, prc_c, prc_r, prc_i, prc_s, prc_g, prc_h
+       prc_c, prc_r, prc_i, prc_s, prc_g, prc_h
 
   USE parallele_umgebung, ONLY: isIO,double_global_maxval,global_maxval, global_minval
 
@@ -247,7 +247,7 @@ contains
        call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
             a_npp,a_rt,a_rpt,a_npt,a_scr7, prc_r, &
             a_ninuct,a_ricet,a_nicet,a_rsnowt,a_rgrt,&
-            a_ninucp,a_ricep,a_nicep,a_rsnowp,a_rgrp,rsup, &
+            a_ninucp,a_ricep,a_nicep,a_rsnowp,a_rgrp, &
             prc_i, prc_s, prc_g)
     IF (debug) THEN
       wmax  = double_global_maxval(a_wp)
@@ -374,7 +374,7 @@ contains
          si
     real, dimension(n1,n2,n3), intent (inout),optional :: prc_i, prc_s, prc_g
 
-    real, dimension(n1) :: tl,temp,rv,rc,nrain,rrain,ninuc,nice, nin_active,rice,nsnow,rsnow,ngrp,rgrp,rs,rsup,r1 
+    real, dimension(n1) :: tl,temp,rv,rc,nrain,rrain,ninuc,nice, nin_active,rice,nsnow,rsnow,ngrp,rgrp,rs,s_i,r1
     integer :: i, j,n
 !as    logical,save  :: firsttime = .true.
     !     real :: dtrk
@@ -396,8 +396,11 @@ contains
              call resetvar(ice,ricep(1:n1,i,j),nicep(1:n1,i,j))
              call resetvar(snow,rsnowp(1:n1,i,j))
              call resetvar(graupel,rgrpp(1:n1,i,j))
-
-             rsup = si(1:n1,i,j)
+             s_i(k) =  R_d &
+                  & * dn0(k) * rv(k) &
+                  & * tk(k) &
+                  & / e_es(dble(tk(k))) - 1.0
+ 
 
              ninuc = ninucp(1:n1,i,j)
 
@@ -441,11 +444,11 @@ contains
                 call resetvar(cldw,rc)
                 call sedim_cd(n1,dt,tl,rc,prc_c(1:n1,i,j))
              case(iicenucnr)
-!                 call n_icenuc(n1,ninuc,nin_active,temp,rv,rsup)
+!                 call n_icenuc(n1,ninuc,nin_active,temp,rv,s_i)
              case(iicenuc)
                 where (ninuc<0.) ninuc = 0.
-!                 call ice_nucleation(n1,ninuc,rice,nice,rsup,tl,temp)
-                 call ice_nucleation_homhet(n1,ice,rv,rc,rice,nice,rsnow, nsnow,rsup,tl,temp)
+!                 call ice_nucleation(n1,ninuc,rice,nice,s_i,tl,temp)
+                 call ice_nucleation_homhet(n1,ice,rv,rc,rice,nice,rsnow, nsnow,s_i,tl,temp)
                  
 
              case(ifreez)
@@ -456,11 +459,11 @@ contains
                 call rain_freeze(n1,rrain,nrain,ninuc,rice,nice,rgrp,temp)
              case(idep)
 ! if (i==15 .and. j==15) then
-!   print *, rsup(10:17)
+!   print *, s_i(10:17)
 ! end if
-                call deposition(n1,ice,ninuc,rice,nice,rv,tl,temp,rsup)
-                call deposition(n1,snow,ninuc,rsnow,nsnow,rv,tl,temp,rsup)
-                call deposition(n1,graupel,ninuc,rgrp,ngrp,rv,tl,temp,rsup)
+                call deposition(n1,ice,ninuc,rice,nice,rv,tl,temp,s_i)
+                call deposition(n1,snow,ninuc,rsnow,nsnow,rv,tl,temp,s_i)
+                call deposition(n1,graupel,ninuc,rgrp,ngrp,rv,tl,temp,s_i)
              case(imelt_ice)
                 call resetvar(ice,rice,nice)
                 call melting(n1,ice,rice,tl,nice,rc,rrain,nrain,temp)
@@ -553,7 +556,7 @@ contains
        end do
     end do
     deallocate(convice,convliq)
-    !print *,maxval(rsup),maxloc(rsup)
+    !print *,maxval(s_i),maxloc(s_i)
   end subroutine mcrph
   subroutine wtr_dff_SB(n1,dn0,rp,np,rl,rs,rv,tl,tk)
     !
@@ -946,24 +949,23 @@ contains
     end do
 
   end subroutine sedim_cd
-  subroutine n_icenuc(n1,nin,nin_active,tk,rv,rsup)
+  subroutine n_icenuc(n1,nin,nin_active,tk,rv,s_i)
     integer, intent(in) :: n1
     real, intent(inout), dimension (n1) :: nin
-    real, intent(in) , dimension(n1) :: tk,rsup,rv,nin_active
+    real, intent(in) , dimension(n1) :: tk,s_i,rv,nin_active
     integer :: k
     real :: fact, supsat
     real :: niner
     fact = (1-exp(-dt/timenuc))
 
     do k=1,n1
-      if (rsup(k) > 0) then
-        supsat = rsup(k)/rv(k)*100.
+      if (s_i(k) > 0) then
 !         niner = n_ice_meyers_contact(tk(k),min(supsat,0.25))
 !         nin(k)  = nin(k) + (n_ice_meyers_contact(tk(k),min(supsat,0.25))-nin(k))*fact
 !         nin(k) = min(nin(k) + niner*dt/timenuc,niner)
-        nin(k)  = n_ice_meyers_contact(tk(k),min(supsat,0.25))
+        nin(k)  = n_ice_meyers_contact(tk(k),min(s_i(k)*100.,0.25))
 ! print *, 'nicenuc',k,nin(k)
-!         if (rsup(k)/rv(k)>0.05) then
+!         if (s_i(k)/rv(k)>0.05) then
 !           nin(k) = max(0.,nin_set -max(nin_active(k),0.))
 !         else
 !           nin(k) = 0.
@@ -973,32 +975,31 @@ contains
 
   end subroutine n_icenuc
 
-  subroutine ice_nucleation(n1,nin,rice,nice,rsup,tl,tk)
+  subroutine ice_nucleation(n1,nin,rice,nice,s_i,tl,tk)
     integer,intent(in) :: n1
-    real, intent(inout),dimension(n1) :: nin,nice, rice, tl,rsup
+    real, intent(inout),dimension(n1) :: nin,nice, rice, tl,s_i
     real,intent(in), dimension(n1) :: tk
     real :: nuc_n, nuc_r
     integer :: k
 
     do k=2,n1
-       if (tk(k) < tmelt .and. rsup(k) > 0.0) then
+       if (tk(k) < tmelt .and. s_i(k) > 0.0) then
           nuc_n = nin(k) 
 
           if (nuc_n>eps0) then
-         nuc_r = min(nuc_n * ice%x_min, rsup(k))
+         nuc_r = nuc_n * ice%x_min
              nuc_n   = nuc_r / ice%x_min        
              nin(k)  = nin(k)  - nuc_n
-             rsup(k) = rsup(k) - nuc_r
              nice(k) = nice(k) + nuc_n
              rice(k) = rice(k) + nuc_r
              tl(k)   = tl(k)   + convice(k)*nuc_r
-! print *, 'icen',k, tk(k), nin(k), rsup(k), nuc_r, nuc_n
+! print *, 'icen',k, tk(k), nin(k), s_i(k), nuc_r, nuc_n
           end if
        endif
     end do
   end subroutine ice_nucleation
 
-  subroutine ice_nucleation_homhet(n1,ice,rv,rcloud,rice,nice,rsnow, nsnow,rsup,tl,tk)
+  subroutine ice_nucleation_homhet(n1,ice,rv,rcloud,rice,nice,rsnow, nsnow,s_i,tl,tk)
   !*******************************************************************************
   !                                                                              *
   ! berechnung der nukleation der wolkeneispartikel                              *
@@ -1029,7 +1030,7 @@ contains
   implicit none
     integer,intent(in) :: n1
     type(particle), intent(in) :: ice
-    real, intent(inout),dimension(n1) :: rv,rcloud, nice, rice, nsnow, rsnow, tl,rsup
+    real, intent(inout),dimension(n1) :: rv,rcloud, nice, rice, nsnow, rsnow, tl,s_i
     real,intent(in), dimension(n1) :: tk
     real :: nuc_n, nuc_r
     integer :: k
@@ -1092,7 +1093,7 @@ contains
 !           na_soot    =  15.e6 ! number density of soot [1/m³], phillips08 value 15e6
 !           na_orga    = 177.e5 ! number density of organics [1/m3], phillips08 value 177e6
       do k = 2, n1
-        if (tk(k) < tmelt .and. rsup(k) > 0.0  &
+        if (tk(k) < tmelt .and. s_i(k) > 0.0  &
           & .and. ( nice(k) < ni_het_max ) )then
           if (rcloud(k) > 0.0) then
             ! immersion freezing at water saturation
@@ -1107,7 +1108,7 @@ contains
 
             ! calculate indices used for look-up tables
             xt = (274. - tk(k))  / ttstep
-            xs = (100*rsup(k)/rv(k)) / ssstep
+            xs = (100*s_i(k)) / ssstep
             xt = min(xt,ttmax-1.)
             xs = min(xs,ssmax-1.)
             tt = int(xt)
@@ -1400,11 +1401,11 @@ contains
     end do
   end subroutine rain_freeze
 
-  subroutine deposition(n1,meteor,ninuc,rice,nice,rv,tl,tk,rsup)
+  subroutine deposition(n1,meteor,ninuc,rice,nice,rv,tl,tk,s_i)
     use thrm, only : esi
     integer, intent(in) :: n1
     type(particle), intent(in) :: meteor
-    real, dimension(n1), intent(inout) :: ninuc,rice,nice,rv,tl,rsup
+    real, dimension(n1), intent(inout) :: ninuc,rice,nice,rv,tl,s_i
     real, dimension(n1), intent(in)    :: tk
 
     integer                     :: k
@@ -1440,17 +1441,13 @@ contains
           !         f_n  = max(f_n,1.e0) 
   !       e_si = esi(tk(k))
 
-        gi = 4.0*pi / ( alvi**2 / (K_T * Rm * tk(k)**2) + Rm * tk(k) / (D_v * esi(tk(k))) )
-          ndep  = gi * n_g * c_g * d_g * rsup(k)/rv(k) * dt * f_n / x_g
-        if (ndep > 0.) then
-          ndep  = min(ndep, rsup(k) / x_g * f_n / f_v, rv(k) / x_g * f_n / f_v)
-        else
+          gi = 4.0*pi / ( alvi**2 / (K_T * Rm * tk(k)**2) + Rm * tk(k) / (D_v * esi(tk(k))) )
+          ndep  = gi * n_g * c_g * d_g * s_i(k) * dt * f_n / x_g
+        if (ndep < 0.) then
           ndep = max(max(ndep, -nice(k)),-rice(k) / x_g * f_n / f_v)
         end if
-          !dep = gi * n_g * c_g * d_g * f_v * rsup(k)/rv(k) * dt 
           dep   = ndep *x_g*f_v/f_n
           rice(k) = rice(k) + dep
-          rsup(k) = rsup(k) - dep
           rv(k) = rv(k) - dep
           tl(k) = tl(k) + convice(k)*dep
         if (meteor%moments==2 .and. ndep < 0.) then
