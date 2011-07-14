@@ -45,7 +45,7 @@ module mcrp
   USE parallele_umgebung, ONLY: isIO,double_global_maxval,global_maxval, global_minval
 
   use thrm, only : thermo, fll_tkrs
-  use stat, only : sflg, updtst
+!axel!  use stat, only : sflg, updtst
   use util, only : get_avg3, azero, sclrset
   implicit none
 
@@ -296,7 +296,7 @@ contains
       WRITE(*,'(A10,10E11.3)') '   ', tmax,qcmax,qrmax,qimax,qsmax,qgmax,qhmax
       ENDIF
     ENDIF
-       call mcrph_sb(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,a_wp,vapor,liquid, &
+    call mcrph_sb(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,a_wp,vapor,liquid, &
             a_rpp,    a_npp    , & ! rain
             a_ricep , a_nicep  , & ! ice
             a_rsnowp, a_nsnowp , & ! snow
@@ -2878,7 +2878,7 @@ contains
     else
        debug_maxval = .false.
     end if
-    if (mod(istep,250).eq.0.and.nstep.eq.3) then
+    if (mod(istep,1234).eq.0.and.nstep.eq.3) then
        debug_timing = .true.
     else
        debug_timing = .false.
@@ -2959,7 +2959,8 @@ contains
           WRITE(*,'(A10,10E11.3)') '   ', wmax,qvmax,qcmax,qrmax,qimax,qsmax,qgmax,qhmax,nimax,tmax
        ENDIF
     ENDIF
-    IF (isIO().and.debug_timing) THEN       
+    IF (debug_timing) THEN       
+!    IF (isIO().and.debug_timing) THEN       
        nt=1
        timing = 0.0
        call cpu_time(timing(nt))
@@ -3120,7 +3121,8 @@ contains
           ENDIF
        ENDIF
        
-       IF (isIO().and.debug_timing) THEN
+       IF (debug_timing) THEN
+!       IF (isIO().and.debug_timing) THEN
           nt=nt+1
           call cpu_time(timing(nt))
        END IF
@@ -3146,8 +3148,9 @@ contains
              WRITE(*,'(A10,10E11.3)') '   ', wmax,qvmax,qcmax,qrmax,qimax,qsmax,qgmax,qhmax,nimax,tmax
           ENDIF
        ENDIF
-
-       IF (isIO().and.debug_timing) THEN
+ 
+       IF (debug_timing) THEN
+!       IF (isIO().and.debug_timing) THEN
           nt=nt+1
           call cpu_time(timing(nt))
        END IF
@@ -3325,24 +3328,25 @@ contains
     pgraupel%name = 'graupel'
     phail%name    = 'hail'
 
-    IF (isIO().and.debug_timing) THEN
+    IF (debug_timing) THEN
+!    IF (isIO().and.debug_timing) THEN
        nt=nt+1
        call cpu_time(timing(nt))
     END IF
 
     IF (debug.and.isIO()) WRITE (0,*) "mcrph_sb: BCs for sedimentation"
 
-    bcstr = 'cnst'   ! 'mixd' or 'cnst'
-    call sclrset(bcstr,ke,je,ie,qr ,dzi_t)
-    call sclrset(bcstr,ke,je,ie,qnr,dzi_t)
-    call sclrset(bcstr,ke,je,ie,qi ,dzi_t)
-    call sclrset(bcstr,ke,je,ie,qni,dzi_t)
-    call sclrset(bcstr,ke,je,ie,qs ,dzi_t)
-    call sclrset(bcstr,ke,je,ie,qns,dzi_t)
-    call sclrset(bcstr,ke,je,ie,qg ,dzi_t)
-    call sclrset(bcstr,ke,je,ie,qng,dzi_t)
-    call sclrset(bcstr,ke,je,ie,qh ,dzi_t)
-    call sclrset(bcstr,ke,je,ie,qnh,dzi_t)
+    !bcstr = 'cnst'   ! 'mixd' or 'cnst'
+    !call sclrset(bcstr,ke,je,ie,qr ,dzi_t)
+    !call sclrset(bcstr,ke,je,ie,qnr,dzi_t)
+    !call sclrset(bcstr,ke,je,ie,qi ,dzi_t)
+    !call sclrset(bcstr,ke,je,ie,qni,dzi_t)
+    !call sclrset(bcstr,ke,je,ie,qs ,dzi_t)
+    !call sclrset(bcstr,ke,je,ie,qns,dzi_t)
+    !call sclrset(bcstr,ke,je,ie,qg ,dzi_t)
+    !call sclrset(bcstr,ke,je,ie,qng,dzi_t)
+    !call sclrset(bcstr,ke,je,ie,qh ,dzi_t)
+    !call sclrset(bcstr,ke,je,ie,qnh,dzi_t)
 
     IF (debug.and.isIO()) WRITE (0,*) "mcrph_sb: sedimentation"
 
@@ -3390,7 +3394,8 @@ contains
     end do
     end if
 
-    IF (isIO().and.debug_timing) THEN
+    IF (debug_timing) THEN
+!    IF (isIO().and.debug_timing) THEN
        nt=nt+1
        call cpu_time(timing(nt))
     END IF
@@ -3436,15 +3441,16 @@ contains
     ENDIF
 
 
-    IF (isIO().and.debug_timing) THEN
+    IF (debug_timing) THEN
+!    IF (isIO().and.debug_timing) THEN
        nt=nt+1
        call cpu_time(timing(nt))
-       WRITE(*,'(1x,a,f8.3,a)') 'mcrph_sb: CPU time  t2-t1(sec) = ',timing(2)-timing(1),' (trafo1)'
-       WRITE(*,'(1x,a,f8.3,a)') '          CPU time  t3-t2(sec) = ',timing(3)-timing(2),' (clouds)'
-       WRITE(*,'(1x,a,f8.3,a)') '          CPU time  t4-t3(sec) = ',timing(4)-timing(3),' (trafo2)'
-       WRITE(*,'(1x,a,f8.3,a)') '          CPU time  t5-t4(sec) = ',timing(5)-timing(4),' (sedi)'
-       WRITE(*,'(1x,a,f8.3,a)') '          CPU time  t6-t5(sec) = ',timing(6)-timing(5),' (final)'
-       WRITE(*,'(1x,a,f8.3)')   '          CPU time  total(sec) = ',timing(nt)-timing(1)
+       WRITE(*,'(1x,a,i3,a,f8.3,a)') 'mcrph_sb: CPU ',myid,' time  t2-t1(sec) = ',timing(2)-timing(1),' (trafo1)'
+       WRITE(*,'(1x,a,i3,a,f8.3,a)') '          CPU ',myid,' time  t3-t2(sec) = ',timing(3)-timing(2),' (clouds)'
+       WRITE(*,'(1x,a,i3,a,f8.3,a)') '          CPU ',myid,' time  t4-t3(sec) = ',timing(4)-timing(3),' (trafo2)'
+       WRITE(*,'(1x,a,i3,a,f8.3,a)') '          CPU ',myid,' time  t5-t4(sec) = ',timing(5)-timing(4),' (sedi)'
+       WRITE(*,'(1x,a,i3,a,f8.3,a)') '          CPU ',myid,' time  t6-t5(sec) = ',timing(6)-timing(5),' (final)'
+       WRITE(*,'(1x,a,i3,a,f8.3)')   '          CPU ',myid,' time  total(sec) = ',timing(nt)-timing(1)
     END IF
 
     IF (debug.and.isIO()) WRITE (*,*) "mcrph_sb: end"

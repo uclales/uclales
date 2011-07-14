@@ -20,6 +20,7 @@
 module init
 
   use grid
+  use ncio
 
   integer, parameter    :: nns = 500
   integer               :: ns

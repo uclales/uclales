@@ -17,23 +17,23 @@ $(LES_ARC)(rad_cldwtr.o) \
 $(LES_ARC)(rad_rndnmb.o) \
 $(LES_ARC)(rad_d4strm.o) \
 $(LES_ARC)(rad_driver.o) \
-$(LES_ARC)(ncio.o)   \
 $(LES_ARC)(util.o)   \
 $(LES_ARC)(grid.o)   \
-$(LES_ARC)(stat.o)   \
 $(LES_ARC)(thrm.o)   \
 $(LES_ARC)(rad_gcss.o)   \
 $(LES_ARC)(modnudge.o)   \
 $(LES_ARC)(modtimedep.o)   \
-$(LES_ARC)(forc.o)   \
-$(LES_ARC)(lsvar.o)   \
-$(LES_ARC)(advf.o)   \
-$(LES_ARC)(advl.o)   \
-$(LES_ARC)(srfc.o)   \
-$(LES_ARC)(prss.o)   \
-$(LES_ARC)(sgsm.o)   \
 $(LES_ARC)(ice_sb.o)   \
 $(LES_ARC)(icemcrp.o)   \
+$(LES_ARC)(ncio.o)   \
+$(LES_ARC)(stat.o)   \
+$(LES_ARC)(sgsm.o)   \
+$(LES_ARC)(prss.o)   \
+$(LES_ARC)(srfc.o)   \
+$(LES_ARC)(advf.o)   \
+$(LES_ARC)(advl.o)   \
+$(LES_ARC)(forc.o)   \
+$(LES_ARC)(lsvar.o)   \
 $(LES_ARC)(step.o)   \
 $(LES_ARC)(init.o)   \
 $(LES_ARC)(rfft.o)   
@@ -74,8 +74,7 @@ $(LES_ARC): $(ARCOBJ_f)
 # --------------------
 #
 
-ncio.o:		mpi_interface.o
-grid.o:		ncio.o
+grid.o:		
 advf.o:		grid.o stat.o util.o
 rad_rndnmb.o:	defs.o
 rad_solver.o:	defs.o
@@ -83,9 +82,10 @@ rad_corkds.o:	defs.o mpi_interface.o
 rad_cldwtr.o:	defs.o rad_corkds.o
 rad_d4strm.o:	defs.o rad_solver.o rad_rndnmb.orad_corkds.o rad_cldwtr.o
 rad_driver.o:	defs.o rad_d4strm.o
-forc.o: 	defs.o grid.o rad_gcss.o 
+forc.o: 	defs.o grid.o rad_gcss.o stat.o
 icemcrp.o: 	defs.o grid.o ice_sb.o
 util.o: 	defs.o grid.o ice_sb.o
 step.o:		icemcrp.o mpi_interface.o
-init.o:		step.o
-
+init.o:		grid.o ncio.o step.o icemcrp.o
+ncio.o:		grid.o mpi_interface.o icemcrp.o
+lsvar.o:	forc.o
