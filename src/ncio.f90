@@ -1,13 +1,20 @@
  module ncio
 
   use netcdf
+  use grid
   use mpi_interface, only : appl_abort, myid, pecount, wrxid, wryid
   use mcrp, only : cldw,rain,ice,snow,graupel,hail
 
   implicit none
   private
 
-  public :: open_nc, define_nc
+  public :: open_nc, define_nc, init_anal, close_anal, write_anal
+
+  integer, private, save  :: nrec0, nvar0, nbase=15
+  integer, save           :: ncid0,ncid_s
+
+  character (len=7),  private :: v_snm='sxx    ' 
+  character (len=80), private :: fname
 
 contains
   !
@@ -236,6 +243,227 @@ contains
     end if
 
   end subroutine define_nc
+  !
+  ! ----------------------------------------------------------------------
+  ! subroutine init_anal:  Defines the netcdf Analysis file
+  !
+  subroutine init_anal(time)
+
+    use mpi_interface, only :myid
+
+!irina
+    integer, parameter :: nnames = 32
+    character (len=7), save :: sbase(nnames) =  (/ &
+         'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,&
+         'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,&  
+         'w      ','t      ','p      ','q      ','l      ','r      '   ,'n      ',&
+         'inuc   ','rice   ','nice   ','rsnow  ','rgrp   ',&
+         'nsnow  ','ngrp   ','rhail  ','nhail  ',          &
+         'stke   ','rflx   ','lflxu  ','lflxd  '/)
+
+    real, intent (in) :: time
+    integer           :: nbeg, nend
+
+    nvar0 = nbase + naddsc    
+    if (level  >= 1) nvar0 = nvar0+1
+    if (level  >= 2) nvar0 = nvar0+1
+    if (level  >= 3) nvar0 = nvar0+2
+    if (level  >= 4) nvar0 = nvar0+5
+    if (level  >= 5) nvar0 = nvar0+4
+    if (iradtyp > 1) nvar0 = nvar0+3
+
+    allocate (sanal(nvar0))
+    sanal(1:nbase) = sbase(1:nbase)
+
+
+    nvar0 = nbase
+    !
+    ! add additional scalars, in the order in which they appear in scalar
+    ! table
+    !
+    if (level >= 1) then
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+1)
+    end if
+    !
+    ! add liquid water, which is a diagnostic variable, first
+    !
+    if (level >= 2) then
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+2)
+    end if
+
+    if (level >= 3) then
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+3)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+4)
+    end if
+    if (level >= 4) then
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+5)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+6)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+7)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+8)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+9)
+    end if
+    if (level >= 5) then
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+10)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+11)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+12)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+13)
+    end if
+    if (iradtyp > 1) then
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+14)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+15)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+16)
+    end if
+
+
+    nbeg = nvar0+1
+    nend = nvar0+naddsc
+    do nvar0 = nbeg, nend
+       write(v_snm(2:3),'(i2.2)') nvar0-nbeg
+       sanal(nvar0) = v_snm
+    end do
+    nvar0=nend
+    fname =  trim(filprf)
+    if(myid == 0) print                                                  &
+            "(//' ',49('-')/,' ',/,'   Initializing: ',A20)",trim(fname)
+    call open_nc( fname, expnme, time, (nxp-4)*(nyp-4), ncid0, nrec0)
+    call define_nc( ncid0, nrec0, nvar0, sanal, n1=nzp, n2=nxp-4, n3=nyp-4)
+    if (myid == 0) print *,'   ...starting record: ', nrec0
+
+  end subroutine init_anal
+  !
+  ! ----------------------------------------------------------------------
+  ! subroutine close_anal:  Closes netcdf anal file
+  !
+  integer function close_anal()
+
+    use netcdf
+
+    close_anal = nf90_close(ncid0)
+
+  end function close_anal
+  !
+  ! ----------------------------------------------------------------------
+  ! Subroutine Write_anal:  Writes the netcdf Analysis file
+  !
+  subroutine write_anal(time)
+
+    use netcdf
+    use mpi_interface, only : myid, appl_abort
+
+    real, intent (in) :: time
+
+    integer :: iret, VarID, nn, n
+    integer :: ibeg(4), icnt(4), i1, i2, j1, j2
+
+    !return 
+    icnt = (/nzp,nxp-4,nyp-4,1   /)
+    ibeg = (/1  ,1  ,1  ,nrec0/)
+    i1 = 3
+    i2 = nxp-2
+    j1 = 3
+    j2 = nyp-2
+    iret = nf90_inq_Varid(ncid0, sanal(1), VarID)
+    iret = nf90_put_var(ncid0, VarID, time, start=(/nrec0/))
+    if (nrec0 == 1) then
+       iret = nf90_inq_varid(ncid0, sanal(2), VarID)
+       iret = nf90_put_var(ncid0, VarID, zt, start = (/nrec0/))
+       iret = nf90_inq_varid(ncid0, sanal(3), VarID)
+       iret = nf90_put_var(ncid0, VarID, zm, start = (/nrec0/))
+       iret = nf90_inq_varid(ncid0, sanal(4), VarID)
+       iret = nf90_put_var(ncid0, VarID, xt(i1:i2), start = (/nrec0/))
+       iret = nf90_inq_varid(ncid0, sanal(5), VarID)
+       iret = nf90_put_var(ncid0, VarID, xm(i1:i2), start = (/nrec0/))
+       iret = nf90_inq_varid(ncid0, sanal(6), VarID)
+       iret = nf90_put_var(ncid0, VarID, yt(j1:j2), start = (/nrec0/))
+       iret = nf90_inq_varid(ncid0, sanal(7), VarID)
+       iret = nf90_put_var(ncid0, VarID, ym(j1:j2), start = (/nrec0/))
+       iret = nf90_inq_varid(ncid0, sanal(8), VarID)
+       iret = nf90_put_var(ncid0, VarID, u0, start = (/nrec0/))
+       iret = nf90_inq_varid(ncid0, sanal(9), VarID)
+       iret = nf90_put_var(ncid0, VarID, v0, start = (/nrec0/))
+       iret = nf90_inq_varid(ncid0, sanal(10), VarID)
+       iret = nf90_put_var(ncid0, VarID, dn0, start = (/nrec0/))
+    end if
+    iret = nf90_inq_varid(ncid0, sanal(11), VarID)
+    iret = nf90_put_var(ncid0, VarID, a_up(:,i1:i2,j1:j2), start=ibeg,    &
+         count=icnt)
+    iret = nf90_inq_varid(ncid0, sanal(12), VarID)
+    iret = nf90_put_var(ncid0, VarID, a_vp(:,i1:i2,j1:j2), start=ibeg,    &
+         count=icnt)
+    iret = nf90_inq_varid(ncid0, sanal(13), VarID)
+    iret = nf90_put_var(ncid0, VarID, a_wp(:,i1:i2,j1:j2), start=ibeg,    &
+         count=icnt)
+    iret = nf90_inq_varid(ncid0, sanal(14), VarID)
+    iret = nf90_put_var(ncid0, VarID, a_theta(:,i1:i2,j1:j2), start=ibeg, &
+         count=icnt)
+    iret = nf90_inq_varid(ncid0, sanal(15), VarID)
+    iret = nf90_put_var(ncid0, VarID, press(:,i1:i2,j1:j2), start=ibeg, &
+         count=icnt)
+    iret = nf90_inq_varid(ncid0, sanal(16), VarID)
+    iret = nf90_put_var(ncid0, VarID, a_rp(:,i1:i2,j1:j2), start=ibeg, &
+         count=icnt)
+
+
+    if (level >= 2)  then
+!        nn = nn+1
+       iret = nf90_inq_varid(ncid0, sanal(17), VarID)
+       iret = nf90_put_var(ncid0, VarID, liquid(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+    end if
+    nn = nbase+2
+!     if (level >=3) then
+      do n = nbase+2, nvar0-1
+       nn = nn+1
+       call newvar(nn-12)
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
+            count=icnt)
+      end do
+! 
+!     if (iradtyp > 1)  then
+!        nn = nn+1
+!        iret = nf90_inq_varid(ncid0, 'rflx', VarID)
+!        iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
+!             count=icnt)
+!   !irina          
+!        nn = nn+1
+!        iret = nf90_inq_varid(ncid0, 'lflxu', VarID)
+!        iret = nf90_put_var(ncid0, VarID, a_lflxu(:,i1:i2,j1:j2), start=ibeg, &
+!             count=icnt)
+!        nn = nn+1
+!        iret = nf90_inq_varid(ncid0, 'lflxd', VarID)
+!        iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
+!             count=icnt)
+!     end if
+
+!     if (nn /= nvar0) then
+!        if (myid == 0) print *, 'ABORTING:  Anal write error'
+!        call appl_abort(0)
+!     end if
+
+    if (myid==0) print "(//' ',12('-'),'   Record ',I3,' to: ',A60)",    &
+         nrec0,fname 
+
+    iret  = nf90_sync(ncid0)
+    nrec0 = nrec0+1
+
+  end subroutine write_anal
   !
   ! ----------------------------------------------------------------------
   ! Subroutine nc_info: Gets long_name, units and dimension info given a

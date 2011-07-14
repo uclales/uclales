@@ -62,8 +62,8 @@ contains
 
     use mpi_interface, only : myid, broadcast, double_scalar_par_max
     use grid, only : dt, dtlong, zt, zm, nzp, dn0, u0, v0, level, &
-         write_hist, write_anal, close_anal ,a_ninucp
-       
+         write_hist, a_ninucp
+    use ncio, only : write_anal, close_anal
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
 
