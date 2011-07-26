@@ -11299,429 +11299,6 @@ CONTAINS
 
   END SUBROUTINE ice_melting
 
-  SUBROUTINE rain_evaporation_uli ()
-    !*******************************************************************************
-    !                                                                              *
-    !   Berechnung der Verdunstungung von Regentropfen
-    !                                                                              *
-    !*******************************************************************************
-
-    USE globale_variablen,  ONLY: loc_ix, loc_iy, loc_iz, T, p, q, p_g, t_g, rho_g, q_cloud, &
-         &                        q_rain, n_rain, dt, S_w, dqdt, speichere_dqdt, &
-         &                        cond_neu_sb, evap_neu_sb, speichere_precipstat
-    USE konstanten,         ONLY: pi,cv,cp,wolke_typ
-    USE parallele_umgebung, ONLY: isIO,abortparallel
-    USE initialisierung,    ONLY: T_0,p_0,rho_0
-    USE gamma_functions_mp_seifert,    ONLY: incgfct_lower
-    USE wolken_konstanten,  ONLY: gfct
-
-    IMPLICIT NONE
-
-    ! .. Local Variables ..
-    INTEGER                     :: i,j,k
-    INTEGER                     :: stat_var = 0
-    INTEGER, SAVE               :: firstcall
-    DOUBLE PRECISION            :: T_a,p_a,e_sw,q_sw,s_sw,R_f,g_d,eva,eva_q,eva_n,a_ld,a_dl
-    DOUBLE PRECISION            :: q_d,q_r,n_r,x_r,d_r,v_r,f_v,N_re,x_d,e_d,f_q,f_n
-    DOUBLE PRECISION            :: n,n_0,mue,d_m,lam,xmax,xmin,G1,G4
-    DOUBLE PRECISION, SAVE      :: c_r               !..Koeff. fuer mittlere Kapazitaet
-    DOUBLE PRECISION, SAVE      :: a_n,b_n,a_q,b_q   !..Koeff. fuer mittleren Ventilationkoeff.
-    TYPE(PARTICLE) :: rai
-
-    ! ub: neue Parametrisierung der Verdunstung von QNR, nur in Kombination 
-    !mit use_mu_Dm_rain_evap = .true. wirksam:
-    ! Achtung: Z.Zt. wirkungslos, da auskommentiert!!!!
-    LOGICAL, PARAMETER          :: use_evap_qn_uli = .TRUE.
-
-    ! In case of exponential rain DSD (nu=-2/3) in the below rain particle definition,
-    ! set this switch to true (in init_seifert()) if intended to use exponential DSD 
-    ! also for evaporation:
-    LOGICAL :: use_exponentialdsd_rain_evap = .FALSE.
-
-    DOUBLE PRECISION, PARAMETER :: eps = 1.d-20
-
-    DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:,:) :: rate_n,rate_q
-
-    ALLOCATE(rate_n(0:loc_ix,1:loc_iy,1:loc_iz), STAT=stat_var)
-    ALLOCATE(rate_q(0:loc_ix,1:loc_iy,1:loc_iz), STAT=stat_var)
-    IF (stat_var/=0) CALL abortparallel("Allokierungsfehler CLOUD rain_evaporation",4)
-
-    rate_q = 0.0
-    rate_n = 0.0
-
-    a_dl = R_d/R_l
-    a_ld = 1.0/a_dl
-
-    IF (cloud_typ > 1 .AND. use_mu_Dm_rain_evap) THEN
-      WRITE (*,*) 'ERROR: This option is currently not supported here'
-      STOP
-    END IF
-
-
-    IF (firstcall.NE.1) THEN
-!      a_q = vent_coeff_a(rain,1)
-!      b_q = vent_coeff_b(rain,1)
-!      a_n = vent_coeff_a(rain,0)
-!      b_n = vent_coeff_b(rain,0)
-      a_q = vent_coeff_a(rain,1)
-      b_q = vent_coeff_b(rain,1)
-      IF (.NOT.use_exponentialdsd_rain_evap) THEN
-        a_n = vent_coeff_a(rain,0)
-        b_n = vent_coeff_b(rain,0)
-      ELSE
-        ! For any distribution with nue <= -1/3, 
-        ! a_n and b_n are not defined. An exponential 
-        ! distribution w.r. to D has nue = -2/3.
-        ! This is another manifestation, that the
-        ! original SB parameterization of the evaporative
-        ! tendency for QNRAIN is wrong!
-        ! Therefore, we cheat here and set nu to the smallest
-        ! possible value. Remember that QNRAIN-tendendy is wrong anyways...
-        rai = rain
-        rai%nu = -0.3
-        a_n = vent_coeff_a(rai,0)
-        b_n = vent_coeff_b(rai,0)
-      END IF
-      c_r = 1.0 / rain%cap
-      firstcall = 1
-      IF (isIO()) THEN
-        !IF (isIO() .AND. isdebug) THEN
-        WRITE (6,'(A,D10.3)') "CLOUD rain_evaporation:"
-        WRITE (6,'(A,D10.3)') "     nu    = ",rain%nu
-        WRITE (6,'(A,D10.3)') "     mu    = ",rain%mu
-        WRITE (6,'(A,D10.3)') "     a_geo = ",rain%a_geo
-        WRITE (6,'(A,D10.3)') "     b_geo = ",rain%b_geo
-        WRITE (6,'(A,D10.3)') "     a_n   = ",a_n
-        WRITE (6,'(A,D10.3)') "     b_n   = ",b_n
-        WRITE (6,'(A,D10.3)') "     a_q   = ",a_q
-        WRITE (6,'(A,D10.3)') "     b_q   = ",b_q
-        WRITE (6,'(A,D10.3)') "     c_r   = ",c_r
-      END IF
-    ELSEIF (isIO() .AND. isdebug) THEN
-      WRITE (6, *) "CLOUD rain_evaporation " 
-    END IF
-
-    G1 = 1              ! gfct(n+1) 
-    G4 = pi * rho_w     ! gfct(n+4) * pi/6. * rho_w
-    DO k = 1, loc_iz
-      DO j = 1, loc_iy
-        DO i = 0, loc_ix
-          q_r = q_rain(i,j,k)
-          p_a  = p_0(i,j,k) !WRF!+ p(i,j,k)
-          T_a  = T_0(i,j,k) !WRF!+ T(i,j,k) + T_g(i,j,k)
-          q_d  = q(i,j,k)
-          x_d  = q(i,j,k) / (rho_0(i,j,k))!WRF!+rho_g(i,j,k))
-          e_d  = q(i,j,k) * R_d * T_a
-          e_sw = e_ws(T_a)
-          s_sw = e_d / e_sw - 1.0                   !..Uebersaettigung bzgl. Wasser
-!          IF(s_sw < 0.0 .AND. q_r > q_krit .AND. q_cloud(i,j,k) < q_krit)THEN
-          IF(s_sw < 0.0 .AND. q_r > 0.0d0 .AND. q_cloud(i,j,k) < q_krit)THEN
-
-
-            g_d = 4.0*pi / ( L_wd**2 / (K_T * R_d * T_a**2) + R_d * T_a / (D_v * e_sw) )
-
-            n_r = n_rain(i,j,k)
-            IF (cloud_typ <= 1) THEN
-              n_0 = 1.00d+07
-              n_r = n_0 * (pi*rho_w*n_0/q_r)**(-1./4.)     !..Nur q_r  (n_0 = const) 
-              x_r = MIN(MAX(q_r/(n_r+eps),rain%x_min),rain%x_max)
-              x_r = MAX(1e3/2e7*q_r,MIN(x_r,1e4/2e5*q_r))
-            ELSEIF (use_mu_Dm_rain_evap) THEN
-
-              x_r = q_r / (n_r+eps)
-              x_r = MIN(MAX(x_r,rain%x_min),rain%x_max)
-              n_r = q_r / x_r
-
-              D_m = ( 6. / (rho_w*pi) * x_r )**(1./3.)
-              mue = rain_cmu1*TANH((rain_cmu2*(D_m-rain_cmu3))**rain_cmu5) + rain_cmu4
-              IF (D_m < rain_cmu3) THEN
-                mue = MAX( (rain%nu+1.0d0)*3.0d0 -1.0d0 , rain_cmu4)
-              ELSE
-                mue = MAX(MIN( mue, 10.0d0), MAX((rain%nu+1.0d0)*3.0d0-1.0d0, rain_cmu4))
-              END IF
-              rai = rain
-              rai%nu = (mue-2.0)/3.0
-              rai%mu = 0.3333333
-              a_q = vent_coeff_a(rai,1)
-              b_q = vent_coeff_b(rai,1)
-              a_n = vent_coeff_a(rai,0)
-              b_n = vent_coeff_b(rai,0)
-            ELSEIF (use_mu_orig_rain_evap) THEN
-              x_r = q_r / (n_r+eps)
-              x_r = MIN(MAX(x_r,rain%x_min),rain%x_max)
-              n_r = q_r / x_r
-              rai = rain
-              rai%mu = 0.3333333
-              a_q = vent_coeff_a(rai,1)
-              b_q = vent_coeff_b(rai,1)
-              a_n = vent_coeff_a(rai,0)
-              b_n = vent_coeff_b(rai,0)
-            ELSEIF (use_exponentialdsd_rain_evap) THEN
-              x_r = MIN(MAX(q_r/(n_r+eps),rain%x_min),rain%x_max)
-              n_0 = n_r/G1 * (G4/G1/x_r)**(1./3.)          !..n0
-              n_0 = MIN(MAX(250.0d+03,n_0),20000.0d+03)
-              n_r = n_0 * (pi*rho_w*n_0/q_r)**(-0.25)     !..Nur q_r  (n_0 = const) 
-            ELSE
-              x_r = MIN(MAX(q_r/(n_r+eps),rain%x_min),rain%x_max)
-              x_r = MAX(1e3/2e7*q_r,MIN(x_r,1e4/2e5*q_r))
-              n_r = q_r / x_r
-            ENDIF
-            d_r = rain%a_geo * x_r**rain%b_geo                 
-            v_r = rain%a_vel * x_r**rain%b_vel * rrho_04(i,j,k)
-
-            N_re = v_r * d_r / nu_l                            
-            f_v  = N_sc**n_f * N_re**m_f           
-
-            f_n  = a_n + b_n * f_v
-            f_q  = a_q + b_q * f_v
-
-            eva   = g_d * n_r * c_r * d_r * s_sw * dt 
-!            eva_q = 0.5 * f_q * eva
-            eva_q = f_q * eva
-
-            ! UB: Neue Parametrisierung der Verdunstung von Regentropfen-Anzahldichte im Falle
-            ! der Anwendung der mue-D-Beziehung von Axel:
-            ! eva_n wird bestimmt als Anzahl der Regentropfen (D > 80 mue-m), die waehrend des Zeitschrittes
-            ! dt auf einen Durchmesser kleiner als 80 mue-m schrumpfen koennen oder die sowieso
-            ! schon kleiner als 80 mue-m sind. Von diesen Tropfen wird angenommen, dass
-            ! sie im folgenden sehr schnell verdunsten und dass deren Masse schon in der
-            ! vorher berechneten eva_q steckt, was so nicht ganz richtig ist: nur ein Teil ihrer Masse steckt in eva_q ...
-            IF (use_mu_Dm_rain_evap .AND. use_evap_qn_uli) THEN
-!!!!              xmin = (2.67304d-6/rai%a_geo)**(1.0d0/rai%b_geo) ! xmin von D=80 mue-m
-!              xmax = (dmax_evap_von_dt_80(dt,s_sw,T_a,p_a*1e-2)*1.0d-6/rai%a_geo)**(1.0d0/rai%b_geo)
-!              lam = ( gfct((rai%nu+1.0)/rai%mu) / gfct((rai%nu+2.0)/rai%mu) * x_r)**(-rai%mu)
-!              n_0 = rai%mu * n_r * lam**((rai%nu+1.0)/rai%mu) / gfct((rai%nu+1.0)/rai%mu)
-!              eva_n = n_0/(rai%mu*lam**((rai%nu+1.0)/rai%mu))* &
-!                   incgfct_lower((rai%nu+1.0)/rai%mu, lam*xmax**rai%mu)
-
-! ub>> setzte melt_n so, dass x_r beim Schmelzvorgang erhalten bleibt:
-              eva_n = MAX(MIN( (eva_q + q_r) / x_r - n_r, 0.0d0), -n_r)
-
-            ELSE
-!              eva_n = f_n * eva / x_r
-              eva_n = MAX(MIN( (eva_q + q_r) / x_r - n_r, 0.0d0), -n_r)
-            END IF
-
-            eva_q = MAX(-eva_q,0.d0) 
-            eva_n = MAX(-eva_n,0.d0) 
-
-            eva_q = MIN(eva_q,q_rain(i,j,k)) 
-            eva_n = MIN(eva_n,n_rain(i,j,k)) 
-
-            rate_q(i,j,k) = eva_q
-
-            !..Berechnung der H_2O-Komponenten
-            q(i,j,k)      = q(i,j,k)      + eva_q
-            q_rain(i,j,k) = q_rain(i,j,k) - eva_q
-            IF (cloud_typ > 1) THEN
-              n_rain(i,j,k) = n_rain(i,j,k) - eva_n
-            END IF
-            ! ub>>
-#ifdef SAVE_CONVERSIONRATES
-            IF (speichere_dqdt) THEN
-              dqdt(i,j,k,36) = eva_q
-            END IF
-#endif
-            IF (speichere_precipstat) THEN
-              evap_neu_sb(i,j,k) = evap_neu_sb(i,j,k) + eva_q
-            END IF
-            ! ub<<
-
-          END IF
-        END DO
-      END DO
-    END DO
-
-    DEALLOCATE(rate_n,rate_q)
-
-  CONTAINS
-
-    FUNCTION dmax_evap_von_dt_80(t0, ssw, temp, pres)
-      IMPLICIT NONE
-      DOUBLE PRECISION :: dmax_evap_von_dt_80
-      DOUBLE PRECISION, INTENT(in) :: t0, ssw, temp, pres
-
-      ! t0 Verdunstungszeit in s
-      ! ssw Uebersaettigung (dimensionslos), <= 0.0!!!
-      ! temp Temperatur in K
-      ! pres Luftdruck in hPa
-
-      ! dmax_evap_von_dt_fit ist max. Tropfendurchmesser, der waehrend t0 zu einem
-      ! Durchmesser kleiner 80 mue-m schrumpfen kann, in mue-m
-
-      ! Fit an exakte Loesung der Verdunstungsgleichung fuer einen Wassertropfen, UB 28.12.2006
-
-      IF (ssw >= 0.0d0 .OR. t0 <= 0.0d0) THEN
-        dmax_evap_von_dt_80 = 80.0d0
-      ELSE
-        IF (pres >= 350.0d0 .AND. temp >= 255.0) THEN
-          dmax_evap_von_dt_80 = dmax_evap_von_dt_80_fit(t0, ssw, temp, pres)
-        ELSEIF (pres < 350.0d0 .AND. temp >= 255.0) THEN
-          dmax_evap_von_dt_80 = dmax_evap_von_dt_80_fit(t0, ssw, temp, 350d0)
-        ELSEIF (pres >= 350.0d0 .AND. temp < 255.0) THEN
-          dmax_evap_von_dt_80 = dmax_evap_von_dt_80_fit(t0, ssw, 255d0, pres)
-        ELSE
-          dmax_evap_von_dt_80 = dmax_evap_von_dt_80_fit(t0, ssw, 255d0, 350d0)
-        END IF
-      END IF
-
-      RETURN
-
-    END FUNCTION dmax_evap_von_dt_80
-
-    FUNCTION dmax_evap_von_dt_80_fit(t0, ssw, temp, pres)
-      IMPLICIT NONE
-      DOUBLE PRECISION :: dmax_evap_von_dt_80_fit
-      DOUBLE PRECISION, INTENT(in) :: t0, ssw, temp, pres
-
-      ! t0 Verdunstungszeit in s
-      ! ssw Uebersaettigung (dimensionslos), <= 0.0!!!
-      ! temp Temperatur in K
-      ! pres Luftdruck in hPa
-
-      ! dmax_evap_von_dt_fit ist max. Tropfendurchmesser, der waehrend t0 zu einem
-      ! Durchmesser kleiner 80 mue-m schrumpfen kann, in mue-m
-
-      ! Fit an exakte Loesung der Verdunstungsgleichung fuer einen Wassertropfen, UB 28.12.2006
-
-      dmax_evap_von_dt_80_fit = &
-           80.0d0 + &
-           (-ssw) ** (8.46314e-01 - 7.25603e-02*(-ssw)) * &
-           t0 ** (8.45971e-01 - 3.05889e-05*t0) * &
-           EXP( -4.57221e-01*pres + 3.38631e-04*pres**2 - &
-	   7.52532e-02*temp + 5.74819e-04*temp**2 - 1.00609e-06*temp**3 + &
-	   4.76251e-03*temp*pres - 1.66550e-05*temp**2*pres - &
-	   3.62118e-06*temp*pres**2 + 1.29988e-08*temp**2*pres**2 + &
-	   1.95564e-08*temp**3*pres + 3.00090e-11*temp*pres**3 - &
-	   1.56593e-11*temp**3*pres**2 - 2.57761e-13*temp**2*pres**3 + &
-	   5.34057e-16*temp**3*pres**3)
-
-      RETURN
-
-    END FUNCTION dmax_evap_von_dt_80_fit
-
-    FUNCTION dmax_evap_von_dt(t0, ssw, temp, pres)
-      IMPLICIT NONE
-      DOUBLE PRECISION :: dmax_evap_von_dt
-      DOUBLE PRECISION, INTENT(in) :: t0, ssw, temp, pres
-
-      ! t0 Verdunstungszeit in s
-      ! ssw Uebersaettigung (dimensionslos), <= 0.0!!!
-      ! temp Temperatur in K
-      ! pres Luftdruck in hPa
-
-      ! dmax_evap_von_dt_fit ist max. Tropfendurchmesser, der waehrend t0 zu einem
-      ! Durchmesser kleiner 3 mue-m schrumpfen kann, in mue-m
-
-      ! Fit an exakte Loesung der Verdunstungsgleichung fuer einen Wassertropfen, UB 28.12.2006
-
-      IF (ssw >= 0.0d0 .OR. t0 <= 0.0d0) THEN
-        dmax_evap_von_dt = 2.67304d0
-      ELSE
-        IF (pres >= 350.0d0 .AND. temp >= 255.0) THEN
-          dmax_evap_von_dt = dmax_evap_von_dt_fit(t0, ssw, temp, pres)
-        ELSEIF (pres < 350.0d0 .AND. temp >= 255.0) THEN
-          dmax_evap_von_dt = dmax_evap_von_dt_fit(t0, ssw, temp, 350d0)
-        ELSEIF (pres >= 350.0d0 .AND. temp < 255.0) THEN
-          dmax_evap_von_dt = dmax_evap_von_dt_fit(t0, ssw, 255d0, pres)
-        ELSE
-          dmax_evap_von_dt = dmax_evap_von_dt_fit(t0, ssw, 255d0, 350d0)
-        END IF
-      END IF
-
-      RETURN
-
-    END FUNCTION dmax_evap_von_dt
-
-    FUNCTION dmax_evap_von_dt_fit(t0, ssw, temp, pres)
-      IMPLICIT NONE
-      DOUBLE PRECISION :: dmax_evap_von_dt_fit
-      DOUBLE PRECISION, INTENT(in) :: t0, ssw, temp, pres
-      DOUBLE PRECISION :: k(34), temp0, pres0, ssw0, t00
-
-      ! t0 Verdunstungszeit in s
-      ! ssw Uebersaettigung (dimensionslos), <= 0.0!!!
-      ! temp Temperatur in K
-      ! pres Luftdruck in hPa
-
-      ! dmax_evap_von_dt_fit ist max. Tropfendurchmesser, der waehrend t0 zu einem
-      ! Durchmesser kleiner 3 mue-m schrumpfen kann, in mue-m
-
-      ! Fit an exakte Loesung der Verdunstungsgleichung fuer einen Wassertropfen, UB 28.12.2006
-
-      k(1) =  3.0723494d+00
-      k(2) =  3.4323082d+00
-      k(3) = -3.1757109d+02
-      k(4) =  2.2300284d+02
-      k(5) = -3.1900499d+01
-      k(6) =  3.2519116d+02
-      k(7) = -5.9528492d+02
-      k(8) = -1.5190419d+00
-      k(9) = -5.6175505d+00
-      k(10) =  3.2666038d+03
-      k(11) = -1.1267302d+04
-      k(12) = -2.3444542d+03
-      k(13) =  8.2523606d+03
-      k(14) =  1.3018925d+04
-      k(15) =  5.2177278d+00
-      k(16) = -9.7173927d+03
-      k(17) = -5.3470122d+01
-      k(18) =  1.2083440d+02
-      k(19) =  4.4115234d+00
-      k(20) =  1.9539047d-01
-      k(21) = -3.6778135d-03
-      k(22) =  3.0932550d-01
-      k(23) = -1.6607613d+01
-      k(24) =  2.7951320d+01
-      k(25) = -1.9397343d+01
-      k(26) =  3.2484952d+01
-      k(27) =  3.6264186d+01
-      k(28) =  9.9492881d+00
-      k(29) = -1.5765954d+01
-      k(30) = -1.9654622d+00
-      k(31) =  3.0199854d+00
-      k(32) = -6.0361783d+01
-      k(33) = -3.1046165d+01
-      k(34) =  5.7600929d+01
-
-      temp0 = temp * 1d-3
-      pres0 = pres * 1d-3
-      ssw0 = -ssw
-      t00 = t0 * 1d-2
-
-      dmax_evap_von_dt_fit = 2.67304d0 + &
-           (ssw0)**( k(1) + k(9)*ssw0 + k(19)*ssw**2 + &
-                         k(20)*ssw0*(t00) + & 
-			 k(23)*(temp0) + k(24)*(temp0)**2 + &
-			 k(27)*(temp0)*(ssw0)+ &
-			 k(32)*(temp0)**2*(ssw0) + &
-			 k(33)*(temp0)*(ssw0)**2 + &
-			 k(34)*(temp0)**2*(ssw0)**2 ) * &
-           (t0)**( k(2) + k(8)*t00 + k(21)*ssw0*(t00) + &
-                         k(22)*(t00)**2 + & 
-                         k(25)*(temp0) + k(26)*(temp0)**2 + &
-                         k(28)*(temp0)*(t00) + &
-                         k(29)*(temp0)**2*(t00) + &
-                         k(30)*(temp0)*(t00)**2 + &
-                         k(31)*(temp0)**2*(t00)**2 ) * &
-           EXP( k(3)*pres0 + k(4)*(pres0)**2 + k(5)*temp0 + &
-                         k(6)*(temp0)**2 + k(7)*(temp0)**3 + &
-                         k(10)*(pres0)*(temp0) + &
-                         k(11)*(pres0)*(temp0)**2 + &
-                         k(12)*(pres0)**2*(temp0) + &
-                         k(13)*(pres0)**2*(temp0)**2 + &
-                         k(14)*(pres0)*(temp0)**3 + &
-                         k(15)*(pres0)**3*(temp0) + &
-                         k(16)*(pres0)**2*(temp0)**3 + &
-                         k(17)*(pres0)**3*(temp0)**2 + &
-                         k(18)*(pres0)**3*(temp0)**3 )
-
-      RETURN
-
-    END FUNCTION dmax_evap_von_dt_fit
-
-  END SUBROUTINE rain_evaporation_uli
-
   SUBROUTINE rain_evaporation ()
     !*******************************************************************************
     !                                                                              *
@@ -13017,60 +12594,39 @@ CONTAINS
       IF (nuc_c_typ .EQ. 0) THEN
         IF (isdebug) WRITE (*,*) '  ... force constant cloud droplet number conc.'
         n_cloud = qnc_const
-! UB_20090316      ELSEIF (nuc_c_typ < 9) THEN
       ELSEIF (nuc_c_typ < 6) THEN
         IF (isdebug) WRITE (*,*) '  ... according to SB2006'
         CALL cloud_nucleation()
       ELSE
         IF (isdebug) WRITE (*,*) '  ... look-up tables according to Segal& Khain'
-! UB_20090227>> 
-!        CALL cloud_nucleation_SK()
-! Use equidistant table lookup for better vectorization instead:
+        ! CALL cloud_nucleation_SK()
+        ! Use equidistant table lookup for better vectorization
         CALL clnuc_sk_4D()
-! UB_20090227<<
       END IF
     END IF
 
     IF (nuc_c_typ.ne.0) THEN
-    n_cloud = MAX(n_cloud, q_cloud / cloud%x_max)
-    n_cloud = MIN(n_cloud, q_cloud / cloud%x_min)
-    end if
+       n_cloud = MAX(n_cloud, q_cloud / cloud%x_max)
+       n_cloud = MIN(n_cloud, q_cloud / cloud%x_min)
+    END IF
 
     IF (ice_typ .NE. 0) THEN
 
       ! Eisnukleation
       IF (isdebug) WRITE (*,*) 'CLOUDS: ice_nucleation'
-      IF (nuc_i_typ > 1000) THEN
-!      CALL ice_nucleation()
-! UB_20090316>> vectorized version:
-        CALL ice_nucleation_vec()
-! UB_20090316<<
-      ELSE
-! AS_20090609>> new version with hom. nucleation
-        CALL ice_nucleation_homhet()
-      END IF
+      ! CALL ice_nucleation()
+      ! CALL ice_nucleation_vec()
+      CALL ice_nucleation_homhet()
 
       n_ice     = MIN(n_ice, q_ice/ice%x_min)
       n_ice     = MAX(n_ice, q_ice/ice%x_max)
-! AS_20090609<<
 
       ! Gefrieren der Wolkentropfen:
       IF (isdebug) WRITE (*,*) 'CLOUDS: cloud_freeze'
       CALL cloud_freeze ()
 
-      ! Depositionswachstum mit dt <= 10 s
-      n_dt = MAX(CEILING(dt/10.0), 1)
-      dt_local = dt/n_dt
       IF (isdebug) WRITE (*,*) 'CLOUDS: vapor_deposition_growth' 
-      DO i=1,n_dt
-! UB_20090227>>
-! Use simpler version without the fancy limiting of evaporative tendencies
-! to enable vectorization:
-!        CALL vapor_deposition_growth(dt_local,i)
-        CALL vapor_dep_simple(dt_local,i)
-! UB_20090227<<
-        !CALL saturation_adjust_h2o ()
-      ENDDO
+      CALL vapor_dep_relaxation(dt,1)
 
       IF (isdebug) WRITE (*,*) 'CLOUDS: ice_selfcollection'
       CALL ice_selfcollection ()
@@ -13093,10 +12649,8 @@ CONTAINS
       IF (ice_typ > 1) THEN
 
         IF (isdebug) WRITE (*,*) 'CLOUDS: graupel_hail_conversion_wetgrowth'
-! UB_20090227>> use of lookup tables for the inc. gamma-fct. 
 !        CALL graupel_hail_conv_wet ()
         CALL graupel_hail_conv_wet_gamlook ()
-! UB_20090227<<
 
         IF (isdebug) WRITE (*,*) 'CLOUDS: hail_ice_collection'
         CALL hail_ice_collection ()
@@ -13163,16 +12717,12 @@ CONTAINS
 
       ! Gefrieren der Regentropfen:
       IF (isdebug) WRITE (*,*) 'CLOUDS: rain_freeze'
-! UB_20080212>
-!      IF (use_rain_freeze_uli .and. ice_typ > 1) THEN
+
       IF (use_rain_freeze_uli) THEN
-! <UB_20080212
         ! new freezing scheme
         ! with a partitioning into ice/graupel/hail
-! UB_20090227>> use of lookup tables for the inc. gamma-fct. 
 !        CALL rain_freeze ()
         CALL rain_freeze_gamlook ()
-! UB_20090227<<
       ELSE
         ! simpler SB2006 rain-to-graupel freezing scheme
         CALL rain_freeze_old ()
@@ -13207,6 +12757,7 @@ CONTAINS
       ! n_ice = MIN(n_ice, 1000d3)
 
     ENDIF
+
     IF (isdebug) CALL process_evaluation (1) ! Optional
 
     !ncmax = global_maxval(n_cloud)
@@ -13256,25 +12807,23 @@ CONTAINS
     END IF
 
     IF (nuc_c_typ > 0) THEN
-    n_cloud = MIN(n_cloud, q_cloud/cloud%x_min)
-    n_cloud = MAX(n_cloud, q_cloud/cloud%x_max)
+       n_cloud = MIN(n_cloud, q_cloud/cloud%x_min)
+       n_cloud = MAX(n_cloud, q_cloud/cloud%x_max)
 
-!AS20080408>
-    ! Hard upper limit for cloud number conc.
-    n_cloud = MIN(n_cloud, 5000d6)
-!<AS20080408
+       ! Hard upper limit for cloud number conc.
+       n_cloud = MIN(n_cloud, 5000d6)
     end if
 
     ! Hydrometeore in ihrer Groesse beschraenken:
     n_rain = MIN(n_rain, q_rain/rain%x_min)
     n_rain = MAX(n_rain, q_rain/rain%x_max)
     IF (ice_typ > 0) THEN
-    n_ice = MIN(n_ice, q_ice/ice%x_min)
-    n_ice = MAX(n_ice, q_ice/ice%x_max)
-    n_snow = MIN(n_snow, q_snow/snow%x_min)
-    n_snow = MAX(n_snow, q_snow/snow%x_max)
-    n_graupel = MIN(n_graupel, q_graupel/graupel%x_min)
-    n_graupel = MAX(n_graupel, q_graupel/graupel%x_max)
+       n_ice = MIN(n_ice, q_ice/ice%x_min)
+       n_ice = MAX(n_ice, q_ice/ice%x_max)
+       n_snow = MIN(n_snow, q_snow/snow%x_min)
+       n_snow = MAX(n_snow, q_snow/snow%x_max)
+       n_graupel = MIN(n_graupel, q_graupel/graupel%x_min)
+       n_graupel = MAX(n_graupel, q_graupel/graupel%x_max)
     END IF
     IF (ice_typ > 1) THEN
       n_hail = MIN(n_hail, q_hail/hail%x_min)
@@ -13284,28 +12833,25 @@ CONTAINS
     ! Analyse der Prozesse
     !CALL process_evaluation (0) ! Optional
 
-    ! diagnostische Beziehung fuer die Dichte
-    ! rho = dichte(p,t,q,q_cloud,q_ice,q_rain,q_snow,q_graupel)
-
     IF(isIO() .AND. isdebug)THEN
       WRITE (6, *) "CLOUD Wolken: END" 
     END IF
 
     if (.false.) then
-    WHERE (q         < 0.0d0) q         = 0.0d0
-    WHERE (n_ice     < 0.0d0) n_ice     = 0.0d0
-    WHERE (q_ice     < 0.0d0) q_ice     = 0.0d0
-    WHERE (n_rain    < 0.0d0) n_rain    = 0.0d0
-    WHERE (q_rain    < 0.0d0) q_rain    = 0.0d0
-    WHERE (n_snow    < 0.0d0) n_snow    = 0.0d0
-    WHERE (q_snow    < 0.0d0) q_snow    = 0.0d0
-    WHERE (n_cloud   < 0.0d0) n_cloud   = 0.0d0
-    WHERE (q_cloud   < 0.0d0) q_cloud   = 0.0d0
-    WHERE (n_cloud   < 0.0d0) n_cloud   = 0.0d0
-    WHERE (n_graupel < 0.0d0) n_graupel = 0.0d0
-    WHERE (q_graupel < 0.0d0) q_graupel = 0.0d0
-    WHERE (n_hail    < 0.0d0) n_hail    = 0.0d0
-    WHERE (q_hail    < 0.0d0) q_hail    = 0.0d0
+       WHERE (q         < 0.0d0) q         = 0.0d0
+       WHERE (n_ice     < 0.0d0) n_ice     = 0.0d0
+       WHERE (q_ice     < 0.0d0) q_ice     = 0.0d0
+       WHERE (n_rain    < 0.0d0) n_rain    = 0.0d0
+       WHERE (q_rain    < 0.0d0) q_rain    = 0.0d0
+       WHERE (n_snow    < 0.0d0) n_snow    = 0.0d0
+       WHERE (q_snow    < 0.0d0) q_snow    = 0.0d0
+       WHERE (n_cloud   < 0.0d0) n_cloud   = 0.0d0
+       WHERE (q_cloud   < 0.0d0) q_cloud   = 0.0d0
+       WHERE (n_cloud   < 0.0d0) n_cloud   = 0.0d0
+       WHERE (n_graupel < 0.0d0) n_graupel = 0.0d0
+       WHERE (q_graupel < 0.0d0) q_graupel = 0.0d0
+       WHERE (n_hail    < 0.0d0) n_hail    = 0.0d0
+       WHERE (q_hail    < 0.0d0) q_hail    = 0.0d0
     end if
 
   CONTAINS
@@ -14695,1132 +14241,7 @@ CONTAINS
 
   END SUBROUTINE accretionKK
 
-  SUBROUTINE vapor_deposition_growth(dt_local,i_local)
-    !*******************************************************************************
-    !                                                                              *
-    !       Berechnung des Wachstums der Eispartikel durch Wasserdampfdiffusion    *
-    !                                                                              *
-    !*******************************************************************************
-
-    USE globale_variablen,  ONLY: loc_ix, loc_iy, loc_iz, T, p, q,T_g,p_g, rho_g,       &
-         &                        q_cloud, n_cloud, q_ice, n_ice, q_graupel, n_graupel, &
-         &                        q_hail, n_hail,                                       & 
-         &                        q_snow, n_snow, q_rain, s_i, s_w, &
-         &                        dqdt, speichere_dqdt, cond_neu_sb, &
-         &                        evap_neu_sb, speichere_precipstat, &
-         &                        deprate_ice, deprate_snow
-    USE konstanten,         ONLY: pi,cv,cp
-    USE parallele_umgebung, ONLY: isIO
-    USE initialisierung,    ONLY: T_0,p_0,rho_0,dichte
-
-    IMPLICIT NONE
-
-    INTEGER                     :: i_local
-    DOUBLE PRECISION            :: dt_local
-    DOUBLE PRECISION            :: a_dl,a_ld,D_vtp
-    DOUBLE PRECISION            :: q_g,n_g,x_g,D_g,q_s,n_s,x_s,conv_q,conv_n,x_conv
-    ! ub>> 
-    DOUBLE PRECISION            :: necessary_d,available_d,weight,depitmp,depstmp,depgtmp,dephtmp,&
-         tv_i,tv_s,tv_g,tv_h,tv(4),tvsort(4),depvec(4),depvec2(4),qxvec(4)
-    INTEGER :: indsort(4)
-    ! ub<<
-    DOUBLE PRECISION, PARAMETER :: eps  = 1.d-20
-
-    DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:,:) :: s_si,g_i
-    DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:,:) :: s_sw,g_w
-    DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:,:) :: dep_ice
-    DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:,:) :: dep_snow
-    DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:,:) :: dep_cloud
-    DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:,:) :: dep_graupel, dep_graupel_n
-    DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:,:) :: dep_hail, dep_hail_n
-
-    ! Locale Variablen 
-    DOUBLE PRECISION            :: T_a             !..Absolute Temperatur
-    DOUBLE PRECISION            :: q_si            !..Wasserdampfdichte bei Eissaettigung
-    DOUBLE PRECISION            :: e_si            !..Wasserpartialdruck bei Eissaettigung
-    DOUBLE PRECISION            :: e_sw            !..Wasserpartialdruck bei saettigung
-    DOUBLE PRECISION            :: q_d,x_d,e_d,R_f,p_a,rho_a,dep_sum
-    INTEGER                     :: i,j,k
-    INTEGER, SAVE               :: firstcall
-    DOUBLE PRECISION            :: qimax, qsmax, qgmax, qhmax        ! <hn
-
-    ALLOCATE(s_si(0:loc_ix,1:loc_iy,1:loc_iz))
-    ALLOCATE(s_sw(0:loc_ix,1:loc_iy,1:loc_iz))
-    ALLOCATE(g_i(0:loc_ix,1:loc_iy,1:loc_iz))
-    ALLOCATE(g_w(0:loc_ix,1:loc_iy,1:loc_iz))
-    ALLOCATE(dep_ice(0:loc_ix,1:loc_iy,1:loc_iz))
-    ALLOCATE(dep_snow(0:loc_ix,1:loc_iy,1:loc_iz))
-    ALLOCATE(dep_cloud(0:loc_ix,1:loc_iy,1:loc_iz))
-    ALLOCATE(dep_graupel(0:loc_ix,1:loc_iy,1:loc_iz))
-    ALLOCATE(dep_graupel_n(0:loc_ix,1:loc_iy,1:loc_iz))
-    ALLOCATE(dep_hail(0:loc_ix,1:loc_iy,1:loc_iz))
-    ALLOCATE(dep_hail_n(0:loc_ix,1:loc_iy,1:loc_iz))
-
-    a_dl = R_d/R_l
-    a_ld = 1.0/a_dl
-
-    IF(isIO() .AND. isdebug)THEN
-      WRITE (6, *) "CLOUD vapor_deposition_growth: " 
-    END IF
-
-    IF (firstcall.NE.1) THEN
-      IF(isIO() .AND. isdebug)THEN
-        WRITE (6,'(A,D10.3)') "  Diffusivitaet von Wasserdampf in Luft:    D_v   = ",D_v
-        WRITE (6,'(A,D10.3)') "  Waermeleitfaehigkeit von Luft:            K_T   = ",K_T
-        WRITE (6,'(A,D10.3)') "  Sublimationswaerme:                       L_ed  = ",L_ed
-        WRITE (6,'(A,D10.3)') "  Kinematische Viskositaet von Luft:        nu_l  = ",nu_l 
-      END IF
-      firstcall = 1
-    ENDIF
-
-    DO k = 1, loc_iz
-      DO j = 1, loc_iy
-        DO i = 0, loc_ix
-          p_a  = p_0(i,j,k) !WRF!+ p(i,j,k) + p_g(i,j,k)
-          T_a  = T_0(i,j,k) !WRF!+ T(i,j,k) + T_g(i,j,k)
-          x_d  = q(i,j,k) / (rho_0(i,j,k))!WRF!+rho_g(i,j,k))
-          e_d  = q(i,j,k) * R_d * T_a
-          e_si = e_es(T_a)
-          e_sw = e_ws(T_a)
-          s_si(i,j,k) = e_d / e_si - 1.0                    !..Uebersaettigung bzgl. Eis
-          !s_sw(i,j,k) = e_d / e_sw - 1.0                    !..Uebersaettigung bzgl. Fluessigwasser
-! UB_20090316:          D_vtp = D_v
-          D_vtp = 8.7602e-5 * T_a**(1.81) / p_a
-          IF (T_a < T_3) THEN
-            g_i(i,j,k) = 4.0*pi / ( L_ed**2 / (K_T * R_d * T_a**2) + R_d * T_a / (D_vtp * e_si) )
-            ! g_w(i,j,k) = 4.0*pi / ( L_wd**2 / (K_T * R_d * T_a**2) + R_d * T_a / (D_vtp * e_sw) )
-          ELSE
-            ! g_w(i,j,k)  = 4.0*pi / ( L_wd**2 / (K_T * R_d * T_a**2) + R_d * T_a / (D_vtp * e_sw) )
-            g_i(i,j,k)  = 0.0
-            s_si(i,j,k) = 0.0
-          ENDIF
-        ENDDO
-      ENDDO
-    ENDDO
-
-    !CALL vapor_deposition_cloud()
-    !CALL saturation_adjust_limiter() ! Limitieren der Kondensation durch Saettigungsadjustierung
-
-    dep_ice     = 0.0
-    dep_snow    = 0.0
-    dep_cloud   = 0.0
-    dep_graupel = 0.0
-    dep_hail    = 0.0
-
-    ! ub>>
-    ! Die Routinen vapor_deposition_ice(), ..., wurden zeitsparender programmiert, indem
-    ! Ausdruecke wie "a ** b" durch exp(b*log(a)) ersetzt wurden und einige Berechnungen
-    ! mit Konstanten vor die Schleifen gezogen wurde. Insbesondere durch die andere
-    ! Potenzierungstechnik ergeben sich aber numerisch leicht unterschiedliche Ergebnisse.
-    ! Im Rahmen der hier verwendeten Depositions-Approximation spielt das aber keine
-    ! grosse Rolle, weil die Approximation an sich schon recht ungenau ist.
-    ! ub<<
-
-    CALL vapor_deposition_ice()
-    CALL vapor_deposition_snow()
-    CALL vapor_deposition_graupel()
-    IF (ice_typ > 1) CALL vapor_deposition_hail()
-
-    !q_cloud = q_cloud + dep_cloud
-    !q       = q       - dep_cloud
-    !T       = T       + dep_cloud * L_ed / cp / rho_0(i,j,k) 
-
-    x_conv = (250e-6/snow%a_geo)**(1./snow%b_geo)
-
-    ! ub>>
-#ifdef SAVE_CONVERSIONRATES
-    IF (speichere_dqdt .AND. i_local == 1) THEN
-      ! Da die Deposition u.U. mit einem kleineren Zeitschritt (dt_local) gerechnet wird,
-      ! muessen weiter unten die Umwandlungsraten waehrend eines grossen Modellzeitschrittes
-      ! (dt) aufsummiert werden. Wenn i_local == 1, dann steht die Zeit auf dem Beginn eines
-      ! grossen Zeitschrittes, also dem Anfangszeitpunkt der Summierung. Deshalb:
-      ! Zur Sicherheit die Abschnitte des Umwandlungsratenspeicherfeldes dqdt nullen,
-      ! die fuer die Depositionsraten gebraucht werden.
-      dqdt(:,:,:,4:7) = 0.0
-    END IF
-#endif
-    ! ub<<
-
-    DO k = 1, loc_iz
-      DO j = 1, loc_iy
-        DO i = 0, loc_ix
-
-          T_a  = T_0(i,j,k) !WRF!+ T(i,j,k) + T_g(i,j,k) 
-
-          ! Nur bei Temperaturen unterhalb des Tripelpunktes wird Deposition/Sublimation parametrisiert.
-          ! Bei T > T_3 kann Eis nur dann verdunsten, wenn es vorher anschmilzt.
-
-          IF (T_a < T_3) THEN
-
-            indsort = 0
-
-            IF (s_si(i,j,k) >= 0.0) THEN
-              ! uebersaettigt: dep_ice, dep_snow, dep_graupel sind >= 0. Beschraenken auf 
-              ! maximal moeglichen uebersaettigten Wasserdampfanteil:
-              q_d  = q(i,j,k)
-
-!!! wurde rausgenommen, weil fuer die nachfolgende Reduzierung mittels weight weiter unten
-!!! das urspruengliche Verhaeltnis der Depositionsfluesse massgeblich sein soll.
-              !                  dep_ice(i,j,k)     = MIN(dep_ice(i,j,k),    q_d)
-              !                  dep_snow(i,j,k)    = MIN(dep_snow(i,j,k),   q_d) 
-              !                  dep_graupel(i,j,k) = MIN(dep_graupel(i,j,k),q_d)
-              !                  dep_hail(i,j,k)    = MIN(dep_hail(i,j,k),q_d) 
-
-              ! Saettigungsueberschuss (zu kondensierendes Wasser, kg/m^3): (Naeherung fuer kleine Dampfdruecke)
-              available_d = q_d * s_si(i,j,k) / (s_si(i,j,k) + 1.0)
-              ! von der Parametrisierung bestimmte Kondensationsmenge waehrend des Zeitschritts:
-              necessary_d = dep_ice(i,j,k) + dep_graupel(i,j,k) + dep_snow(i,j,k) + dep_hail(i,j,k)
-
-              IF (ABS(necessary_d) < eps) THEN
-                dep_ice(i,j,k)     = 0.0
-                dep_snow(i,j,k)    = 0.0
-                dep_graupel(i,j,k) = 0.0               
-                dep_hail(i,j,k)    = 0.0
-              ELSEIF (necessary_d > available_d) THEN
-                weight = available_d / necessary_d
-                dep_ice(i,j,k)     = weight * dep_ice(i,j,k)
-                dep_snow(i,j,k)    = weight * dep_snow(i,j,k)
-                dep_graupel(i,j,k) = weight * dep_graupel(i,j,k)
-                dep_hail(i,j,k)    = weight * dep_hail(i,j,k)
-              ENDIF
-
-            ELSE
-              ! untersaettigt: dep_ice, dep_snow, dep_graupel sind < 0. Beschraenken auf 
-              ! maximal moeglichen untersaettigten Wasserdampfanteil sowie auf maximal vorhandenes Eis.
-              ! Die Notwendigkeit einer Begrenzung entsteht durch einen i.a. viel zu grossen
-              ! Depositionszeitschritt, so dass das hier verwendete 
-              ! Euler-Vorwaerts-Zeitintegrationsschema hoffnungslos instabil ist.
-
-              ! Hier wird im Gegensatz zum uebersaettigten Fall zuerst jeder einzelne Depositionsfluss
-              ! auf das maximal vorhandene Reservoir begrenzt, bevor durch weight auf den
-              ! maximal moeglichen Dampfinput fuer die untersaettigte Luft begrenzt wird.
-              depitmp    = MAX(dep_ice(i,j,k),    -q_ice(i,j,k))
-              depstmp    = MAX(dep_snow(i,j,k),   -q_snow(i,j,k))
-              dephtmp    = MAX(dep_hail(i,j,k),   -q_hail(i,j,k))  
-              depgtmp    = MAX(dep_graupel(i,j,k),-q_graupel(i,j,k)) 
-
-              ! Saettigungsdefizit (Wasserdampf-Aufnahmereservoir der Luft, kg/m^3):
-              available_d = s_si(i,j,k) * e_es(T_0(i,j,k)) / (R_d * T_0(i,j,k))
-              ! von der Parametrisierung bestimmte Verdunstungsmenge waehrend des Zeitschritts:
-              necessary_d = depitmp + depstmp + depgtmp + dephtmp
-
-              ! available_d und necessary_d sind hier < 0!
-              IF (necessary_d < -eps) THEN
-                IF (necessary_d < available_d) THEN
-                  ! In diesem Falle kann waehrend des Zeitschritts nicht soviel verdunstet werden 
-                  ! wie von der Parametrisierung berechnet, weil das Saettigungsdefizit nicht gross genug ist. 
-                  ! Die Verdunstung wird auf das Saettigungsdefizit begrenzt, und die Begrenzung
-                  ! wird gemaess der einzelnen Verdunstungsraten "gerecht" auf die Niederschlagsarten aufgeteilt.
-                  ! Dabei wird beruecksichtigt, dass waehrend des Zeitschritts von mindestens einer Niederschlagsart
-                  ! ggf. alles Wasser verdunsten kann. Dann wird die Begrenzung auf die verbleibende(n)
-                  ! Niederschlagsart(en) aufgeteilt, unter Beruecksichtigung, dass evtl. dafuer nicht
-                  ! genuegend Reservoir (Saettigungsdefizit) in der Umgebungsluft vorhanden ist.
-
-                  ! Dazu werden benoetigt: Verdunstungszeitskalen der einzelnen Hydrometeorarten:
-
-                  tv_i = dt_local / eps ! initialis. mit seeeehr langem Zeitscale ....
-                  tv_s = tv_i
-                  tv_g = tv_i  
-                  tv_h = tv_i 
-
-                  IF (ABS(dep_ice(i,j,k))     > eps) tv_i = -q_ice(i,j,k) / dep_ice(i,j,k) * dt_local
-                  IF (ABS(dep_snow(i,j,k))    > eps) tv_s = -q_snow(i,j,k) / dep_snow(i,j,k) * dt_local
-                  IF (ABS(dep_graupel(i,j,k)) > eps) tv_g = -q_graupel(i,j,k) / dep_graupel(i,j,k) * dt_local
-                  IF (ABS(dep_hail(i,j,k))    > eps) tv_h = -q_hail(i,j,k) / dep_hail(i,j,k) * dt_local 
-
-
-                  IF (tv_i >= dt_local .AND. tv_s >= dt_local .AND. tv_g >= dt_local .AND. tv_h >= dt_local) THEN
-                    ! Keine Niederschlagsart wuerde waehrend des Zeitschritts vollstaendig aufgezehrt.
-                    ! Der Begrenzungsfaktor ist folglich bei allen gleich.
-                    weight = available_d / necessary_d
-                    dep_ice(i,j,k)     = weight * depitmp
-                    dep_snow(i,j,k)    = weight * depstmp
-                    dep_graupel(i,j,k) = weight * depgtmp
-                    dep_hail(i,j,k)    = weight * dephtmp
-
-                  ELSE 
-                    ! Mindestens eine Niederschlagsart wird waehrend des Zeitschrittes vollstaendig aufgezehrt.
-                    ! Zusammen mit der Tatsache, dass die Verdunstung aufgrund zu kleinen
-                    ! Saettigungsdefizits begrenzt werden muss, ergibt sich das Problem der "sinnvollen"
-                    ! Gewichtung dieser Begrenzung. Hier wird der Ansatz verfolgt, dass Hydrometeorarten,
-                    ! die waehrend des Zeitschritts aufgrund der Parametrisierung vollstaendig verdunsten
-                    ! wuerden, dies auch tun, wenn fuer den in der entsprechenden Zeit insgesamt freigesetzten 
-                    ! Wasserdampf genuegend Reservoir
-                    ! in der Umgebungsluft vorhanden ist. Die Begrenzung wird dann auf die verbleibende(n) Hydrometeorart(en)
-                    ! "gerecht" anhand der Verdunstungsraten aufgeteilt.
-
-                    ! Man erreicht dies z.B. durch eine Aufteilung in Zeitbereiche anhand der
-                    ! Verdunstungszeiten der einzelnen Hydrometeorarten, welche man vorher nach ebendieser
-                    ! Zeit sortiert. 
-
-                    tv = (/tv_i, tv_s, tv_g, tv_h/)
-                    depvec = (/dep_ice(i,j,k), dep_snow(i,j,k), dep_graupel(i,j,k), dep_hail(i,j,k)/)
-                    depvec2 = (/depitmp, depstmp, depgtmp, dephtmp/)
-                    qxvec(1) = -q_ice(i,j,k)
-                    qxvec(2) = -q_snow(i,j,k)
-                    qxvec(3) = -q_graupel(i,j,k)
-                    qxvec(4) = -q_hail(i,j,k)
-
-                    IF (ice_typ > 1) THEN
-                      ! Rechnung mit Hagel,
-                      ! aus Rechenzeitgruenden hier Fallunterscheidung
-
-                      tvsort = sortiere4(tv, indsort)
-
-                      IF (tvsort(1) < dt_local .AND. &
-                           tvsort(2) >= dt_local .AND. &
-                           tvsort(3) >= dt_local .AND. &
-                           tvsort(4) >= dt_local) THEN
-                        ! Die am schnellsten verdunstende Niederschlagsart wuerde waehrend dt_local  aufgezehrt, die beiden anderen nicht.
-                        IF (available_d < (depvec2(indsort(1)) + &
-                             (depvec(indsort(2))+depvec(indsort(3))+depvec(indsort(4)))/dt_local*tv(indsort(1)))) THEN
-                          ! Es ist genuegend Feuchtedefizit in der Luft vorhanden, damit die am schnellsten verdunstende
-                          ! Niederschlagsart vollstaendig verdunsten kann. Begrenzt werden die Raten der anderen beiden Arten.
-                          depvec(indsort(1))     = depvec2(indsort(1))
-                          IF (ABS(depvec(indsort(2))+depvec(indsort(3))+depvec(indsort(4))) >= eps) THEN
-                            weight = (available_d-depvec2(indsort(1))) &
-                                   & / (depvec(indsort(2))+depvec(indsort(3))+depvec(indsort(4)))
-                          ELSE
-                            weight = 0.0
-                          END IF
-                          depvec(indsort(2)) = weight * depvec(indsort(2))
-                          depvec(indsort(3)) = weight * depvec(indsort(3))
-                          depvec(indsort(4)) = weight * depvec(indsort(4))
-
-                        ELSE
-
-                          ! Es ist nicht genuegend Feuchtedefizit in der Luft vorhanden, damit die am schnellsten verdunstende
-                          ! Niederschlagsart vollstaendig verdunsten kann. Begrenzt werden alle 4 Arten:
-                          weight = available_d &
-                            & / (depvec(indsort(1))+depvec(indsort(2))+depvec(indsort(3))+depvec(indsort(4)))
-                          depvec(indsort(1)) = weight * depvec(indsort(1))
-                          depvec(indsort(2)) = weight * depvec(indsort(2))
-                          depvec(indsort(3)) = weight * depvec(indsort(3))
-                          depvec(indsort(4)) = weight * depvec(indsort(4))
-
-                        END IF
-
-                      ELSE IF (tvsort(1) < dt_local .AND. &
-                           tvsort(2) < dt_local .AND. &
-                           tvsort(3) >= dt_local .AND. &
-                           tvsort(4) >= dt_local) THEN
-                        ! Die zwei am schnellsten verdunstenden Niederschlagsarten wuerden waehrend dt_local 
-                        ! aufgezehrt, die dritte und vierte nicht.
-                        IF (available_d < depvec2(indsort(1))+depvec2(indsort(2)) + &
-                             (depvec(indsort(3))+depvec(indsort(4)))/dt_local*tv(indsort(2))) THEN
-                          ! Genuegend Feuchte-Reservoir in der Umgebungsluft, deshalb koennen die am schnellsten und zweitschnellsten
-                          ! verdunstenden Niederschlagsarten auch wirklich verdunsten.
-                          depvec(indsort(1))     = depvec2(indsort(1))
-                          depvec(indsort(2))     = depvec2(indsort(2))
-                          IF (ABS(depvec(indsort(3))+depvec(indsort(4))) >= eps) THEN
-                            weight = (available_d-depvec2(indsort(1))-depvec2(indsort(2))) &
-                                   & / (depvec(indsort(3))+depvec(indsort(4)))
-                          ELSE
-                            weight = 0.0
-                          END IF
-                          depvec(indsort(3)) = weight * depvec(indsort(3))
-                          depvec(indsort(4)) = weight * depvec(indsort(4))
-
-                        ELSE
-
-                          IF (available_d < depvec2(indsort(1))+(depvec(indsort(2))+depvec(indsort(3))+ &
-                               depvec(indsort(4)))/dt_local*tv(indsort(1))) THEN
-                            ! Nur die am schnellsten verdunstende Niederschlagsart wird aufgezehrt; 
-                            ! fuer die zweite ist die Zeit bis zum Fuellen des Reservoirs nicht mehr lang genug. 
-                            ! Die zweite, dritte und vierte werden nicht aufgezehrt.
-                            depvec(indsort(1)) = depvec2(indsort(1))
-                            IF (ABS(depvec(indsort(2))+depvec(indsort(3))+depvec(indsort(4))) >= eps) THEN
-                              weight = (available_d-depvec2(indsort(1))) &
-                                     & / (depvec(indsort(2))+depvec(indsort(3))+depvec(indsort(4)))
-                            ELSE
-                              weight = 0.0
-                            END IF
-                            depvec(indsort(2)) = weight * depvec(indsort(2))
-                            depvec(indsort(3)) = weight * depvec(indsort(3))
-                            depvec(indsort(4)) = weight * depvec(indsort(4))
-
-                          ELSE
-                            ! Aufgrund zu kleinen Reservoirs kann gar keine Niederschlagsart vollstaendig verdunsten;
-                            ! Die Zeit bis zum Auffuellen des Reservoirs ist hierfuer zu kurz.
-                            weight = available_d / (SUM(depvec))
-                            depvec(indsort(1)) = weight * depvec(indsort(1))
-                            depvec(indsort(2)) = weight * depvec(indsort(2))
-                            depvec(indsort(3)) = weight * depvec(indsort(3))
-                            depvec(indsort(4)) = weight * depvec(indsort(4))
-
-                          END IF
-                        END IF
-
-                      ELSE IF (tvsort(1) < dt_local .AND. &
-                           tvsort(2) < dt_local .AND. &
-                           tvsort(3) < dt_local .AND. &
-                           tvsort(4) >= dt_local) THEN
-                        ! Die drei am schnellsten verdunstenden Niederschlagsarten wuerden waehrend 
-                        ! dt_local aufgezehrt werden, die vierte nicht.
-                        IF (available_d < depvec2(indsort(1))+depvec2(indsort(2))+depvec2(indsort(3)) + &
-                             depvec(indsort(4))/dt_local*tv(indsort(3))) THEN
-                          ! Genuegend Feuchte-Reservoir in der Umgebungsluft, deshalb koennen die am schnellsten, zweit- und drittschnellsten
-                          ! verdunstenden Niederschlagsarten auch wirklich verdunsten.
-                          depvec(indsort(1)) = depvec2(indsort(1))
-                          depvec(indsort(2)) = depvec2(indsort(2))
-                          depvec(indsort(3)) = depvec2(indsort(3))
-                          depvec(indsort(4)) = available_d - (depvec2(indsort(1))+depvec2(indsort(2))+depvec2(indsort(3)))
-                        ELSE
-
-                          IF (available_d < depvec2(indsort(1))+depvec2(indsort(2))+ &
-                               (depvec(indsort(3))+depvec(indsort(4)))/dt_local*tv(indsort(2))) THEN
-                            ! Nur die zwei am schnellsten verdunstenden Niederschlagsarten werden aufgezehrt; 
-                            ! fuer die dritte ist die Zeit bis zum Fuellen des Reservoirs nicht mehr lang genug. 
-                            ! Die dritte und vierte wird nicht aufgezehrt.
-                            depvec(indsort(1)) = depvec2(indsort(1))
-                            depvec(indsort(2)) = depvec2(indsort(2))
-                            IF (ABS(depvec(indsort(3))+depvec(indsort(4))) >= eps) THEN
-                              weight = (available_d-depvec2(indsort(1))-depvec2(indsort(2)))  &
-                                     & / (depvec(indsort(3))+depvec(indsort(4)))
-                            ELSE
-                              weight = 0.0
-                            END IF
-                            depvec(indsort(3)) = weight * depvec(indsort(3))
-                            depvec(indsort(4)) = weight * depvec(indsort(4))
-
-                          ELSE
-
-                            IF (available_d < depvec2(indsort(1))+(depvec(indsort(2))+depvec(indsort(3))+ &
-                                 depvec(indsort(4)))/dt_local*tv(indsort(1))) THEN
-                              ! Nur die am schnellsten verdunstende Niederschlagsart wird aufgezehrt; 
-                              ! fuer die zweite und dritte ist die Zeit bis zum Fuellen des Reservoirs nicht mehr lang genug. 
-                              ! Die zweite, dritte und vierte werden nicht aufgezehrt.
-                              depvec(indsort(1)) = depvec2(indsort(1))
-                              IF (ABS(depvec(indsort(2))+depvec(indsort(3))+depvec(indsort(4))) >= eps) THEN
-                                weight = (available_d-depvec2(indsort(1))) &
-                                       & / (depvec(indsort(2))+depvec(indsort(3))+depvec(indsort(4)))
-                              ELSE
-                                weight = 0.0
-                              END IF
-                              depvec(indsort(2)) = weight * depvec(indsort(2))
-                              depvec(indsort(3)) = weight * depvec(indsort(3))
-                              depvec(indsort(4)) = weight * depvec(indsort(4))
-
-                            ELSE
-
-                              ! Aufgrund zu kleinen Reservoirs kann gar keine Niederschlagsart vollstaendig verdunsten;
-                              ! Die Zeit bis zum Auffuellen des Reservoirs ist hierfuer zu kurz.
-                              weight = available_d / (SUM(depvec))
-                              depvec(indsort(1)) = weight * depvec(indsort(1))
-                              depvec(indsort(2)) = weight * depvec(indsort(2))
-                              depvec(indsort(3)) = weight * depvec(indsort(3))
-                              depvec(indsort(4)) = weight * depvec(indsort(4))
-
-                            END IF
-                          END IF
-                        END IF
-
-                      ELSE IF (tvsort(1) < dt_local .AND. &
-                           tvsort(2) < dt_local .AND. &
-                           tvsort(3) < dt_local .AND. &
-                           tvsort(4) < dt_local) THEN
-                        ! der Fall dass necessary < available und trotzdem alle tv_x < dt_local
-                        ! kann eintreten, da necessary aus depxtmp berechnet wird, tv_x aber aus dep_x.
-                        ! Alle Eisteilchen verdunsten vollstaendig
-                        depvec(indsort(1)) = depvec2(indsort(1))   
-                        depvec(indsort(2)) = depvec2(indsort(2))   
-                        depvec(indsort(3)) = depvec2(indsort(3))   
-                        depvec(indsort(4)) = depvec2(indsort(4))                                         
-
-                      ELSE 
-                        WRITE (*,*) 'VAPOR_DEPOSITION: Da ist was faul im untersaettigten Fall excl 1'
-                        WRITE (*,*) 'tvsort =', tvsort
-                        WRITE (*,*) 'tv     = ', tv
-                        WRITE (*,*) 'depvec = ', depvec
-                        WRITE (*,*) 'depvec2= ', depvec2
-                        WRITE (*,*) 'qxvec  = ', qxvec
-                        WRITE (*,*) 'dt_local= ', dt_local, '  available_d=', available_d, ' necesary_d=',necessary_d
-                      END IF
-
-                    ELSE ! ice_typ <= 1, kein Hagel, vereinfachter Entscheidungsbaum:
-
-                      tvsort(1:3) = sortiere3(tv(1:3), indsort(1:3))
-
-                      IF (tvsort(1) < dt_local .AND. &
-                           tvsort(2) >= dt_local .AND. &
-                           tvsort(3) >= dt_local) THEN
-                        ! Die am schnellsten verdunstende Niederschlagsart wuerde waehrend dt_local 
-                        ! aufgezehrt, die beiden anderen nicht.
-                        IF (available_d < (depvec2(indsort(1)) + &
-                             (depvec(indsort(2))+depvec(indsort(3)))/dt_local*tv(indsort(1)))) THEN
-                          ! Es ist genuegend Feuchtedefizit in der Luft vorhanden, damit die am schnellsten verdunstende
-                          ! Niederschlagsart vollstaendig verdunsten kann. Begrenzt werden die Raten der anderen beiden Arten.
-                          depvec(indsort(1))     = depvec2(indsort(1))
-                          IF (ABS(depvec(indsort(2))+depvec(indsort(3))) >= eps) THEN
-                            weight = (available_d-depvec2(indsort(1))) / (depvec(indsort(2))+depvec(indsort(3)))
-                          ELSE
-                            weight = 0.0
-                          END IF
-                          depvec(indsort(2)) = weight * depvec(indsort(2))
-                          depvec(indsort(3)) = weight * depvec(indsort(3))
-
-                        ELSE
-
-                          ! Es ist nicht genuegend Feuchtedefizit in der Luft vorhanden, damit die am schnellsten verdunstende
-                          ! Niederschlagsart vollstaendig verdunsten kann. Begrenzt werden alle 3 Arten:
-                          weight = available_d / (depvec(indsort(1))+depvec(indsort(2))+depvec(indsort(3)))
-                          depvec(indsort(1)) = weight * depvec(indsort(1))
-                          depvec(indsort(2)) = weight * depvec(indsort(2))
-                          depvec(indsort(3)) = weight * depvec(indsort(3))
-
-                        END IF
-
-                      ELSE IF (tvsort(1) < dt_local .AND. &
-                           tvsort(2) < dt_local .AND. &
-                           tvsort(3) >= dt_local) THEN
-                        ! Die zwei am schnellsten verdunstende Niederschlagsarten wuerden waehrend dt_local 
-                        ! aufgezehrt, die dritte nicht.
-
-                        IF (available_d < depvec2(indsort(1))+depvec2(indsort(2)) + &
-                             (depvec(indsort(3)))/dt_local*tv(indsort(2))) THEN
-                          ! Es ist genuegend Feuchtedefizit in der Luft vorhanden, damit die zwei am schnellsten verdunstenden
-                          ! Niederschlagsarten vollstaendig verdunsten koennen. Begrenzt wird die Rate der dritten NS-Art.
-                          depvec(indsort(1))     = depvec2(indsort(1))
-                          depvec(indsort(2))     = depvec2(indsort(2))
-                          depvec(indsort(3)) = available_d - depvec2(indsort(1)) - depvec2(indsort(2))
-
-                        ELSE
-
-                          IF (available_d < depvec2(indsort(1))+(depvec(indsort(2))+depvec(indsort(3))+ &
-                               depvec(indsort(4)))/dt_local*tv(indsort(1))) THEN
-                            ! Nur die am schnellsten verdunstende Niederschlagsart wird aufgezehrt; 
-                            ! fuer die zweite ist die Zeit bis zum Fuellen des Reservoirs nicht mehr lang genug. 
-                            ! Die zweite und dritte werden nicht aufgezehrt.
-                            depvec(indsort(1)) = depvec2(indsort(1))
-                            IF (ABS(depvec(indsort(2))+depvec(indsort(3))) >= eps) THEN
-                              weight = (available_d-depvec2(indsort(1))) / (depvec(indsort(2))+depvec(indsort(3)))
-                            ELSE
-                              weight = 0.0
-                            END IF
-                            depvec(indsort(2)) = weight * depvec(indsort(2))
-                            depvec(indsort(3)) = weight * depvec(indsort(3))
-
-                          ELSE
-                            ! Aufgrund zu kleinen Reservoirs kann gar keine Niederschlagsart vollstaendig verdunsten;
-                            ! Die Zeit bis zum Auffuellen des Reservoirs ist hierfuer zu kurz.
-                            weight = available_d / (SUM(depvec(1:3)))
-                            depvec(indsort(1)) = weight * depvec(indsort(1))
-                            depvec(indsort(2)) = weight * depvec(indsort(2))
-                            depvec(indsort(3)) = weight * depvec(indsort(3))
-
-                          END IF
-                        END IF
-
-                      ELSE IF (tvsort(1) < dt_local .AND. &
-                           tvsort(2) < dt_local .AND. &
-                           tvsort(3) < dt_local) THEN
-                        ! der Fall dass necessary < available und trotzdem alle tv_x < dt_local
-                        ! kann eintreten, da necessary aus depxtmp berechnet wird, tv_x aber aus dep_x.
-                        ! Alle Eisteilchen verdunsten vollstaendig
-                        depvec(indsort(1)) = depvec2(indsort(1))   
-                        depvec(indsort(2)) = depvec2(indsort(2))   
-                        depvec(indsort(3)) = depvec2(indsort(3))   
-
-                      ELSE 
-                        WRITE (*,*) 'VAPOR_DEPOSITION: Da ist was faul im untersaettigten Fall excl 2'
-                        WRITE (*,*) 'tvsort =', tvsort
-                        WRITE (*,*) 'tv     = ', tv
-                        WRITE (*,*) 'depvec = ', depvec
-                        WRITE (*,*) 'depvec2= ', depvec2
-                        WRITE (*,*) 'qxvec  = ', qxvec
-                        WRITE (*,*) 'dt_local= ', dt_local, '  available_d=', available_d, ' necesary_d=',necessary_d
-                      END IF
-
-                    END IF
-
-                    ! Zurueckverteilen:
-                    dep_ice(i,j,k) = depvec(1)
-                    dep_snow(i,j,k) = depvec(2)
-                    dep_graupel(i,j,k) = depvec(3)
-                    dep_hail(i,j,k) = depvec(4)
-
-                  END IF
-
-
-                ELSE
-
-                  ! In diesem Falle kann die vollstaendige von der Parametrisierung berechnete
-                  ! Verdunstungsmenge aller Hydrometeorarten verdunstet werden. Keine Begrenzung ist noetig 
-                  ! (bis auf die Begrenzung auf die vorhandene Hydrometeormasse).
-                  dep_ice(i,j,k)     = depitmp
-                  dep_snow(i,j,k)    = depstmp
-                  dep_graupel(i,j,k) = depgtmp
-                  dep_hail(i,j,k)    = dephtmp
-
-                END IF
-
-              ELSE
-
-                ! Deposition so gering, dass man sie getrost zu 0 setzen kann:
-                dep_ice(i,j,k)     = 0.0
-                dep_snow(i,j,k)    = 0.0
-                dep_graupel(i,j,k) = 0.0    
-                dep_hail(i,j,k)    = 0.0                    
-
-              END IF
-
-            END IF
-
-            ! Zur Sicherheit: Pruefen auf Qx < 0.0:
-            ! An dieser Stelle kann es vorkommen, dass ein |dep_xxx| > q_xxx ist, und zwar im Falle sehr kleiner absoluter Werte.
-            IF (q_ice(i,j,k)+dep_ice(i,j,k) < 0.0 .OR. &
-                 q_snow(i,j,k)+dep_snow(i,j,k) < 0.0 .OR. &
-                 q_graupel(i,j,k)+dep_graupel(i,j,k) < 0.0 .OR. &
-                 q_hail(i,j,k)+dep_hail(i,j,k) < 0.0) THEN
-
-              IF (q_ice(i,j,k)+dep_ice(i,j,k) < -1d-20 .OR. &
-                   q_snow(i,j,k)+dep_snow(i,j,k) < -1d-20 .OR. &
-                   q_graupel(i,j,k)+dep_graupel(i,j,k) < -1d-20 .OR. &
-                   q_hail(i,j,k)+dep_hail(i,j,k) < -1d-20) THEN
-
-                WRITE (*,*) 'VAPOR_DEPOSITION: Warnung --- Qx < 0.0 aufgetreten (wird spaeter begrenzt):'
-                WRITE (*,*) '     ----- Kann vorkommen bei sehr kleinen Werten von Qx und dep_x -----'
-                WRITE (*,*) 'Punkt ', i, ',', j, ',', k
-                WRITE (*,*) 'q_ice     = ', q_ice(i,j,k)+dep_ice(i,j,k), '  dep_ice = ', dep_ice(i,j,k), '  tv_i = ', tv_i
-                WRITE (*,*) 'q_snow    = ', q_snow(i,j,k)+dep_snow(i,j,k), '  dep_snow = ', dep_snow(i,j,k), '  tv_s = ', tv_s
-                WRITE (*,*) 'q_graupel = ', q_graupel(i,j,k)+dep_graupel(i,j,k), '  dep_graupel = ', dep_graupel(i,j,k), '  tv_g = ', tv_g
-                WRITE (*,*) 'q_hail    = ', q_hail(i,j,k)+dep_hail(i,j,k), '  dep_hail = ', dep_hail(i,j,k), '  tv_h = ', tv_h
-                WRITE (*,*) 'tv_x_max = dt_local / eps = ', dt_local / eps
-              END IF
-              !AS 20060220>
-              ! Deshalb hier nochmals eine letzte Begrenzung:
-              dep_hail(i,j,k)    = MAX(dep_hail(i,j,k),   -q_hail(i,j,k)   )
-              dep_graupel(i,j,k) = MAX(dep_graupel(i,j,k),-q_graupel(i,j,k))
-              dep_snow(i,j,k)    = MAX(dep_snow(i,j,k),   -q_snow(i,j,k)   )
-              dep_ice(i,j,k)     = MAX(dep_ice(i,j,k),    -q_ice(i,j,k)    )
-              !<end AS
-            END IF
-
-            dep_sum = dep_ice(i,j,k) + dep_graupel(i,j,k) + dep_snow(i,j,k) + dep_hail(i,j,k)
-            IF (dep_sum > q(i,j,k) .AND. dep_sum > 0.0) THEN
-              IF (dep_sum > 1d-20) THEN
-                WRITE (*,*) 'VAPOR_DEPOSITION: Warnung --- dep_sum > q aufgetreten (wird spaeter begrenzt):'
-                WRITE (*,*) '     ----- Sollte eigentlich nicht vorkommen -----'
-                WRITE (*,*) 'Punkt ', i, ',', j, ',', k
-                WRITE (*,*) 'q_ice     = ', q_ice(i,j,k)+dep_ice(i,j,k), '  dep_ice = ', dep_ice(i,j,k)
-                WRITE (*,*) 'q_snow    = ', q_snow(i,j,k)+dep_snow(i,j,k), '  dep_snow = ', dep_snow(i,j,k)
-                WRITE (*,*) 'q_graupel = ', q_graupel(i,j,k)+dep_graupel(i,j,k), '  dep_graupel = ', dep_graupel(i,j,k)
-                WRITE (*,*) 'q_hail    = ', q_hail(i,j,k)+dep_hail(i,j,k), '  dep_hail = ', dep_hail(i,j,k)
-                WRITE (*,*) 'q = ', q(i,j,k)+dep_sum, '   dep_sum = ', dep_sum
-              END IF
-              ! Kondensation begrenzen auf max. vorhandene Feuchtigkeit 
-              ! (sollte aber nach dem vorhergegangenen Begrenzen wirklich nicht noetig sein ...):
-              weight = q(i,j,k) / dep_sum
-              dep_ice(i,j,k)     = weight * dep_ice(i,j,k)
-              dep_snow(i,j,k)    = weight * dep_snow(i,j,k)
-              dep_graupel(i,j,k) = weight * dep_graupel(i,j,k)
-              dep_hail(i,j,k)    = weight * dep_hail(i,j,k)
-              dep_sum = q(i,j,k)
-            END IF
-
-            ! Moeglichkeit der hail-to-snow conversion momentan nicht vorgesehen
-            n_g = n_graupel(i,j,k)
-            q_g = q_graupel(i,j,k)                  
-            x_g = MIN(MAX(q_g/(n_g+eps),graupel%x_min),graupel%x_max)
-            D_g = graupel%a_geo * x_g**graupel%b_geo   
-            IF (.FALSE. .AND. dep_graupel(i,j,k) > 0 .AND. D_g < 800d-6) THEN
-              !if (dep_graupel(i,j,k) > 0 .AND. D_g < 800d-6 .AND. q_cloud(i,j,k) < 1e-4) then
-              !..Graupel to snow conversion
-              conv_q = MIN(q_g, 3.0 * dep_graupel(i,j,k))
-              !conv_n = conv_q/x_g
-              !conv_n = MIN(n_g, 0.25 * dep_graupel_n(i,j,k))
-              q_snow(i,j,k)    = q_snow(i,j,k)    + conv_q
-              q_graupel(i,j,k) = q_graupel(i,j,k) - conv_q + dep_graupel(i,j,k)
-              n_snow(i,j,k)    = n_snow(i,j,k)    + conv_q / MIN(x_g,x_conv)
-              n_graupel(i,j,k) = n_graupel(i,j,k) - conv_q / x_g      
-            ELSE
-              q_graupel(i,j,k) = q_graupel(i,j,k) + dep_graupel(i,j,k)
-              conv_q = 0.0
-            ENDIF
-
-            q_ice(i,j,k)     = q_ice(i,j,k)     + dep_ice(i,j,k)
-            q_snow(i,j,k)    = q_snow(i,j,k)    + dep_snow(i,j,k)
-            IF (ice_typ > 1) q_hail(i,j,k)    = q_hail(i,j,k)    + dep_hail(i,j,k)    ! <hn
-
-            q(i,j,k) = q(i,j,k) - dep_sum
-
-
-            ! ub>>
-#ifdef SAVE_CONVERSIONRATES
-            IF (speichere_dqdt) THEN
-              ! Wegen kleinerem Zeitschritt dt_local: Aufsummieren, nicht einfach den Wert setzen.
-              IF (dep_sum >= 0.0) THEN
-                dqdt(i,j,k,4) = dqdt(i,j,k,4) + dep_ice(i,j,k)
-                dqdt(i,j,k,5) = dqdt(i,j,k,5) + dep_snow(i,j,k)
-                dqdt(i,j,k,6) = dqdt(i,j,k,6) + dep_graupel(i,j,k)
-                dqdt(i,j,k,55) = dqdt(i,j,k,55) + dep_hail(i,j,k)
-                dqdt(i,j,k,7) = dqdt(i,j,k,7) + conv_q
-              ELSE
-                dqdt(i,j,k,56) = dqdt(i,j,k,56) - dep_ice(i,j,k)
-                dqdt(i,j,k,32) = dqdt(i,j,k,32) - dep_snow(i,j,k)
-                dqdt(i,j,k,33) = dqdt(i,j,k,33) - dep_graupel(i,j,k)
-                dqdt(i,j,k,53) = dqdt(i,j,k,53) - dep_hail(i,j,k)
-              END IF
-            END IF
-#endif
-
-            IF (speichere_precipstat) THEN
-              IF (dep_sum >= 0.0) THEN
-                cond_neu_sb(i,j,k) = cond_neu_sb(i,j,k) + dep_sum
-              ELSE
-                evap_neu_sb(i,j,k) = evap_neu_sb(i,j,k) - dep_sum
-              END IF
-            END IF
-            ! ub<<
-
-            IF (use_ice_graupel_conv_uli) THEN
-              deprate_ice(i,j,k) = deprate_ice(i,j,k) + dep_ice(i,j,k)
-              deprate_snow(i,j,k) = deprate_snow(i,j,k) + dep_snow(i,j,k)
-            END IF
-
-            !WRF!T(i,j,k) = T(i,j,k) + dep_sum * L_ed / cp / rho_0(i,j,k) 
-            !WRF!p(i,j,k) = p(i,j,k) + dep_sum * L_ed / cv * R_l
-
-
-          ENDIF
-        ENDDO
-      ENDDO
-    ENDDO
-
-    DEALLOCATE(s_si,s_sw,g_i,g_w,dep_ice,dep_cloud,dep_snow,dep_graupel,dep_graupel_n, &
-         &  dep_hail,dep_hail_n)
-
-  CONTAINS
-
-    ! ub>>
-    FUNCTION sortiere4(x, indsort)
-      IMPLICIT NONE
-      DOUBLE PRECISION, INTENT(in) :: x(4)
-      DOUBLE PRECISION :: sortiere4(4)
-      INTEGER, INTENT(out) :: indsort(4)
-      INTEGER :: i, j, itmp
-      DOUBLE PRECISION :: tmp
-
-      sortiere4 = x
-
-      DO i=1,4
-        indsort(i) = i
-      END DO
-
-      ! Bubble-Sort, Ergebnis in aufsteigender Reihenfolge
-      DO i=1,3
-        DO j=1,3
-          IF (sortiere4(j) > sortiere4(j+1)) THEN
-            tmp = sortiere4(j)
-            sortiere4(j) = sortiere4(j+1)
-            sortiere4(j+1) = tmp
-            itmp = indsort(j)
-            indsort(j) = indsort(j+1)
-            indsort(j+1) = itmp
-          END IF
-        END DO
-      END DO
-
-      !      WRITE(*,*) 'VAPOR_DEPOSITION_GROWTH: Sortiere4 ...'
-
-    END FUNCTION sortiere4
-
-    FUNCTION sortiere3(x, indsort)
-      IMPLICIT NONE
-      DOUBLE PRECISION, INTENT(in) :: x(3)
-      DOUBLE PRECISION :: sortiere3(3)
-      INTEGER, INTENT(out) :: indsort(3)
-      INTEGER :: i, j, itmp
-      DOUBLE PRECISION :: tmp
-
-      sortiere3 = x
-
-      DO i=1,3
-        indsort(i) = i
-      END DO
-
-      ! Bubble-Sort, Ergebnis in aufsteigender Reihenfolge
-      DO i=1,2
-        DO j=1,2
-          IF (sortiere3(j) > sortiere3(j+1)) THEN
-            tmp = sortiere3(j)
-            sortiere3(j) = sortiere3(j+1)
-            sortiere3(j+1) = tmp
-            itmp = indsort(j)
-            indsort(j) = indsort(j+1)
-            indsort(j+1) = itmp
-          END IF
-        END DO
-      END DO
-
-      !      WRITE(*,*) 'VAPOR_DEPOSITION_GROWTH: Sortiere3 ...'
-
-    END FUNCTION sortiere3
-    ! ub<<
-
-    SUBROUTINE vapor_deposition_cloud()
-      IMPLICIT NONE
-
-      DOUBLE PRECISION            :: q_c,n_c,x_c,d_c,v_c,f_v,N_re,f_v_fakt
-      DOUBLE PRECISION, SAVE      :: c_c             !..Koeff. fuer mittlere Kapazitaet
-      DOUBLE PRECISION, SAVE      :: a_f,b_f         !..Koeff. fuer mittleren Ventilationkoeff.
-      INTEGER                     :: i,j,k
-      INTEGER, SAVE               :: firstcall
-
-      IF (firstcall.NE.1) THEN
-        c_c = 1.0 / cloud%cap
-        a_f = vent_coeff_a(cloud,1)
-        b_f = vent_coeff_b(cloud,1)
-        IF(isIO())THEN
-          WRITE (6, *) "  CLOUD vapor_deposition_cloud: " 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Geometrie von Wolkentropfen:  a_cloud   = ",cloud%a_geo  
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Geometrie von Wolkentropfen:  b_cloud   = ",cloud%b_geo
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Sedimentation:                alf_cloud = ",cloud%a_vel 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Sedimentation:                bet_cloud = ",cloud%b_vel 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Kapazitaet:                   c_c       = ",c_c 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer mittleren Ventilationskoeff.: a_f       = ",a_f 
-          WRITE (6,'(A,D10.3)') "                                            b_f       = ",b_f 
-        END IF
-        firstcall = 1
-      ELSEIF (isIO() .AND. isdebug) THEN
-        WRITE (6, *) "  CLOUD vapor_deposition_cloud " 
-      ENDIF
-
-      f_v_fakt = N_sc**n_f
-      DO k = 1, loc_iz
-        DO j = 1, loc_iy
-          DO i = 0, loc_ix
-            n_c = n_cloud(i,j,k)                                   !..Anzahldichte
-            q_c = q_cloud(i,j,k)                                   !..Massendichte
-
-            x_c = MIN(MAX(q_c/(n_c+eps),MAX(cloud%x_min,eps)),cloud%x_max)  !..mittlere Masse
-            ! x_c**b_geo durch EXP(b_geo*LOG(x_c)) ersetzen, da x_c == 0 nicht mehr vorkommen kann; 20 % schneller:
-            d_c = cloud%a_geo * EXP(cloud%b_geo*LOG(x_c))          !..mittlerer Durchmesser
-            v_c = cloud%a_vel * EXP(cloud%b_vel*LOG(x_c)) * rrho_c(i,j,k)   !..mittlere Sedimentationsgeschw.
-
-            N_re = v_c * d_c / nu_l                                !..mittlere Reynoldszahl
-            ! N_re**m_f durch EXP(m_f*LOG(N_re)) ersetzen, da N_re == 0 nicht mehr vorkommen kann:
-            f_v  = a_f + b_f * f_v_fakt * EXP(m_f*LOG(N_re))             !..mittlerer Vent.Koeff.
-            f_v  = MAX(f_v,1.d0) !unnoetig??
-
-            dep_cloud(i,j,k) = g_w(i,j,k) * n_c * c_c * d_c * f_v * s_sw(i,j,k) * dt_local
-          ENDDO
-        ENDDO
-      ENDDO
-
-    END SUBROUTINE vapor_deposition_cloud
-
-    SUBROUTINE vapor_deposition_ice()
-      IMPLICIT NONE
-
-      DOUBLE PRECISION            :: q_i,n_i,x_i,d_i,v_i,f_v,N_re,f_v_fakt
-      DOUBLE PRECISION, SAVE      :: c_i             !..Koeff. fuer mittlere Kapazitaet
-      DOUBLE PRECISION, SAVE      :: a_f,b_f         !..Koeff. fuer mittleren Ventilationkoeff.
-      INTEGER                     :: i,j,k
-      INTEGER, SAVE               :: firstcall
-
-      IF (firstcall.NE.1) THEN
-        c_i = 1.0 / ice%cap
-        a_f = vent_coeff_a(ice,1)
-        b_f = vent_coeff_b(ice,1)
-        IF(isIO() .AND. isdebug)THEN
-          WRITE (6, *) "  CLOUD vapor_deposition_ice: " 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Geometrie von Eis:            a_ice   = ",ice%a_geo  
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Geometrie von Eis:            b_ice   = ",ice%b_geo
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Sedimentation von Eis:        alf_ice = ",ice%a_vel 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Sedimentation von Eis:        bet_ice = ",ice%b_vel 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Kapazitaet:                   c_i     = ",c_i 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer mittleren Ventilationskoeff.: a_f     = ",a_f 
-          WRITE (6,'(A,D10.3)') "                                            b_f     = ",b_f 
-        END IF
-        firstcall = 1
-      ELSEIF (isIO() .AND. isdebug) THEN
-        WRITE (6, *) "  CLOUD vapor_deposition_ice " 
-      ENDIF
-
-      f_v_fakt = N_sc**n_f
-      DO k = 1, loc_iz
-        DO j = 1, loc_iy
-          DO i = 0, loc_ix
-
-            ! hn: in case q_ice=0, dep_ice has to be zero too
-
-            IF (q_ice(i,j,k) == 0.0d0) THEN
-              dep_ice(i,j,k)   = 0.0d0
-            ELSE  
-              n_i = n_ice(i,j,k)                                   !..Anzahldichte
-              q_i = q_ice(i,j,k)                                   !..Massendichte
-
-              x_i = MIN(MAX(q_i/(n_i+eps),MAX(ice%x_min,eps)),ice%x_max)    !..mittlere Masse
-              ! x_i**b_geo durch EXP(b_geo*LOG(x_i)) ersetzen, da x_i == 0 nicht mehr vorkommen kann; 20 % schneller:
-              d_i = ice%a_geo * EXP(ice%b_geo*LOG(x_i))            !..mittlerer Durchmesser
-              v_i = ice%a_vel * EXP(ice%b_vel*LOG(x_i)) * rrho_04(i,j,k)    !..mittlere Sedimentationsgeschw.
-
-              N_re = v_i * d_i / nu_l                              !..mittlere Reynoldszahl
-              ! N_re**m_f durch EXP(m_f*LOG(N_re)) ersetzen, da N_re == 0 nicht mehr vorkommen kann:
-              f_v  = a_f + b_f * f_v_fakt * EXP(m_f*LOG(N_re))     !..mittlerer Vent.Koeff.
-              f_v  = MAX(f_v,1.d0) !unnoetig??
-
-              dep_ice(i,j,k) = g_i(i,j,k) * n_i * c_i * d_i * f_v * s_si(i,j,k) * dt_local
-            ENDIF
-
-          ENDDO
-        ENDDO
-      ENDDO
-
-    END SUBROUTINE vapor_deposition_ice
-
-    SUBROUTINE vapor_deposition_graupel()
-      IMPLICIT NONE
-
-      ! Locale Variablen 
-      INTEGER                     :: i,j,k
-      INTEGER, SAVE               :: firstcall
-      DOUBLE PRECISION            :: q_g,n_g,x_g,d_g,v_g,f_v,f_n,N_re,f_v_fakt,vent_fakt
-      DOUBLE PRECISION, SAVE      :: c_g                 !..Koeff. fuer mittlere Kapazitaet
-      DOUBLE PRECISION, SAVE      :: a_f,b_f,a_n,b_n     !..Koeff. fuer mittleren Ventilationkoeff.
-
-      IF (firstcall.NE.1) THEN
-        c_g = 1.0 / graupel%cap
-        a_n = vent_coeff_a(graupel,0)
-        b_n = vent_coeff_b(graupel,0)
-        a_f = vent_coeff_a(graupel,1)
-        b_f = vent_coeff_b(graupel,1)
-        IF (isIO() .AND. isdebug) THEN
-          WRITE (6, *) "  CLOUD vapor_deposition_graupel: " 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Geometrie von Graupel:        a_geo = ",graupel%a_geo  
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Geometrie von Graupel:        b_geo = ",graupel%b_geo
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Sediment. von Graupel:        a_vel = ",graupel%a_vel 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Sediment. von Graupel:        b_vel = ",graupel%b_vel 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Gaskonstante feuchter Luft:   a_dl  = ",a_dl 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Kapazitaet:                   c_g   = ",c_g 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer mittleren Ventilationskoeff.: a_f   = ",a_f 
-          WRITE (6,'(A,D10.3)') "                                            b_f   = ",b_f 
-        END IF
-        firstcall = 1
-      ELSEIF(isIO() .AND. isdebug)THEN
-        WRITE (6, *) "  CLOUD vapor_deposition_graupel" 
-      ENDIF
-
-      f_v_fakt = N_sc**n_f
-      vent_fakt = b_n / b_f
-      DO k = 1, loc_iz
-        DO j = 1, loc_iy
-          DO i = 0, loc_ix
-
-            ! hn: in case q_garupel=0, dep_graupel has to be zero too
-
-            IF (q_graupel(i,j,k) == 0.0d0) THEN
-              dep_graupel(i,j,k)   = 0.0d0
-              dep_graupel_n(i,j,k) = 0.0d0
-            ELSE
-
-              n_g = n_graupel(i,j,k)                                     !..Anzahldichte
-              q_g = q_graupel(i,j,k)                                     !..Massendichte
-
-              x_g = MIN(MAX(q_g/(n_g+eps),MAX(graupel%x_min,eps)),graupel%x_max)  !..mittlere Masse
-              ! x_g**b_geo durch EXP(b_geo*LOG(x_g)) ersetzen, da x_g == 0 nicht mehr vorkommen kann; 20 % schneller:
-              d_g = graupel%a_geo * EXP(graupel%b_geo*LOG(x_g))          !..mittlerer Durchmesser
-              v_g = graupel%a_vel * EXP(graupel%b_vel*LOG(x_g)) * rrho_04(i,j,k)  !..mittlere Sedimentationsgeschw.
-
-              N_re = v_g * d_g / nu_l                                    !..mittlere Reynoldszahl
-              ! N_re**m_f durch EXP(m_f*LOG(N_re)) ersetzen, da N_re == 0 nicht mehr vorkommen kann:
-              f_v  = a_f + b_f * f_v_fakt * EXP(m_f*LOG(N_re))           !..mittlerer Vent.Koeff.
-              ! ub>> Schnellere Berechnung wg. Verzicht auf "**":
-              !              f_n  = a_n + b_n * f_v_fakt * N_re**m_f                    !..mittlerer Vent.Koeff.
-              f_n = a_n + vent_fakt * (f_v - a_f)                        !..mittlerer Vent.Koeff.
-              ! ub<<
-              f_v  = MAX(f_v,1.d0) !unnoetig??
-              f_n  = MAX(f_n,1.d0) !unnoetig??
-
-              dep_graupel(i,j,k) = g_i(i,j,k) * n_g * c_g * d_g * f_v * s_si(i,j,k) * dt_local
-              dep_graupel_n(i,j,k) = dep_graupel(i,j,k) * f_n/f_v / x_g
-            ENDIF
-
-          ENDDO
-        ENDDO
-      ENDDO
-
-    END SUBROUTINE vapor_deposition_graupel
-
-    SUBROUTINE vapor_deposition_hail()
-      IMPLICIT NONE
-
-      ! Locale Variablen 
-      INTEGER                     :: i,j,k
-      INTEGER, SAVE               :: firstcall
-      DOUBLE PRECISION            :: q_h,n_h,x_h,d_h,v_h,f_v,f_n,N_re,f_v_fakt,vent_fakt
-      DOUBLE PRECISION, SAVE      :: c_h                 !..Koeff. fuer mittlere Kapazitaet
-      DOUBLE PRECISION, SAVE      :: a_f,b_f,a_n,b_n     !..Koeff. fuer mittleren Ventilationkoeff.
-
-      IF (firstcall.NE.1) THEN
-        c_h = 1.0 / hail%cap
-        a_n = vent_coeff_a(hail,0)
-        b_n = vent_coeff_b(hail,0)
-        a_f = vent_coeff_a(hail,1)
-        b_f = vent_coeff_b(hail,1)
-        IF (isIO() .AND. isdebug) THEN
-          WRITE (6, *) "  CLOUD vapor_deposition_hail: " 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Geometrie von Hail:        a_geo = ",hail%a_geo  
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Geometrie von Hail:        b_geo = ",hail%b_geo
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Sediment. von Hail:        a_vel = ",hail%a_vel 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Sediment. von Hail:        b_vel = ",hail%b_vel 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Gaskonstante feuchter Luft:   a_dl  = ",a_dl 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Kapazitaet:                   c_h   = ",c_h 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer mittleren Ventilationskoeff.: a_f   = ",a_f 
-          WRITE (6,'(A,D10.3)') "                                            b_f   = ",b_f 
-        END IF
-        firstcall = 1
-      ELSEIF(isIO() .AND. isdebug)THEN
-        WRITE (6, *) "  CLOUD vapor_deposition_hail" 
-      ENDIF
-
-      f_v_fakt = N_sc**n_f
-      vent_fakt = b_n / b_f
-      DO k = 1, loc_iz
-        DO j = 1, loc_iy
-          DO i = 0, loc_ix
-
-            ! hn: in case q_hail=0, dep_hail has to be zero too
-
-            IF (q_hail(i,j,k) == 0.0d0) THEN
-              dep_hail(i,j,k)   = 0.0d0
-              dep_hail_n(i,j,k) = 0.0d0
-            ELSE
-              n_h = n_hail(i,j,k)                                     !..Anzahldichte
-              q_h = q_hail(i,j,k)                                     !..Massendichte
-
-              x_h = MIN(MAX(q_h/(n_h+eps),MAX(hail%x_min,eps)),hail%x_max)  !..mittlere Masse
-              ! x_h**b_geo durch EXP(b_geo*LOG(x_h)) ersetzen, da x_h == 0 nicht mehr vorkommen kann; 20 % schneller:
-              d_h = hail%a_geo * EXP(hail%b_geo*LOG(x_h))          !..mittlerer Durchmesser
-              v_h = hail%a_vel * EXP(hail%b_vel*LOG(x_h)) * rrho_04(i,j,k)  !..mittlere Sedimentationsgeschw.
-
-              N_re = v_h * d_h / nu_l                                    !..mittlere Reynoldszahl
-              ! N_re**m_f durch EXP(m_f*LOG(N_re)) ersetzen, da N_re == 0 nicht mehr vorkommen kann:
-              f_v  = a_f + b_f * f_v_fakt * EXP(m_f*LOG(N_re))
-              ! ub>> Schnellere Berechnung wg. Verzicht auf "**":
-              !              f_n  = a_n + b_n * f_v_fakt * N_re**m_f                   !..mittlerer Vent.Koeff.
-              f_n = a_n + vent_fakt * (f_v - a_f)                        !..mittlerer Vent.Koeff.
-              ! ub<<
-              f_v  = MAX(f_v,1.d0) !unnoetig??
-              f_n  = MAX(f_n,1.d0) !unnoetig??
-
-              dep_hail(i,j,k) = g_i(i,j,k) * n_h * c_h * d_h * f_v * s_si(i,j,k) * dt_local
-              dep_hail_n(i,j,k) = dep_hail(i,j,k) * f_n/f_v / x_h
-            ENDIF
-
-          ENDDO
-        ENDDO
-      ENDDO
-
-    END SUBROUTINE vapor_deposition_hail
-
-    SUBROUTINE vapor_deposition_snow()
-      IMPLICIT NONE
-
-      ! Locale Variablen 
-      DOUBLE PRECISION            :: q_s,n_s,x_s,d_s,v_s,f_v,N_re,f_v_fakt
-      DOUBLE PRECISION, SAVE      :: c_s             !..Koeff. fuer mittlere Kapazitaet
-      DOUBLE PRECISION, SAVE      :: a_f,b_f         !..Koeff. fuer mittleren Ventilationkoeff.
-      INTEGER                     :: i,j,k
-      INTEGER, SAVE               :: firstcall
-
-      IF (firstcall.NE.1) THEN
-        c_s = 1.0 / snow%cap
-        a_f = vent_coeff_a(snow,1)
-        b_f = vent_coeff_b(snow,1)
-        IF(isIO() .AND. isdebug)THEN
-          WRITE (6, *) "  CLOUD vapor_deposition_snow: " 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Geometrie von Schnee:        a_geo = ",snow%a_geo  
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Geometrie von Schnee:        b_geo = ",snow%b_geo
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Sediment. von Schnee:        a_vel = ",snow%a_vel 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Sediment. von Schnee:        b_vel = ",snow%b_vel 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Gaskonstante feuchter Luft:   a_dl = ",a_dl 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer mittlerer Kapazitaet:         c_s  = ",c_s 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer mittleren Ventilationskoeff.: a_f  = ",a_f 
-          WRITE (6,'(A,D10.3)') "                                            b_f  = ",b_f 
-        END IF
-        firstcall = 1
-      ELSEIF (isIO() .AND. isdebug) THEN
-        WRITE (6, *) "  CLOUD vapor_deposition_snow: " 
-      ENDIF
-
-      f_v_fakt = N_sc**n_f
-      DO k = 1, loc_iz
-        DO j = 1, loc_iy
-          DO i = 0, loc_ix
-            IF (q_snow(i,j,k) == 0.0d0) THEN
-              dep_snow(i,j,k) = 0.d0
-            ELSE
-              n_s = n_snow(i,j,k)                        !..Anzahldichte in SI
-              q_s = q_snow(i,j,k)                        !..Fluessigwassergehalt in SI
-
-              x_s = MIN(MAX(q_s/(n_s+eps),MAX(snow%x_min,eps)),snow%x_max)   !..mittlere Masse in SI     
-              ! x_s**b_geo durch EXP(b_geo*LOG(x_s)) ersetzen, da x_s == 0 nicht mehr vorkommen kann; 20 % schneller:
-              d_s = snow%a_geo * EXP(snow%b_geo*LOG(x_s))           !..mittlerer Durchmesser
-              v_s = snow%a_vel * EXP(snow%b_vel*LOG(x_s)) * rrho_04(i,j,k)   !..mittlere Sedimentationsgeschw.
-
-              N_re = v_s * d_s / nu_l                         !..mittlere Reynoldszahl
-              ! N_re**m_f durch EXP(m_f*LOG(N_re)) ersetzen, da N_re == 0 nicht mehr vorkommen kann:
-              f_v  = a_f + b_f * f_v_fakt * EXP(m_f*LOG(N_re))        !..mittlerer Vent.Koeff.
-              f_v  = MAX(f_v,1.d0) !unnoetig??
-
-              dep_snow(i,j,k) = g_i(i,j,k) * n_s * c_s * d_s * f_v * s_si(i,j,k) * dt_local
-            ENDIF
-
-          ENDDO
-        ENDDO
-      ENDDO
-
-    END SUBROUTINE vapor_deposition_snow
-
-    SUBROUTINE saturation_adjust_limiter ()
-
-      ! .. Local Scalars ..
-      DOUBLE PRECISION :: e_sat, rdrl, rdrlm1, rlrd, rlrdm1, t_
-      DOUBLE PRECISION :: a_, a1, b_, b1, dq_d, lrcv, q_sat, rcv, lrcp, rho_a, q_c
-
-      rcv  = 1.0d0 /  cv
-      lrcv = L_wd  * rcv
-      lrcp = L_wd  / cp
-
-      DO k = 1, loc_iz
-        DO j = 1, loc_iy
-          DO i = 0, loc_ix
-            q_d   = q(i,j,k)
-            q_c   = q_cloud(i,j,k)
-            T_a   = T_0(i,j,k) ! WRF + T(i,j,k) + T_g(i,j,k)
-            p_a   = p_0(i,j,k) ! WRF + p(i,j,k) + p_g(i,j,k)
-            rho_a = rho_0(i,j,k) ! WRF + rho_g(i,j,k)
-
-            a_    = A_w
-            b_    = B_w
-            e_sat = e_ws (T_a)
-
-            !...Berechnung der spezifischen Saettigungsfeuchte, Dotzek (4.33)
-            q_sat = rlrd / (p_a / e_sat + rlrdm1)
-
-            !...Berechnung der Adjustierungs-Terme, Dotzek, S. 35
-            a1 = a_ * (T_3 - b_) / (T_a - b_)**2
-            b1 = a1 * lrcp * q_sat
-
-            !...Berechnung des Phasenuebergangs, Dotzek, S. 36
-            dq_d = (q_d - q_sat*rho_a) / (1.0d0 + b1)
-
-            !...Limitieren von dep_cloud
-            dep_cloud(i,j,k) = MIN (dq_d, dep_cloud(i,j,k))
-            dep_cloud(i,j,k) = MAX (q_c,  dep_cloud(i,j,k))
-
-          END DO
-        END DO
-
-      END DO
-
-    END SUBROUTINE saturation_adjust_limiter
-
-  END SUBROUTINE vapor_deposition_growth
-
-  SUBROUTINE vapor_dep_simple(dt_local,i_local)
+  SUBROUTINE vapor_dep_relaxation(dt_local,i_local)
     !*******************************************************************************
     !                                                                              *
     !       Berechnung des Wachstums der Eispartikel durch Wasserdampfdiffusion    *
@@ -15848,13 +14269,14 @@ CONTAINS
     ! ub>> 
     DOUBLE PRECISION            :: necessary_d,available_d,weight,depitmp,depstmp,depgtmp,dephtmp
     ! ub<<
+    DOUBLE PRECISION            :: zdt,qvsidiff,Xi_i,Xfac
+    DOUBLE PRECISION            :: tau_i_i,tau_s_i,tau_g_i,tau_h_i
     DOUBLE PRECISION, PARAMETER :: eps  = 1.d-20
 
     DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:,:) :: s_si,g_i
     DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:,:) :: s_sw,g_w
     DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:,:) :: dep_ice
     DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:,:) :: dep_snow
-    DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:,:) :: dep_cloud
     DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:,:) :: dep_graupel, dep_graupel_n
     DOUBLE PRECISION, ALLOCATABLE, DIMENSION(:,:,:) :: dep_hail, dep_hail_n
 
@@ -15874,7 +14296,6 @@ CONTAINS
     ALLOCATE(g_w(0:loc_ix,1:loc_iy,1:loc_iz))
     ALLOCATE(dep_ice(0:loc_ix,1:loc_iy,1:loc_iz))
     ALLOCATE(dep_snow(0:loc_ix,1:loc_iy,1:loc_iz))
-    ALLOCATE(dep_cloud(0:loc_ix,1:loc_iy,1:loc_iz))
     ALLOCATE(dep_graupel(0:loc_ix,1:loc_iy,1:loc_iz))
     ALLOCATE(dep_graupel_n(0:loc_ix,1:loc_iy,1:loc_iz))
     ALLOCATE(dep_hail(0:loc_ix,1:loc_iy,1:loc_iz))
@@ -15900,21 +14321,17 @@ CONTAINS
     DO k = 1, loc_iz
       DO j = 1, loc_iy
         DO i = 0, loc_ix
-          p_a  = p_0(i,j,k) !WRF!+ p(i,j,k) + p_g(i,j,k)
-          T_a  = T_0(i,j,k) !WRF!+ T(i,j,k) + T_g(i,j,k)
-          x_d  = q(i,j,k) / (rho_0(i,j,k))!WRF!+rho_g(i,j,k))
+          p_a  = p_0(i,j,k)
+          T_a  = T_0(i,j,k)
+          x_d  = q(i,j,k) / rho_0(i,j,k)
           e_d  = q(i,j,k) * R_d * T_a
           e_si = e_es(T_a)
           e_sw = e_ws(T_a)
           s_si(i,j,k) = e_d / e_si - 1.0                    !..Uebersaettigung bzgl. Eis
-          !s_sw(i,j,k) = e_d / e_sw - 1.0                    !..Uebersaettigung bzgl. Fluessigwasser
-! UB_20090316:          D_vtp = D_v
           D_vtp = 8.7602e-5 * T_a**(1.81) / p_a
           IF (T_a < T_3) THEN
             g_i(i,j,k) = 4.0*pi / ( L_ed**2 / (K_T * R_d * T_a**2) + R_d * T_a / (D_vtp * e_si) )
-            ! g_w(i,j,k) = 4.0*pi / ( L_wd**2 / (K_T * R_d * T_a**2) + R_d * T_a / (D_vtp * e_sw) )
           ELSE
-            ! g_w(i,j,k)  = 4.0*pi / ( L_wd**2 / (K_T * R_d * T_a**2) + R_d * T_a / (D_vtp * e_sw) )
             g_i(i,j,k)  = 0.0
             s_si(i,j,k) = 0.0
           ENDIF
@@ -15922,12 +14339,8 @@ CONTAINS
       ENDDO
     ENDDO
 
-    !CALL vapor_deposition_cloud()
-    !CALL saturation_adjust_limiter() ! Limitieren der Kondensation durch Saettigungsadjustierung
-
     dep_ice     = 0.0
     dep_snow    = 0.0
-    dep_cloud   = 0.0
     dep_graupel = 0.0
     dep_hail    = 0.0
 
@@ -15945,340 +14358,120 @@ CONTAINS
     CALL vapor_deposition_graupel()
     IF (ice_typ > 1) CALL vapor_deposition_hail()
 
-    !q_cloud = q_cloud + dep_cloud
-    !q       = q       - dep_cloud
-    !T       = T       + dep_cloud * L_ed / cp / rho_0(i,j,k) 
-
     x_conv = (250e-6/snow%a_geo)**(1./snow%b_geo)
 
-    ! ub>>
-#ifdef SAVE_CONVERSIONRATES
-    IF (speichere_dqdt .AND. i_local == 1) THEN
-      ! Da die Deposition u.U. mit einem kleineren Zeitschritt (dt_local) gerechnet wird,
-      ! muessen weiter unten die Umwandlungsraten waehrend eines grossen Modellzeitschrittes
-      ! (dt) aufsummiert werden. Wenn i_local == 1, dann steht die Zeit auf dem Beginn eines
-      ! grossen Zeitschrittes, also dem Anfangszeitpunkt der Summierung. Deshalb:
-      ! Zur Sicherheit die Abschnitte des Umwandlungsratenspeicherfeldes dqdt nullen,
-      ! die fuer die Depositionsraten gebraucht werden.
-      dqdt(:,:,:,4:7) = 0.0
-    END IF
-#endif
-    ! ub<<
+    zdt = 1.0/dt_local
 
     DO k = 1, loc_iz
       DO j = 1, loc_iy
         DO i = 0, loc_ix
 
-          T_a  = T_0(i,j,k) !WRF!+ T(i,j,k) + T_g(i,j,k) 
+          T_a  = T_0(i,j,k)
 
           ! Nur bei Temperaturen unterhalb des Tripelpunktes wird Deposition/Sublimation parametrisiert.
           ! Bei T > T_3 kann Eis nur dann verdunsten, wenn es vorher anschmilzt.
 
           IF (T_a < T_3) THEN
 
-            IF (s_si(i,j,k) >= 0.0) THEN
-              ! uebersaettigt: dep_ice, dep_snow, dep_graupel sind >= 0. Beschraenken auf 
-              ! maximal moeglichen uebersaettigten Wasserdampfanteil:
-              q_d  = q(i,j,k)
+             ! Depositional growth with relaxation time-scale approach based on:
+             ! "A New Double-Moment Microphysics Parameterization for Application in Cloud and
+             ! Climate Models. Part 1: Description" by H. Morrison, J.A.Curry, V.I. Khvorostyanov
+             ! (M05)
+             
+             qvsidiff  = q(i,j,k) - e_es(T_a)/(R_d*T_a)
+             
+             ! deposition rates are already multiplied with dt_local, therefore divide them here
+             tau_i_i  = zdt/qvsidiff*dep_ice(i,j,k)
+             tau_s_i  = zdt/qvsidiff*dep_snow(i,j,k)
+             tau_g_i  = zdt/qvsidiff*dep_graupel(i,j,k)
+             tau_h_i  = zdt/qvsidiff*dep_hail(i,j,k)
+             
+             Xi_i = ( tau_i_i + tau_s_i + tau_g_i + tau_h_i ) 
+             
+             Xfac =  qvsidiff / Xi_i * (1.0 - EXP(- dt_local*Xi_i))
+             
+             dep_ice(i,j,k)     = Xfac * tau_i_i
+             dep_snow(i,j,k)    = Xfac * tau_s_i
+             dep_graupel(i,j,k) = Xfac * tau_g_i
+             dep_hail(i,j,k)    = Xfac * tau_h_i
+             
+             IF (qvsidiff < 0.0) THEN
+                dep_ice(i,j,k)     = MAX(dep_ice(i,j,k),    -q_ice(i,j,k))
+                dep_snow(i,j,k)    = MAX(dep_snow(i,j,k),   -q_snow(i,j,k))
+                dep_graupel(i,j,k) = MAX(dep_graupel(i,j,k),-q_graupel(i,j,k)) 
+                dep_hail(i,j,k)    = MAX(dep_hail(i,j,k),   -q_hail(i,j,k))  
+             END IF
 
-              ! Saettigungsueberschuss (zu kondensierendes Wasser, kg/m^3): (Naeherung fuer kleine Dampfdruecke)
-              available_d = q_d * s_si(i,j,k) / (s_si(i,j,k) + 1.0)
-              ! von der Parametrisierung bestimmte Kondensationsmenge waehrend des Zeitschritts:
-              necessary_d = dep_ice(i,j,k) + dep_graupel(i,j,k) + dep_snow(i,j,k) + dep_hail(i,j,k)
+             dep_sum = dep_ice(i,j,k) + dep_graupel(i,j,k) + dep_snow(i,j,k) + dep_hail(i,j,k)
 
-              IF (ABS(necessary_d) < eps) THEN
-                dep_ice(i,j,k)     = 0.0
-                dep_snow(i,j,k)    = 0.0
-                dep_graupel(i,j,k) = 0.0               
-                dep_hail(i,j,k)    = 0.0
-              ELSEIF (necessary_d > available_d) THEN
-                weight = available_d / necessary_d
-                dep_ice(i,j,k)     = weight * dep_ice(i,j,k)
-                dep_snow(i,j,k)    = weight * dep_snow(i,j,k)
-                dep_graupel(i,j,k) = weight * dep_graupel(i,j,k)
-                dep_hail(i,j,k)    = weight * dep_hail(i,j,k)
-              ENDIF
+             IF (.FALSE.) THEN
 
-            ELSE
-              ! untersaettigt: dep_ice, dep_snow, dep_graupel sind < 0. Beschraenken auf 
-              ! maximal moeglichen untersaettigten Wasserdampfanteil sowie auf maximal vorhandenes Eis.
-              ! Die Notwendigkeit einer Begrenzung entsteht durch einen i.a. viel zu grossen
-              ! Depositionszeitschritt, so dass das hier verwendete 
-              ! Euler-Vorwaerts-Zeitintegrationsschema hoffnungslos instabil ist.
-
-              ! Hier wird im Gegensatz zum uebersaettigten Fall zuerst jeder einzelne Depositionsfluss
-              ! auf das maximal vorhandene Reservoir begrenzt, bevor durch weight auf den
-              ! maximal moeglichen Dampfinput fuer die untersaettigte Luft begrenzt wird.
-              depitmp    = MAX(dep_ice(i,j,k),    -q_ice(i,j,k))
-              depstmp    = MAX(dep_snow(i,j,k),   -q_snow(i,j,k))
-              dephtmp    = MAX(dep_hail(i,j,k),   -q_hail(i,j,k))  
-              depgtmp    = MAX(dep_graupel(i,j,k),-q_graupel(i,j,k)) 
-
-              ! Saettigungsdefizit (Wasserdampf-Aufnahmereservoir der Luft, kg/m^3):
-              available_d = s_si(i,j,k) * e_es(T_0(i,j,k)) / (R_d * T_0(i,j,k))
-              ! von der Parametrisierung bestimmte Verdunstungsmenge waehrend des Zeitschritts:
-              necessary_d = depitmp + depstmp + depgtmp + dephtmp
-
-              ! available_d und necessary_d sind hier < 0!
-              IF (necessary_d < -eps) THEN
-                IF (necessary_d < available_d) THEN
-                  ! In diesem Falle kann waehrend des Zeitschritts nicht soviel verdunstet werden 
-                  ! wie von der Parametrisierung berechnet, weil das Saettigungsdefizit nicht gross genug ist. 
-                  ! Die Verdunstung wird auf das Saettigungsdefizit begrenzt
-
-                  weight = available_d / necessary_d
-                  dep_ice(i,j,k)     = weight * depitmp
-                  dep_snow(i,j,k)    = weight * depstmp
-                  dep_graupel(i,j,k) = weight * depgtmp
-                  dep_hail(i,j,k)    = weight * dephtmp
-
-
-                ELSE
-
-                  ! In diesem Falle kann die vollstaendige von der Parametrisierung berechnete
-                  ! Verdunstungsmenge aller Hydrometeorarten verdunstet werden. Keine Begrenzung ist noetig 
-                  ! (bis auf die Begrenzung auf die vorhandene Hydrometeormasse).
-                  dep_ice(i,j,k)     = depitmp
-                  dep_snow(i,j,k)    = depstmp
-                  dep_graupel(i,j,k) = depgtmp
-                  dep_hail(i,j,k)    = dephtmp
-
+                ! Zur Sicherheit: Pruefen auf Qx < 0.0:
+                ! An dieser Stelle kann es vorkommen, dass ein |dep_xxx| > q_xxx ist, 
+                ! und zwar im Falle sehr kleiner absoluter Werte.
+                IF (q_ice(i,j,k)+dep_ice(i,j,k) < 0.0 .OR. &
+                     q_snow(i,j,k)+dep_snow(i,j,k) < 0.0 .OR. &
+                     q_graupel(i,j,k)+dep_graupel(i,j,k) < 0.0 .OR. &
+                     q_hail(i,j,k)+dep_hail(i,j,k) < 0.0) THEN
+                   
+                   dep_hail(i,j,k)    = MAX(dep_hail(i,j,k),   -q_hail(i,j,k)   )
+                   dep_graupel(i,j,k) = MAX(dep_graupel(i,j,k),-q_graupel(i,j,k))
+                   dep_snow(i,j,k)    = MAX(dep_snow(i,j,k),   -q_snow(i,j,k)   )
+                   dep_ice(i,j,k)     = MAX(dep_ice(i,j,k),    -q_ice(i,j,k)    )
                 END IF
-
-              ELSE
-
-                ! Deposition so gering, dass man sie getrost zu 0 setzen kann:
-                dep_ice(i,j,k)     = 0.0
-                dep_snow(i,j,k)    = 0.0
-                dep_graupel(i,j,k) = 0.0    
-                dep_hail(i,j,k)    = 0.0                    
-
-              END IF
-
-            END IF
-
-            ! Zur Sicherheit: Pruefen auf Qx < 0.0:
-            ! An dieser Stelle kann es vorkommen, dass ein |dep_xxx| > q_xxx ist, und zwar im Falle sehr kleiner absoluter Werte.
-            IF (q_ice(i,j,k)+dep_ice(i,j,k) < 0.0 .OR. &
-                 q_snow(i,j,k)+dep_snow(i,j,k) < 0.0 .OR. &
-                 q_graupel(i,j,k)+dep_graupel(i,j,k) < 0.0 .OR. &
-                 q_hail(i,j,k)+dep_hail(i,j,k) < 0.0) THEN
-
-!!$              IF (q_ice(i,j,k)+dep_ice(i,j,k) < -1d-20 .OR. &
-!!$                   q_snow(i,j,k)+dep_snow(i,j,k) < -1d-20 .OR. &
-!!$                   q_graupel(i,j,k)+dep_graupel(i,j,k) < -1d-20 .OR. &
-!!$                   q_hail(i,j,k)+dep_hail(i,j,k) < -1d-20) THEN
-!!$
-!!$                WRITE (*,*) 'VAPOR_DEPOSITION: Warnung --- Qx < 0.0 aufgetreten (wird spaeter begrenzt):'
-!!$                WRITE (*,*) '     ----- Kann vorkommen bei sehr kleinen Werten von Qx und dep_x -----'
-!!$                WRITE (*,*) 'Punkt ', i, ',', j, ',', k
-!!$                WRITE (*,*) 'q_ice     = ', q_ice(i,j,k)+dep_ice(i,j,k), '  dep_ice = ', dep_ice(i,j,k)
-!!$                WRITE (*,*) 'q_snow    = ', q_snow(i,j,k)+dep_snow(i,j,k), '  dep_snow = ', dep_snow(i,j,k)
-!!$                WRITE (*,*) 'q_graupel = ', q_graupel(i,j,k)+dep_graupel(i,j,k), '  dep_graupel = ', dep_graupel(i,j,k)
-!!$                WRITE (*,*) 'q_hail    = ', q_hail(i,j,k)+dep_hail(i,j,k), '  dep_hail = ', dep_hail(i,j,k)
-!!$                WRITE (*,*) 'tv_x_max = dt_local / eps = ', dt_local / eps
-!!$              END IF
-              !AS 20060220>
-              ! Deshalb hier nochmals eine letzte Begrenzung:
-              dep_hail(i,j,k)    = MAX(dep_hail(i,j,k),   -q_hail(i,j,k)   )
-              dep_graupel(i,j,k) = MAX(dep_graupel(i,j,k),-q_graupel(i,j,k))
-              dep_snow(i,j,k)    = MAX(dep_snow(i,j,k),   -q_snow(i,j,k)   )
-              dep_ice(i,j,k)     = MAX(dep_ice(i,j,k),    -q_ice(i,j,k)    )
-              !<end AS
-            END IF
-
-            dep_sum = dep_ice(i,j,k) + dep_graupel(i,j,k) + dep_snow(i,j,k) + dep_hail(i,j,k)
-            IF (dep_sum > q(i,j,k) .AND. dep_sum > 0.0) THEN
-!!$              IF (dep_sum > 1d-20) THEN
-!!$                WRITE (*,*) 'VAPOR_DEPOSITION: Warnung --- dep_sum > q aufgetreten (wird spaeter begrenzt):'
-!!$                WRITE (*,*) '     ----- Sollte eigentlich nicht vorkommen -----'
-!!$                WRITE (*,*) 'Punkt ', i, ',', j, ',', k
-!!$                WRITE (*,*) 'q_ice     = ', q_ice(i,j,k)+dep_ice(i,j,k), '  dep_ice = ', dep_ice(i,j,k)
-!!$                WRITE (*,*) 'q_snow    = ', q_snow(i,j,k)+dep_snow(i,j,k), '  dep_snow = ', dep_snow(i,j,k)
-!!$                WRITE (*,*) 'q_graupel = ', q_graupel(i,j,k)+dep_graupel(i,j,k), '  dep_graupel = ', dep_graupel(i,j,k)
-!!$                WRITE (*,*) 'q_hail    = ', q_hail(i,j,k)+dep_hail(i,j,k), '  dep_hail = ', dep_hail(i,j,k)
-!!$                WRITE (*,*) 'q = ', q(i,j,k)+dep_sum, '   dep_sum = ', dep_sum
-!!$              END IF
-              ! Kondensation begrenzen auf max. vorhandene Feuchtigkeit 
-              ! (sollte aber nach dem vorhergegangenen Begrenzen wirklich nicht noetig sein ...):
-              weight = q(i,j,k) / dep_sum
-              dep_ice(i,j,k)     = weight * dep_ice(i,j,k)
-              dep_snow(i,j,k)    = weight * dep_snow(i,j,k)
-              dep_graupel(i,j,k) = weight * dep_graupel(i,j,k)
-              dep_hail(i,j,k)    = weight * dep_hail(i,j,k)
-              dep_sum = q(i,j,k)
-            END IF
-
-            ! Moeglichkeit der hail-to-snow conversion momentan nicht vorgesehen
-            n_g = n_graupel(i,j,k)
-            q_g = q_graupel(i,j,k)                  
-            x_g = MIN(MAX(q_g/(n_g+eps),graupel%x_min),graupel%x_max)
-            D_g = graupel%a_geo * x_g**graupel%b_geo   
-            IF (.FALSE. .AND. dep_graupel(i,j,k) > 0 .AND. D_g < 800d-6) THEN
-              !if (dep_graupel(i,j,k) > 0 .AND. D_g < 800d-6 .AND. q_cloud(i,j,k) < 1e-4) then
-              !..Graupel to snow conversion
-              conv_q = MIN(q_g, 3.0 * dep_graupel(i,j,k))
-              !conv_n = conv_q/x_g
-              !conv_n = MIN(n_g, 0.25 * dep_graupel_n(i,j,k))
-              q_snow(i,j,k)    = q_snow(i,j,k)    + conv_q
-              q_graupel(i,j,k) = q_graupel(i,j,k) - conv_q + dep_graupel(i,j,k)
-              n_snow(i,j,k)    = n_snow(i,j,k)    + conv_q / MIN(x_g,x_conv)
-              n_graupel(i,j,k) = n_graupel(i,j,k) - conv_q / x_g      
-            ELSE
-              q_graupel(i,j,k) = q_graupel(i,j,k) + dep_graupel(i,j,k)
-              conv_q = 0.0
-            ENDIF
-
-            q_ice(i,j,k)     = q_ice(i,j,k)     + dep_ice(i,j,k)
-            q_snow(i,j,k)    = q_snow(i,j,k)    + dep_snow(i,j,k)
-            IF (ice_typ > 1) q_hail(i,j,k)    = q_hail(i,j,k)    + dep_hail(i,j,k)    ! <hn
-
-            q(i,j,k) = q(i,j,k) - dep_sum
-
-            ! ub>>
-#ifdef SAVE_CONVERSIONRATES
-            IF (speichere_dqdt) THEN
-              ! Wegen kleinerem Zeitschritt dt_local: Aufsummieren, nicht einfach den Wert setzen.
-              IF (dep_sum >= 0.0) THEN
-                dqdt(i,j,k,4) = dqdt(i,j,k,4) + dep_ice(i,j,k)
-                dqdt(i,j,k,5) = dqdt(i,j,k,5) + dep_snow(i,j,k)
-                dqdt(i,j,k,6) = dqdt(i,j,k,6) + dep_graupel(i,j,k)
-                dqdt(i,j,k,55) = dqdt(i,j,k,55) + dep_hail(i,j,k)
-                dqdt(i,j,k,7) = dqdt(i,j,k,7) + conv_q
-              ELSE
-                dqdt(i,j,k,56) = dqdt(i,j,k,56) - dep_ice(i,j,k)
-                dqdt(i,j,k,32) = dqdt(i,j,k,32) - dep_snow(i,j,k)
-                dqdt(i,j,k,33) = dqdt(i,j,k,33) - dep_graupel(i,j,k)
-                dqdt(i,j,k,53) = dqdt(i,j,k,53) - dep_hail(i,j,k)
-              END IF
-            END IF
-#endif
-
-            IF (speichere_precipstat) THEN
-              IF (dep_sum >= 0.0) THEN
-                cond_neu_sb(i,j,k) = cond_neu_sb(i,j,k) + dep_sum
-              ELSE
-                evap_neu_sb(i,j,k) = evap_neu_sb(i,j,k) - dep_sum
-              END IF
-            END IF
-            ! ub<<
-
- 
-
+                
+                IF (dep_sum > q(i,j,k) .AND. dep_sum > 0.0) THEN
+                   ! Kondensation begrenzen auf max. vorhandene Feuchtigkeit 
+                   ! (sollte aber nach dem vorhergegangenen Begrenzen wirklich nicht noetig sein ...):
+                   weight = q(i,j,k) / dep_sum
+                   dep_ice(i,j,k)     = weight * dep_ice(i,j,k)
+                   dep_snow(i,j,k)    = weight * dep_snow(i,j,k)
+                   dep_graupel(i,j,k) = weight * dep_graupel(i,j,k)
+                   dep_hail(i,j,k)    = weight * dep_hail(i,j,k)
+                   dep_sum = q(i,j,k)
+                END IF
+             END IF
+             
+             n_g = n_graupel(i,j,k)
+             q_g = q_graupel(i,j,k)                  
+             x_g = MIN(MAX(q_g/(n_g+eps),graupel%x_min),graupel%x_max)
+             D_g = graupel%a_geo * x_g**graupel%b_geo   
+             ! TURNED OFF
+             IF (.FALSE. .AND. dep_graupel(i,j,k) > 0 .AND. D_g < 800d-6) THEN
+                !if (dep_graupel(i,j,k) > 0 .AND. D_g < 800d-6 .AND. q_cloud(i,j,k) < 1e-4) then
+                !..Graupel to snow conversion
+                conv_q = MIN(q_g, 3.0 * dep_graupel(i,j,k))
+                !conv_n = conv_q/x_g
+                !conv_n = MIN(n_g, 0.25 * dep_graupel_n(i,j,k))
+                q_snow(i,j,k)    = q_snow(i,j,k)    + conv_q
+                q_graupel(i,j,k) = q_graupel(i,j,k) - conv_q + dep_graupel(i,j,k)
+                n_snow(i,j,k)    = n_snow(i,j,k)    + conv_q / MIN(x_g,x_conv)
+                n_graupel(i,j,k) = n_graupel(i,j,k) - conv_q / x_g      
+             ELSE
+                q_graupel(i,j,k) = q_graupel(i,j,k) + dep_graupel(i,j,k)
+                conv_q = 0.0
+             ENDIF
+             
+             q_ice(i,j,k)     = q_ice(i,j,k)     + dep_ice(i,j,k)
+             q_snow(i,j,k)    = q_snow(i,j,k)    + dep_snow(i,j,k)
+             IF (ice_typ > 1) q_hail(i,j,k)    = q_hail(i,j,k)    + dep_hail(i,j,k)    ! <hn
+             
+             q(i,j,k) = q(i,j,k) - dep_sum
+             
             IF (use_ice_graupel_conv_uli) THEN
-              deprate_ice(i,j,k) = deprate_ice(i,j,k) + dep_ice(i,j,k)
-              deprate_snow(i,j,k) = deprate_snow(i,j,k) + dep_snow(i,j,k)
+               deprate_ice(i,j,k) = deprate_ice(i,j,k) + dep_ice(i,j,k)
+               deprate_snow(i,j,k) = deprate_snow(i,j,k) + dep_snow(i,j,k)
             END IF
-
-            !WRF!T(i,j,k) = T(i,j,k) + dep_sum * L_ed / cp / rho_0(i,j,k) 
-            !WRF!p(i,j,k) = p(i,j,k) + dep_sum * L_ed / cv * R_l
-
-
+           
           ENDIF
         ENDDO
       ENDDO
     ENDDO
 
-!!$#ifdef SAVE_CONVERSIONRATES
-    IF (speichere_dqdt) THEN
-      DO k = 1, loc_iz
-        DO j = 1, loc_iy
-          DO i = 0, loc_ix
-
-            IF (dep_ice(i,j,k) + dep_graupel(i,j,k) + dep_snow(i,j,k) + dep_hail(i,j,k) >= 0.0) THEN
-              dqdt(i,j,k,4) = dqdt(i,j,k,4) + dep_ice(i,j,k)
-              dqdt(i,j,k,5) = dqdt(i,j,k,5) + dep_snow(i,j,k)
-              dqdt(i,j,k,6) = dqdt(i,j,k,6) + dep_graupel(i,j,k)
-              dqdt(i,j,k,55) = dqdt(i,j,k,55) + dep_hail(i,j,k)
-              dqdt(i,j,k,7) = dqdt(i,j,k,7) + conv_q
-            ELSE
-              dqdt(i,j,k,56) = dqdt(i,j,k,56) - dep_ice(i,j,k)
-              dqdt(i,j,k,32) = dqdt(i,j,k,32) - dep_snow(i,j,k)
-              dqdt(i,j,k,33) = dqdt(i,j,k,33) - dep_graupel(i,j,k)
-              dqdt(i,j,k,53) = dqdt(i,j,k,53) - dep_hail(i,j,k)
-            END IF
-
-          END DO
-        END DO
-      END DO
-    END IF
-!!$#endif
-
-    IF (speichere_precipstat) THEN
-      DO k = 1, loc_iz
-        DO j = 1, loc_iy
-          DO i = 0, loc_ix
-
-            dep_sum = dep_ice(i,j,k) + dep_graupel(i,j,k) + dep_snow(i,j,k) + dep_hail(i,j,k)
-            IF (dep_sum >= 0.0) THEN
-              cond_neu_sb(i,j,k) = cond_neu_sb(i,j,k) + dep_sum
-            ELSE
-              evap_neu_sb(i,j,k) = evap_neu_sb(i,j,k) - dep_sum
-            END IF
-
-          END DO
-        END DO
-      END DO
-    END IF
-
-
-    DEALLOCATE(s_si,s_sw,g_i,g_w,dep_ice,dep_cloud,dep_snow,dep_graupel,dep_graupel_n, &
+    DEALLOCATE(s_si,s_sw,g_i,g_w,dep_ice,dep_snow,dep_graupel,dep_graupel_n, &
          &  dep_hail,dep_hail_n)
 
   CONTAINS
-
-
-    SUBROUTINE vapor_deposition_cloud()
-      IMPLICIT NONE
-
-      DOUBLE PRECISION            :: q_c,n_c,x_c,d_c,v_c,f_v,N_re,f_v_fakt
-      DOUBLE PRECISION, SAVE      :: c_c             !..Koeff. fuer mittlere Kapazitaet
-      DOUBLE PRECISION, SAVE      :: a_f,b_f         !..Koeff. fuer mittleren Ventilationkoeff.
-      INTEGER                     :: i,j,k
-      INTEGER, SAVE               :: firstcall
-
-      IF (firstcall.NE.1) THEN
-        c_c = 1.0 / cloud%cap
-        a_f = vent_coeff_a(cloud,1)
-        b_f = vent_coeff_b(cloud,1)
-        IF(isIO())THEN
-          WRITE (6, *) "  CLOUD vapor_deposition_cloud: " 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Geometrie von Wolkentropfen:  a_cloud   = ",cloud%a_geo  
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Geometrie von Wolkentropfen:  b_cloud   = ",cloud%b_geo
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Sedimentation:                alf_cloud = ",cloud%a_vel 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Sedimentation:                bet_cloud = ",cloud%b_vel 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer Kapazitaet:                   c_c       = ",c_c 
-          WRITE (6,'(A,D10.3)') "  Koeff. fuer mittleren Ventilationskoeff.: a_f       = ",a_f 
-          WRITE (6,'(A,D10.3)') "                                            b_f       = ",b_f 
-        END IF
-        firstcall = 1
-      ELSEIF (isIO() .AND. isdebug) THEN
-        WRITE (6, *) "  CLOUD vapor_deposition_cloud " 
-      ENDIF
-
-      f_v_fakt = N_sc**n_f
-      DO k = 1, loc_iz
-        DO j = 1, loc_iy
-          DO i = 0, loc_ix
-            n_c = n_cloud(i,j,k)                                   !..Anzahldichte
-            q_c = q_cloud(i,j,k)                                   !..Massendichte
-
-            x_c = MIN(MAX(q_c/(n_c+eps),MAX(cloud%x_min,eps)),cloud%x_max)  !..mittlere Masse
-            ! x_c**b_geo durch EXP(b_geo*LOG(x_c)) ersetzen, da x_c == 0 nicht mehr vorkommen kann; 20 % schneller:
-            d_c = cloud%a_geo * EXP(cloud%b_geo*LOG(x_c))          !..mittlerer Durchmesser
-            v_c = cloud%a_vel * EXP(cloud%b_vel*LOG(x_c)) * rrho_c(i,j,k)   !..mittlere Sedimentationsgeschw.
-
-            N_re = v_c * d_c / nu_l                                !..mittlere Reynoldszahl
-            ! N_re**m_f durch EXP(m_f*LOG(N_re)) ersetzen, da N_re == 0 nicht mehr vorkommen kann:
-            f_v  = a_f + b_f * f_v_fakt * EXP(m_f*LOG(N_re))             !..mittlerer Vent.Koeff.
-            f_v  = MAX(f_v,1.d0) !unnoetig??
-
-            dep_cloud(i,j,k) = g_w(i,j,k) * n_c * c_c * d_c * f_v * s_sw(i,j,k) * dt_local
-          ENDDO
-        ENDDO
-      ENDDO
-
-    END SUBROUTINE vapor_deposition_cloud
 
     SUBROUTINE vapor_deposition_ice()
       IMPLICIT NONE
@@ -16322,14 +14515,12 @@ CONTAINS
               q_i = q_ice(i,j,k)                                   !..Massendichte
 
               x_i = MIN(MAX(q_i/(n_i+eps),MAX(ice%x_min,eps)),ice%x_max)    !..mittlere Masse
-              ! x_i**b_geo durch EXP(b_geo*LOG(x_i)) ersetzen, da x_i == 0 nicht mehr vorkommen kann; 20 % schneller:
+
               d_i = ice%a_geo * EXP(ice%b_geo*LOG(x_i))            !..mittlerer Durchmesser
               v_i = ice%a_vel * EXP(ice%b_vel*LOG(x_i)) * rrho_04(i,j,k)    !..mittlere Sedimentationsgeschw.
 
               N_re = v_i * d_i / nu_l                              !..mittlere Reynoldszahl
-              ! N_re**m_f durch EXP(m_f*LOG(N_re)) ersetzen, da N_re == 0 nicht mehr vorkommen kann:
               f_v  = a_f + b_f * f_v_fakt * EXP(m_f*LOG(N_re))     !..mittlerer Vent.Koeff.
-              !f_v  = MAX(f_v,1.d0) !unnoetig??
 
               dep_ice(i,j,k) = g_i(i,j,k) * n_i * c_i * d_i * f_v * s_si(i,j,k) * dt_local
             ENDIF
@@ -16389,17 +14580,13 @@ CONTAINS
               q_g = q_graupel(i,j,k)                                     !..Massendichte
 
               x_g = MIN(MAX(q_g/(n_g+eps),MAX(graupel%x_min,eps)),graupel%x_max)  !..mittlere Masse
-              ! x_g**b_geo durch EXP(b_geo*LOG(x_g)) ersetzen, da x_g == 0 nicht mehr vorkommen kann; 20 % schneller:
+
               d_g = graupel%a_geo * EXP(graupel%b_geo*LOG(x_g))          !..mittlerer Durchmesser
               v_g = graupel%a_vel * EXP(graupel%b_vel*LOG(x_g)) * rrho_04(i,j,k)  !..mittlere Sedimentationsgeschw.
 
               N_re = v_g * d_g / nu_l                                    !..mittlere Reynoldszahl
-              ! N_re**m_f durch EXP(m_f*LOG(N_re)) ersetzen, da N_re == 0 nicht mehr vorkommen kann:
               f_v  = a_f + b_f * f_v_fakt * EXP(m_f*LOG(N_re))           !..mittlerer Vent.Koeff.
-              ! ub>> Schnellere Berechnung wg. Verzicht auf "**":
-              !              f_n  = a_n + b_n * f_v_fakt * N_re**m_f                    !..mittlerer Vent.Koeff.
               f_n = a_n + vent_fakt * (f_v - a_f)                        !..mittlerer Vent.Koeff.
-              ! ub<<
               f_v  = MAX(f_v,1.d0) !unnoetig??
               f_n  = MAX(f_n,1.d0) !unnoetig??
 
@@ -16461,17 +14648,16 @@ CONTAINS
               q_h = q_hail(i,j,k)                                     !..Massendichte
 
               x_h = MIN(MAX(q_h/(n_h+eps),MAX(hail%x_min,eps)),hail%x_max)  !..mittlere Masse
-              ! x_h**b_geo durch EXP(b_geo*LOG(x_h)) ersetzen, da x_h == 0 nicht mehr vorkommen kann; 20 % schneller:
+
               d_h = hail%a_geo * EXP(hail%b_geo*LOG(x_h))          !..mittlerer Durchmesser
               v_h = hail%a_vel * EXP(hail%b_vel*LOG(x_h)) * rrho_04(i,j,k)  !..mittlere Sedimentationsgeschw.
 
               N_re = v_h * d_h / nu_l                                    !..mittlere Reynoldszahl
-              ! N_re**m_f durch EXP(m_f*LOG(N_re)) ersetzen, da N_re == 0 nicht mehr vorkommen kann:
+
               f_v  = a_f + b_f * f_v_fakt * EXP(m_f*LOG(N_re))
-              ! ub>> Schnellere Berechnung wg. Verzicht auf "**":
-              !              f_n  = a_n + b_n * f_v_fakt * N_re**m_f                   !..mittlerer Vent.Koeff.
+
               f_n = a_n + vent_fakt * (f_v - a_f)                        !..mittlerer Vent.Koeff.
-              ! ub<<
+
               f_v  = MAX(f_v,1.d0) !unnoetig??
               f_n  = MAX(f_n,1.d0) !unnoetig??
 
@@ -16526,12 +14712,12 @@ CONTAINS
               q_s = q_snow(i,j,k)                        !..Fluessigwassergehalt in SI
 
               x_s = MIN(MAX(q_s/(n_s+eps),MAX(snow%x_min,eps)),snow%x_max)   !..mittlere Masse in SI     
-              ! x_s**b_geo durch EXP(b_geo*LOG(x_s)) ersetzen, da x_s == 0 nicht mehr vorkommen kann; 20 % schneller:
+
               d_s = snow%a_geo * EXP(snow%b_geo*LOG(x_s))           !..mittlerer Durchmesser
               v_s = snow%a_vel * EXP(snow%b_vel*LOG(x_s)) * rrho_04(i,j,k)   !..mittlere Sedimentationsgeschw.
 
               N_re = v_s * d_s / nu_l                         !..mittlere Reynoldszahl
-              ! N_re**m_f durch EXP(m_f*LOG(N_re)) ersetzen, da N_re == 0 nicht mehr vorkommen kann:
+
               f_v  = a_f + b_f * f_v_fakt * EXP(m_f*LOG(N_re))        !..mittlerer Vent.Koeff.
               f_v  = MAX(f_v,1.d0) !unnoetig??
 
@@ -16544,51 +14730,7 @@ CONTAINS
 
     END SUBROUTINE vapor_deposition_snow
 
-    SUBROUTINE saturation_adjust_limiter ()
-
-      ! .. Local Scalars ..
-      DOUBLE PRECISION :: e_sat, rdrl, rdrlm1, rlrd, rlrdm1, t_
-      DOUBLE PRECISION :: a_, a1, b_, b1, dq_d, lrcv, q_sat, rcv, lrcp, rho_a, q_c
-
-      rcv  = 1.0d0 /  cv
-      lrcv = L_wd  * rcv
-      lrcp = L_wd  / cp
-
-      DO k = 1, loc_iz
-        DO j = 1, loc_iy
-          DO i = 0, loc_ix
-            q_d   = q(i,j,k)
-            q_c   = q_cloud(i,j,k)
-            T_a   = T_0(i,j,k) ! WRF + T(i,j,k) + T_g(i,j,k)
-            p_a   = p_0(i,j,k) ! WRF + p(i,j,k) + p_g(i,j,k)
-            rho_a = rho_0(i,j,k) ! WRF + rho_g(i,j,k)
-
-            a_    = A_w
-            b_    = B_w
-            e_sat = e_ws (T_a)
-
-            !...Berechnung der spezifischen Saettigungsfeuchte, Dotzek (4.33)
-            q_sat = rlrd / (p_a / e_sat + rlrdm1)
-
-            !...Berechnung der Adjustierungs-Terme, Dotzek, S. 35
-            a1 = a_ * (T_3 - b_) / (T_a - b_)**2
-            b1 = a1 * lrcp * q_sat
-
-            !...Berechnung des Phasenuebergangs, Dotzek, S. 36
-            dq_d = (q_d - q_sat*rho_a) / (1.0d0 + b1)
-
-            !...Limitieren von dep_cloud
-            dep_cloud(i,j,k) = MIN (dq_d, dep_cloud(i,j,k))
-            dep_cloud(i,j,k) = MAX (q_c,  dep_cloud(i,j,k))
-
-          END DO
-        END DO
-
-      END DO
-
-    END SUBROUTINE saturation_adjust_limiter
-
-  END SUBROUTINE vapor_dep_simple
+  END SUBROUTINE vapor_dep_relaxation
 
   SUBROUTINE cloud_nucleation()
     !*******************************************************************************
