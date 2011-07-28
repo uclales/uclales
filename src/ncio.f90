@@ -252,12 +252,12 @@ contains
     use mpi_interface, only :myid
 
 !irina
-    integer, parameter :: nnames = 32
+    integer, parameter :: nnames = 31
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,&
          'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,&  
          'w      ','t      ','p      ','q      ','l      ','r      '   ,'n      ',&
-         'inuc   ','rice   ','nice   ','rsnow  ','rgrp   ',&
+         'rice   ','nice   ','rsnow  ','rgrp   ',&
          'nsnow  ','ngrp   ','rhail  ','nhail  ',          &
          'stke   ','rflx   ','lflxu  ','lflxd  '/)
 
@@ -268,7 +268,7 @@ contains
     if (level  >= 1) nvar0 = nvar0+1
     if (level  >= 2) nvar0 = nvar0+1
     if (level  >= 3) nvar0 = nvar0+2
-    if (level  >= 4) nvar0 = nvar0+5
+    if (level  >= 4) nvar0 = nvar0+4
     if (level  >= 5) nvar0 = nvar0+4
     if (iradtyp > 1) nvar0 = nvar0+3
 
@@ -301,33 +301,31 @@ contains
     end if
     if (level >= 4) then
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+5)
+       sanal(nvar0) = sbase(20)
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+6)
+       sanal(nvar0) = sbase(21)
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+7)
+       sanal(nvar0) = sbase(22)
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+8)
-       nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+9)
+       sanal(nvar0) = sbase(23)
     end if
     if (level >= 5) then
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+10)
+       sanal(nvar0) = sbase(24)
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+11)
+       sanal(nvar0) = sbase(25)
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+12)
+       sanal(nvar0) = sbase(26)
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+13)
+       sanal(nvar0) = sbase(27)
     end if
     if (iradtyp > 1) then
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+14)
+       sanal(nvar0) = sbase(29)
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+15)
+       sanal(nvar0) = sbase(30)
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(nbase+16)
+       sanal(nvar0) = sbase(31)
     end if
 
 

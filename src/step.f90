@@ -62,7 +62,7 @@ contains
 
     use mpi_interface, only : myid, broadcast, double_scalar_par_max
     use grid, only : dt, dtlong, zt, zm, nzp, dn0, u0, v0, level, &
-         write_hist, a_ninucp
+         write_hist
     use ncio, only : write_anal, close_anal
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
@@ -251,7 +251,7 @@ contains
   ! 
   subroutine tendencies(nstep)
 
-    use grid, only : a_ut, a_vt, a_wt, a_tt, a_rt, a_rpt, a_npt, a_ninuct, &
+    use grid, only : a_ut, a_vt, a_wt, a_tt, a_rt, a_rpt, a_npt, &
                      a_ricet,a_nicet,a_rsnowt, a_rgrt,&
                      a_rhailt,a_nhailt,a_nsnowt, a_ngrt,&
                      a_xt1, a_xt2, nscl, nxyzp, level
@@ -273,17 +273,16 @@ contains
           a_npt =>a_xt1(:,:,:,7)
        end if
        if (level >= 4) then
-          a_ninuct =>a_xt1(:,:,:, 8)
-          a_ricet  =>a_xt1(:,:,:, 9)
-          a_nicet  =>a_xt1(:,:,:,10)
-          a_rsnowt =>a_xt1(:,:,:,11)
-          a_rgrt   =>a_xt1(:,:,:,12)
+          a_ricet  =>a_xt1(:,:,:, 8)
+          a_nicet  =>a_xt1(:,:,:, 9)
+          a_rsnowt =>a_xt1(:,:,:,10)
+          a_rgrt   =>a_xt1(:,:,:,11)
        end if
        if (level >= 5) then
-          a_nsnowt =>a_xt1(:,:,:,13)
-          a_ngrt   =>a_xt1(:,:,:,14)
-          a_rhailt =>a_xt1(:,:,:,15)
-          a_nhailt =>a_xt1(:,:,:,16)
+          a_nsnowt =>a_xt1(:,:,:,12)
+          a_ngrt   =>a_xt1(:,:,:,13)
+          a_rhailt =>a_xt1(:,:,:,14)
+          a_nhailt =>a_xt1(:,:,:,15)
        end if
 
     case(2)
@@ -298,17 +297,16 @@ contains
           a_npt =>a_xt2(:,:,:,7)
        end if
        if (level >= 4) then
-          a_ninuct =>a_xt2(:,:,:, 8)
-          a_ricet  =>a_xt2(:,:,:, 9)
-          a_nicet  =>a_xt2(:,:,:,10)
-          a_rsnowt =>a_xt2(:,:,:,11)
-          a_rgrt   =>a_xt2(:,:,:,12)
+          a_ricet  =>a_xt2(:,:,:, 8)
+          a_nicet  =>a_xt2(:,:,:, 9)
+          a_rsnowt =>a_xt2(:,:,:,10)
+          a_rgrt   =>a_xt2(:,:,:,11)
        end if
        if (level >= 5) then
-          a_nsnowt =>a_xt2(:,:,:,13)
-          a_ngrt   =>a_xt2(:,:,:,14)
-          a_rhailt =>a_xt2(:,:,:,15)
-          a_nhailt =>a_xt2(:,:,:,16)
+          a_nsnowt =>a_xt2(:,:,:,12)
+          a_ngrt   =>a_xt2(:,:,:,13)
+          a_rhailt =>a_xt2(:,:,:,14)
+          a_nhailt =>a_xt2(:,:,:,15)
        end if
 
     end select
@@ -322,7 +320,7 @@ contains
 
 !irina
     use grid, only : a_xp, a_xt1, a_xt2, a_up, a_vp, a_wp, a_sp, dzi_t, dt,  &
-         nscl, nxp, nyp, nzp, newvar,level, a_rpp,a_ninucp,a_ricep,a_nicep,a_rsnowp,a_rgrp,a_npp,rkalpha,rkbeta, &
+         nscl, nxp, nyp, nzp, newvar,level, a_rpp,a_ricep,a_nicep,a_rsnowp,a_rgrp,a_npp,rkalpha,rkbeta, &
          a_nsnowp,a_ngrp,a_rhailp,a_nhailp,a_rp
     use util, only : sclrset,velset
 
@@ -403,14 +401,10 @@ contains
     end where
    end if
    if (level >= 4) then
-    a_ninucp(1,:,:) = 0.
     a_ricep(1,:,:) = 0.
     a_nicep(1,:,:) = 0.
     a_rsnowp(1,:,:) = 0. 
     a_rgrp(1,:,:) = 0.
-    where (a_ninucp < 0.) 
-      a_ninucp=0.
-    end where
     where (a_ricep < 0.) 
       a_ricep=0.
     end where
