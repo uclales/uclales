@@ -160,7 +160,7 @@ contains
          , vmean, dn0, prc_c,prc_g,prc_i,prc_r,prc_s, prc_h, a_rpp, a_npp, albedo, CCN, iradtyp, a_rflx    &
          , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa &
          , a_ricep, a_rsnowp, a_rgrp, a_rhailp, a_nicep, a_nsnowp, a_ngrp, a_nhailp &
-         , vapor, rsup
+         , vapor
 
     real, intent (in) :: time
 
@@ -200,9 +200,9 @@ contains
          a_npp, prc_r, CCN)
     if (debug) WRITE (0,*) 'statistics: micro3 ok    myid=',myid
 
-    if (level ==4) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, rsup,a_ricep, a_rsnowp, a_rgrp,a_nicep,prc_i,prc_s,prc_g)
+    if (level ==4) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp,a_nicep,prc_i,prc_s,prc_g)
 
-    if (level ==5) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, rsup,a_ricep, a_rsnowp, a_rgrp,a_nicep,prc_i,prc_s,prc_g,a_rhailp,prc_h)
+    if (level ==5) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp,a_nicep,prc_i,prc_s,prc_g,a_rhailp,prc_h)
 
     if (debug) WRITE (0,*) 'statistics: micro ok    myid=',myid
 
@@ -756,12 +756,12 @@ contains
   ! SUBROUTINE ACCUM_LVL4: Accumulates specialized statistics that depend
   ! on level 4 variables.
   !
-  subroutine accum_lvl4(n1, n2, n3,  dn0, zm, rv, rsup,rice, rsnow, rgrp,nice, rrate_i, rrate_s, rrate_g,rhail,rrate_h)
+  subroutine accum_lvl4(n1, n2, n3,  dn0, zm, rv,rice, rsnow, rgrp,nice, rrate_i, rrate_s, rrate_g,rhail,rrate_h)
     use grid, only : a_pexnr,pi0,pi1
     use defs, only : alvi,cp
     integer, intent (in) :: n1,n2,n3
     real, intent (in), dimension(n1)        :: zm, dn0
-    real, intent (in), dimension(n1,n2,n3)  :: rv,rsup,rice,rsnow,rgrp,nice, rrate_i, rrate_s, rrate_g
+    real, intent (in), dimension(n1,n2,n3)  :: rv,rice,rsnow,rgrp,nice, rrate_i, rrate_s, rrate_g
     real, intent (in), dimension(n1,n2,n3), optional  :: rhail, rrate_h
     integer                   :: k, i, j, km1
     real, dimension(n2,n3)    :: scr
@@ -791,8 +791,6 @@ contains
 
     call get_avg3(n1,n2,n3,rgrp,a1)
     svctr(:,102)=svctr(:,102) + a1(:)*1000.
-    call get_avg3(n1,n2,n3,rsup,a1)
-    svctr(:,103)=svctr(:,103) + a1(:)/1000.
     if (present(rhail)) then
       call get_avg3(n1,n2,n3,rhail,a1)
       svctr(:,109)=svctr(:,109) + a1(:)*1000.

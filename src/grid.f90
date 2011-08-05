@@ -73,7 +73,7 @@ module grid
   ! 3D Arrays 
   !irina
   real, dimension (:,:,:), allocatable ::                                     &
-       a_theta, a_pexnr, press, vapor, liquid, a_rflx, a_sflx,rsup,   &
+       a_theta, a_pexnr, press, vapor, liquid, a_rflx, a_sflx,rsi,   &
        a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7,                &
        a_lflxu, a_lflxd, a_sflxu, a_sflxd,a_km, &
        prc_c, prc_r, prc_i, prc_s, prc_g, prc_h 
@@ -249,9 +249,9 @@ contains
        allocate(prc_i(nzp,nxp,nyp))
        allocate(prc_s(nzp,nxp,nyp))
        allocate(prc_g(nzp,nxp,nyp))
-       allocate(rsup(nzp,nxp,nyp))
-       rsup = 0.
-       memsize = memsize + 3*nxyzp
+       allocate(rsi(nzp,nxp,nyp))
+       rsi = 0.
+       memsize = memsize + 4*nxyzp
     end if
     if (level >= 5) then
        allocate(prc_h(nzp,nxp,nyp))
