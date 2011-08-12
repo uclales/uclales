@@ -409,7 +409,7 @@ contains
              end where
              rgrp = rgrpp(1:n1,i,j)
              where (rgrp>0)
-                ngrp = graupel%nr
+                ngrp = rgrp/graupel%x_min
              elsewhere
                 ngrp = 0
              end where
@@ -604,13 +604,13 @@ contains
           S = rv(k)/rs(k) - 1.
 
           if (S < 0) then
-             cerpt = 2. * pi * Dp * G * S * np(k)
-             cerpt = min (cerpt, rv(k)/dt)
+             cerpt = 2. * pi * Dp * G * S * np(k) * dt
+             cerpt = max (cerpt, -rp(k))
              cenpt = c_Nevap*cerpt * np(k) / rp(k)
-             np(k)=np(k) + cenpt*dt
-             rp(k)=rp(k) + cerpt*dt
-             rv(k)=rv(k) - cerpt*dt
-             tl(k)=tl(k) + convliq(k)*cerpt*dt
+             np(k)=np(k) + cenpt
+             rp(k)=rp(k) + cerpt
+             rv(k)=rv(k) - cerpt
+             tl(k)=tl(k) + convliq(k)*cerpt
           end if
        end if
     end do
@@ -717,11 +717,12 @@ contains
              Dc = ( Xc / prw )**(1./3.)
              au = Cau * (Dc * mmt / 2.)**Eau
           end if
-          au    = min(au,rc(k)/dt)
-          rp(k) = rp(k) + au*dt
-          rc(k) = rc(k) - au*dt
-          tl(k) = tl(k) + convliq(k)*au*dt
-          np(k) = np(k) + au/cldw%x_max*dt
+          au    = au * dt
+          au    = min(au,rc(k))
+          rp(k) = rp(k) + au
+          rc(k) = rc(k) - au
+          tl(k) = tl(k) + convliq(k)*au
+          np(k) = np(k) + au/cldw%x_max
        end if
     end do
 
@@ -781,15 +782,16 @@ contains
                 ac = Cac * (rc(k) * rp(k))**Eac
              end if
              !
-             ac    = min(ac, rc(k)/dt)
-             rp(k) = rp(k) + ac*dt
-             rc(k) = rc(k) - ac*dt
-             tl(k) = tl(k) + convliq(k)*ac*dt
+             ac    = ac * dt
+             ac    = min(ac, rc(k))
+             rp(k) = rp(k) + ac
+             rc(k) = rc(k) - ac
+             tl(k) = tl(k) + convliq(k)*ac
 
           end if
-          sc = k_rr * np(k) * rp(k) * sqrt(rho_0*dn0(k))
-          sc = min(sc, np(k)/dt)
-          np(k) = np(k) - sc*dt
+          sc = k_rr * np(k) * rp(k) * sqrt(rho_0*dn0(k)) * sc
+          sc = min(sc, np(k))
+          np(k) = np(k) - sc
        end if
     end do
 
@@ -1436,7 +1438,6 @@ contains
       dep_ice  = dep(ice    ,dn0(k),rice(k) ,nice(k) ,temp(k),s_i(k))
       dep_snow = dep(snow   ,dn0(k),rsnow(k),nsnow(k),temp(k),s_i(k))
       dep_grp  = dep(graupel,dn0(k),rgrp(k) ,ngrp(k) ,temp(k),s_i(k))
-if (s_i(k)*supsat<0) print *, 'fout', supsat, s_i(k)
       tau_ice  = dep_ice/supsat
       tau_snow = dep_snow/supsat
       tau_grp  = dep_grp/supsat
@@ -2635,10 +2636,13 @@ if (s_i(k)*supsat<0) print *, 'fout', supsat, s_i(k)
     real, dimension(:), intent(inout) :: mass
     real, dimension(:), intent(inout), optional :: num
 
-    where (mass < rthres)
-       mass = 0.
-    end where
-    mass(1) = 0.
+    if (any(mass < 0.)) then
+      print *, trim(meteor%name), 'below zero', mass
+    end if
+!     where (mass < rthres)
+!        mass = 0.
+!     end where
+!     mass(1) = 0.
     if (present(num)) then
        where (meteor%x_max*num < mass)
           num = mass/meteor%x_max
@@ -2739,11 +2743,11 @@ if (s_i(k)*supsat<0) print *, 'fout', supsat, s_i(k)
        !Graupel properties
        graupel = PARTICLE('graupel', & ! 'graupel'
             1,  & !number of moments
-            2e7, &      !Number of droplets
-            0.000000, & !.nu.....Width parameter of the distribution
+            2e5, &      !Number of droplets
+            1.000000, & !.nu.....Width parameter of the distribution
             0.166666, & !.mu.....exponential parameter of the distribution
-            1.00e-06, & !.x_max..maximum particle mass
-            1.00e-06, & !.x_min..minimale particler mass
+            1.00e-08, & !.x_max..maximum particle mass
+            1.00e-08, & !.x_min..minimale particler mass
             1.10e-01, & !.a_geo..coefficient of meteor geometry
             0.300000, & !.b_geo..coefficient of meteor geometry = 1/3.10
             7.64e+01, & !.a_vel..coefficient of fall velocity
