@@ -9701,14 +9701,6 @@ CONTAINS
             q_rain(i,j,k) = q_rain(i,j,k) - fr_q
             n_rain(i,j,k) = n_r - fr_n
 
-            !          IF (q_rain(i,j,k) < 0.0) THEN
-            !            !WRITE (*,*) 'SEIFERT RAIN_FREEZE_GAMLOOK: Qrain < 0.0, ', i,j,k, T_a, q_r, j_het, fr_q, fr_q_tmp
-            !            q_rain(i,j,k) = 0.0d0
-            !          END IF
-            !          IF (n_rain(i,j,k) < 0.0) THEN
-            !            !WRITE (*,*) 'SEIFERT RAIN_FREEZE_GAMLOOK: Nrain < 0.0, ', i,j,k, T_a, n_r, j_het, fr_n, fr_n_tmp
-            !            n_rain(i,j,k) = 0.0d0
-            !          END IF
 
             IF (ice_typ < 2) THEN 
               ! ohne Hagelklasse,  gefrierender Regen wird Eis oder Graupel
@@ -9726,6 +9718,16 @@ CONTAINS
               n_hail(i,j,k) = n_hail(i,j,k)  + fr_n_h
             ENDIF
 
+            IF (q_rain(i,j,k) < 0.0) THEN
+               if (abs(q_rain(i,j,k)).gt.1e-12) &
+                    WRITE (*,*) 'RAIN_FREEZE_GAMLOOK: Qrain < 0.0, ', i,j,k, q_rain(i,j,k), T_a, q_r, j_het, fr_q, fr_q_tmp
+               q_rain(i,j,k) = 0.0d0
+            END IF
+            IF (n_rain(i,j,k) < 0.0) THEN
+               if (abs(n_rain(i,j,k)).gt.1e-12) &
+                    WRITE (*,*) 'RAIN_FREEZE_GAMLOOK: Nrain < 0.0, ', i,j,k, n_rain(i,j,k), T_a, n_r, j_het, fr_n, fr_n_tmp
+               n_rain(i,j,k) = 0.0d0
+            END IF
             IF (q_graupel(i,j,k) < 0.0) THEN
               q_graupel(i,j,k) = 0.0d0
             END IF
@@ -12831,7 +12833,7 @@ CONTAINS
     END IF
 
     ! Analyse der Prozesse
-    !CALL process_evaluation (0) ! Optional
+    !CALL process_evaluation (6) ! Optional
 
     IF(isIO() .AND. isdebug)THEN
       WRITE (6, *) "CLOUD Wolken: END" 
@@ -14249,7 +14251,7 @@ CONTAINS
     !*******************************************************************************
 
 
-    USE globale_variablen,  ONLY: loc_ix, loc_iy, loc_iz, T, q,        &
+    USE globale_variablen,  ONLY: loc_ix, loc_iy, loc_iz, T, q, s_i,                    &
          &                        q_cloud, n_cloud, q_ice, n_ice, q_graupel, n_graupel, &
          &                        q_hail, n_hail,                                       & 
          &                        q_snow, n_snow, q_rain, &
@@ -14379,56 +14381,67 @@ CONTAINS
              ! (M05)
              
              qvsidiff  = q(i,j,k) - e_es(T_a)/(R_d*T_a)
-             
-             ! deposition rates are already multiplied with dt_local, therefore divide them here
-             tau_i_i  = zdt/qvsidiff*dep_ice(i,j,k)
-             tau_s_i  = zdt/qvsidiff*dep_snow(i,j,k)
-             tau_g_i  = zdt/qvsidiff*dep_graupel(i,j,k)
-             tau_h_i  = zdt/qvsidiff*dep_hail(i,j,k)
-             
-             Xi_i = ( tau_i_i + tau_s_i + tau_g_i + tau_h_i ) 
-             
-             Xfac =  qvsidiff / Xi_i * (1.0 - EXP(- dt_local*Xi_i))
-             
-             dep_ice(i,j,k)     = Xfac * tau_i_i
-             dep_snow(i,j,k)    = Xfac * tau_s_i
-             dep_graupel(i,j,k) = Xfac * tau_g_i
-             dep_hail(i,j,k)    = Xfac * tau_h_i
-             
-             IF (qvsidiff < 0.0) THEN
-                dep_ice(i,j,k)     = MAX(dep_ice(i,j,k),    -q_ice(i,j,k))
-                dep_snow(i,j,k)    = MAX(dep_snow(i,j,k),   -q_snow(i,j,k))
-                dep_graupel(i,j,k) = MAX(dep_graupel(i,j,k),-q_graupel(i,j,k)) 
-                dep_hail(i,j,k)    = MAX(dep_hail(i,j,k),   -q_hail(i,j,k))  
-             END IF
 
-             dep_sum = dep_ice(i,j,k) + dep_graupel(i,j,k) + dep_snow(i,j,k) + dep_hail(i,j,k)
+             if (abs(qvsidiff).lt.eps) then                
 
-             IF (.FALSE.) THEN
+                dep_ice(i,j,k)     = 0.0
+                dep_snow(i,j,k)    = 0.0
+                dep_graupel(i,j,k) = 0.0               
+                dep_hail(i,j,k)    = 0.0
+                dep_sum            = 0.0
 
-                ! Zur Sicherheit: Pruefen auf Qx < 0.0:
-                ! An dieser Stelle kann es vorkommen, dass ein |dep_xxx| > q_xxx ist, 
-                ! und zwar im Falle sehr kleiner absoluter Werte.
-                IF (q_ice(i,j,k)+dep_ice(i,j,k) < 0.0 .OR. &
-                     q_snow(i,j,k)+dep_snow(i,j,k) < 0.0 .OR. &
-                     q_graupel(i,j,k)+dep_graupel(i,j,k) < 0.0 .OR. &
-                     q_hail(i,j,k)+dep_hail(i,j,k) < 0.0) THEN
-                   
-                   dep_hail(i,j,k)    = MAX(dep_hail(i,j,k),   -q_hail(i,j,k)   )
-                   dep_graupel(i,j,k) = MAX(dep_graupel(i,j,k),-q_graupel(i,j,k))
-                   dep_snow(i,j,k)    = MAX(dep_snow(i,j,k),   -q_snow(i,j,k)   )
-                   dep_ice(i,j,k)     = MAX(dep_ice(i,j,k),    -q_ice(i,j,k)    )
-                END IF
+             else
+             
+                ! deposition rates are already multiplied with dt_local, therefore divide them here
+                tau_i_i  = zdt/qvsidiff*dep_ice(i,j,k)
+                tau_s_i  = zdt/qvsidiff*dep_snow(i,j,k)
+                tau_g_i  = zdt/qvsidiff*dep_graupel(i,j,k)
+                tau_h_i  = zdt/qvsidiff*dep_hail(i,j,k)
                 
-                IF (dep_sum > q(i,j,k) .AND. dep_sum > 0.0) THEN
-                   ! Kondensation begrenzen auf max. vorhandene Feuchtigkeit 
-                   ! (sollte aber nach dem vorhergegangenen Begrenzen wirklich nicht noetig sein ...):
-                   weight = q(i,j,k) / dep_sum
-                   dep_ice(i,j,k)     = weight * dep_ice(i,j,k)
-                   dep_snow(i,j,k)    = weight * dep_snow(i,j,k)
-                   dep_graupel(i,j,k) = weight * dep_graupel(i,j,k)
-                   dep_hail(i,j,k)    = weight * dep_hail(i,j,k)
-                   dep_sum = q(i,j,k)
+                Xi_i = ( tau_i_i + tau_s_i + tau_g_i + tau_h_i ) 
+             
+                Xfac =  qvsidiff / Xi_i * (1.0 - EXP(- dt_local*Xi_i))
+                
+                dep_ice(i,j,k)     = Xfac * tau_i_i
+                dep_snow(i,j,k)    = Xfac * tau_s_i
+                dep_graupel(i,j,k) = Xfac * tau_g_i
+                dep_hail(i,j,k)    = Xfac * tau_h_i
+             
+                IF (qvsidiff < 0.0) THEN
+                   dep_ice(i,j,k)     = MAX(dep_ice(i,j,k),    -q_ice(i,j,k))
+                   dep_snow(i,j,k)    = MAX(dep_snow(i,j,k),   -q_snow(i,j,k))
+                   dep_graupel(i,j,k) = MAX(dep_graupel(i,j,k),-q_graupel(i,j,k)) 
+                   dep_hail(i,j,k)    = MAX(dep_hail(i,j,k),   -q_hail(i,j,k))  
+                END IF
+
+                dep_sum = dep_ice(i,j,k) + dep_graupel(i,j,k) + dep_snow(i,j,k) + dep_hail(i,j,k)
+
+                IF (.FALSE.) THEN
+
+                   ! Zur Sicherheit: Pruefen auf Qx < 0.0:
+                   ! An dieser Stelle kann es vorkommen, dass ein |dep_xxx| > q_xxx ist, 
+                   ! und zwar im Falle sehr kleiner absoluter Werte.
+                   IF ( q_ice(i,j,k)+dep_ice(i,j,k) < 0.0 .OR. &
+                        q_snow(i,j,k)+dep_snow(i,j,k) < 0.0 .OR. &
+                        q_graupel(i,j,k)+dep_graupel(i,j,k) < 0.0 .OR. &
+                        q_hail(i,j,k)+dep_hail(i,j,k) < 0.0) THEN
+                      
+                      dep_hail(i,j,k)    = MAX(dep_hail(i,j,k),   -q_hail(i,j,k)   )
+                      dep_graupel(i,j,k) = MAX(dep_graupel(i,j,k),-q_graupel(i,j,k))
+                      dep_snow(i,j,k)    = MAX(dep_snow(i,j,k),   -q_snow(i,j,k)   )
+                      dep_ice(i,j,k)     = MAX(dep_ice(i,j,k),    -q_ice(i,j,k)    )
+                   END IF
+                
+                   IF (dep_sum > q(i,j,k) .AND. dep_sum > 0.0) THEN
+                      ! Kondensation begrenzen auf max. vorhandene Feuchtigkeit 
+                      ! (sollte aber nach dem vorhergegangenen Begrenzen wirklich nicht noetig sein ...):
+                      weight = q(i,j,k) / dep_sum
+                      dep_ice(i,j,k)     = weight * dep_ice(i,j,k)
+                      dep_snow(i,j,k)    = weight * dep_snow(i,j,k)
+                      dep_graupel(i,j,k) = weight * dep_graupel(i,j,k)
+                      dep_hail(i,j,k)    = weight * dep_hail(i,j,k)
+                      dep_sum = q(i,j,k)
+                   END IF
                 END IF
              END IF
              
