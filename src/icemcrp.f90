@@ -2759,6 +2759,7 @@ contains
 
     use defs, only : cpr,p00,alvl,alvi
     use grid, only : dt,dzi_t,zm
+    use thrm, only : rsif
 
     ! KAMM2 modules
 
@@ -2977,10 +2978,13 @@ contains
        DO ii = its, ite           
           DO kk = kts, kte
              ! supersaturation w.r.t. ice
-             ssi(kk,jj,ii) =  R_d & 
-                  & * dn0(kk) * qv(kk,jj,ii) &
-                  & * tk(kk,jj,ii) &
-                  & / e_es(dble(tk(kk,jj,ii))) - 1.0
+             hlp           = p00 * ((pi0(kk)+pi1(kk)+exner(kk,jj,ii))/cp)**cpr
+             ssi(kk,jj,ii) = qv(kk,jj,ii)/rsif(hlp,tk(kk,jj,ii)) - 1.0
+
+!             ssi(kk,jj,ii) =  R_d & 
+!                  & * dn0(kk) * qv(kk,jj,ii) &
+!                  & * tk(kk,jj,ii) &
+!                  & / e_es(dble(tk(kk,jj,ii))) - 1.0
           ENDDO
        ENDDO
     ENDDO
@@ -3066,10 +3070,13 @@ contains
           jj = jlm(i)
           kk = klm(i)
            
+          hlp = R_l * (1.0 +  (R_l/R_d-1.0) * qv(kk,jj,ii)) 
+
           ! ... dynamics
           T_0(i,j,k)      = tk(kk,jj,ii)
           p_0(i,j,k)      = p00 * ((pi0(kk)+pi1(kk)+exner(kk,jj,ii))/cp)**cpr
-          rho_k(i,j,k)    = dn0(kk)
+          rho_k(i,j,k)    = p_0(i,j,k)/(hlp*tk(kk,jj,ii))
+!         rho_k(i,j,k)    = dn0(kk)
 
           ! .. the ice supersaturation
           S_i(i,j,k)   = ssi(kk,jj,ii)
@@ -3193,7 +3200,7 @@ contains
              stop
           ENDIF
           IF (MINVAL(q_rain) < 0.0) THEN
-             write (*,*) ' mcrph_sb: q_rain < 0, STOPPED AFTER CLOUDS 1'
+             write (*,*) ' mcrph_sb: q_rain < 0, STOPPED AFTER CLOUDS 1', MINVAL(q_rain)
              stop
           ENDIF
           IF (MINVAL(q_ice) < 0.0) THEN
@@ -3399,6 +3406,66 @@ contains
        nt=nt+1
        call cpu_time(timing(nt))
     END IF
+
+    IF (debug) THEN
+       IF (MINVAL(qc) < 0.0) THEN
+          write (*,*) ' mcrph_sb: qc < 0, STOPPED AFTER SEDIMENTATION'
+          stop
+       ENDIF
+       IF (MINVAL(qi) < 0.0) THEN
+          write (*,*) ' mcrph_sb: qi < 0, STOPPED AFTER SEDIMENTATION'
+          stop
+       ENDIF
+       IF (MINVAL(qs) < 0.0) THEN
+          write (*,*) ' mcrph_sb: qs < 0, STOPPED AFTER SEDIMENTATION'
+          stop
+       ENDIF
+       IF (MINVAL(qg) < 0.0) THEN
+          write (*,*) ' mcrph_sb: qg < 0, STOPPED AFTER SEDIMENTATION'
+          stop
+       ENDIF
+       IF (MINVAL(qh) < 0.0) THEN
+          write (*,*) ' mcrph_sb: qh < 0, STOPPED AFTER SEDIMENTATION'
+          stop
+       ENDIF
+       IF (MINVAL(qr) < 0.0) THEN
+          write (*,*) ' mcrph_sb: qr < 0, STOPPED AFTER SEDIMENTATION'
+          stop
+       ENDIF
+       IF (MINVAL(qni) < 0.0) THEN
+          write (*,*) ' mcrph_sb: qni < 0, STOPPED AFTER SEDIMENTATION'
+          stop
+       ENDIF
+       IF (MINVAL(qns) < 0.0) THEN
+          write (*,*) ' mcrph_sb: qns < 0, STOPPED AFTER SEDIMENTATION'
+          stop
+       ENDIF
+       IF (MINVAL(qng) < 0.0) THEN
+          write (*,*) ' mcrph_sb: qng < 0, STOPPED AFTER SEDIMENTATION'
+          stop
+       ENDIF
+       IF (MINVAL(qnh) < 0.0) THEN
+          write (*,*) ' mcrph_sb: qnh < 0, STOPPED AFTER SEDIMENTATION'
+          stop
+       ENDIF
+       IF (MINVAL(qnr) < 0.0) THEN
+          write (*,*) ' mcrph_sb: qnr < 0, STOPPED AFTER SEDIMENTATION'
+          stop
+       ENDIF
+    ENDIF
+
+    WHERE (qv < 0.0) qv = 0.0
+    WHERE (qc < 0.0) qc = 0.0
+    WHERE (qr < 0.0) qr = 0.0
+    WHERE (qi < 0.0) qi = 0.0
+    WHERE (qs < 0.0) qs = 0.0
+    WHERE (qg < 0.0) qg = 0.0
+    WHERE (qh < 0.0) qh = 0.0
+    WHERE (qnr < 0.0) qnr = 0.0
+    WHERE (qni < 0.0) qni = 0.0
+    WHERE (qns < 0.0) qns = 0.0
+    WHERE (qng < 0.0) qng = 0.0
+    WHERE (qnh < 0.0) qnh = 0.0
 
     DO i=1,ie
        DO j=1,je
