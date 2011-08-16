@@ -73,7 +73,7 @@ module grid
   ! 3D Arrays 
   !irina
   real, dimension (:,:,:), allocatable ::                                     &
-       a_theta, a_pexnr, press, vapor, liquid, a_rflx, a_sflx,rsup,   &
+       a_theta, a_pexnr, press, vapor, liquid, a_rflx, a_sflx,rsi,   &
        a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7,                &
        a_lflxu, a_lflxd, a_sflxu, a_sflxd,a_km, &
        prc_c, prc_r, prc_i, prc_s, prc_g, prc_h 
@@ -82,7 +82,6 @@ module grid
   !
   real, dimension (:,:,:), pointer :: a_up, a_ut, a_vp, a_vt, a_wp, a_wt,     &
        a_sp, a_st, a_tp, a_tt, a_rp, a_rt, a_rpp, a_rpt, a_npp, a_npt,        &
-       a_ninucp, a_ninuct , & ! ice nuclei concentration 
        a_ricep , a_ricet  , & ! ice mixing ratio
        a_nicep , a_nicet  , & ! ice number concentration
        a_rsnowp, a_rsnowt , & ! snow
@@ -198,7 +197,7 @@ contains
     nscl = nscl+naddsc
     if (level   > 0) nscl = nscl+1  ! qt only
     if (level   > 2) nscl = nscl+2  ! nr,qr
-    if (level   > 3) nscl = nscl+5  ! ni,qi,qs,qg,ninuc
+    if (level   > 3) nscl = nscl+4  ! ni,qi,qs,qg
     if (level   > 4) nscl = nscl+4  ! ns,ng,qh,nh (for Axel's two-moment scheme)
 
     allocate (a_xp(nzp,nxp,nyp,nscl), a_xt1(nzp,nxp,nyp,nscl),        &
@@ -221,18 +220,17 @@ contains
     end if
     ! ice microphysics
     if (level >= 4) then
-      a_ninucp =>a_xp(:,:,:, 8)
-      a_ricep  =>a_xp(:,:,:, 9)
-      a_nicep  =>a_xp(:,:,:,10)
-      a_rsnowp =>a_xp(:,:,:,11)
-      a_rgrp   =>a_xp(:,:,:,12)
+      a_ricep  =>a_xp(:,:,:, 8)
+      a_nicep  =>a_xp(:,:,:, 9)
+      a_rsnowp =>a_xp(:,:,:,10)
+      a_rgrp   =>a_xp(:,:,:,11)
     end if
     ! SB2006 two-moment scheme with hail
     if (level == 5) then
-      a_nsnowp =>a_xp(:,:,:,13)
-      a_ngrp   =>a_xp(:,:,:,14)
-      a_rhailp =>a_xp(:,:,:,15)
-      a_nhailp =>a_xp(:,:,:,16)
+      a_nsnowp =>a_xp(:,:,:,12)
+      a_ngrp   =>a_xp(:,:,:,13)
+      a_rhailp =>a_xp(:,:,:,14)
+      a_nhailp =>a_xp(:,:,:,15)
     end if
 
     allocate (a_ustar(nxp,nyp),a_tstar(nxp,nyp),a_rstar(nxp,nyp))
@@ -251,9 +249,9 @@ contains
        allocate(prc_i(nzp,nxp,nyp))
        allocate(prc_s(nzp,nxp,nyp))
        allocate(prc_g(nzp,nxp,nyp))
-       allocate(rsup(nzp,nxp,nyp))
-       rsup = 0.
-       memsize = memsize + 3*nxyzp
+       allocate(rsi(nzp,nxp,nyp))
+       rsi = 0.
+       memsize = memsize + 4*nxyzp
     end if
     if (level >= 5) then
        allocate(prc_h(nzp,nxp,nyp))

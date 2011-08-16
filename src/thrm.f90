@@ -32,7 +32,7 @@ contains
   subroutine thermo (level)
 
     use grid, only : liquid, vapor, a_theta, a_pexnr, press, a_scr1,  &
-         a_scr2, a_rp, a_tp, nxp, nyp, nzp, th00, pi0, pi1,a_rpp,rsup,a_ricep,a_rsnowp,a_rgrp
+         a_scr2, a_rp, a_tp, nxp, nyp, nzp, th00, pi0, pi1,a_rpp,rsi,a_ricep,a_rsnowp,a_rgrp
     integer, intent (in) :: level
 
     select case (level)
@@ -44,7 +44,7 @@ contains
             pi1,th00,a_rp,vapor,liquid,a_scr2)
     case (4,5)
        call satadjst(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
-            pi1,th00,a_rp,vapor,liquid,a_scr2,rsup)
+            pi1,th00,a_rp,vapor,liquid,a_scr2,rsi)
     end select
 ! stop    
   end subroutine thermo
@@ -105,7 +105,7 @@ contains
 ! SATADJST:  this routine calculates theta, and pressure and diagnoses
 ! liquid water using a saturation adjustment for warm-phase systems
 ! 
-  subroutine satadjst(level,n1,n2,n3,pp,p,tl,th,tk,pi0,pi1,th00,rt,rv,rc,rs,rsup)
+  subroutine satadjst(level,n1,n2,n3,pp,p,tl,th,tk,pi0,pi1,th00,rt,rv,rc,rs,rsi)
 
     use defs, only : cp, cpr, alvl, ep, Rm, p00,t_hn,tmelt
     use mpi_interface, only : appl_abort
@@ -116,7 +116,7 @@ contains
     real, intent (in), dimension (n1)          :: pi0, pi1
     real, intent (in)                          :: th00
     real, intent (out), dimension (n1,n2,n3)   :: rc,rv,rs,th,tk,p
-    real, intent (out), optional, dimension (n1,n2,n3) :: rsup
+    real, intent (out), optional, dimension (n1,n2,n3) :: rsi
 
     integer :: k, i, j, iterate
     real    :: exner,tli,txi,tx1,tx,rsx,rix,rcx,ravail,dtx,part
@@ -159,7 +159,7 @@ contains
              rc(k,i,j)=rcx
              rv(k,i,j)=rt(k,i,j)-rc(k,i,j)
              rs(k,i,j)  = rsx
-             if (level>3) rsup(k,i,j)= rv(k,i,j) - rix
+             if (level>3) rsi(k,i,j) = rix
              tk(k,i,j)=tx
              th(k,i,j)=tk(k,i,j)/exner
 ! if (i == 15 .and. j == 15) then
@@ -171,29 +171,29 @@ contains
     enddo
   end subroutine satadjst
 ! 
-
-  subroutine satpart(n1,n2,n3,rv,rc,rsup,tk)
-    use defs, only : t_hn, tmelt
-    integer, intent(in) :: n1,n2,n3
-    real,dimension(n1,n2,n3), intent(inout) :: rv,rc
-    real,dimension(n1,n2,n3), intent(out)   :: rsup
-    real,dimension(n1,n2,n3), intent(in)    :: tk
-    integer :: i,j,k
-    real :: part
-    
-     do j=3,n3-2
-       do i=3,n2-2
-          do k=1,n1
-            part = max(0.,min(1.,(tk(k,i,j)-t_hn)/(tmelt-t_hn)))
-            rsup(k,i,j) = rc(k,i,j)*(1-part)
-            rc(k,i,j)   = part*rc(k,i,j)
-            rv(k,i,j)   = rsup(k,i,j)+rv(k,i,j)
-        end do
-      end do
-    end do
-
-  end subroutine satpart
-
+! 
+!   subroutine satpart(n1,n2,n3,rv,rc,rsup,tk)
+!     use defs, only : t_hn, tmelt
+!     integer, intent(in) :: n1,n2,n3
+!     real,dimension(n1,n2,n3), intent(inout) :: rv,rc
+!     real,dimension(n1,n2,n3), intent(out)   :: rsup
+!     real,dimension(n1,n2,n3), intent(in)    :: tk
+!     integer :: i,j,k
+!     real :: part
+!     
+!      do j=3,n3-2
+!        do i=3,n2-2
+!           do k=1,n1
+!             part = max(0.,min(1.,(tk(k,i,j)-t_hn)/(tmelt-t_hn)))
+!             rsup(k,i,j) = rc(k,i,j)*(1-part)
+!             rc(k,i,j)   = part*rc(k,i,j)
+!             rv(k,i,j)   = rsup(k,i,j)+rv(k,i,j)
+!         end do
+!       end do
+!     end do
+! 
+!   end subroutine satpart
+! 
 
 ! ---------------------------------------------------------------------
 ! This function calculates the water saturation vapor mixing ratio as a

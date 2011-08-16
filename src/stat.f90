@@ -110,25 +110,25 @@ contains
     svctr(:,:) = 0.
     ssclr(:)   = 0.                 ! changed from = -999. to = 0.
 
-    select case(level)
-    case (0)
-       nv1 = 13
-       nv2 = 58
-    case (1)
-       nv1 = 14
-       nv2 = 58
-    case (2)
-       nv1 = 20
-       nv2 = 83
-       !irina
-       if (iradtyp == 4) nv1=21
-    case (3:4)
-       nv1 = 43
-       nv2 = 107
-    case default
+!     select case(level)
+!     case (0)
+!        nv1 = 13
+!        nv2 = 58
+!     case (1)
+!        nv1 = 14
+!        nv2 = 58
+!     case (2)
+!        nv1 = 20
+!        nv2 = 83
+!        !irina
+!        if (iradtyp == 4) nv1=21
+!     case (3:4)
+!        nv1 = 43
+!        nv2 = 107
+!     case default
        nv1 = nvar1
        nv2 = nvar2
-    end select
+!     end select
 
     fname =  trim(filprf)//'.ts'
     if(myid == 0) print                                                  &
@@ -159,9 +159,8 @@ contains
          , a_rp, a_tp, press, nxp, nyp, nzp, dzi_m, dzi_t, zm, zt, th00, umean &
          , vmean, dn0, prc_c,prc_g,prc_i,prc_r,prc_s, prc_h, a_rpp, a_npp, albedo, CCN, iradtyp, a_rflx    &
          , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa &
-         , a_ricep, a_rsnowp, a_rgrp, a_rhailp, a_ninucp &
-         , a_nicep, a_nsnowp, a_ngrp, a_nhailp &
-         , vapor, rsup
+         , a_ricep, a_rsnowp, a_rgrp, a_rhailp, a_nicep, a_nsnowp, a_ngrp, a_nhailp &
+         , vapor
 
     real, intent (in) :: time
 
@@ -201,9 +200,9 @@ contains
          a_npp, prc_r, CCN)
     if (debug) WRITE (0,*) 'statistics: micro3 ok    myid=',myid
 
-    if (level ==4) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, rsup,a_ricep, a_rsnowp, a_rgrp,a_ninucp,a_nicep,prc_i,prc_s,prc_g)
+    if (level ==4) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp,a_nicep,prc_i,prc_s,prc_g)
 
-    if (level ==5) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, rsup,a_ricep, a_rsnowp, a_rgrp,a_ninucp,a_nicep,prc_i,prc_s,prc_g,a_rhailp,prc_h)
+    if (level ==5) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp,a_nicep,prc_i,prc_s,prc_g,a_rhailp,prc_h)
 
     if (debug) WRITE (0,*) 'statistics: micro ok    myid=',myid
 
@@ -757,12 +756,12 @@ contains
   ! SUBROUTINE ACCUM_LVL4: Accumulates specialized statistics that depend
   ! on level 4 variables.
   !
-  subroutine accum_lvl4(n1, n2, n3,  dn0, zm, rv, rsup,rice, rsnow, rgrp,ninuc,nice, rrate_i, rrate_s, rrate_g,rhail,rrate_h)
+  subroutine accum_lvl4(n1, n2, n3,  dn0, zm, rv,rice, rsnow, rgrp,nice, rrate_i, rrate_s, rrate_g,rhail,rrate_h)
     use grid, only : a_pexnr,pi0,pi1
     use defs, only : alvi,cp
     integer, intent (in) :: n1,n2,n3
     real, intent (in), dimension(n1)        :: zm, dn0
-    real, intent (in), dimension(n1,n2,n3)  :: rv,rsup,rice,rsnow,rgrp,ninuc,nice, rrate_i, rrate_s, rrate_g
+    real, intent (in), dimension(n1,n2,n3)  :: rv,rice,rsnow,rgrp,nice, rrate_i, rrate_s, rrate_g
     real, intent (in), dimension(n1,n2,n3), optional  :: rhail, rrate_h
     integer                   :: k, i, j, km1
     real, dimension(n2,n3)    :: scr
@@ -772,14 +771,6 @@ contains
 !     real, dimension(n2,n3) :: scr1
 !     logical                :: aflg
  
-
-    !
-    ! average ice nuclei
-    !
-
-    call get_avg3(n1,n2,n3,ninuc,a1)
-    svctr(:,98)=svctr(:,98) + a1(:)/1000.
-
     !
     ! conditionally average ice numbers, and droplet concentrations
     !
@@ -800,8 +791,6 @@ contains
 
     call get_avg3(n1,n2,n3,rgrp,a1)
     svctr(:,102)=svctr(:,102) + a1(:)*1000.
-    call get_avg3(n1,n2,n3,rsup,a1)
-    svctr(:,103)=svctr(:,103) + a1(:)/1000.
     if (present(rhail)) then
       call get_avg3(n1,n2,n3,rhail,a1)
       svctr(:,109)=svctr(:,109) + a1(:)*1000.
@@ -1041,7 +1030,7 @@ contains
     ! 
     do n=1,nv1
        iret = nf90_inq_varid(ncid1, s1(n), VarID)
-       iret = nf90_put_var(ncid1, VarID, ssclr(n), start=(/nrec1/))
+       if(iret == 0) iret = nf90_put_var(ncid1, VarID, ssclr(n), start=(/nrec1/))
        ssclr(n) = 0.
     end do
     iret = nf90_sync(ncid1)
