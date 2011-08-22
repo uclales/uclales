@@ -19,6 +19,10 @@
 !
 module step
 
+!axel for debugging only>
+  USE parallele_umgebung, ONLY: isIO,global_maxval_stdout
+!<axel
+
   implicit none
 
   integer :: istpfl = 1
@@ -43,6 +47,8 @@ module step
   logical :: lsvarflg = .false.
   character (len=8) :: case_name = 'astex'
 
+  integer :: istp
+
 contains
   ! 
   ! ----------------------------------------------------------------------
@@ -55,17 +61,16 @@ contains
   subroutine stepper
 
     use mpi_interface, only : myid, broadcast, double_scalar_par_max
-
     use grid, only : dt, dtlong, zt, zm, nzp, dn0, u0, v0, level, &
-         write_hist, write_anal, close_anal ,a_ninucp
-         
+         write_hist
+    use ncio, only : write_anal, close_anal
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
     real    :: t1,t2,tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax
-    integer :: istp, iret
+    integer :: iret
     !
     ! Timestep loop for program
     !
@@ -165,8 +170,9 @@ contains
   ! 
   subroutine t_step
 
+    use mpi_interface, only : myid
     use grid, only : level, dt, nstep, a_tt, a_up, a_vp, a_wp, dxi, dyi, dzi_t, &
-         nxp, nyp, nzp, dn0,a_scr1, u0, v0, a_ut, a_vt, a_wt, zt
+         nxp, nyp, nzp, dn0,a_scr1, u0, v0, a_ut, a_vt, a_wt, zt, a_ricep
     use stat, only : sflg, statistics
     use sgsm, only : diffuse
     !irina
@@ -182,13 +188,16 @@ contains
     use util, only : velset,get_avg
     use modtimedep, only : timedep
 
+    logical, parameter :: debug = .false.
 !     integer :: k
     real :: xtime
 !     character (len=11)    :: fname = 'debugXX.dat'
-
+  
     xtime = time/86400. + strtim
     call timedep(time,timmax, sst)
     do nstep = 1,3
+
+       if (debug) call global_maxval_stdout('t_step start: ','a_ricep = ',a_ricep)
 
        ! Add additional criteria to ensure that some profile statistics that are  
        ! updated every 'ssam_intvl' outside the main statistics module
@@ -210,26 +219,28 @@ contains
        call diffuse
        call fadvect
        call ladvect
+       if (debug) call global_maxval_stdout('t_step adv:   ','a_ricep = ',a_ricep)
        if (level >= 1) then
           call thermo(level)
-!irina   
-        ! print *, 'sst bef forcing',sst     
-         !print *, "tt",a_tt(:,5,5)
           call forcings(xtime,cntlat,sst,div,case_name)
-         !print *, "tt",a_tt(:,5,5)
-          call micro(level)
+          call micro(level,istp)
+          if (debug) call global_maxval_stdout('t_step micro: ','a_ricep = ',a_ricep)
        end if
        call corlos 
        call buoyancy
        call sponge
        call update (nstep)
+       if (debug) call global_maxval_stdout('t_step update:','a_ricep = ',a_ricep)
        call poisson 
+       if (debug) call global_maxval_stdout('t_step pois:  ','a_ricep = ',a_ricep)
        call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
-
+       if (debug) call global_maxval_stdout('t_step end:   ','a_ricep = ',a_ricep)
     end do
 
     if (statflg) then 
+       if (debug) WRITE (0,*) 't_step statflg thermo, myid=',myid
        call thermo (level)
+       if (debug) WRITE (0,*) 't_step statflg statistics, myid=',myid
        call statistics (time+dt)
        sflg = .False.
     end if
@@ -240,8 +251,9 @@ contains
   ! 
   subroutine tendencies(nstep)
 
-    use grid, only : a_ut, a_vt, a_wt, a_tt, a_rt, a_rpt, a_npt, a_ninuct, &
+    use grid, only : a_ut, a_vt, a_wt, a_tt, a_rt, a_rpt, a_npt, &
                      a_ricet,a_nicet,a_rsnowt, a_rgrt,&
+                     a_rhailt,a_nhailt,a_nsnowt, a_ngrt,&
                      a_xt1, a_xt2, nscl, nxyzp, level
     use util, only : azero
 
@@ -261,11 +273,16 @@ contains
           a_npt =>a_xt1(:,:,:,7)
        end if
        if (level >= 4) then
-          a_ninuct =>a_xt1(:,:,:, 8)
-          a_ricet  =>a_xt1(:,:,:, 9)
-          a_nicet  =>a_xt1(:,:,:,10)
-          a_rsnowt =>a_xt1(:,:,:,11)
-          a_rgrt   =>a_xt1(:,:,:,12)
+          a_ricet  =>a_xt1(:,:,:, 8)
+          a_nicet  =>a_xt1(:,:,:, 9)
+          a_rsnowt =>a_xt1(:,:,:,10)
+          a_rgrt   =>a_xt1(:,:,:,11)
+       end if
+       if (level >= 5) then
+          a_nsnowt =>a_xt1(:,:,:,12)
+          a_ngrt   =>a_xt1(:,:,:,13)
+          a_rhailt =>a_xt1(:,:,:,14)
+          a_nhailt =>a_xt1(:,:,:,15)
        end if
 
     case(2)
@@ -280,12 +297,18 @@ contains
           a_npt =>a_xt2(:,:,:,7)
        end if
        if (level >= 4) then
-          a_ninuct =>a_xt2(:,:,:, 8)
-          a_ricet  =>a_xt2(:,:,:, 9)
-          a_nicet  =>a_xt2(:,:,:,10)
-          a_rsnowt =>a_xt2(:,:,:,11)
-          a_rgrt   =>a_xt2(:,:,:,12)
+          a_ricet  =>a_xt2(:,:,:, 8)
+          a_nicet  =>a_xt2(:,:,:, 9)
+          a_rsnowt =>a_xt2(:,:,:,10)
+          a_rgrt   =>a_xt2(:,:,:,11)
        end if
+       if (level >= 5) then
+          a_nsnowt =>a_xt2(:,:,:,12)
+          a_ngrt   =>a_xt2(:,:,:,13)
+          a_rhailt =>a_xt2(:,:,:,14)
+          a_nhailt =>a_xt2(:,:,:,15)
+       end if
+
     end select
 
   end subroutine tendencies
@@ -297,21 +320,74 @@ contains
 
 !irina
     use grid, only : a_xp, a_xt1, a_xt2, a_up, a_vp, a_wp, a_sp, dzi_t, dt,  &
-         nscl, nxp, nyp, nzp, newvar,level, a_rpp,a_ninucp,a_ricep,a_nicep,a_rsnowp,a_rgrp,a_npp,rkalpha,rkbeta
+         nscl, nxp, nyp, nzp, newvar,level, a_rpp,a_ricep,a_nicep,a_rsnowp,a_rgrp,a_npp,rkalpha,rkbeta, &
+         a_nsnowp,a_ngrp,a_rhailp,a_nhailp,a_rp
     use util, only : sclrset,velset
+
+!axel for debugging only>
+  USE parallele_umgebung, ONLY: isIO,double_global_maxval
+!<axel
 
     integer, intent (in) :: nstep
 
     integer :: n
 
+!axel for debugging only>
+    logical :: debug = .false.
+    REAL(KIND=8) :: wmax,qvmax,qcmax,qrmax,qimax,qsmax,qgmax,qhmax,&
+         &                  ncmax,nimax,tmax
+
+!<axel
+
+    IF (debug) THEN
+      wmax  = double_global_maxval(a_wp)
+      qvmax = double_global_maxval(a_rp)
+      qrmax = double_global_maxval(a_rpp)
+      qimax = double_global_maxval(a_ricep)
+      qsmax = double_global_maxval(a_rsnowp)
+      qgmax = double_global_maxval(a_rgrp)
+      qhmax = double_global_maxval(a_rhailp)
+      nimax = double_global_maxval(a_nicep)
+      IF (isIO()) THEN
+      WRITE (*,*) "STEP: output before update, nstep = ",nstep
+      WRITE(*,'(10x,a)') 'Maximum Values:'
+      WRITE(*,'(A10,10A11)')   '   ', 'w','qt','qr','qi','qs','qg','qh','ni'
+      WRITE(*,'(A10,10E11.3)') '   ', wmax,qvmax,qrmax,qimax,qsmax,qgmax,qhmax,nimax
+      ENDIF
+    ENDIF
+
     a_xp = a_xp + dt *(rkalpha(nstep)*a_xt1 + rkbeta(nstep)*a_xt2)
 
+    IF (debug) THEN
+      wmax  = double_global_maxval(a_wp)
+      qvmax = double_global_maxval(a_rp)
+      qrmax = double_global_maxval(a_rpp)
+      qimax = double_global_maxval(a_ricep)
+      qsmax = double_global_maxval(a_rsnowp)
+      qgmax = double_global_maxval(a_rgrp)
+      qhmax = double_global_maxval(a_rhailp)
+      nimax = double_global_maxval(a_nicep)
+      IF (isIO()) THEN
+      WRITE (*,*) "STEP: output after update, nstep = ",nstep
+      WRITE(*,'(10x,a)') 'Maximum Values:'
+      WRITE(*,'(A10,10A11)')   '   ', 'w','qt','qr','qi','qs','qg','qh','ni'
+      WRITE(*,'(A10,10E11.3)') '   ', wmax,qvmax,qrmax,qimax,qsmax,qgmax,qhmax,nimax
+      ENDIF
+    ENDIF
+
+
     call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
+
+!    call global_maxval_stdout('update velset:','a_ricep = ',a_ricep)
 
     do n=4,nscl
        call newvar(n,istep=nstep)
        call sclrset('mixd',nzp,nxp,nyp,a_sp,dzi_t)
+       ! for debugging
+       !call sclrset('mixd',nzp,nxp,nyp,a_sp,dzi_t,n)
     end do
+
+!    call global_maxval_stdout('update sclrst:','a_ricep = ',a_ricep)
 
 !irina
    if (level >= 3) then
@@ -325,19 +401,18 @@ contains
     end where
    end if
    if (level >= 4) then
-    a_ninucp(1,:,:) = 0.
     a_ricep(1,:,:) = 0.
     a_nicep(1,:,:) = 0.
     a_rsnowp(1,:,:) = 0. 
     a_rgrp(1,:,:) = 0.
-    where (a_ninucp < 0.) 
-      a_ninucp=0.
-    end where
     where (a_ricep < 0.) 
       a_ricep=0.
     end where
     where (a_ricep < 0.) 
       a_ricep=0.
+    end where
+    where (a_ricep <= 0.) 
+      a_nicep=0.
     end where
     where (a_nicep < 0.) 
       a_nicep=0.
@@ -348,9 +423,36 @@ contains
     where (a_rgrp < 0.) 
       a_rgrp=0.
     end where
-   
+   end if
+   if (level >= 5) then
+    a_nsnowp(1,:,:) = 0. 
+    a_ngrp(1,:,:)   = 0.
+    a_rhailp(1,:,:) = 0.
+    a_nhailp(1,:,:) = 0.
+    where (a_rhailp < 0.) 
+      a_rhailp=0.
+    end where
+    where (a_rhailp <= 0.) 
+      a_nhailp=0.
+    end where
+    where (a_rsnowp <= 0.) 
+      a_nsnowp=0.
+    end where
+    where (a_rgrp <= 0.) 
+      a_ngrp=0.
+    end where
+    where (a_nhailp < 0.) 
+      a_nhailp=0.
+    end where
+    where (a_nsnowp < 0.) 
+      a_nsnowp=0.
+    end where
+    where (a_ngrp < 0.) 
+      a_ngrp=0.
+    end where
    end if
 
+!   call global_maxval_stdout('update clipp: ','a_ricep = ',a_ricep)
 
   end subroutine update
   !
@@ -433,7 +535,7 @@ contains
   subroutine buoyancy
 
     use grid, only : a_up, a_vp, a_wp, a_wt, vapor, a_theta, a_scr1, a_scr3,liquid,&
-         a_rp,a_rpp,a_ricep, a_rsnowp, a_rgrp, nxp, nyp, nzp, dzi_m, th00, level, pi1
+         a_rp,a_rpp,a_ricep, a_rsnowp, a_rgrp, a_rhailp, nxp, nyp, nzp, dzi_m, th00, level, pi1
     use stat, only : sflg, comp_tke
     use util, only : ae1mm
     use thrm, only : update_pi1
@@ -443,6 +545,7 @@ contains
     if (level>1) rl = liquid
     if (level>2) rl = rl + a_rpp
     if (level>3) rl = rl + a_ricep + a_rsnowp + a_rgrp
+    if (level>4) rl = rl + a_rhailp
     
     
     call boyanc(nzp,nxp,nyp,level,a_wt,a_theta,vapor,rl,th00,a_scr1)

@@ -19,6 +19,10 @@
 !
 module util
 
+!axel for debugging only>
+!  USE parallele_umgebung, ONLY: isIO,global_maxval_stdout
+!<axel
+
   use mpi_interface, only : cyclics, cyclicc
   implicit none
 
@@ -30,11 +34,12 @@ contains
   ! gradient via extrapolation, or a zero-gradient condition depending
   ! on the flag, typically used to set boundary conditions for scalars
   !
-  subroutine sclrset(type,n1,n2,n3,a,dz)
+  subroutine sclrset(type,n1,n2,n3,a,dz,n)
 
     use mpi_interface, only : myid, appl_abort
 
     integer, intent(in)           :: n1,n2,n3
+    integer, intent(in), optional :: n
     real, intent(in), optional    :: dz(n1)
     real, intent(inout)           :: a(n1,n2,n3)
     character (len=4)             :: type
@@ -56,13 +61,17 @@ contains
        call appl_abort(0)
     end select
 
+!    if (present(n)) then
+!      if (n.eq.9) call global_maxval_stdout('sclrset:    ','a_ricep = ',a)
+!    end if
+
     do j=1,n3
        do i=1,n2
           a(1,i,j)  = a(2,i,j)    - dzf1*(a(3,i,j)    - a(2,i,j))
           a(n1,i,j) = a(n1-1,i,j) + dzf2*(a(n1-1,i,j) - a(n1-2,i,j))
        end do
     end do
-
+    
     call cyclics(n1,n2,n3,a,req)
     call cyclicc(n1,n2,n3,a,req)
 

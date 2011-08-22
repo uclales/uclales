@@ -32,7 +32,7 @@ contains
   subroutine thermo (level)
 
     use grid, only : liquid, vapor, a_theta, a_pexnr, press, a_scr1,  &
-         a_scr2, a_rp, a_tp, nxp, nyp, nzp, th00, pi0, pi1,a_rpp,rsup,a_ricep,a_rsnowp,a_rgrp
+         a_scr2, a_rp, a_tp, nxp, nyp, nzp, th00, pi0, pi1,a_rpp,rsi,a_ricep,a_rsnowp,a_rgrp
     integer, intent (in) :: level
 
     select case (level)
@@ -42,10 +42,11 @@ contains
     case (2,3)
        call satadjst(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
             pi1,th00,a_rp,vapor,liquid,a_scr2)
-    case (4)
+    case (4,5)
        call satadjst(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
-            pi1,th00,a_rp,vapor,liquid,a_scr2,rsup)
+            pi1,th00,a_rp,vapor,liquid,a_scr2,rsi)
     end select
+! stop    
   end subroutine thermo
 !
 ! -------------------------------------------------------------------------
@@ -104,7 +105,7 @@ contains
 ! SATADJST:  this routine calculates theta, and pressure and diagnoses
 ! liquid water using a saturation adjustment for warm-phase systems
 ! 
-  subroutine satadjst(level,n1,n2,n3,pp,p,tl,th,tk,pi0,pi1,th00,rt,rv,rc,rs,rsup)
+  subroutine satadjst(level,n1,n2,n3,pp,p,tl,th,tk,pi0,pi1,th00,rt,rv,rc,rs,rsi)
 
     use defs, only : cp, cpr, alvl, ep, Rm, p00,t_hn,tmelt
     use mpi_interface, only : appl_abort
@@ -115,12 +116,11 @@ contains
     real, intent (in), dimension (n1)          :: pi0, pi1
     real, intent (in)                          :: th00
     real, intent (out), dimension (n1,n2,n3)   :: rc,rv,rs,th,tk,p
-    real, intent (out), optional, dimension (n1,n2,n3) :: rsup
+    real, intent (out), optional, dimension (n1,n2,n3) :: rsi
 
     integer :: k, i, j, iterate
     real    :: exner,tli,txi,tx1,tx,rsx,rix,rcx,ravail,dtx,part
     real, parameter :: epsln = 1.e-4
-
     do j=3,n3-2
        do i=3,n2-2
           do k=1,n1
@@ -131,11 +131,12 @@ contains
              tli=(tl(k,i,j)+th00)*exner
              tx=tli
              rsx=rslf(p(k,i,j),tx)
+             if (level>3) rix=rsif(p(k,i,j),tx)
              rcx=max(rt(k,i,j)-rsx,0.)
              ravail = rt(k,i,j)
              part = 1.
              if (rcx > 0.) then
-                do while (dtx > epsln .and. iterate < 10)
+                do while (dtx > epsln .and. iterate < 20)
                    txi=alvl/(cp*tx)
                    tx1=tx - (tx - tli*(1.+txi*rcx))/(1. + txi*tli                &
                         *(rcx/tx+(1.+rsx*ep)*rsx*alvl/(Rm*tx*tx)))
@@ -145,109 +146,109 @@ contains
                    rsx=rslf(p(k,i,j),tx)
                    if (level>3) then
                      rix=rsif(p(k,i,j),tx)
-!                     part = max(0.,min(1.,(tx-t_hn)/(tmelt-t_hn)))
+! !                     part = max(0.,min(1.,(tx-t_hn)/(tmelt-t_hn)))
                    end if
                    rcx = part*max(ravail-rsx,0.)
                 end do
                 if (dtx > epsln) then
+                    print *, k,i,j,p(k,i,j), tli,rcx  ,exner
                     print *, '  ABORTING: thrm', dtx, epsln
                    call appl_abort(0)
                 endif
-
              endif
-             
              rc(k,i,j)=rcx
              rv(k,i,j)=rt(k,i,j)-rc(k,i,j)
              rs(k,i,j)  = rsx
-             if (level>3) rsup(k,i,j)= rv(k,i,j) - rix
+             if (level>3) rsi(k,i,j) = rix
              tk(k,i,j)=tx
              th(k,i,j)=tk(k,i,j)/exner
+! if (i == 15 .and. j == 15) then
+!   print *, k,tx, exner
+! 
+! end if
           enddo
        enddo
     enddo
-
   end subroutine satadjst
 ! 
-
-  subroutine satpart(n1,n2,n3,rv,rc,rsup,tk)
-    use defs, only : t_hn, tmelt
-    integer, intent(in) :: n1,n2,n3
-    real,dimension(n1,n2,n3), intent(inout) :: rv,rc
-    real,dimension(n1,n2,n3), intent(out)   :: rsup
-    real,dimension(n1,n2,n3), intent(in)    :: tk
-    integer :: i,j,k
-    real :: part
-    
-     do j=3,n3-2
-       do i=3,n2-2
-          do k=1,n1
-            part = max(0.,min(1.,(tk(k,i,j)-t_hn)/(tmelt-t_hn)))
-            rsup(k,i,j) = rc(k,i,j)*(1-part)
-            rc(k,i,j)   = part*rc(k,i,j)
-            rv(k,i,j)   = rsup(k,i,j)+rv(k,i,j)
-        end do
-      end do
-    end do
-
-  end subroutine satpart
-
-! !
-! ---------------------------------------------------------------------
-! This function calculates the liquid saturation vapor mixing ratio as
-! a function of temperature and pressure
 ! 
-  real function rslf(p,t)
-  use defs, only : tmelt
+!   subroutine satpart(n1,n2,n3,rv,rc,rsup,tk)
+!     use defs, only : t_hn, tmelt
+!     integer, intent(in) :: n1,n2,n3
+!     real,dimension(n1,n2,n3), intent(inout) :: rv,rc
+!     real,dimension(n1,n2,n3), intent(out)   :: rsup
+!     real,dimension(n1,n2,n3), intent(in)    :: tk
+!     integer :: i,j,k
+!     real :: part
+!     
+!      do j=3,n3-2
+!        do i=3,n2-2
+!           do k=1,n1
+!             part = max(0.,min(1.,(tk(k,i,j)-t_hn)/(tmelt-t_hn)))
+!             rsup(k,i,j) = rc(k,i,j)*(1-part)
+!             rc(k,i,j)   = part*rc(k,i,j)
+!             rv(k,i,j)   = rsup(k,i,j)+rv(k,i,j)
+!         end do
+!       end do
+!     end do
+! 
+!   end subroutine satpart
+! 
 
-  real, intent (in) :: p, t
-  real, parameter :: c0=0.6105851e+03, c1=0.4440316e+02,    &
-                     c2=0.1430341e+01, c3=0.2641412e-01,    &
-                     c4=0.2995057e-03, c5=0.2031998e-05,    &
-                     c6=0.6936113e-08, c7=0.2564861e-11,    &
-                     c8=-.3704404e-13 
-real, parameter :: c0_i=0.6114327e+03, c1_i=0.5027041e+02,    &
-                     c2_i=0.1875982e+01, c3_i=0.4158303e-01,    &
-                     c4_i=0.5992408e-03, c5_i=0.5743775e-05,    &
-                     c6_i=0.3566847e-07, c7_i=0.1306802e-09,    &
-                     c8_i=0.2152144e-12
-  real ::  esl, x
+! ---------------------------------------------------------------------
+! This function calculates the water saturation vapor mixing ratio as a
+! function of temperature and pressure
+!
+   real elemental function rslf(p,t)
 
-  x=max(-80.,t-tmelt)
-  if (x>0.) then
+    real, intent (in) :: p, t
+    rslf=.622*esl(t)/(p-esl(t))
 
-  ! esl=612.2*exp(17.67*x/(t-29.65))
+   end function rslf
+
+   real elemental function esl(t)
+    use defs, only : tmelt
+    real, intent (in) :: t
+    real, parameter :: c0=0.6105851e+03, c1=0.4440316e+02,    &
+                      c2=0.1430341e+01, c3=0.2641412e-01,    &
+                      c4=0.2995057e-03, c5=0.2031998e-05,    &
+                      c6=0.6936113e-08, c7=0.2564861e-11,    &
+                      c8=-.3704404e-13
+    real  :: x
+
+    x=max(-80.,t-tmelt)
+
     esl=c0+x*(c1+x*(c2+x*(c3+x*(c4+x*(c5+x*(c6+x*(c7+x*c8)))))))
-    rslf=.622*esl/(p-esl)
-  else
-  ! esl=612.2*exp(17.67*x/(t-29.65))
-    esl=c0_i+x*(c1_i+x*(c2_i+x*(c3_i+x*(c4_i+x*(c5_i+x*(c6_i+x*(c7_i+x*c8_i)))))))
-    rslf=.622*esl/(p-esl)
 
-  end if
+   end function esl
 
-  end function rslf
-! 
 ! ---------------------------------------------------------------------
-! ! This function calculates the ice saturation vapor mixing ratio as a 
-! ! function of temperature and pressure
-! ! 
-   real function rsif(p,t)
- 
-   real, intent (in) :: p, t
-   real, parameter :: c0_i=0.6114327e+03, c1_i=0.5027041e+02,    &
-                      c2_i=0.1875982e+01, c3_i=0.4158303e-01,    &
-                      c4_i=0.5992408e-03, c5_i=0.5743775e-05,    &
-                      c6_i=0.3566847e-07, c7_i=0.1306802e-09,    &
-                      c8_i=0.2152144e-12
- 
-   real  :: esi, x
- 
-   x=max(-80.,t-273.16)
-    esi=c0_i+x*(c1_i+x*(c2_i+x*(c3_i+x*(c4_i+x*(c5_i+x*(c6_i+x*(c7_i+x*c8_i)))))))
-   rsif=.622*esi/(p-esi)
- 
+! This function calculates the ice saturation vapor mixing ratio as a
+! function of temperature and pressure
+!
+   real elemental function rsif(p,t)
+
+    real, intent (in) :: p, t
+    rsif=.622*esi(t)/(p-esi(t))
+
    end function rsif
-! 
+
+   real elemental function esi(t)
+    use defs, only : tmelt
+    real, intent (in) :: t
+    real, parameter   :: c0_i=0.6114327e+03, c1_i=0.5027041e+02,    &
+                         c2_i=0.1875982e+01, c3_i=0.4158303e-01,    &
+                         c4_i=0.5992408e-03, c5_i=0.5743775e-05,    &
+                         c6_i=0.3566847e-07, c7_i=0.1306802e-09,    &
+                         c8_i=0.2152144e-12
+    real  :: x
+
+    x=max(-80.,t-tmelt)
+
+    esi=c0_i+x*(c1_i+x*(c2_i+x*(c3_i+x*(c4_i+x*(c5_i+x*(c6_i+x*(c7_i+x*c8_i)))))))
+
+   end function esi
+
 ! -------------------------------------------------------------------------
 ! FLL_TKRS: Updates scratch arrays with temperature and saturation mixing
 ! ratio
@@ -322,7 +323,7 @@ real, parameter :: c0_i=0.6114327e+03, c1_i=0.5027041e+02,    &
               end if
               en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
                    + bb*(rt(k+1,i,j)-rt(k,i,j)))
-           case (3,4)
+           case (3,4,5)
               rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
               rsbar=0.5*(rs(k,i,j)+rs(k+1,i,j))
               kp1=min(n1-1,k+2)
@@ -336,7 +337,8 @@ real, parameter :: c0_i=0.6114327e+03, c1_i=0.5027041e+02,    &
               en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
                    + bb*(rt(k+1,i,j)-rt(k,i,j)))
            case default 
-              stop 'level not supported in bruvais'
+              WRITE (*,*) 'level=',level,', not supported in bruvais'
+              stop 
            end select
         end do
         en2(n1,i,j)=en2(n1-1,i,j)

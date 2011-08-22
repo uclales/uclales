@@ -95,7 +95,7 @@ contains
     use mpi_interface, only : myid, appl_abort
     use modnudge, only : lnudge,tnudgefac
     use modtimedep, only : ltimedep
-    use mcrp, only : microseq,lrandommicro,timenuc,nin_set
+    use mcrp, only : microseq,lrandommicro,timenuc,nin_set, cloud_type
 
     implicit none
 
@@ -129,7 +129,7 @@ contains
          div,  &                       !irina: divergence
          lnudge, tnudgefac, ltimedep, &             !thijs: Nudging
          SolarConstant, & ! SolarConstant (In case of prescribed TOA radiation
-         lrandommicro, microseq,timenuc ,nin_set   !thijs: sequence of variables for microphysics
+         lrandommicro, microseq,timenuc ,nin_set,cloud_type   !thijs: sequence of variables for microphysics
 
     ps       = 0.
     ts       = th00
@@ -145,7 +145,7 @@ contains
     open  (1,status='old',file='NAMELIST')
     read  (1, nml=model)
     close (1)
-    write (*,model)
+    write (0,model)
     !
     ! write file variable control to standard output
     !

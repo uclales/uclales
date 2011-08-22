@@ -19,6 +19,7 @@
 !
 module stat
 
+  use mpi_interface, only : myid
   use ncio, only : open_nc, define_nc
   use grid, only : level
   use util, only : get_avg, get_cor, get_avg3, get_cor3, get_var3, get_csum
@@ -28,11 +29,12 @@ module stat
   private
 
 !irina
-  integer, parameter :: nvar1 = 43, nvar2 = 107
-
+  ! axel, me too!
+  integer, parameter :: nvar1 = 45, nvar2 = 109 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2, nv1=nvar1, nv2=nvar2
   real, save         :: fsttm, lsttm, nsmp = 0
 
+  logical, parameter :: debug = .false.
   logical            :: sflg = .false.
   real               :: ssam_intvl = 30.   ! statistical sampling interval
   real               :: savg_intvl = 1800. ! statistical averaging interval
@@ -46,7 +48,7 @@ module stat
        'CCN    ','nrain  ','nrcnt  ','zcmn   ','zbmn   ','tkeint ', & !25
        'lflxut ','lflxdt ','sflxut ','sflxdt ','thl_int','wvp_bar', & !31
        'wvp_var','iwp_bar','iwp_var','swp_bar','swp_var','gwp_bar', & !37
-       'gwp_var'/),                                                 & !43
+       'gwp_var','hwp_bar','hwp_var'/),                             & !43
        s2(nvar2)=(/                                                 &
        'time   ','zt     ','zm     ','dn0    ','u0     ','v0     ', & ! 1
        'fsttm  ','lsttm  ','nsmp   ','u      ','v      ','t      ', & ! 7
@@ -65,7 +67,8 @@ module stat
        'Nr     ','rr     ','prc_r  ','evap   ','frc_prc','prc_prc', & !85
        'frc_ran','hst_srf','lflxu  ','lflxd  ','sflxu  ','sflxd  ',& !91
        'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel',& !97
-       'rsup   ','prc_c  ','prc_i  ','prc_s  ','prc_g  '/)           !103
+       'rsup   ','prc_c  ','prc_i  ','prc_s  ','prc_g  ','prc_h  ',& !103
+       'hail   '/)                                                    !109
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:), svctr(:,:), ssclr(:)
@@ -107,22 +110,25 @@ contains
     svctr(:,:) = 0.
     ssclr(:)   = 0.                 ! changed from = -999. to = 0.
 
-    select case(level)
-    case (0)
-       nv1 = 13
-       nv2 = 58
-    case (1)
-       nv1 = 14
-       nv2 = 58
-    case (2)
-       nv1 = 20
-       nv2 = 83
-       !irina
-       if (iradtyp == 4) nv1=21
-    case default
+!     select case(level)
+!     case (0)
+!        nv1 = 13
+!        nv2 = 58
+!     case (1)
+!        nv1 = 14
+!        nv2 = 58
+!     case (2)
+!        nv1 = 20
+!        nv2 = 83
+!        !irina
+!        if (iradtyp == 4) nv1=21
+!     case (3:4)
+!        nv1 = 43
+!        nv2 = 107
+!     case default
        nv1 = nvar1
        nv2 = nvar2
-    end select
+!     end select
 
     fname =  trim(filprf)//'.ts'
     if(myid == 0) print                                                  &
@@ -151,9 +157,11 @@ contains
 !irina
     use grid, only : a_up, a_vp, a_wp, liquid, a_theta, a_scr1, a_scr2       &
          , a_rp, a_tp, press, nxp, nyp, nzp, dzi_m, dzi_t, zm, zt, th00, umean &
-         , vmean, dn0, prc_c,prc_g,prc_i,prc_r,prc_s, a_rpp, a_npp, albedo, CCN, iradtyp, a_rflx    &
+         , vmean, dn0, prc_c,prc_g,prc_i,prc_r,prc_s, prc_h, a_rpp, a_npp, albedo, CCN, iradtyp, a_rflx    &
          , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa &
-         , a_ricep, a_rsnowp, a_rgrp,a_ninucp,a_nicep,vapor,rsup
+         , a_ricep, a_rsnowp, a_rgrp, a_rhailp, a_nicep, a_nsnowp, a_ngrp, a_nhailp &
+         , vapor
+
     real, intent (in) :: time
 
     if (nsmp == 0.) fsttm = time
@@ -162,6 +170,8 @@ contains
     !
     ! profile statistics
     !
+
+    if (debug) WRITE (0,*) 'statistics: start,      myid=',myid
 
     call accum_stat(nzp, nxp, nyp, zm, a_up, a_vp, a_wp, a_tp, press, umean    &
          ,vmean,th00)
@@ -178,14 +188,24 @@ contains
        lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
     end if
 
+    if (debug) WRITE (0,*) 'statistics: rad ok      myid=',myid
+
     if (level >=1) call accum_lvl1(nzp, nxp, nyp, a_rp)
+    if (debug) WRITE (0,*) 'statistics: micro1 ok    myid=',myid
     if (level >=2) call accum_lvl2(nzp, nxp, nyp, th00, dn0, zm, a_wp,       &
          a_scr1, a_theta, a_tp, liquid, a_scr2, a_rp,prc_c)
+    if (debug) WRITE (0,*) 'statistics: micro2 ok    myid=',myid
 
     if (level >=3) call accum_lvl3(nzp, nxp, nyp, dn0, zm, liquid, a_rpp,    &
          a_npp, prc_r, CCN)
+    if (debug) WRITE (0,*) 'statistics: micro3 ok    myid=',myid
 
-    if (level >=4) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, rsup,a_ricep, a_rsnowp, a_rgrp,a_ninucp,a_nicep,prc_i,prc_s,prc_g)
+    if (level ==4) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp,a_nicep,prc_i,prc_s,prc_g)
+
+    if (level ==5) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp,a_nicep,prc_i,prc_s,prc_g,a_rhailp,prc_h)
+
+    if (debug) WRITE (0,*) 'statistics: micro ok    myid=',myid
+
     !
     ! scalar statistics
     !
@@ -193,7 +213,11 @@ contains
     if (level >=1) call ts_lvl1(nzp, nxp, nyp, dn0, zt, dzi_m, a_rp)
     if (level >=2) call ts_lvl2(nzp, nxp, nyp, a_rp, a_scr2, zt)
 
+    if (debug) WRITE (0,*) 'statistics: set_ts ok,  myid=',myid
+
     call write_ts
+
+    if (debug) WRITE (0,*) 'statistics: end,        myid=',myid
 
   end subroutine statistics
   ! 
@@ -499,6 +523,8 @@ contains
     !
     ! liquid water statistics
     !
+    if (debug) WRITE (0,*) 'accum_lvl2: liq wat stat,    myid=',myid
+
     call get_avg3(n1,n2,n3,rl,a1)
     call get_var3(n1,n2,n3,rl,a1,a2)
 
@@ -519,6 +545,7 @@ contains
     !
     ! do some conditional sampling statistics: cloud, cloud-core
     !
+    if (debug) WRITE (0,*) 'accum_lvl2: sampling, tv1    myid=',myid
     do j=3,n3-2
        do i=3,n2-2
           do k=1,n1
@@ -528,6 +555,7 @@ contains
     end do
     call get_avg3(n1,n2,n3,tv,tvbar)
 
+    if (debug) WRITE (0,*) 'accum_lvl2: sampling, tv2    myid=',myid
     xy1mx = 0.
     do k=1,n1
        aflg = .false.
@@ -589,6 +617,7 @@ contains
     svctr(:,104)=svctr(:,104) + a1
     ! water paths
     !
+    if (debug) WRITE (0,*) 'accum_lvl2: water paths,     myid=',myid
     do j=3,n3-2
        do i=3,n2-2
           scr(i,j) = 0.
@@ -727,12 +756,13 @@ contains
   ! SUBROUTINE ACCUM_LVL4: Accumulates specialized statistics that depend
   ! on level 4 variables.
   !
-  subroutine accum_lvl4(n1, n2, n3,  dn0, zm, rv, rsup,rice, rsnow, rgrp,ninuc,nice, rrate_i, rrate_s, rrate_g)
+  subroutine accum_lvl4(n1, n2, n3,  dn0, zm, rv,rice, rsnow, rgrp,nice, rrate_i, rrate_s, rrate_g,rhail,rrate_h)
     use grid, only : a_pexnr,pi0,pi1
     use defs, only : alvi,cp
     integer, intent (in) :: n1,n2,n3
     real, intent (in), dimension(n1)        :: zm, dn0
-    real, intent (in), dimension(n1,n2,n3)  :: rv,rsup,rice,rsnow,rgrp,ninuc,nice, rrate_i, rrate_s, rrate_g
+    real, intent (in), dimension(n1,n2,n3)  :: rv,rice,rsnow,rgrp,nice, rrate_i, rrate_s, rrate_g
+    real, intent (in), dimension(n1,n2,n3), optional  :: rhail, rrate_h
     integer                   :: k, i, j, km1
     real, dimension(n2,n3)    :: scr
 
@@ -741,14 +771,6 @@ contains
 !     real, dimension(n2,n3) :: scr1
 !     logical                :: aflg
  
-
-    !
-    ! average ice nuclei
-    !
-
-    call get_avg3(n1,n2,n3,ninuc,a1)
-    svctr(:,98)=svctr(:,98) + a1(:)/1000.
-
     !
     ! conditionally average ice numbers, and droplet concentrations
     !
@@ -769,8 +791,10 @@ contains
 
     call get_avg3(n1,n2,n3,rgrp,a1)
     svctr(:,102)=svctr(:,102) + a1(:)*1000.
-    call get_avg3(n1,n2,n3,rsup,a1)
-    svctr(:,103)=svctr(:,103) + a1(:)/1000.
+    if (present(rhail)) then
+      call get_avg3(n1,n2,n3,rhail,a1)
+      svctr(:,109)=svctr(:,109) + a1(:)*1000.
+    end if
 
 !Watervaporpath
     do j=3,n3-2
@@ -823,12 +847,32 @@ contains
     end do
     ssclr(42) = get_avg(1,n2,n3,1,scr)
     ssclr(43) = get_cor(1,n2,n3,1,scr,scr)
+    if (present(rhail)) then
+!hail path
+    do j=3,n3-2
+       do i=3,n2-2
+          scr(i,j) = 0.
+          do k=1,n1
+               convice = alvi/cp*(pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp
+            km1=max(1,k-1)
+             scr(i,j)=scr(i,j)+rhail(k,i,j)*(zm(k)-zm(km1))*dn0(k)
+          end do
+       end do
+    end do
+    ssclr(44) = get_avg(1,n2,n3,1,scr)
+    ssclr(45) = get_cor(1,n2,n3,1,scr,scr)
+    end if
+
     call get_avg3(n1,n2,n3,rrate_i,a1)
     svctr(:,105)=svctr(:,105) + a1
     call get_avg3(n1,n2,n3,rrate_s,a1)
     svctr(:,106)=svctr(:,106) + a1
     call get_avg3(n1,n2,n3,rrate_g,a1)
     svctr(:,107)=svctr(:,107) + a1
+    if (present(rrate_h)) then
+    call get_avg3(n1,n2,n3,rrate_h,a1)
+    svctr(:,108)=svctr(:,108) + a1
+    end if
 
   end subroutine accum_lvl4
 
@@ -986,7 +1030,7 @@ contains
     ! 
     do n=1,nv1
        iret = nf90_inq_varid(ncid1, s1(n), VarID)
-       iret = nf90_put_var(ncid1, VarID, ssclr(n), start=(/nrec1/))
+       if(iret == 0) iret = nf90_put_var(ncid1, VarID, ssclr(n), start=(/nrec1/))
        ssclr(n) = 0.
     end do
     iret = nf90_sync(ncid1)
