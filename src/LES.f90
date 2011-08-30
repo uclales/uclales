@@ -82,9 +82,10 @@ contains
     use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon
     !use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon, sst
     use step, only : timmax, timrsm, istpfl, corflg, outflg, frqanl, frqhis,          &
-         strtim, radfrq, cntlat,& 
+         frqcross , strtim, radfrq, cntlat,& 
          case_name,lsvarflg, sst, div, wctime                   !irina
 !cgils         
+    use ncio, only : crossnames, crossx, crossy, crossz
     use forc, only : lstendflg, sfc_albedo     
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
@@ -114,7 +115,7 @@ contains
          dzrat  , dzmax  , igrdtyp, & ! stretched grid parameters
          timmax , dtlong , istpfl , timrsm, wctime, & ! timestep control
          runtype, hfilin , filprf , & ! type of run (INITIAL or HISTORY)
-         frqhis , frqanl , outflg , & ! freq of history/anal writes, output flg
+         frqhis , frqanl, frqcross, crossnames, crossx, crossy, crossz , outflg , & ! freq of history/anal writes, output flg
          iradtyp, radfrq , strtim , sfc_albedo, & ! radiation type flag
          isfctyp, ubmin  , zrough , & ! surface parameterization type
          sst    , dthcon , drtcon , & ! SSTs, surface flx parameters

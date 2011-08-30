@@ -81,8 +81,11 @@ contains
           call init_anal(time)
           call thermo(level)
           call write_anal(time)
+          call init_cross(time)
+          call write_cross(time)
        else
           call init_anal(time+dt)
+          call init_cross(time+dt)
           call write_hist(0, time)
        end if
     end if

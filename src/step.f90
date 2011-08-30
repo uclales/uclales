@@ -34,6 +34,7 @@ module step
 
   real    :: frqhis =  9000.
   real    :: frqanl =  3600.
+  real    :: frqcross =  3600.
   real    :: radfrq =  0.
 
   real    :: time   =  0.
@@ -63,7 +64,7 @@ contains
     use mpi_interface, only : myid, broadcast, double_scalar_par_max
     use grid, only : dt, dtlong, zt, zm, nzp, dn0, u0, v0, level, &
          write_hist
-    use ncio, only : write_anal, close_anal
+    use ncio, only : write_anal, close_anal, write_cross, close_cross
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
 
@@ -146,6 +147,10 @@ contains
           call thermo(level)
           call write_anal(time)
        end if
+       if ((mod(tplsdt,frqcross) < dt .or. time >= timmax) .and. outflg) then
+          call thermo(level)
+          call write_cross(time)
+       end if
 
        if(myid == 0) then
           call cpu_time(t2)           !t1=timing()
@@ -159,6 +164,7 @@ contains
 
     call write_hist(1, time)
     iret = close_anal()
+    iret = close_cross()
     iret = close_stat()
 
   end subroutine stepper
