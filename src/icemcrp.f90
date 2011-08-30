@@ -386,11 +386,11 @@ contains
           rv = vapor(1:n1,i,j)
           rc = rcld(1:n1,i,j)
           rs = rsat(1:n1,i,j)
-          rsi = rsati(1:n1,i,j)
           rrain = rp(1:n1,i,j)
           nrain = np(1:n1,i,j)
           convliq = alvl/cp*(pi0+pi1+exner(1:n1,i,j))/cp
           if (level == 4) then
+             rsi = rsati(1:n1,i,j)
              call resetvar(ice,ricep(1:n1,i,j),nicep(1:n1,i,j))
              call resetvar(snow,rsnowp(1:n1,i,j))
              call resetvar(graupel,rgrpp(1:n1,i,j))
