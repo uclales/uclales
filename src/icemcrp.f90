@@ -71,8 +71,8 @@ module mcrp
 
   real, parameter :: eps0 = 1e-20       ! small number
   real, parameter :: eps1 = 1e-9        ! small number
-  real, parameter :: rthres = 0.0          ! small number
-  !real, parameter :: rthres = 1e-14        ! small number
+!   real, parameter :: rthres = 0.0          ! small number
+  real, parameter :: rthres = 1e-20        ! small number
   real, parameter :: rho_0 = 1.21       ! air density at surface
 
   real, parameter :: prw = pi * rowt / 6.
@@ -402,8 +402,8 @@ contains
              rice = ricep(1:n1,i,j)
              nice = nicep(1:n1,i,j)
              rsnow = rsnowp(1:n1,i,j)
-             where (rsnow>0)
-                nsnow = snownr(snow%mu,temp,rsnow)
+             where (rsnow > rthres)
+                 nsnow = snownr(snow%mu,temp,rsnow)
              elsewhere
                 nsnow = 0
              end where
@@ -570,9 +570,10 @@ contains
         + mmb(6)*nn**2+mmb(7)*ztc**2*nn+mmb(8)*ztc*nn**2+mmb(9)*ztc**3+mmb(10)*nn**3
     m2s = qsg / zams
     m3s = alf*EXP(bet*LOG(m2s))
-
+    n0s = 13.50 * m2s**4
+    hlp = m3s**(-3)
+    n0s = n0s * hlp
     hlp  = zn0s1*EXP(zn0s2*ztc)
-    n0s = 13.50 * m2s**4 / m3s**3
     n0s = MAX(n0s,0.5*hlp)
     n0s = MIN(n0s,1e2*hlp)
     n0s = MIN(n0s,1e9)
@@ -2639,10 +2640,10 @@ contains
     if (any(mass < 0.)) then
       print *, trim(meteor%name), 'below zero', mass
     end if
-!     where (mass < rthres)
-!        mass = 0.
-!     end where
-!     mass(1) = 0.
+    where (mass < rthres)
+       mass = 0.
+    end where
+    mass(1) = 0.
     if (present(num)) then
        where (meteor%x_max*num < mass)
           num = mass/meteor%x_max
