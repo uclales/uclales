@@ -45,5 +45,10 @@ module defs
   real, parameter :: pi     = 3.14159265358979323846264338327
   real, parameter :: tmelt  = 273.16
   real, parameter :: t_hn   = 236.15
+  integer, parameter :: long   = selected_int_kind(18)          !< The kind of a 64bit integer
+  integer, parameter :: int32  = selected_int_kind( 9)          !< The kind of a 32bit integer
+  integer, parameter :: short  = selected_int_kind( 4)          !< The kind of a 16bit integer
+  integer, parameter :: single = selected_real_kind(p=6,r=37)   !< The kind of a 32bit real
+  integer, parameter :: double = selected_real_kind(p=13,r=307) !< The kind of a 64bit real
 
 end module defs

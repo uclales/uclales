@@ -91,6 +91,27 @@ module grid
        a_rhailp, a_rhailt,  & ! hail
        a_nhailp, a_nhailt
  
+
+  character(40)      :: zname      = 'z'
+  character(40)      :: zhname     = 'zh'
+  character(40)      :: zlongname  = 'Vertical position of cell centers'
+  character(40)      :: zhlongname = 'Vertical position of cell faces'
+  character(40)      :: zunit      = 'm'
+  character(40)      :: xname      = 'x'
+  character(40)      :: xhname     = 'xh'
+  character(40)      :: xlongname  = 'Longitudinal position of cell centers'
+  character(40)      :: xhlongname = 'Longitudinal position of cell faces'
+  character(40)      :: xunit      = 'm'
+  character(40)      :: yname      = 'y'
+  character(40)      :: yhname     = 'yh'
+  character(40)      :: ylongname  = 'Lateral position of cell centers'
+  character(40)      :: yhlongname = 'Lateral position of cell faces'
+  character(40)      :: yunit      = 'm'
+  character(40)      :: tname      = 'time'
+  character(40)      :: tlongname  = 'Time'
+  character(40)      :: tunit      = 's'
+  integer, parameter :: ictr = 0
+  integer, parameter :: ihlf = 1
   !
   ! Memory for prognostic variables
   !
