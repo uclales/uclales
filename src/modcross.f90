@@ -16,19 +16,30 @@
 !  Copyright 2010-2011 Chiel van Heerwaarden and Thijs Heus
 !> All kinds of auxilarily functions and variables for
 module modcross
-use defs, only : long
 
 implicit none
 
   logical            :: lcross = .false., ldocross, lxy = .false., lxz = .false., lyz = .false.
   real               :: dtcross = 60, xcross = 0., ycross = 0., zcross = 0.
   integer            :: icross,jcross,kcross
-  integer(kind=long) :: idtcross, itimenextcross
 
   integer :: ncross = 0
-  character(len=80), allocatable, dimension(:) :: crossname
+  character(len=7), allocatable, dimension(:) :: crossname
+  integer, parameter :: nvar_all = 22
+  character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
+         'u      ','v      ','w      ','t      ','r      ', & !1-5
+         'l      ','rp     ','np     ','ricep  ','nicep  ', & !6-10
+         'rsnowp ','rgrpp  ','nsnowp ','ngrpp  ','rhailp ', & !11-15
+         'nhailp ','lwp    ','rwp    ','iwp    ','swp    ', & !16-20
+         'gwp    ','hwp    '/)                                !21-22
 
-  integer :: nccrossid, nccrossrec
+  integer :: nccrossid, nccrossrec, nvar
+  
+  interface writecross
+    module procedure writecross_2D
+    module procedure writecross_3D
+  end interface writecross
+  
 
 contains
 
@@ -40,11 +51,12 @@ contains
     use modnetcdf,       only : open_nc
     use grid,            only : nzp, nxp, nyp, zt, xt, yt, xm, ym
     real, intent(in) :: rtimee
+    integer :: n
     character(len=*), intent(in) :: expname
-
-
     integer :: i, j, k
     character(len=4) :: cmpicoordx, cmpicoordy
+    
+!     return
     write(cmpicoordx,'(i4.4)') wrxid
     write(cmpicoordy,'(i4.4)') wryid
     if (lxy) then
@@ -74,27 +86,116 @@ contains
       end if
     end if
 
-    if (.not.(lxy .or. lxz .or. lyz)) lcross = .false.
+!     if (.not.(lxy .or. lxz .or. lyz)) lcross = .false.
     if (lcross) call open_nc(trim(expname)//'.out.cross.'//cmpicoordx//'.'//cmpicoordy//'.nc', nccrossid, nccrossrec, rtimee)
+  
+    do n=1,nvar_all
+      call addcross(crossvars(n))
+    end do
 
   end subroutine initcross
 
-  integer function addcross(name, longname, unit, loc)
-    use modnetcdf,   only : addvar_nc
-    use grid,        only : ictr, ihlf, nzp, nxp, nyp, zt, xt, yt, zm, xm, ym, &
+  subroutine addcross(name)
+    use modnetcdf,     only : addvar_nc
+    use mpi_interface, only : appl_abort
+    use grid,          only : level, ictr, ihlf, nzp, nxp, nyp, zt, xt, yt, zm, xm, ym, &
                             zname, zlongname, zunit, zhname, zhlongname, &
                             xname, xlongname, xunit, xhname, xhlongname, &
                             yname, ylongname, yunit, yhname, yhlongname, &
                             tname, tlongname, tunit
 
-    character (*), intent(in)     :: name, longname, unit
-    integer, intent(in)           :: loc(3)
+    character (*), intent(in)     :: name
     character (40), dimension(3) :: dimname, dimlongname, dimunit
     character (len=80), dimension(size(crossname)) :: ctmp
+    character (len=80) :: longname, unit
     real, allocatable, dimension(:,:) :: dimvalues
-    integer, dimension(3)             :: dimsize
+    integer, dimension(3)             :: loc, dimsize
+    integer :: n
 
     if (lcross) then
+      loc = (/ictr, ictr, ictr/)
+      unit = 'kg/kg'
+      do n = 1, nvar_all
+        select case (trim(name))
+        case('u')
+          loc = (/ictr, ihlf, ictr/)
+          longname =  'Zonal wind'
+          unit = 'm/s'
+        case('v')
+          loc = (/ictr, ictr, ihlf/)
+          longname =  'Meridional wind'
+          unit = 'm/s'
+        case('w')
+          loc = (/ihlf, ictr, ictr/)
+          longname =  'Meridional wind'
+          unit = 'm/s'
+        case('t')
+          longname =  'Liquid water potential temperature'
+          unit = 'K'
+        case('r')
+          if (level < 1) return
+          longname =  'Total water content'
+        case('l')
+          if (level < 2) return
+          longname =  'Liquid water content'
+        case('rp')
+          if (level < 3) return
+          longname =  'Rain water content'
+        case('np')
+          if (level < 3) return
+          longname =  'Rain water number density'
+        case('ricep')
+          if (level < 4) return
+          longname =  'Cloud ice content'
+        case('nicep')
+          if (level < 4) return
+          longname =  'Cloud ice number density'
+        case('rsnowp')
+          if (level < 4) return
+          longname =  'Snow content'
+        case('nsnowp')
+          if (level < 5) return
+          longname =  'Snow number density'
+        case('rgrpp')
+          if (level < 4) return
+          longname =  'Graupel content'
+        case('ngrpp')
+          if (level < 5) return
+          longname =  'Graupel number density'
+        case('rhailp')
+          if (level < 5) return
+          longname =  'Hail content'
+        case('nhailp')
+          if (level < 5) return
+          longname =  'Hail number density'
+        case('lwp')
+          if (level < 2) return
+          longname = 'Liquid water path'
+          unit = 'kg/m2'
+        case('rwp')
+          if (level < 3) return
+          longname = 'Rain water path'
+          unit = 'kg/m2'
+        case('iwp')
+          if (level < 4) return
+          longname = 'Ice water path'
+          unit = 'kg/m2'
+        case('swp')
+          if (level < 4) return
+          longname = 'Snow water path'
+          unit = 'kg/m2'
+        case('gwp')
+          if (level < 4) return
+          longname = 'Graupel water path'
+          unit = 'kg/m2'
+        case('hwp')
+          if (level < 5) return
+          longname = 'Hail water path'
+          unit = 'kg/m2'
+        case default
+          return
+        end select
+      end do
       if(ncross /= 0) then
         ctmp = crossname
         deallocate(crossname)
@@ -159,38 +260,11 @@ contains
           dimname(2)            = yname
           dimlongname(2)        = ylongname
         else
-          dimvalues(1:nyp-4,2)  = ym(3:nxp-2)
+          dimvalues(1:nyp-4,2)  = ym(3:nyp-2)
           dimname(2)            = yhname
           dimlongname(2)        = yhlongname
         end if
         call addvar_nc(nccrossid, trim(name)//'yz', 'yz crosssection of '//trim(longname), &
-        unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
-        crossname(ncross) = name
-      end if
-      if (lxz) then
-        dimunit(1) = zunit
-        dimunit(2) = xunit
-        dimsize(1) = nzp - 2
-        dimsize(2) = nxp - 4
-        if(loc(1)==ictr) then
-          dimvalues(1:nzp-2,1)  = zt(2:nzp-1)
-          dimname(1)            = zname
-          dimlongname(1)        = zlongname
-        else
-          dimvalues(1:nzp-2,1)  = zm(2:nzp-1)
-          dimname(1)            = zhname
-          dimlongname(1)        = zhlongname
-        end if
-        if(loc(2)==ictr) then
-          dimvalues(1:nxp-4,2)  = xt(3:nxp-2)
-          dimname(2)            = xname
-          dimlongname(2)        = xlongname
-        else
-          dimvalues(1:nxp-4,2)  = xm(3:nxp-2)
-          dimname(2)            = xhname
-          dimlongname(2)        = xhlongname
-        end if
-        call addvar_nc(nccrossid, trim(name)//'xz', 'xz crosssection of '//trim(longname), &
         unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
         crossname(ncross) = name
       end if
@@ -214,60 +288,149 @@ contains
           dimname(2)            = yname
           dimlongname(2)        = ylongname
         else
-          dimvalues(1:nyp-4,2)  = ym(3:nxp-2)
+          dimvalues(1:nyp-4,2)  = ym(3:nyp-2)
           dimname(2)            = yhname
           dimlongname(2)        = yhlongname
         end if
-        call addvar_nc(nccrossid, trim(name)//'yz', 'yz crosssection of '//trim(longname), &
+        call addvar_nc(nccrossid, trim(name)//'xy', 'xy crosssection of '//trim(longname), &
         unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
         crossname(ncross) = name
       end if
     end if
-    addcross = ncross
-  end function addcross
+    
+  end subroutine addcross
 
   subroutine triggercross(rtimee)
-    use grid,      only : tname
+    use grid,      only : nxp, nyp, tname, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
+       a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp
     use modnetcdf, only : writevar_nc
     real, intent(in) :: rtimee
+    real, dimension(3:nxp-2,3:nyp-2) :: tmp
+    integer :: n
     
+    if (.not. lcross) return
     call writevar_nc(nccrossid, tname, rtimee, nccrossrec)
+    do n = 1, ncross
+      select case(trim(crossname(n)))
+      case('u')
+        call writecross(crossname(n), a_up)
+      case('v')
+        call writecross(crossname(n), a_vp)
+      case('w')
+        call writecross(crossname(n), a_wp)
+      case('t')
+        call writecross(crossname(n), a_tp)
+      case('r')
+        call writecross(crossname(n), a_rp)
+      case('l')
+        call writecross(crossname(n), liquid)
+      case('rp')
+        call writecross(crossname(n), a_rpp)
+      case('np')
+        call writecross(crossname(n), a_npp)
+      case('ricep')
+        call writecross(crossname(n), a_ricep)
+      case('nicep')
+        call writecross(crossname(n), a_nicep)
+      case('rsnowp')
+        call writecross(crossname(n), a_rsnowp)
+      case('nsnowp')
+        call writecross(crossname(n), a_nsnowp)
+      case('rgrpp')
+        call writecross(crossname(n), a_rgrp)
+      case('ngrpp')
+        call writecross(crossname(n), a_ngrp)
+      case('rhailp')
+        call writecross(crossname(n), a_rhailp)
+      case('nhailp')
+        call writecross(crossname(n), a_nhailp)
+      case('lwp')
+        call calcintpath(liquid, tmp)
+        call writecross(crossname(n), tmp)
+      case('rwp')
+        call calcintpath(a_rpp, tmp)
+        call writecross(crossname(n), tmp)
+      case('iwp')
+        call calcintpath(a_ricep, tmp)
+        call writecross(crossname(n), tmp)
+      case('swp')
+        call calcintpath(a_rsnowp, tmp)
+        call writecross(crossname(n), tmp)
+      case('gwp')
+        call calcintpath(a_rgrp, tmp)
+        call writecross(crossname(n), tmp)
+      case('hwp')
+        call calcintpath(a_rhailp, tmp)
+        call writecross(crossname(n), tmp)
+      end select
+    end do
 
   end subroutine triggercross
 
-  subroutine writecross(nr, am)
+  subroutine writecross_3D(crossname, am)
     use grid,     only : nxp, nyp, nzp
     use modnetcdf,       only : writevar_nc
 
-    integer, intent(in)                :: nr
+    character(*), intent(in)                :: crossname
     real, dimension(1:nzp, 1:nxp, 1:nyp), intent(in) :: am
     real, dimension(:,:), allocatable  :: cross
 
   ! XZ crosssection
     if (lxz) then
       allocate(cross(2:nzp-1, 3:nxp-2))
-      cross(2:nzp,2:nxp) = am(2:nzp-1, 3:nxp-2, jcross)
-      call writevar_nc(nccrossid, trim(crossname(nr))//'xz', cross, nccrossrec)
+      cross = am(2:nzp-1, 3:nxp-2, jcross)
+      call writevar_nc(nccrossid, trim(crossname)//'xz', cross, nccrossrec)
       deallocate(cross)
     end if
 
   ! YZ crosssection
     if (lyz) then
       allocate(cross(2:nzp-1, 3:nyp-2))
-      cross(2:nzp,2:nxp) = am(2:nzp-1, icross, 3:nyp-2)
-      call writevar_nc(nccrossid, trim(crossname(nr))//'yz', cross, nccrossrec)
+      cross = am(2:nzp-1, icross, 3:nyp-2)
+      call writevar_nc(nccrossid, trim(crossname)//'yz', cross, nccrossrec)
       deallocate(cross)
     end if
 
   ! XY crosssection
     if (lxy) then
       allocate(cross(3:nxp-2, 3:nyp-2))
-      cross(2:nzp,2:nxp) = am(kcross, 3:nzp-2, 3:nyp-2)
-      call writevar_nc(nccrossid, trim(crossname(nr))//'xy', cross, nccrossrec)
+      cross = am(kcross, 3:nzp-2, 3:nyp-2)
+      call writevar_nc(nccrossid, trim(crossname)//'xy', cross, nccrossrec)
       deallocate(cross)
     end if
 
-  end subroutine writecross
+  end subroutine writecross_3D
+  
 
+  subroutine writecross_2D(crossname, am)
+    use grid,     only : nxp, nyp, nzp
+    use modnetcdf,       only : writevar_nc
+
+    character(*), intent(in)                :: crossname
+    real, dimension(:,:), intent(in) :: am
+    call writevar_nc(nccrossid, trim(crossname)//'xy', am, nccrossrec)
+
+  end subroutine writecross_2D
+  
+  subroutine exitcross
+    use modnetcdf, only : close_nc
+    call close_nc(nccrossid)
+  end subroutine exitcross
+
+  subroutine calcintpath(varin, varout)
+    use grid, only : nzp, nxp, nyp, dn0, zm
+    real, intent(in), dimension(:,:,:) :: varin
+    real, intent(out), dimension(3:,3:)  :: varout
+    integer :: i, j, k, km1
+    varout = 0.
+    do j=3,nyp-2
+      do i=3,nxp-2
+        do k=2,nzp-1
+          km1=max(1,k-1)
+          varout(i,j) = varout(i,j)+varin(k,i,j)*(zm(k)-zm(km1))*dn0(k)
+        enddo
+      end do
+    end do
+  end subroutine calcintpath
 end module modcross
 

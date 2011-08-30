@@ -64,7 +64,8 @@ contains
     use mpi_interface, only : myid, broadcast, double_scalar_par_max
     use grid, only : dt, dtlong, zt, zm, nzp, dn0, u0, v0, level, &
          write_hist
-    use ncio, only : write_anal, close_anal, write_cross, close_cross
+    use ncio, only : write_anal, close_anal
+    use modcross, only : triggercross, exitcross
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
 
@@ -149,7 +150,7 @@ contains
        end if
        if ((mod(tplsdt,frqcross) < dt .or. time >= timmax) .and. outflg) then
           call thermo(level)
-          call write_cross(time)
+          call triggercross(time)
        end if
 
        if(myid == 0) then
@@ -164,7 +165,7 @@ contains
 
     call write_hist(1, time)
     iret = close_anal()
-    iret = close_cross()
+    call exitcross
     iret = close_stat()
 
   end subroutine stepper

@@ -85,7 +85,8 @@ contains
          frqcross , strtim, radfrq, cntlat,& 
          case_name,lsvarflg, sst, div, wctime                   !irina
 !cgils         
-    use ncio, only : crossnames, crossx, crossy, crossz
+    use modnetcdf, only : lsync
+    use modcross, only : lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars
     use forc, only : lstendflg, sfc_albedo     
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
@@ -115,7 +116,9 @@ contains
          dzrat  , dzmax  , igrdtyp, & ! stretched grid parameters
          timmax , dtlong , istpfl , timrsm, wctime, & ! timestep control
          runtype, hfilin , filprf , & ! type of run (INITIAL or HISTORY)
-         frqhis , frqanl, frqcross, crossnames, crossx, crossy, crossz , outflg , & ! freq of history/anal writes, output flg
+         frqhis , frqanl, frqcross, outflg , & ! freq of history/anal writes, output flg
+         lsync, lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars,&
+         
          iradtyp, radfrq , strtim , sfc_albedo, & ! radiation type flag
          isfctyp, ubmin  , zrough , & ! surface parameterization type
          sst    , dthcon , drtcon , & ! SSTs, surface flx parameters
@@ -146,7 +149,7 @@ contains
     open  (1,status='old',file='NAMELIST')
     read  (1, nml=model)
     close (1)
-    write (0,model)
+!     write (0,model)
     !
     ! write file variable control to standard output
     !

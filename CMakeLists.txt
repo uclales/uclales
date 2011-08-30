@@ -43,7 +43,7 @@ if(MPI)
  FILE(GLOB mpifile "${CMAKE_CURRENT_SOURCE_DIR}/src/mpi/mpi_interface.f90")
 else()
   MESSAGE(STATUS "MPI is Disabled.")
-  FILE(GLOB mpifile "${CMAKE_CURRENT_SOURCE_DIR}/mpi/seq_interface.f90")
+  FILE(GLOB mpifile "${CMAKE_CURRENT_SOURCE_DIR}/src/seq/seq_interface.f90")
 endif()
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different ${mpifile} ${CMAKE_CURRENT_SOURCE_DIR}/src/mpi_interface.f90)
 

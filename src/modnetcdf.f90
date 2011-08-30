@@ -74,7 +74,7 @@ contains
   subroutine open_nc(fname, ncid,nrec, rtimee)
     use netcdf, only : nf90_create, nf90_open, nf90_inquire, nf90_inquire_dimension, &
                        nf90_inq_varid, nf90_get_var, nf90_put_var, nf90_sync, nf90_share, nf90_write, nf90_noerr, nf90_inquire_variable, nf90_short
-    use grid,   only : tunit
+    use grid,   only : tname
     integer, intent (out)          :: ncid   !< NetCDF file number
     integer, intent (out)          :: nrec   !< The record number that corresponds to the current simulation time
     real, intent(in), optional     :: rtimee !< Simulation time
@@ -109,7 +109,7 @@ contains
       iret  = nf90_inquire_dimension(ncid, RecordDimID, len=nrec)
       if (iret==0) then
         if (nrec > 0) then
-          iret  = nf90_inq_varid(ncid,tunit,timeID)
+          iret  = nf90_inq_varid(ncid,tname,timeID)
           if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
           allocate (xtimes(0:nrec))
           iret  = nf90_get_var(ncid, timeId, xtimes(0:nrec-1))

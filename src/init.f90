@@ -46,6 +46,7 @@ contains
     use mpi_interface, only : appl_abort, myid
     use thrm, only : thermo
     use mcrp, only : initmcrp
+    use modcross, only : initcross, triggercross
 !
 
     implicit none
@@ -81,11 +82,12 @@ contains
           call init_anal(time)
           call thermo(level)
           call write_anal(time)
-          call init_cross(time)
-          call write_cross(time)
+          call initcross(time, filprf)
+          call triggercross(time)
        else
           call init_anal(time+dt)
-          call init_cross(time+dt)
+          call initcross(time+dt, filprf)
+          call triggercross(time+dt)
           call write_hist(0, time)
        end if
     end if
