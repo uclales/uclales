@@ -21,6 +21,8 @@ $(LES_ARC)(util.o)   \
 $(LES_ARC)(grid.o)   \
 $(LES_ARC)(thrm.o)   \
 $(LES_ARC)(rad_gcss.o)   \
+$(LES_ARC)(modnetcdf.o)   \
+$(LES_ARC)(modcross.o)   \
 $(LES_ARC)(modnudge.o)   \
 $(LES_ARC)(modtimedep.o)   \
 $(LES_ARC)(ice_sb.o)   \
