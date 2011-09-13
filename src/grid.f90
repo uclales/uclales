@@ -47,6 +47,7 @@ module grid
   integer           :: iradtyp = 0         ! radiation model type
   integer           :: level   = 0         ! thermodynamic level
   integer           :: naddsc  = 0         ! number of additional scalars
+  logical           :: lwaterbudget        ! switch for liquid water budget diagnostics
 
   integer           :: nfpt = 10           ! number of rayleigh friction points
   real              :: distim = 300.0      ! dissipation timescale
@@ -68,12 +69,16 @@ module grid
   ! 2D Arrays (surface fluxes)
   !
   real, dimension (:,:), allocatable :: albedo, a_ustar, a_tstar, a_rstar,    &
-       uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa
+       uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa, &
+       prc_acc, &  ! accumulated precipitation [kg/m2] (diagnostic for 2D output)
+       cnd_acc, &  ! accumulated condensation  [kg/m2] (diagnostic for 2D output)
+       cev_acc, &  ! accumulated evaporation of cloud water [kg/m2] (diagnostic for 2D output)
+       rev_acc     ! accumulated evaporation of rainwater   [kg/m2] (diagnostic for 2D output)
   !
   ! 3D Arrays 
   !irina
   real, dimension (:,:,:), allocatable ::                                     &
-       a_theta, a_pexnr, press, vapor, liquid, a_rflx, a_sflx,rsi,   &
+       a_theta, a_pexnr, press, vapor, a_rflx, a_sflx, liquid, rsi,           &
        a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7,                &
        a_lflxu, a_lflxd, a_sflxu, a_sflxd,a_km, &
        prc_c, prc_r, prc_i, prc_s, prc_g, prc_h 
@@ -89,7 +94,7 @@ module grid
        a_rgrp,   a_rgrt,    & ! graupel
        a_ngrp,   a_ngrt,    &
        a_rhailp, a_rhailt,  & ! hail
-       a_nhailp, a_nhailt
+       a_nhailp, a_nhailt, a_rct, a_cld
  
 
   character(40)      :: zname      = 'z'
@@ -116,6 +121,7 @@ module grid
   ! Memory for prognostic variables
   !
   real, dimension (:,:,:,:), allocatable, target :: a_xp, a_xt1, a_xt2
+  !
   !
   integer :: nscl = 4
   !
@@ -221,6 +227,8 @@ contains
     if (level   > 3) nscl = nscl+4  ! ni,qi,qs,qg
     if (level   > 4) nscl = nscl+4  ! ns,ng,qh,nh (for Axel's two-moment scheme)
 
+    if (lwaterbudget) nscl = nscl+1 ! additional cloud water a_cld in the tracer array
+
     allocate (a_xp(nzp,nxp,nyp,nscl), a_xt1(nzp,nxp,nyp,nscl),        &
          a_xt2(nzp,nxp,nyp,nscl))         
 
@@ -238,6 +246,16 @@ contains
     if (level >= 3) then 
       a_rpp =>a_xp(:,:,:,6)
       a_npp =>a_xp(:,:,:,7)
+    end if
+    if (lwaterbudget) then 
+      ! for liquid water budget and precipitation efficiency diagnostic
+      a_cld=>a_xp(:,:,:,8)
+      a_cld(:,:,:) = 0.
+      allocate (prc_acc(nxp,nyp),cnd_acc(nxp,nyp),cev_acc(nxp,nyp),rev_acc(nxp,nyp))
+      prc_acc(:,:) = 0.   ! accumulated precipitation                [kg/m2]
+      cnd_acc(:,:) = 0.   ! accumulated condensation                 [kg/m2]
+      cev_acc(:,:) = 0.   ! accumulated evaporation of cloud water   [kg/m2]
+      rev_acc(:,:) = 0.   ! accumulated evaporation of raindwater    [kg/m2]
     end if
     ! ice microphysics
     if (level >= 4) then

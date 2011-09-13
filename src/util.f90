@@ -19,10 +19,6 @@
 !
 module util
 
-!axel for debugging only>
-!  USE parallele_umgebung, ONLY: isIO,global_maxval_stdout
-!<axel
-
   use mpi_interface, only : cyclics, cyclicc
   implicit none
 
@@ -60,10 +56,6 @@ contains
        if (myid == 0) print *, '  ABORTING:  BCs not supported'
        call appl_abort(0)
     end select
-
-!    if (present(n)) then
-!      if (n.eq.9) call global_maxval_stdout('sclrset:    ','a_ricep = ',a)
-!    end if
 
     do j=1,n3
        do i=1,n2

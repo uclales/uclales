@@ -29,22 +29,30 @@ contains
 ! is passed in to allow level of diagnosis to be determined by call rather
 ! than by runtype
 !
-  subroutine thermo (level)
+  subroutine thermo (level,opt)
 
     use grid, only : liquid, vapor, a_theta, a_pexnr, press, a_scr1,  &
-         a_scr2, a_rp, a_tp, nxp, nyp, nzp, th00, pi0, pi1,a_rpp,rsi,a_ricep,a_rsnowp,a_rgrp
+         a_scr2, a_rp, a_tp, nxp, nyp, nzp, th00, pi0, pi1,a_rpp,rsi,a_ricep,a_rsnowp,a_rgrp, &
+         cnd_acc, cev_acc, zm, dn0, nstep, a_cld
     integer, intent (in) :: level
+    integer, intent (in), optional :: opt
 
     select case (level)
     case default
        call drythrm(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,   &
             pi1,th00,a_rp,vapor)
     case (2,3)
-       call satadjst(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
-            pi1,th00,a_rp,vapor,liquid,a_scr2)
+       if (present(opt)) then ! for lwaterbudget = .true.
+          call satadjst(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
+               pi1,th00,a_rp,vapor,liquid,a_scr2, &
+               cloud=a_cld,tcond=cnd_acc,tevap=cev_acc,zm=zm,rho=dn0,nstep=nstep)
+       else
+          call satadjst(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
+               pi1,th00,a_rp,vapor,liquid,a_scr2)
+       end if
     case (4,5)
        call satadjst(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
-            pi1,th00,a_rp,vapor,liquid,a_scr2,rsi)
+            pi1,th00,a_rp,vapor,liquid,a_scr2,rsi=rsi)
     end select
 ! stop    
   end subroutine thermo
@@ -105,7 +113,8 @@ contains
 ! SATADJST:  this routine calculates theta, and pressure and diagnoses
 ! liquid water using a saturation adjustment for warm-phase systems
 ! 
-  subroutine satadjst(level,n1,n2,n3,pp,p,tl,th,tk,pi0,pi1,th00,rt,rv,rc,rs,rsi)
+  subroutine satadjst(level,n1,n2,n3,pp,p,tl,th,tk,pi0,pi1,th00,rt,rv,rc,rs,rsi,&
+       cloud,tcond,tevap,zm,rho,nstep)
 
     use defs, only : cp, cpr, alvl, ep, Rm, p00,t_hn,tmelt
     use mpi_interface, only : appl_abort
@@ -115,12 +124,18 @@ contains
     real, intent (in), dimension (n1,n2,n3)    :: pp, tl, rt
     real, intent (in), dimension (n1)          :: pi0, pi1
     real, intent (in)                          :: th00
-    real, intent (out), dimension (n1,n2,n3)   :: rc,rv,rs,th,tk,p
+    real, intent (out), dimension (n1,n2,n3)   :: rv,rs,th,tk,p
+    real, intent (out), dimension (n1,n2,n3) :: rc
     real, intent (out), optional, dimension (n1,n2,n3) :: rsi
+    real, intent (inout), optional, dimension (n1,n2,n3) :: cloud
+    real, intent (inout), optional, dimension (n2,n3)    :: tcond,tevap
+    real, intent (in), optional, dimension (n1)  :: zm,rho
+    integer, intent (in), optional :: nstep
 
     integer :: k, i, j, iterate
     real    :: exner,tli,txi,tx1,tx,rsx,rix,rcx,ravail,dtx,part
     real, parameter :: epsln = 1.e-4
+
     do j=3,n3-2
        do i=3,n2-2
           do k=1,n1
@@ -156,6 +171,14 @@ contains
                    call appl_abort(0)
                 endif
              endif
+             if (present(tcond)) then
+                if (k.gt.1) then
+                   ! diagnostic to get precipitation efficiency
+                   tcond(i,j) = tcond(i,j) + max(rcx-cloud(k,i,j),0.)*(zm(k)-zm(k-1))*rho(k)
+                   tevap(i,j) = tevap(i,j) + max(cloud(k,i,j)-rcx,0.)*(zm(k)-zm(k-1))*rho(k)
+                end if
+                cloud(k,i,j) = rcx
+             end if
              rc(k,i,j)=rcx
              rv(k,i,j)=rt(k,i,j)-rc(k,i,j)
              rs(k,i,j)  = rsx

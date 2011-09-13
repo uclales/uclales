@@ -2467,6 +2467,33 @@ CONTAINS
 
   END FUNCTION global_minval
 
+  DOUBLE PRECISION FUNCTION global_sum_2d(feld)
+    USE parallel_utilities, ONLY :   &
+         & global_values               ! collects values from all nodes
+    USE data_parameters , ONLY :     &
+         & iintegers,                & ! KIND-type parameters for integer variables
+         & ireals                      ! KIND-type parameters for real variables
+    USE data_parallel , ONLY:        &
+         & icomm_cart,               & ! communicator for the virtual cartesian topology
+         & imp_reals                   ! determines the correct REAL type used in the model
+    IMPLICIT NONE
+
+    DOUBLE PRECISION, DIMENSION(:,:),INTENT(in):: feld
+
+    INTEGER (KIND=iintegers) :: ierror  ! error status variable
+    CHARACTER (LEN=80) :: yerrmsg ! for error message
+    REAL (KIND=ireals) :: loc_sum
+
+    loc_sum = SUM(feld)
+
+    IF (num_compute > 1) THEN
+      CALL global_values (loc_sum,1,'SUM',imp_reals,icomm_cart,-1,yerrmsg,ierror)
+    END IF
+
+    global_sum_2d = loc_sum
+
+  END FUNCTION global_sum_2d
+
   DOUBLE PRECISION FUNCTION global_maxval_2d(feld)
     USE parallel_utilities, ONLY :   &
          & global_values               ! collects values from all nodes
@@ -2562,6 +2589,19 @@ CONTAINS
 
   END FUNCTION double_global_maxval
 
+  FUNCTION double_global_sumval(feld)
+    use mpi_interface,  only : myid, double_scalar_par_sum
+    IMPLICIT NONE
+
+    real(kind=8), DIMENSION(:,:,:),INTENT(in):: feld
+    real(kind=8) :: loc_sum, double_global_sumval
+
+    loc_sum = MAXVAL(feld)
+
+    call double_scalar_par_sum(loc_sum,double_global_sumval)
+
+  END FUNCTION double_global_sumval
+
   SUBROUTINE global_maxval_stdout(text1,text2,feld)
     IMPLICIT NONE
     character(len=*), intent (in) :: text1,text2
@@ -2573,6 +2613,18 @@ CONTAINS
     if (isIO()) WRITE(*,'(3x,A,2x,A,E11.3)') text1,text2,maxi    
 
   END SUBROUTINE global_maxval_stdout 
+
+  SUBROUTINE global_sumval_stdout(text1,text2,feld)
+    IMPLICIT NONE
+    character(len=*), intent (in) :: text1,text2
+    real(kind=8), DIMENSION(:,:,:),INTENT(in):: feld
+    real(kind=8) :: sumi 
+
+    sumi = double_global_sumval(feld)
+
+    if (isIO()) WRITE(*,'(3x,A,2x,A,E11.3)') text1,text2,sumi    
+
+  END SUBROUTINE global_sumval_stdout 
 #endif
 
 END MODULE parallele_umgebung

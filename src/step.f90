@@ -19,10 +19,6 @@
 !
 module step
 
-!axel for debugging only>
-  USE parallele_umgebung, ONLY: isIO,global_maxval_stdout
-!<axel
-
   implicit none
 
   integer :: istpfl = 1
@@ -179,7 +175,8 @@ contains
 
     use mpi_interface, only : myid
     use grid, only : level, dt, nstep, a_tt, a_up, a_vp, a_wp, dxi, dyi, dzi_t, &
-         nxp, nyp, nzp, dn0,a_scr1, u0, v0, a_ut, a_vt, a_wt, zt, a_ricep
+         nxp, nyp, nzp, dn0,a_scr1, u0, v0, a_ut, a_vt, a_wt, zt, a_ricep, a_rct, a_rpt, &
+         lwaterbudget
     use stat, only : sflg, statistics
     use sgsm, only : diffuse
     !irina
@@ -204,8 +201,6 @@ contains
     call timedep(time,timmax, sst)
     do nstep = 1,3
 
-       if (debug) call global_maxval_stdout('t_step start: ','a_ricep = ',a_ricep)
-
        ! Add additional criteria to ensure that some profile statistics that are  
        ! updated every 'ssam_intvl' outside the main statistics module
        ! are not updated (summed) in all three RK substeps.
@@ -216,32 +211,30 @@ contains
 
        call tendencies(nstep)
        call thermo(level)
-!irina : should I called only at nstep=3 ?
+
        if (lsvarflg) then
-      ! print *, 'step', lsvarflg
-       call varlscale(time,case_name,sst,div,u0,v0)
+          call varlscale(time,case_name,sst,div,u0,v0)
        end if
        call surface(sst)      
-!       
+
        call diffuse
        call fadvect
        call ladvect
-       if (debug) call global_maxval_stdout('t_step adv:   ','a_ricep = ',a_ricep)
        if (level >= 1) then
-          call thermo(level)
+          if (lwaterbudget) then
+             call thermo(level,1)
+          else
+             call thermo(level)
+          end if
           call forcings(xtime,cntlat,sst,div,case_name)
           call micro(level,istp)
-          if (debug) call global_maxval_stdout('t_step micro: ','a_ricep = ',a_ricep)
        end if
        call corlos 
        call buoyancy
        call sponge
        call update (nstep)
-       if (debug) call global_maxval_stdout('t_step update:','a_ricep = ',a_ricep)
        call poisson 
-       if (debug) call global_maxval_stdout('t_step pois:  ','a_ricep = ',a_ricep)
        call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
-       if (debug) call global_maxval_stdout('t_step end:   ','a_ricep = ',a_ricep)
     end do
 
     if (statflg) then 
@@ -261,7 +254,8 @@ contains
     use grid, only : a_ut, a_vt, a_wt, a_tt, a_rt, a_rpt, a_npt, &
                      a_ricet,a_nicet,a_rsnowt, a_rgrt,&
                      a_rhailt,a_nhailt,a_nsnowt, a_ngrt,&
-                     a_xt1, a_xt2, nscl, nxyzp, level
+                     a_xt1, a_xt2, nscl, nxyzp, level, &
+                     lwaterbudget, a_rct
     use util, only : azero
 
     integer, intent (in) :: nstep
@@ -279,6 +273,7 @@ contains
           a_rpt =>a_xt1(:,:,:,6)
           a_npt =>a_xt1(:,:,:,7)
        end if
+       if (lwaterbudget) a_rct =>a_xt1(:,:,:,8)
        if (level >= 4) then
           a_ricet  =>a_xt1(:,:,:, 8)
           a_nicet  =>a_xt1(:,:,:, 9)
@@ -303,6 +298,7 @@ contains
           a_rpt =>a_xt2(:,:,:,6)
           a_npt =>a_xt2(:,:,:,7)
        end if
+       if (lwaterbudget) a_rct =>a_xt2(:,:,:,8)
        if (level >= 4) then
           a_ricet  =>a_xt2(:,:,:, 8)
           a_nicet  =>a_xt2(:,:,:, 9)
@@ -328,64 +324,16 @@ contains
 !irina
     use grid, only : a_xp, a_xt1, a_xt2, a_up, a_vp, a_wp, a_sp, dzi_t, dt,  &
          nscl, nxp, nyp, nzp, newvar,level, a_rpp,a_ricep,a_nicep,a_rsnowp,a_rgrp,a_npp,rkalpha,rkbeta, &
-         a_nsnowp,a_ngrp,a_rhailp,a_nhailp,a_rp
+         a_nsnowp,a_ngrp,a_rhailp,a_nhailp,a_rp,liquid
     use util, only : sclrset,velset
-
-!axel for debugging only>
-  USE parallele_umgebung, ONLY: isIO,double_global_maxval
-!<axel
 
     integer, intent (in) :: nstep
 
     integer :: n
 
-!axel for debugging only>
-    logical :: debug = .false.
-    REAL(KIND=8) :: wmax,qvmax,qcmax,qrmax,qimax,qsmax,qgmax,qhmax,&
-         &                  ncmax,nimax,tmax
-
-!<axel
-
-    IF (debug) THEN
-      wmax  = double_global_maxval(a_wp)
-      qvmax = double_global_maxval(a_rp)
-      qrmax = double_global_maxval(a_rpp)
-      qimax = double_global_maxval(a_ricep)
-      qsmax = double_global_maxval(a_rsnowp)
-      qgmax = double_global_maxval(a_rgrp)
-      qhmax = double_global_maxval(a_rhailp)
-      nimax = double_global_maxval(a_nicep)
-      IF (isIO()) THEN
-      WRITE (*,*) "STEP: output before update, nstep = ",nstep
-      WRITE(*,'(10x,a)') 'Maximum Values:'
-      WRITE(*,'(A10,10A11)')   '   ', 'w','qt','qr','qi','qs','qg','qh','ni'
-      WRITE(*,'(A10,10E11.3)') '   ', wmax,qvmax,qrmax,qimax,qsmax,qgmax,qhmax,nimax
-      ENDIF
-    ENDIF
-
     a_xp = a_xp + dt *(rkalpha(nstep)*a_xt1 + rkbeta(nstep)*a_xt2)
 
-    IF (debug) THEN
-      wmax  = double_global_maxval(a_wp)
-      qvmax = double_global_maxval(a_rp)
-      qrmax = double_global_maxval(a_rpp)
-      qimax = double_global_maxval(a_ricep)
-      qsmax = double_global_maxval(a_rsnowp)
-      qgmax = double_global_maxval(a_rgrp)
-      qhmax = double_global_maxval(a_rhailp)
-      nimax = double_global_maxval(a_nicep)
-      IF (isIO()) THEN
-      WRITE (*,*) "STEP: output after update, nstep = ",nstep
-      WRITE(*,'(10x,a)') 'Maximum Values:'
-      WRITE(*,'(A10,10A11)')   '   ', 'w','qt','qr','qi','qs','qg','qh','ni'
-      WRITE(*,'(A10,10E11.3)') '   ', wmax,qvmax,qrmax,qimax,qsmax,qgmax,qhmax,nimax
-      ENDIF
-    ENDIF
-
-
     call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
-
-!    call global_maxval_stdout('update velset:','a_ricep = ',a_ricep)
 
     do n=4,nscl
        call newvar(n,istep=nstep)
@@ -394,73 +342,71 @@ contains
        !call sclrset('mixd',nzp,nxp,nyp,a_sp,dzi_t,n)
     end do
 
-!    call global_maxval_stdout('update sclrst:','a_ricep = ',a_ricep)
-
-!irina
-   if (level >= 3) then
-    a_rpp(1,:,:) = 0.
-    a_npp(1,:,:) = 0.
-    where (a_rpp < 0.) 
-      a_rpp=0.
-    end where
-    where (a_npp < 0.) 
-      a_npp=0.
-    end where
-   end if
-   if (level >= 4) then
-    a_ricep(1,:,:) = 0.
-    a_nicep(1,:,:) = 0.
-    a_rsnowp(1,:,:) = 0. 
-    a_rgrp(1,:,:) = 0.
-    where (a_ricep < 0.) 
-      a_ricep=0.
-    end where
-    where (a_ricep < 0.) 
-      a_ricep=0.
-    end where
-    where (a_ricep <= 0.) 
-      a_nicep=0.
-    end where
-    where (a_nicep < 0.) 
-      a_nicep=0.
-    end where
-    where (a_rsnowp < 0.) 
-      a_rsnowp=0.
-    end where
-    where (a_rgrp < 0.) 
-      a_rgrp=0.
-    end where
-   end if
-   if (level >= 5) then
-    a_nsnowp(1,:,:) = 0. 
-    a_ngrp(1,:,:)   = 0.
-    a_rhailp(1,:,:) = 0.
-    a_nhailp(1,:,:) = 0.
-    where (a_rhailp < 0.) 
-      a_rhailp=0.
-    end where
-    where (a_rhailp <= 0.) 
-      a_nhailp=0.
-    end where
-    where (a_rsnowp <= 0.) 
-      a_nsnowp=0.
-    end where
-    where (a_rgrp <= 0.) 
-      a_ngrp=0.
-    end where
-    where (a_nhailp < 0.) 
-      a_nhailp=0.
-    end where
-    where (a_nsnowp < 0.) 
-      a_nsnowp=0.
-    end where
-    where (a_ngrp < 0.) 
-      a_ngrp=0.
-    end where
-   end if
-
-!   call global_maxval_stdout('update clipp: ','a_ricep = ',a_ricep)
-
+    if (level >= 3) then
+       a_rpp(1,:,:) = 0.
+       a_npp(1,:,:) = 0.
+       where (a_rpp < 0.) 
+          a_rpp=0.
+       end where
+       where (a_npp < 0.) 
+          a_npp=0.
+       end where
+       where (liquid < 0.) 
+          liquid=0.
+       end where
+    end if
+    if (level >= 4) then
+       a_ricep(1,:,:) = 0.
+       a_nicep(1,:,:) = 0.
+       a_rsnowp(1,:,:) = 0. 
+       a_rgrp(1,:,:) = 0.
+       where (a_ricep < 0.) 
+          a_ricep=0.
+       end where
+       where (a_ricep < 0.) 
+          a_ricep=0.
+       end where
+       where (a_ricep <= 0.) 
+          a_nicep=0.
+       end where
+       where (a_nicep < 0.) 
+          a_nicep=0.
+       end where
+       where (a_rsnowp < 0.) 
+          a_rsnowp=0.
+       end where
+       where (a_rgrp < 0.) 
+          a_rgrp=0.
+       end where
+    end if
+    if (level >= 5) then
+       a_nsnowp(1,:,:) = 0. 
+       a_ngrp(1,:,:)   = 0.
+       a_rhailp(1,:,:) = 0.
+       a_nhailp(1,:,:) = 0.
+       where (a_rhailp < 0.) 
+          a_rhailp=0.
+       end where
+       where (a_rhailp <= 0.) 
+          a_nhailp=0.
+       end where
+       where (a_rsnowp <= 0.) 
+          a_nsnowp=0.
+       end where
+       where (a_rgrp <= 0.) 
+          a_ngrp=0.
+       end where
+       where (a_nhailp < 0.) 
+          a_nhailp=0.
+       end where
+       where (a_nsnowp < 0.) 
+          a_nsnowp=0.
+       end where
+       where (a_ngrp < 0.) 
+          a_ngrp=0.
+       end where
+    end if
+    
   end subroutine update
   !
   !----------------------------------------------------------------------

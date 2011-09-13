@@ -26,10 +26,10 @@ module mcrp
 
   use wolken_driver,     only: cloud_type => wolke_typ
 
-  use mpi_interface,  only : myid, double_scalar_par_max
+  use mpi_interface,  only : myid, double_scalar_par_max, double_scalar_par_sum
   use defs, only : tmelt,alvl, alvi,rowt,roice, pi, Rm, cp,t_hn
   use grid, only : dt,nstep,rkbeta,rkalpha, dxi, dyi ,dzi_t, nxp, nyp, nzp,nfpt, a_pexnr, pi0,pi1,a_rp, a_tp, th00, ccn,    &
-       dn0, pi0,pi1, a_rt, a_tt,a_rpp, a_rpt, a_npp, a_npt, vapor, liquid, a_wp,      &
+       dn0, pi0,pi1, a_rt, a_tt,a_rpp, a_rpt, a_npp, a_npt, vapor, liquid, a_wp, zm,      &
        a_theta, a_scr1, a_scr2, a_scr7, rsi, &
        a_ricep , a_ricet  , & ! ice mixing ratio
        a_nicep , a_nicet  , & ! ice number concentration
@@ -39,12 +39,13 @@ module mcrp
        a_ngrp,   a_ngrt,    & ! graupel number
        a_rhailp, a_rhailt,  & ! hail mass
        a_nhailp, a_nhailt,  & ! hail number
-       prc_c, prc_r, prc_i, prc_s, prc_g, prc_h
+       prc_c, prc_r, prc_i, prc_s, prc_g, prc_h, & 
+       lwaterbudget, prc_acc, rev_acc, a_rct, cnd_acc, cev_acc, a_cld
 
-  USE parallele_umgebung, ONLY: isIO,double_global_maxval,global_maxval, global_minval
+  USE parallele_umgebung, ONLY: isIO,double_global_maxval,global_maxval,global_minval,global_maxval_stdout,global_sumval_stdout
+  USE modcross, ONLY: calcintpath
 
   use thrm, only : thermo, fll_tkrs, esl, esi
-!axel!  use stat, only : sflg, updtst
   use util, only : get_avg3, azero, sclrset
   implicit none
 
@@ -163,6 +164,8 @@ module mcrp
 
   integer :: istep = -999
 
+  real :: rct_acc, rpt_acc
+
 contains
 
   !
@@ -174,9 +177,12 @@ contains
     integer, intent (in) :: level
 
     logical :: debug = .false.
-    REAL(KIND=8) :: wmax,qvmax,qcmax,qrmax,qimax,qsmax,qgmax,qhmax,&
-         &                  precmax,rhomax,rhomin,ncmax,nimax,dzmin,tmax,tmin
+    REAL(KIND=8) :: wmax,qvmax,qcmax,qrmax,qimax,qsmax,qgmax,qhmax, &
+         &          precmax,rhomax,rhomin,ncmax,nimax,dzmin,tmax,tmin, &
+         &          hlp1,hlp2,hlp3,hlp4,hlp5,hlp6,hlp7,hlp8,hsum
     integer, optional :: istp
+    real, dimension(3:nxp-2,3:nyp-2) :: tmp
+
 
     if (present(istp)) istep = istp
 
@@ -191,110 +197,66 @@ contains
     call fll_tkrs(nzp,nxp,nyp,a_theta,a_pexnr,pi0,pi1,a_scr1,rs=a_scr2)
     select case (level)
     case(2)
-       if (droplet_sedim) call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c)
+       if (droplet_sedim) then
+          call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c)
+          if (nstep.eq.3) prc_acc = prc_acc + prc_c(2,:,:) * dt
+       end if
     case(3)
-    if (mod(istep,100).eq.0.and.nstep.eq.3) then
-    !IF (debug) THEN
-      wmax  = double_global_maxval(a_wp)
-      qvmax = double_global_maxval(vapor)
-      qcmax = double_global_maxval(liquid)
-      qrmax = double_global_maxval(a_rpp)
-      nimax = double_global_maxval(a_npp)
-      tmax  = double_global_maxval(a_scr1)
-      IF (isIO()) THEN
-      WRITE (*,*) "micro: output before mcrph"
-      WRITE(*,'(10x,a)') 'Maximum Values:'
-      WRITE(*,'(A10,10A11)')   '   ', 'w','qv','qc','qr','nr','tmax'
-      WRITE(*,'(A10,10E11.3)') '   ', wmax,qvmax,qcmax,qrmax,nimax,tmax
-      ENDIF
-    ENDIF
-       call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
-            a_npp,a_rt,a_rpt,a_npt,a_scr7, prc_r)
-    if (mod(istep,100).eq.0.and.nstep.eq.3) then
-    !IF (debug) THEN
-      wmax  = double_global_maxval(a_wp)
-      qvmax = double_global_maxval(vapor)
-      qcmax = double_global_maxval(liquid)
-      qrmax = double_global_maxval(a_rpp)
-      nimax = double_global_maxval(a_npp)
-      tmax  = double_global_maxval(a_scr1)
-      IF (isIO()) THEN
-      WRITE (*,*) "micro: output after mcrph"
-      WRITE(*,'(10x,a)') 'Maximum Values:'
-      WRITE(*,'(A10,10A11)')   '   ', 'w','qv','qc','qr','nr','tmax'
-      WRITE(*,'(A10,10E11.3)') '   ', wmax,qvmax,qcmax,qrmax,nimax,tmax
-      ENDIF
-    ENDIF
+       if (.not.lwaterbudget) then
+          call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
+               a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r)
+       else
+          call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
+               a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r,rct=a_rct)
+
+          prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)) * dt / 3.
+
+          if (debug.and.lwaterbudget) then
+             ! standard output of liquid water budget
+             call calcintpath(a_rct,tmp)
+             if (istep.le.1) then
+                rct_acc = - sum(tmp)*dt
+             else
+                rct_acc = rct_acc - sum(tmp)*dt
+             end if
+             call double_scalar_par_sum(rct_acc,hlp7)
+             call calcintpath(a_rpt,tmp)
+             if (istep.le.1) then
+                rpt_acc = sum(tmp)*dt
+             else
+                rpt_acc = rpt_acc + sum(tmp)*dt
+             end if
+             call double_scalar_par_sum(rpt_acc,hlp8)
+             
+             hsum = sum(cnd_acc) ; call double_scalar_par_sum(hsum,hlp1)
+             hsum = sum(cev_acc) ; call double_scalar_par_sum(hsum,hlp2)
+             hsum = sum(rev_acc) ; call double_scalar_par_sum(hsum,hlp3)
+             hsum = sum(prc_acc) ; call double_scalar_par_sum(hsum,hlp4)
+             call calcintpath(liquid,tmp)
+             hsum = sum(tmp)     ; call double_scalar_par_sum(hsum,hlp5)
+             call calcintpath(a_rpp,tmp)       
+             hsum = sum(tmp)     ; call double_scalar_par_sum(hsum,hlp6)
+             if (isIO()) then
+                write (*,*) "micro: liquid water budget after mcrph, nstep = ",nstep
+                write(*,'(A10,12A15)')   '   ', 'cnd','cev','cnd-cev','cwp','cnd-cev-cwp','rwp','cnd-cev-lwp','rev','prc','rev+prc'
+                write(*,'(A10,12E15.5)') '   ', hlp1,hlp2,hlp1-hlp2,hlp5,hlp1-hlp2-hlp5,hlp6,hlp1-hlp2-hlp5-hlp6,hlp3,hlp4,hlp3+hlp4
+             endif
+             !       call global_maxval_stdout('micro:    max ','a_cld = ',a_cld)
+             !       call global_sumval_stdout('micro:    avg ','a_cld = ',a_cld)
+             !       call global_maxval_stdout('micro:    max ','a_rct = ',a_rct)
+             !       call global_sumval_stdout('micro:    avg ','a_rct = ',a_rct)
+             !       call global_maxval_stdout('micro:    max ','a_rpt = ',a_rpt)
+             !       call global_sumval_stdout('micro:    avg ','a_rpt = ',a_rpt)
+          end if
+       end if
     case(4)
-    IF (debug) THEN
-      wmax  = double_global_maxval(a_wp)
-      qvmax = double_global_maxval(vapor)
-      qcmax = double_global_maxval(liquid)
-      qrmax = double_global_maxval(a_rpp)
-      qimax = double_global_maxval(a_ricep)
-      qsmax = double_global_maxval(a_rsnowp)
-      qgmax = double_global_maxval(a_rgrp)
-      nimax = double_global_maxval(a_nicep)
-      tmax  = double_global_maxval(a_scr1)
-      IF (isIO()) THEN
-      WRITE (*,*) "micro: output before mcrph"
-      WRITE(*,'(10x,a)') 'Maximum Values:'
-      WRITE(*,'(A10,10A11)')   '   ', 'w','qv','qc','qr','qi','qs','qg','ni','tmax'
-      WRITE(*,'(A10,10E11.3)') '   ', wmax,qvmax,qcmax,qrmax,qimax,qsmax,qgmax,nimax,tmax
-      ENDIF
-    ENDIF
        call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
             a_npp,a_rt,a_rpt,a_npt,a_scr7, prc_r,rsi, a_ricet,a_nicet,a_rsnowt,a_rgrt,&
             a_ricep,a_nicep,a_rsnowp,a_rgrp, &
             prc_i, prc_s, prc_g)
-    IF (debug) THEN
-      wmax  = double_global_maxval(a_wp)
-      qvmax = double_global_maxval(vapor)
-      qcmax = double_global_maxval(liquid)
-      qrmax = double_global_maxval(a_rpp)
-      qimax = double_global_maxval(a_ricep)
-      qsmax = double_global_maxval(a_rsnowp)
-      qgmax = double_global_maxval(a_rgrp)
-      nimax = double_global_maxval(a_nicep)
-      tmax  = double_global_maxval(a_scr1)
-      IF (isIO()) THEN
-      WRITE (*,*) "micro: output after mcrph"
-      WRITE(*,'(10x,a)') 'Maximum Values:'
-      WRITE(*,'(A10,10A11)')   '   ', 'w','qv','qc','qr','qi','qs','qg','ni','tmax'
-      WRITE(*,'(A10,10E11.3)') '   ', wmax,qvmax,qcmax,qrmax,qimax,qsmax,qgmax,nimax,tmax
-      ENDIF
-    ENDIF
+       if (nstep.eq.3) prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)+prc_i(2,:,:)+prc_s(2,:,:)+prc_g(2,:,:)) * dt
     case(5)
-    IF (debug) THEN
-      wmax  = double_global_maxval(a_wp)
-      qvmax = double_global_maxval(vapor)
-!       qcmax = double_global_maxval(liquid)
-      qrmax = double_global_maxval(a_rpp)
-      qimax = double_global_maxval(a_ricep)
-      qsmax = double_global_maxval(a_rsnowp)
-      qgmax = double_global_maxval(a_rgrp)
-      qhmax = double_global_maxval(a_rhailp)
-      nimax = double_global_maxval(a_nicep)
-      tmax  = double_global_maxval(a_scr1)
-      IF (isIO()) THEN
-      WRITE (*,*) "micro: output before mcrph_sb"
-      WRITE(*,'(10x,a)') 'Maximum Values:'
-      WRITE(*,'(A10,10A11)')   '   ', 'w','qv','qc','qr','qi','qs','qg','qh','ni','tmax'
-      WRITE(*,'(A10,10E11.3)') '   ', wmax,qvmax,qcmax,qrmax,qimax,qsmax,qgmax,qhmax,nimax,tmax
-      ENDIF
-      tmax  = double_global_maxval(a_tt)
-      qcmax = double_global_maxval(a_rt)
-      qrmax = double_global_maxval(a_rpt)
-      qimax = double_global_maxval(a_ricet)
-      qsmax = double_global_maxval(a_rsnowt)
-      qgmax = double_global_maxval(a_rgrt)
-      qhmax = double_global_maxval(a_rhailt)
-      IF (isIO()) THEN
-      WRITE(*,'(A10,10A11)')   '   ', 'ttend','qttend','qrtend','qitend','qstend','qgtend', 'qhtend'
-      WRITE(*,'(A10,10E11.3)') '   ', tmax,qcmax,qrmax,qimax,qsmax,qgmax,qhmax
-      ENDIF
-    ENDIF
-    call mcrph_sb(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,a_wp,vapor,liquid, &
+       call mcrph_sb(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,a_wp,vapor,liquid, &
             a_rpp,    a_npp    , & ! rain
             a_ricep , a_nicep  , & ! ice
             a_rsnowp, a_nsnowp , & ! snow
@@ -307,35 +269,8 @@ contains
             a_rgrt,   a_ngrt,    & ! graupel
             a_rhailt, a_nhailt,  & ! hail
             prc_c, prc_r, prc_i, prc_s, prc_g, prc_h)
-    IF (debug) THEN
-      wmax  = double_global_maxval(a_wp)
-      qvmax = double_global_maxval(vapor)
-      qcmax = double_global_maxval(liquid)
-      qrmax = double_global_maxval(a_rpp)
-      qimax = double_global_maxval(a_ricep)
-      qsmax = double_global_maxval(a_rsnowp)
-      qgmax = double_global_maxval(a_rgrp)
-      qhmax = double_global_maxval(a_rhailp)
-      nimax = double_global_maxval(a_nicep)
-      tmax  = double_global_maxval(a_scr1)
-      IF (isIO()) THEN
-      WRITE (*,*) "micro: output after mcrph_sb"
-      WRITE(*,'(10x,a)') 'Maximum Values:'
-      WRITE(*,'(A10,10A11)')   '   ', 'w','qv','qc','qr','qi','qs','qg','qh','ni','tmax'
-      WRITE(*,'(A10,10E11.3)') '   ', wmax,qvmax,qcmax,qrmax,qimax,qsmax,qgmax,qhmax,nimax,tmax
-      ENDIF
-      tmax  = double_global_maxval(a_tt)
-      qcmax = double_global_maxval(a_rt)
-      qrmax = double_global_maxval(a_rpt)
-      qimax = double_global_maxval(a_ricet)
-      qsmax = double_global_maxval(a_rsnowt)
-      qgmax = double_global_maxval(a_rgrt)
-      qhmax = double_global_maxval(a_rhailt)
-      IF (isIO()) THEN
-      WRITE(*,'(A10,10A11)')   '   ', 'ttend','qttend','qrtend','qitend','qstend','qgtend', 'qhtend'
-      WRITE(*,'(A10,10E11.3)') '   ', tmax,qcmax,qrmax,qimax,qsmax,qgmax,qhmax
-      ENDIF
-    ENDIF
+       if (nstep.eq.3) prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)+prc_i(2,:,:)          &
+                                           +prc_s(2,:,:)+prc_g(2,:,:)+prc_h(2,:,:)) * dt
     end select
 
   end subroutine micro
@@ -346,7 +281,7 @@ contains
 
   subroutine mcrph(level,n1,n2,n3,dn0,exner,pi0,pi1,thl,tlt,tk,vapor,rsat,rcld,prc_c, &
        rp, np, rtt,rpt,npt,dissip, prc_r,rsati, ricet,nicet,rsnowt,rgrpt,ricep,nicep,rsnowp,rgrpp, &
-       prc_i, prc_s, prc_g)
+       prc_i, prc_s, prc_g, rct)
 
     integer, intent (in) :: level,n1,n2,n3
     real, dimension(n1)      , intent (in)             :: dn0,pi0,pi1  !Density and mean pressures
@@ -363,6 +298,7 @@ contains
          rtt,& !Total water tendency
          rpt,&!rain water tendency
          npt,&!rain droplet number tendency
+         rct,&! cloud water tendency
          dissip, &
          prc_r
 
@@ -423,7 +359,11 @@ contains
              case(iwtrdff)
                 call resetvar(cldw,rc)
                 call resetvar(rain,rrain,nrain)
-                call wtr_dff_SB(n1,dn0,rrain,nrain,rc,rs,rv,tl,temp)
+                if (lwaterbudget) then
+                   call wtr_dff_SB(n1,dn0,rrain,nrain,rc,rs,rv,tl,temp,ev=rev_acc(i,j),zm=zm)
+                else
+                   call wtr_dff_SB(n1,dn0,rrain,nrain,rc,rs,rv,tl,temp)
+                end if
              case(iauto)
                 call resetvar(cldw,rc)
                 call resetvar(rain,rrain,nrain)
@@ -532,7 +472,12 @@ contains
           rtt(2:n1,i,j) = rtt(2:n1,i,j) +(rv(2:n1) - vapor(2:n1,i,j))/dt + (rc(2:n1) - rcld(2:n1,i,j))/dt
           rpt(2:n1,i,j) = max(rpt(2:n1,i,j) +(rrain(2:n1) - rp(2:n1,i,j))/dt,-rp(2:n1,i,j)/dt)
           npt(2:n1,i,j) = max(npt(2:n1,i,j) +(nrain(2:n1) - np(2:n1,i,j))/dt,-np(2:n1,i,j)/dt)
-
+          
+          if (present(rct)) then
+!             rct(2:n1,i,j) = (rc(2:n1) - rcld(2:n1,i,j))/dt
+!             rct(2:n1,i,j) = rtt(2:n1,i,j) +(rc(2:n1) - rcld(2:n1,i,j))/dt
+             rct(2:n1,i,j) = rct(2:n1,i,j) + (rc(2:n1) - rcld(2:n1,i,j))/dt
+          end if
           if (level == 4) then
              ricet(2:n1,i,j)  = max(ricet(2:n1,i,j)  + (rice(2:n1) - ricep(2:n1,i,j))/dt,-ricep(2:n1,i,j)/dt)
              nicet(2:n1,i,j)  = nicet(2:n1,i,j)  + (nice(2:n1) - nicep(2:n1,i,j))/dt
@@ -542,6 +487,7 @@ contains
 
        end do
     end do
+
     deallocate(convice,convliq)
     !print *,maxval(s_i),maxloc(s_i)
   end subroutine mcrph
@@ -581,7 +527,8 @@ contains
 !     n0s = zn0s1 * exp(zn0s2*ztc)
     snownr = n0s/mu
   end function snownr
-  subroutine wtr_dff_SB(n1,dn0,rp,np,rl,rs,rv,tl,tk)
+
+  subroutine wtr_dff_SB(n1,dn0,rp,np,rl,rs,rv,tl,tk,ev,zm)
     !
     ! ---------------------------------------------------------------------
     ! WTR_DFF_SB: calculates the evolution of the both number- and
@@ -590,8 +537,10 @@ contains
     !
 
     integer, intent (in) :: n1
-    real, intent (in)    :: tk(n1),rs(n1), dn0(n1)
+    real, intent (in)    :: tk(n1),rs(n1),dn0(n1)
     real, intent (inout) :: rp(n1), np(n1),tl(n1),rv(n1),rl(n1)
+    real, intent (inout), optional :: ev
+    real, intent (in),    optional :: zm(n1)
 
     real, parameter     :: c_Nevap = 1.
     integer             :: k
@@ -612,6 +561,8 @@ contains
              rp(k)=rp(k) + cerpt
              rv(k)=rv(k) - cerpt
              tl(k)=tl(k) + convliq(k)*cerpt
+             
+             if (present(ev)) ev=ev - cerpt * (zm(k)-zm(k-1))*dn0(k) / 3.
           end if
        end if
     end do
@@ -2663,10 +2614,12 @@ contains
        firsttime = .false.
     end if
 
+    if (level/=3) lwaterbudget = .false.
     if (level==2) then
        nprocess = 1
        microseq = isedimcd
     end if
+    if (lwaterbudget)  nprocwarm = 4
     if (level>=3)      nprocess = nprocwarm
     if (level==4)      nprocess = nprocess + nprocice
 

@@ -90,14 +90,14 @@ contains
     use forc, only : lstendflg, sfc_albedo     
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
-         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype, CCN
+         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype, CCN, lwaterbudget
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,irsflg, iseed, hfilin,   &
          zrand
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
     use modnudge, only : lnudge,tnudgefac
     use modtimedep, only : ltimedep
-    use mcrp, only : microseq,lrandommicro,timenuc,nin_set, cloud_type
+    use mcrp, only : microseq,lrandommicro,timenuc,nin_set,cloud_type
 
     implicit none
 
@@ -133,7 +133,8 @@ contains
          div,  &                       !irina: divergence
          lnudge, tnudgefac, ltimedep, &             !thijs: Nudging
          SolarConstant, & ! SolarConstant (In case of prescribed TOA radiation
-         lrandommicro, microseq,timenuc ,nin_set,cloud_type   !thijs: sequence of variables for microphysics
+         lrandommicro, microseq,timenuc ,nin_set,cloud_type, &  !thijs: sequence of variables for microphysics
+         lwaterbudget                 ! axel: flag for liquid water budget diagnostics (only level=3)
 
     ps       = 0.
     ts       = th00

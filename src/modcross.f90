@@ -25,14 +25,14 @@ implicit none
 
   integer :: ncross = 0
   character(len=7), allocatable, dimension(:) :: crossname
-  integer, parameter :: nvar_all = 22
+  integer, parameter :: nvar_all = 26
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
          'l      ','rp     ','np     ','ricep  ','nicep  ', & !6-10
          'rsnowp ','rgrpp  ','nsnowp ','ngrpp  ','rhailp ', & !11-15
          'nhailp ','lwp    ','rwp    ','iwp    ','swp    ', & !16-20
-         'gwp    ','hwp    '/)                                !21-22
-
+         'gwp    ','hwp    ','prc_acc','cnd_acc','cev_acc', & !21-25
+         'rev_acc'/)                                          !26
   integer :: nccrossid, nccrossrec, nvar
   
   interface writecross
@@ -102,7 +102,8 @@ contains
                             zname, zlongname, zunit, zhname, zhlongname, &
                             xname, xlongname, xunit, xhname, xhlongname, &
                             yname, ylongname, yunit, yhname, yhlongname, &
-                            tname, tlongname, tunit
+                            tname, tlongname, tunit, &
+                            lwaterbudget
 
     character (*), intent(in)     :: name
     character (40), dimension(3) :: dimname, dimlongname, dimunit
@@ -192,6 +193,22 @@ contains
           if (level < 5) return
           longname = 'Hail water path'
           unit = 'kg/m2'
+        case ('prc_acc')
+          if (.not.lwaterbudget) return
+          longname = 'acc. precip'
+          unit = 'kg/m2'
+        case ('cnd_acc')
+          if (.not.lwaterbudget) return
+          longname = 'acc. condensation'
+          unit = 'kg/m2'          
+        case ('cev_acc')
+          if (.not.lwaterbudget) return
+          longname = 'acc. evaporation of cloud water'
+          unit = 'kg/m2'          
+        case ('rev_acc')
+          if (.not.lwaterbudget) return
+          longname = 'acc. evaporation of rain water'
+          unit = 'kg/m2'          
         case default
           return
         end select
@@ -302,7 +319,8 @@ contains
 
   subroutine triggercross(rtimee)
     use grid,      only : nxp, nyp, tname, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
-       a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp
+       a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
+       prc_acc, cnd_acc, cev_acc, rev_acc
     use modnetcdf, only : writevar_nc
     real, intent(in) :: rtimee
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
@@ -362,6 +380,22 @@ contains
       case('hwp')
         call calcintpath(a_rhailp, tmp)
         call writecross(crossname(n), tmp)
+      case('prc_acc')
+        tmp = prc_acc(3:nxp-2, 3:nyp-2)
+        call writecross(crossname(n), tmp)
+!!        prc_acc = 0.
+      case('cnd_acc')
+        tmp = cnd_acc(3:nxp-2, 3:nyp-2)
+        call writecross(crossname(n), tmp)
+!!        cnd_acc = 0.
+      case('cev_acc')
+        tmp = cev_acc(3:nxp-2, 3:nyp-2)
+        call writecross(crossname(n), tmp)
+!!        cev_acc = 0.
+      case('rev_acc')
+        tmp = rev_acc(3:nxp-2, 3:nyp-2)
+        call writecross(crossname(n), tmp)
+!!        rev_acc = 0.
       end select
     end do
 
@@ -394,7 +428,7 @@ contains
   ! XY crosssection
     if (lxy) then
       allocate(cross(3:nxp-2, 3:nyp-2))
-      cross = am(kcross, 3:nzp-2, 3:nyp-2)
+      cross = am(kcross, 3:nxp-2, 3:nyp-2)
       call writevar_nc(nccrossid, trim(crossname)//'xy', cross, nccrossrec)
       deallocate(cross)
     end if
