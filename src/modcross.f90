@@ -194,7 +194,6 @@ contains
           longname = 'Hail water path'
           unit = 'kg/m2'
         case ('prc_acc')
-          if (.not.lwaterbudget) return
           longname = 'acc. precip'
           unit = 'kg/m2'
         case ('cnd_acc')

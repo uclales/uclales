@@ -199,7 +199,6 @@ contains
     case(2)
        if (droplet_sedim) then
           call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c)
-          if (nstep.eq.3) prc_acc = prc_acc + prc_c(2,:,:) * dt
        end if
     case(3)
        if (.not.lwaterbudget) then
@@ -254,7 +253,7 @@ contains
             a_npp,a_rt,a_rpt,a_npt,a_scr7, prc_r,rsi, a_ricet,a_nicet,a_rsnowt,a_rgrt,&
             a_ricep,a_nicep,a_rsnowp,a_rgrp, &
             prc_i, prc_s, prc_g)
-       if (nstep.eq.3) prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)+prc_i(2,:,:)+prc_s(2,:,:)+prc_g(2,:,:)) * dt
+       prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)+prc_i(2,:,:)+prc_s(2,:,:)+prc_g(2,:,:)) * dt / 3.
     case(5)
        call mcrph_sb(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,a_wp,vapor,liquid, &
             a_rpp,    a_npp    , & ! rain
@@ -269,8 +268,8 @@ contains
             a_rgrt,   a_ngrt,    & ! graupel
             a_rhailt, a_nhailt,  & ! hail
             prc_c, prc_r, prc_i, prc_s, prc_g, prc_h)
-       if (nstep.eq.3) prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)+prc_i(2,:,:)          &
-                                           +prc_s(2,:,:)+prc_g(2,:,:)+prc_h(2,:,:)) * dt
+       prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)+prc_i(2,:,:)          &
+                           +prc_s(2,:,:)+prc_g(2,:,:)+prc_h(2,:,:)) * dt / 3.
     end select
 
   end subroutine micro

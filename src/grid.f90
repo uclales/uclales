@@ -246,6 +246,8 @@ contains
     if (level >= 3) then 
       a_rpp =>a_xp(:,:,:,6)
       a_npp =>a_xp(:,:,:,7)
+      allocate (prc_acc(nxp,nyp))
+      prc_acc(:,:) = 0.   ! accumulated precipitation for 2D output  [kg/m2]
     end if
     if (lwaterbudget) then 
       ! for liquid water budget and precipitation efficiency diagnostic
