@@ -383,19 +383,19 @@ contains
       case('prc_acc')
         tmp = prc_acc(3:nxp-2, 3:nyp-2)
         call writecross(crossname(n), tmp)
-!!        prc_acc = 0.
+        prc_acc = 0.
       case('cnd_acc')
         tmp = cnd_acc(3:nxp-2, 3:nyp-2)
         call writecross(crossname(n), tmp)
-!!        cnd_acc = 0.
+        cnd_acc = 0.
       case('cev_acc')
         tmp = cev_acc(3:nxp-2, 3:nyp-2)
         call writecross(crossname(n), tmp)
-!!        cev_acc = 0.
+        cev_acc = 0.
       case('rev_acc')
         tmp = rev_acc(3:nxp-2, 3:nyp-2)
         call writecross(crossname(n), tmp)
-!!        rev_acc = 0.
+        rev_acc = 0.
       end select
     end do
 

@@ -1222,9 +1222,25 @@ contains
        if (itype==1) ncinfo = 'Km'
        !if (itype==1) ncinfo = 'kg/m^2'
        if (itype==2) ncinfo = 'time'
+    case('qt_th')    
+       if (itype==0) ncinfo = 'Covariance of total water and liquid water potential temperature'
+       if (itype==1) ncinfo = 'kg/kg K'
+       if (itype==2) ncinfo = 'tttt'
+    case('s_1')    
+       if (itype==0) ncinfo = 'Mean of s (extended liquid water specific humidity)'
+       if (itype==1) ncinfo = ''
+       if (itype==2) ncinfo = 'tttt'
+    case('s_2')    
+       if (itype==0) ncinfo = 'Variance of s (extended liquid water specific humidity)'
+       if (itype==1) ncinfo = ''
+       if (itype==2) ncinfo = 'tttt'
+    case('s_3')    
+       if (itype==0) ncinfo = 'Third moment of s (extended liquid water specific humidity)'
+       if (itype==1) ncinfo = ''
+       if (itype==2) ncinfo = 'tttt'
 
     case default
-       if (myid==0) print *, 'ABORTING: variable not found ',trim(short_name)
+       if (myid==0) print *, 'ABORTING: variable not found in ncinfo, ',trim(short_name)
        call appl_abort(0)
     end select
 

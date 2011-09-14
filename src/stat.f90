@@ -30,7 +30,7 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 45, nvar2 = 109 ! number of time series and profiles
+  integer, parameter :: nvar1 = 45, nvar2 = 113 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2, nv1=nvar1, nv2=nvar2
   real, save         :: fsttm, lsttm, nsmp = 0
 
@@ -65,10 +65,10 @@ module stat
        'wr_cs1 ','cs2    ','cnt_cs2','w_cs2  ','tl_cs2 ','tv_cs2 ', & !73
        'rt_cs2 ','rl_cs2 ','wt_cs2 ','wv_cs2 ','wr_cs2 ','Nc     ', & !79  
        'Nr     ','rr     ','prc_r  ','evap   ','frc_prc','prc_prc', & !85
-       'frc_ran','hst_srf','lflxu  ','lflxd  ','sflxu  ','sflxd  ',& !91
-       'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel',& !97
-       'rsup   ','prc_c  ','prc_i  ','prc_s  ','prc_g  ','prc_h  ',& !103
-       'hail   '/)                                                    !109
+       'frc_ran','hst_srf','lflxu  ','lflxd  ','sflxu  ','sflxd  ', & !91
+       'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel', & !97
+       'rsup   ','prc_c  ','prc_i  ','prc_s  ','prc_g  ','prc_h  ', & !103
+       'hail   ','qt_th  ','s_1    ','s_2    ','s_3    '/)            !109-113
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:), svctr(:,:), ssclr(:)
@@ -190,9 +190,9 @@ contains
 
     if (debug) WRITE (0,*) 'statistics: rad ok      myid=',myid
 
-    if (level >=1) call accum_lvl1(nzp, nxp, nyp, a_rp)
+    if (level >=1) call accum_lvl1(nzp, nxp, nyp, a_rp, a_tp)
     if (debug) WRITE (0,*) 'statistics: micro1 ok    myid=',myid
-    if (level >=2) call accum_lvl2(nzp, nxp, nyp, th00, dn0, zm, a_wp,       &
+    if (level >=2) call accum_lvl2(nzp, nxp, nyp, th00, dn0, zm, press, a_wp,       &
          a_scr1, a_theta, a_tp, liquid, a_scr2, a_rp,prc_c)
     if (debug) WRITE (0,*) 'statistics: micro2 ok    myid=',myid
 
@@ -471,30 +471,35 @@ contains
   ! SUBROUTINE ACCUM_LVL1: Accumulates various statistics over an 
   ! averaging period for moisture variable (smoke or total water)
   !
-  subroutine accum_lvl1(n1,n2,n3,rt)
+  subroutine accum_lvl1(n1,n2,n3,rt,th)
 
-    integer, intent (in) :: n1,n2,n3
-    real, intent (in)  :: rt(n1,n2,n3)
+    integer, intent (in)  :: n1,n2,n3
+    real, intent (in)     :: rt(n1,n2,n3)
+    real, intent (in)     :: th(n1,n2,n3)
 
     integer :: i,j,k
-    real    :: a1(n1),a2(n1),a3(n1)
+    real    :: a1(n1),a2(n1),a3(n1),ab(n1),b1(n1)
 
     call get_avg3(n1,n2,n3,rt,a1)
+    call get_avg3(n1,n2,n3,th,b1)
     call get_var3(n1,n2,n3,rt,a1,a2)
 
     a3(:) = 0.
+    ab(:) = 0.
     do j=3,n3-2
        do i=3,n2-2
           do k=1,n1
              a3(k) = a3(k) + (rt(k,i,j)-a1(k))**3
+             ab(k) = ab(k) + (rt(k,i,j)-a1(k))*(th(k,i,j)-b1(k))
           end do
        end do
     end do
 
     do k=1,n1
-       svctr(k,50)=svctr(k,50) + a1(k)*1000.
-       svctr(k,51)=svctr(k,51) + a2(k)
-       svctr(k,52)=svctr(k,52) + a3(k)/REAL((n2-4)*(n3-4))
+       svctr(k,50) =svctr(k,50)  + a1(k)*1000.
+       svctr(k,51) =svctr(k,51)  + a2(k)
+       svctr(k,52) =svctr(k,52)  + a3(k)/REAL((n2-4)*(n3-4))
+       svctr(k,110)=svctr(k,110) + ab(k)/REAL((n2-4)*(n3-4))
     end do
 
   end subroutine accum_lvl1
@@ -503,22 +508,25 @@ contains
   ! SUBROUTINE ACCUM_LVL2: Accumulates specialized statistics that depend
   ! on level 3 variables.
   !
-  subroutine accum_lvl2(n1, n2, n3, th00, dn0, zm, w, tv, th, tl, &
+  subroutine accum_lvl2(n1, n2, n3, th00, dn0, zm, p, w, tv, th, tl, &
        rl, rs, rt, rrate)
 
-    use defs, only : ep2
+    use defs, only : ep2, alvl, cp, cpr, p00, R, Rm, rcp
+    use thrm, only : rslf
 
     integer, intent (in) :: n1,n2,n3
     real, intent (in)                       :: th00
     real, intent (in), dimension(n1)        :: zm, dn0
-    real, intent (in), dimension(n1,n2,n3)  :: w, th, tl, rl, rs, rt, rrate
+    real, intent (in), dimension(n1,n2,n3)  :: p, w, th, tl, rl, rs, rt, rrate
     real, intent (out), dimension(n1,n2,n3) :: tv
 
     integer                   :: k, i, j, km1
     logical                   :: aflg
     real                      :: xy1mx
-    real, dimension(n1)       :: a1, a2, a3, tvbar
+    real, dimension(n1)       :: a1, a2, a3, tvbar, svar1, svar2, svar3
     real, dimension(n2,n3)    :: scr, xy1, xy2
+    real, dimension(n1,n2,n3) :: svar,tvar
+    real                      :: tkl,rst,alf
 
     !
     ! liquid water statistics
@@ -542,6 +550,41 @@ contains
        svctr(k,60)=svctr(k,60) + a2(k)
        svctr(k,61)=svctr(k,61) + a3(k)/REAL((n2-4)*(n3-4))
     end do
+
+    !
+    ! s variable (extended liquid water specific humidity)
+    !
+    do j=3,n3-2
+       do i=3,n2-2
+          do k=1,n1
+             tkl = (tl(k,i,j)+th00) * (p(k,i,j)/p00)**rcp
+             rst = rslf(p(k,i,j),tkl)
+             ! Eq (1) of Lewellen and Yoh (1993)
+             ! consistent with Eq (1) of Larson et al. (2001)
+             alf = 0.622*rst*alvl/(R*tkl**2)  
+             svar(k,i,j) = (rt(k,i,j) - rst) ! /(1.0 + alf*alvl/cp)
+          end do
+       end do
+    end do
+
+    call get_avg3(n1,n2,n3,svar,svar1)
+    call get_var3(n1,n2,n3,svar,svar1,svar2)
+
+    svar3(:) = 0.
+    do j=3,n3-2
+       do i=3,n2-2
+          do k=1,n1
+            svar3(k) = svar3(k) + (svar(k,i,j)-svar1(k))**3
+          end do
+       end do
+    end do
+
+    do k=1,n1
+       svctr(k,111)=svctr(k,111) + svar1(k)                     
+       svctr(k,112)=svctr(k,112) + svar2(k)                     
+       svctr(k,113)=svctr(k,113) + svar3(k) / REAL((n2-4)*(n3-4)) 
+    end do
+
     !
     ! do some conditional sampling statistics: cloud, cloud-core
     !
