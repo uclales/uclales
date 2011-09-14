@@ -566,7 +566,6 @@ contains
           km1=max(1,k-1)
           varout(i,j) = varout(i,j)+varin(k,i,j)*(zm(k)-zm(km1))*dn0(k)
         enddo
-        if (varout(i,j) == 0.) varout(i,j) = fillvalue_double
       end do
     end do
   end subroutine calcintpath
@@ -624,6 +623,7 @@ contains
             varout(i,j) = varout(i,j) + zm(k)-zm(k-1)
           end if
         end do
+        if (varout(i,j) == 0.) varout(i,j) = fillvalue_double
       end do
     end do
   end subroutine calcdepth
