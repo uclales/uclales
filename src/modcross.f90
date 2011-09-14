@@ -22,18 +22,18 @@ implicit none
   logical            :: lcross = .false., ldocross, lxy = .false., lxz = .false., lyz = .false.
   real               :: dtcross = 60, xcross = 0., ycross = 0., zcross = 0.
   integer            :: icross,jcross,kcross
-
+  real               :: threstracer = 2
   integer :: ncross = 0
   character(len=7), allocatable, dimension(:) :: crossname
-  integer, parameter :: nvar_all = 33
+  integer, parameter :: nvar_all = 34
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
          'l      ','rp     ','np     ','ricep  ','nicep  ', & !6-10
          'rsnowp ','rgrpp  ','nsnowp ','ngrpp  ','rhailp ', & !11-15
          'nhailp ','lwp    ','rwp    ','iwp    ','swp    ', & !16-20
          'gwp    ','hwp    ','prc_acc','cnd_acc','cev_acc', & !21-25
-         'rev_acc','cldbase','cldtop ','clddept','trcpath', & !26-30
-         'trcbase','trctop ','trcdept'/)                      !31-33
+         'rev_acc','cldbase','cldtop ','clddept','tracer ', & !26-30
+         'trcpath','trcbase','trctop ','trcdept'/)           !31-34
   integer :: nccrossid, nccrossrec, nvar
   
   interface writecross
@@ -89,11 +89,9 @@ contains
 
 !     if (.not.(lxy .or. lxz .or. lyz)) lcross = .false.
     if (lcross) call open_nc(trim(expname)//'.out.cross.'//cmpicoordx//'.'//cmpicoordy//'.nc', nccrossid, nccrossrec, rtimee)
-  
     do n=1,nvar_all
       call addcross(crossvars(n))
     end do
-
   end subroutine initcross
 
   subroutine addcross(name)
@@ -113,135 +111,156 @@ contains
     real, allocatable, dimension(:,:) :: dimvalues
     integer, dimension(3)             :: loc, dimsize
     integer :: n
+    logical :: iscross
 
     if (lcross) then
       loc = (/ictr, ictr, ictr/)
       unit = 'kg/kg'
-      do n = 1, nvar_all
-        select case (trim(name))
-        case('u')
-          loc = (/ictr, ihlf, ictr/)
-          longname =  'Zonal wind'
-          unit = 'm/s'
-        case('v')
-          loc = (/ictr, ictr, ihlf/)
-          longname =  'Meridional wind'
-          unit = 'm/s'
-        case('w')
-          loc = (/ihlf, ictr, ictr/)
-          longname =  'Meridional wind'
-          unit = 'm/s'
-        case('t')
-          longname =  'Liquid water potential temperature'
-          unit = 'K'
-        case('r')
-          if (level < 1) return
-          longname =  'Total water content'
-        case('l')
-          if (level < 2) return
-          longname =  'Liquid water content'
-        case('rp')
-          if (level < 3) return
-          longname =  'Rain water content'
-        case('np')
-          if (level < 3) return
-          longname =  'Rain water number density'
-        case('ricep')
-          if (level < 4) return
-          longname =  'Cloud ice content'
-        case('nicep')
-          if (level < 4) return
-          longname =  'Cloud ice number density'
-        case('rsnowp')
-          if (level < 4) return
-          longname =  'Snow content'
-        case('nsnowp')
-          if (level < 5) return
-          longname =  'Snow number density'
-        case('rgrpp')
-          if (level < 4) return
-          longname =  'Graupel content'
-        case('ngrpp')
-          if (level < 5) return
-          longname =  'Graupel number density'
-        case('rhailp')
-          if (level < 5) return
-          longname =  'Hail content'
-        case('nhailp')
-          if (level < 5) return
-          longname =  'Hail number density'
-        case('lwp')
-          if (level < 2) return
-          longname = 'Liquid water path'
-          unit = 'kg/m2'
-        case('rwp')
-          if (level < 3) return
-          longname = 'Rain water path'
-          unit = 'kg/m2'
-        case('iwp')
-          if (level < 4) return
-          longname = 'Ice water path'
-          unit = 'kg/m2'
-        case('swp')
-          if (level < 4) return
-          longname = 'Snow water path'
-          unit = 'kg/m2'
-        case('gwp')
-          if (level < 4) return
-          longname = 'Graupel water path'
-          unit = 'kg/m2'
-        case('hwp')
-          if (level < 5) return
-          longname = 'Hail water path'
-          unit = 'kg/m2'
-        case ('prc_acc')
-          if (.not.lwaterbudget) return
-          longname = 'acc. precip'
-          unit = 'kg/m2'
-        case ('cnd_acc')
-          if (.not.lwaterbudget) return
-          longname = 'acc. condensation'
-          unit = 'kg/m2'          
-        case ('cev_acc')
-          if (.not.lwaterbudget) return
-          longname = 'acc. evaporation of cloud water'
-          unit = 'kg/m2'          
-        case ('rev_acc')
-          if (.not.lwaterbudget) return
-          longname = 'acc. evaporation of rain water'
-          unit = 'kg/m2'          
-        case ('cldbase')
-          if (level < 2) return
-          longname = 'Cloud base height'
-          unit = 'm'          
-        case ('cldtop')
-          if (level < 2) return
-          longname = 'Cloud top height'
-          unit = 'm'          
-        case ('clddept')
-          if (level < 2) return
-          longname = 'Cloud depth'
-          unit = 'm'          
-        case ('trcpath')
-          if (lcouvreux) return
-          longname = 'Tracer path'
-          unit = 'kg/m2'
-        case ('trcbase')
-          if (lcouvreux) return
-          longname = 'Tracer base height'
-          unit = 'm'          
-        case ('trctop')
-          if (lcouvreux) return
-          longname = 'Tracer top height'
-          unit = 'm'          
-        case ('trcdept')
-          if (lcouvreux) return
-          longname = 'Tracer depth'
-          unit = 'm'          
-        case default
-          return
-        end select
-      end do
+      iscross = .false.
+      select case (trim(name))
+      case('u')
+        loc = (/ictr, ihlf, ictr/)
+        longname =  'Zonal wind'
+        unit = 'm/s'
+        iscross = .true.
+     case('v')
+        loc = (/ictr, ictr, ihlf/)
+        longname =  'Meridional wind'
+        unit = 'm/s'
+        iscross = .true.
+      case('w')
+        loc = (/ihlf, ictr, ictr/)
+        longname =  'Meridional wind'
+        unit = 'm/s'
+        iscross = .true.
+      case('t')
+        longname =  'Liquid water potential temperature'
+        unit = 'K'
+        iscross = .true.
+      case('r')
+        if (level < 1) return
+        longname =  'Total water content'
+        iscross = .true.
+      case('l')
+        if (level < 2) return
+        longname =  'Liquid water content'
+        iscross = .true.
+      case('rp')
+        if (level < 3) return
+        longname =  'Rain water content'
+        iscross = .true.
+      case('np')
+        if (level < 3) return
+        longname =  'Rain water number density'
+        iscross = .true.
+      case('ricep')
+        if (level < 4) return
+        longname =  'Cloud ice content'
+        iscross = .true.
+      case('nicep')
+        if (level < 4) return
+        longname =  'Cloud ice number density'
+        iscross = .true.
+      case('rsnowp')
+        if (level < 4) return
+        longname =  'Snow content'
+        iscross = .true.
+      case('nsnowp')
+        if (level < 5) return
+        longname =  'Snow number density'
+        iscross = .true.
+      case('rgrpp')
+        if (level < 4) return
+        longname =  'Graupel content'
+        iscross = .true.
+      case('ngrpp')
+        if (level < 5) return
+        longname =  'Graupel number density'
+        iscross = .true.
+      case('rhailp')
+        if (level < 5) return
+        longname =  'Hail content'
+        iscross = .true.
+      case('tracer')
+        if (.not. lcouvreux) return
+        longname =  'Tracer'
+        iscross = .true.
+        unit = '-'
+      case('nhailp')
+        if (level < 5) return
+        longname =  'Hail number density'
+        iscross = .true.
+      case('lwp')
+        if (level < 2) return
+        longname = 'Liquid water path'
+        unit = 'kg/m2'
+      case('rwp')
+        if (level < 3) return
+        longname = 'Rain water path'
+        unit = 'kg/m2'
+      case('iwp')
+        if (level < 4) return
+        longname = 'Ice water path'
+        unit = 'kg/m2'
+      case('swp')
+        if (level < 4) return
+        longname = 'Snow water path'
+        unit = 'kg/m2'
+      case('gwp')
+        if (level < 4) return
+        longname = 'Graupel water path'
+        unit = 'kg/m2'
+      case('hwp')
+        if (level < 5) return
+        longname = 'Hail water path'
+        unit = 'kg/m2'
+      case ('prc_acc')
+        if (.not.lwaterbudget) return
+        longname = 'acc. precip'
+        unit = 'kg/m2'
+      case ('cnd_acc')
+        if (.not.lwaterbudget) return
+        longname = 'acc. condensation'
+        unit = 'kg/m2'          
+      case ('cev_acc')
+        if (.not.lwaterbudget) return
+        longname = 'acc. evaporation of cloud water'
+        unit = 'kg/m2'          
+      case ('rev_acc')
+        if (.not.lwaterbudget) return
+        longname = 'acc. evaporation of rain water'
+        unit = 'kg/m2'          
+      case ('cldbase')
+        if (level < 2) return
+        longname = 'Cloud base height'
+        unit = 'm'          
+      case ('cldtop')
+        if (level < 2) return
+        longname = 'Cloud top height'
+        unit = 'm'          
+      case ('clddept')
+        if (level < 2) return
+        longname = 'Cloud depth'
+        unit = 'm'          
+      case ('trcpath')
+        if (.not.lcouvreux) return
+        longname = 'Tracer path'
+        unit = 'm^-2'
+      case ('trcbase')
+        if (.not.lcouvreux) return
+        longname = 'Tracer base height'
+        unit = 'm'          
+      case ('trctop')
+        if (.not.lcouvreux) return
+        longname = 'Tracer top height'
+        unit = 'm'          
+      case ('trcdept')
+        if (.not.lcouvreux) return
+        longname = 'Tracer depth'
+        unit = 'm'          
+      case default
+        return
+      end select
       if(ncross /= 0) then
         ctmp = crossname
         deallocate(crossname)
@@ -259,63 +278,90 @@ contains
       dimunit(3)            = tunit
       dimsize    = 0
       dimvalues  = 0
-
-      if (lxz) then
-        dimunit(1) = zunit
-        dimunit(2) = xunit
-        dimsize(1) = nzp - 2
-        dimsize(2) = nxp - 4
-        if(loc(1)==ictr) then
-          dimvalues(1:nzp-2,1)  = zt(2:nzp-1)
-          dimname(1)            = zname
-          dimlongname(1)        = zlongname
-        else
-          dimvalues(1:nzp-2,1)  = zm(2:nzp-1)
-          dimname(1)            = zhname
-          dimlongname(1)        = zhlongname
+      if (iscross) then
+        if (lxz) then
+          dimunit(1) = zunit
+          dimunit(2) = xunit
+          dimsize(1) = nzp - 2
+          dimsize(2) = nxp - 4
+          if(loc(1)==ictr) then
+            dimvalues(1:nzp-2,1)  = zt(2:nzp-1)
+            dimname(1)            = zname
+            dimlongname(1)        = zlongname
+          else
+            dimvalues(1:nzp-2,1)  = zm(2:nzp-1)
+            dimname(1)            = zhname
+            dimlongname(1)        = zhlongname
+          end if
+          if(loc(2)==ictr) then
+            dimvalues(1:nxp-4,2)  = xt(3:nxp-2)
+            dimname(2)            = xname
+            dimlongname(2)        = xlongname
+          else
+            dimvalues(1:nxp-4,2)  = xm(3:nxp-2)
+            dimname(2)            = xhname
+            dimlongname(2)        = xhlongname
+          end if
+          call addvar_nc(nccrossid, trim(name)//'xz', 'xz crosssection of '//trim(longname), &
+          unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
+          crossname(ncross) = name
         end if
-        if(loc(2)==ictr) then
-          dimvalues(1:nxp-4,2)  = xt(3:nxp-2)
-          dimname(2)            = xname
-          dimlongname(2)        = xlongname
-        else
-          dimvalues(1:nxp-4,2)  = xm(3:nxp-2)
-          dimname(2)            = xhname
-          dimlongname(2)        = xhlongname
+        if (lyz) then
+          dimunit(1) = zunit
+          dimunit(2) = yunit
+          dimsize(1) = nzp - 2
+          dimsize(2) = nyp - 4
+          if(loc(1)==ictr) then
+            dimvalues(1:nzp-2,1)  = zt(2:nzp-1)
+            dimname(1)            = zname
+            dimlongname(1)        = zlongname
+          else
+            dimvalues(1:nzp-2,1)  = zm(2:nzp-1)
+            dimname(1)            = zhname
+            dimlongname(1)        = zhlongname
+          end if
+          if(loc(2)==ictr) then
+            dimvalues(1:nyp-4,2)  = yt(3:nyp-2)
+            dimname(2)            = yname
+            dimlongname(2)        = ylongname
+          else
+            dimvalues(1:nyp-4,2)  = ym(3:nyp-2)
+            dimname(2)            = yhname
+            dimlongname(2)        = yhlongname
+          end if
+          call addvar_nc(nccrossid, trim(name)//'yz', 'yz crosssection of '//trim(longname), &
+          unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
+          crossname(ncross) = name
         end if
-        call addvar_nc(nccrossid, trim(name)//'xz', 'xz crosssection of '//trim(longname), &
-        unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
-        crossname(ncross) = name
-      end if
-      if (lyz) then
-        dimunit(1) = zunit
-        dimunit(2) = yunit
-        dimsize(1) = nzp - 2
-        dimsize(2) = nyp - 4
-        if(loc(1)==ictr) then
-          dimvalues(1:nzp-2,1)  = zt(2:nzp-1)
-          dimname(1)            = zname
-          dimlongname(1)        = zlongname
-        else
-          dimvalues(1:nzp-2,1)  = zm(2:nzp-1)
-          dimname(1)            = zhname
-          dimlongname(1)        = zhlongname
-        end if
-        if(loc(2)==ictr) then
-          dimvalues(1:nyp-4,2)  = yt(3:nyp-2)
-          dimname(2)            = yname
-          dimlongname(2)        = ylongname
-        else
-          dimvalues(1:nyp-4,2)  = ym(3:nyp-2)
-          dimname(2)            = yhname
-          dimlongname(2)        = yhlongname
-        end if
-        call addvar_nc(nccrossid, trim(name)//'yz', 'yz crosssection of '//trim(longname), &
-        unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
-        crossname(ncross) = name
-      end if
-      
-      if (lxy) then
+        
+        if (lxy) then
+          dimunit(1) = xunit
+          dimunit(2) = yunit
+          dimsize(1) = nxp - 4
+          dimsize(2) = nyp - 4
+          if(loc(1)==ictr) then
+            dimvalues(1:nxp-4,1)  = xt(3:nxp-2)
+            dimname(1)            = xname
+            dimlongname(1)        = xlongname
+          else
+            dimvalues(1:nxp-4,1)  = xm(3:nxp-2)
+            dimname(1)            = xhname
+            dimlongname(1)        = xhlongname
+          end if
+          if(loc(2)==ictr) then
+            dimvalues(1:nyp-4,2)  = yt(3:nyp-2)
+            dimname(2)            = yname
+            dimlongname(2)        = ylongname
+          else
+            dimvalues(1:nyp-4,2)  = ym(3:nyp-2)
+            dimname(2)            = yhname
+            dimlongname(2)        = yhlongname
+          end if
+          call addvar_nc(nccrossid, trim(name)//'xy', 'xy crosssection of '//trim(longname), &
+          unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
+          crossname(ncross) = name
+        end if      
+      else
         dimunit(1) = xunit
         dimunit(2) = yunit
         dimsize(1) = nxp - 4
@@ -338,7 +384,7 @@ contains
           dimname(2)            = yhname
           dimlongname(2)        = yhlongname
         end if
-        call addvar_nc(nccrossid, trim(name)//'xy', 'xy crosssection of '//trim(longname), &
+        call addvar_nc(nccrossid, trim(name), trim(longname), &
         unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
         crossname(ncross) = name
       end if
@@ -395,6 +441,8 @@ contains
         call writecross(crossname(n), a_rhailp)
       case('nhailp')
         call writecross(crossname(n), a_nhailp)
+      case('tracer')
+        call writecross(crossname(n), tracer)
       case('lwp')
         call calcintpath(liquid, tmp)
         call writecross(crossname(n), tmp)
@@ -496,7 +544,7 @@ contains
 
     character(*), intent(in)                :: crossname
     real, dimension(:,:), intent(in) :: am
-    call writevar_nc(nccrossid, trim(crossname)//'xy', am, nccrossrec)
+    call writevar_nc(nccrossid, trim(crossname), am, nccrossrec)
 
   end subroutine writecross_2D
   
@@ -506,6 +554,7 @@ contains
   end subroutine exitcross
 
   subroutine calcintpath(varin, varout)
+    use modnetcdf, only : fillvalue_double
     use grid, only : nzp, nxp, nyp, dn0, zm
     real, intent(in), dimension(:,:,:) :: varin
     real, intent(out), dimension(3:,3:)  :: varout
@@ -517,6 +566,7 @@ contains
           km1=max(1,k-1)
           varout(i,j) = varout(i,j)+varin(k,i,j)*(zm(k)-zm(km1))*dn0(k)
         enddo
+        if (varout(i,j) == 0.) varout(i,j) = fillvalue_double
       end do
     end do
   end subroutine calcintpath
@@ -574,7 +624,6 @@ contains
             varout(i,j) = varout(i,j) + zm(k)-zm(k-1)
           end if
         end do
-        if (varout(i,j) == 0.) varout(i,j) = fillvalue_double
       end do
     end do
   end subroutine calcdepth
@@ -595,16 +644,16 @@ contains
     div = sqrt(div)
     
     do k = 2, nzp -1
-      divmin(k) = divmin(k) + div(k) * 0.05 * (zm(k)-zm(k-1))/zt(k)
+      divmin(k:nzp-1) = divmin(k:nzp-1) + div(k) * 0.05 * (zm(k)-zm(k-1))/zt(k)
       div(k) = 1./max(1e-10, max(divmin(k), div(k)))
     end do
     do j=3,nyp-2
       do i=3,nxp-2
         do k=2,nzp-1
-          if (0.5 * (a_wp(k,i,j) + a_wp(k-1,i,j) )> 0.) then
-            varout(k,i,j) = (varin(k,i,j) - mean(k)) * div(k) - 1. 
+!           if (0.5 * (a_wp(k,i,j) + a_wp(k-1,i,j))> 0.) then
+            varout(k,i,j) = (varin(k,i,j) - mean(k)) * div(k) - threstracer
             varout(k,i,j) = max(0.,varout(k,i,j))
-          end if
+!           end if
         enddo
       end do
     end do
