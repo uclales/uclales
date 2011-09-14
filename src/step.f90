@@ -38,6 +38,7 @@ module step
   real    :: cntlat =  31.5 ! 30.0
   logical :: outflg = .true.
   logical :: statflg = .false.
+  real    :: tau = 900.
 !irina  
   real    :: sst=292.
   real    :: div = 3.75e-6
@@ -232,6 +233,7 @@ contains
        call corlos 
        call buoyancy
        call sponge
+       call decay
        call update (nstep)
        call poisson 
        call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
@@ -255,7 +257,8 @@ contains
                      a_ricet,a_nicet,a_rsnowt, a_rgrt,&
                      a_rhailt,a_nhailt,a_nsnowt, a_ngrt,&
                      a_xt1, a_xt2, nscl, nxyzp, level, &
-                     lwaterbudget, a_rct
+                     lwaterbudget, a_rct, &
+                     lcouvreux, a_cvrxt, ncvrx
     use util, only : azero
 
     integer, intent (in) :: nstep
@@ -274,6 +277,7 @@ contains
           a_npt =>a_xt1(:,:,:,7)
        end if
        if (lwaterbudget) a_rct =>a_xt1(:,:,:,8)
+       if (lcouvreux)    a_cvrxt =>a_xt1(:,:,:,ncvrx)
        if (level >= 4) then
           a_ricet  =>a_xt1(:,:,:, 8)
           a_nicet  =>a_xt1(:,:,:, 9)
@@ -299,6 +303,7 @@ contains
           a_npt =>a_xt2(:,:,:,7)
        end if
        if (lwaterbudget) a_rct =>a_xt2(:,:,:,8)
+       if (lcouvreux)    a_cvrxt =>a_xt2(:,:,:,ncvrx)
        if (level >= 4) then
           a_ricet  =>a_xt2(:,:,:, 8)
           a_nicet  =>a_xt2(:,:,:, 9)
@@ -606,6 +611,24 @@ contains
     end if
        
   end subroutine sponge
+  
+  subroutine decay
+    use grid, only : lcouvreux, a_cvrxp, a_cvrxt, nxp, nyp, nzp, dt
+    integer :: i, j, k
+    real    :: rate
+    if (lcouvreux) then
+      rate = 1./(max(tau, dt))    
+      do j = 3, nyp - 2
+        do i = 3, nxp - 2
+          do k = 2, nzp
+            a_cvrxt(k,i,j) = a_cvrxt(k,i,j) - a_cvrxp(k,i,j) * rate
+          end do
+        end do
+      end do
+    end if
+              
+  end subroutine
+
   !
   ! --------------------------------------------------------------------
   ! subroutine get_diverg: gets velocity tendency divergence and puts it 

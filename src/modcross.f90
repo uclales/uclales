@@ -25,14 +25,15 @@ implicit none
 
   integer :: ncross = 0
   character(len=7), allocatable, dimension(:) :: crossname
-  integer, parameter :: nvar_all = 26
+  integer, parameter :: nvar_all = 33
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
          'l      ','rp     ','np     ','ricep  ','nicep  ', & !6-10
          'rsnowp ','rgrpp  ','nsnowp ','ngrpp  ','rhailp ', & !11-15
          'nhailp ','lwp    ','rwp    ','iwp    ','swp    ', & !16-20
          'gwp    ','hwp    ','prc_acc','cnd_acc','cev_acc', & !21-25
-         'rev_acc'/)                                          !26
+         'rev_acc','cldbase','cldtop ','clddept','trcpath', & !26-30
+         'trcbase','trctop ','trcdept'/)                      !31-33
   integer :: nccrossid, nccrossrec, nvar
   
   interface writecross
@@ -103,7 +104,7 @@ contains
                             xname, xlongname, xunit, xhname, xhlongname, &
                             yname, ylongname, yunit, yhname, yhlongname, &
                             tname, tlongname, tunit, &
-                            lwaterbudget
+                            lwaterbudget, lcouvreux
 
     character (*), intent(in)     :: name
     character (40), dimension(3) :: dimname, dimlongname, dimunit
@@ -209,6 +210,34 @@ contains
           if (.not.lwaterbudget) return
           longname = 'acc. evaporation of rain water'
           unit = 'kg/m2'          
+        case ('cldbase')
+          if (level < 2) return
+          longname = 'Cloud base height'
+          unit = 'm'          
+        case ('cldtop')
+          if (level < 2) return
+          longname = 'Cloud top height'
+          unit = 'm'          
+        case ('clddept')
+          if (level < 2) return
+          longname = 'Cloud depth'
+          unit = 'm'          
+        case ('trcpath')
+          if (lcouvreux) return
+          longname = 'Tracer path'
+          unit = 'kg/m2'
+        case ('trcbase')
+          if (lcouvreux) return
+          longname = 'Tracer base height'
+          unit = 'm'          
+        case ('trctop')
+          if (lcouvreux) return
+          longname = 'Tracer top height'
+          unit = 'm'          
+        case ('trcdept')
+          if (lcouvreux) return
+          longname = 'Tracer depth'
+          unit = 'm'          
         case default
           return
         end select
@@ -318,16 +347,20 @@ contains
   end subroutine addcross
 
   subroutine triggercross(rtimee)
-    use grid,      only : nxp, nyp, tname, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
+    use grid,      only : nxp, nyp, nzp, tname, zt, zm, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
-       prc_acc, cnd_acc, cev_acc, rev_acc
-    use modnetcdf, only : writevar_nc
+       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux
+    use modnetcdf, only : writevar_nc, fillvalue_double
     real, intent(in) :: rtimee
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
-    integer :: n
+    real, dimension(nzp,nxp,nyp) :: tracer
+    integer :: n, i, j, k
     
     if (.not. lcross) return
     call writevar_nc(nccrossid, tname, rtimee, nccrossrec)
+    if (lcouvreux) then
+      call scalexcess(a_cvrxp, tracer)
+    end if
     do n = 1, ncross
       select case(trim(crossname(n)))
       case('u')
@@ -396,6 +429,27 @@ contains
         tmp = rev_acc(3:nxp-2, 3:nyp-2)
         call writecross(crossname(n), tmp)
 !!        rev_acc = 0.
+      case ('cldbase')
+        call calcbase(liquid, tmp)
+        call writecross(crossname(n), tmp)
+      case ('cldtop')
+        call calctop(liquid, tmp)
+        call writecross(crossname(n), tmp)
+      case ('clddept')
+        call calcdepth(liquid, tmp)
+        call writecross(crossname(n), tmp)
+      case('trcpath')
+        call calcintpath(tracer, tmp)
+        call writecross(crossname(n), tmp)
+      case ('trcbase')
+        call calcbase(tracer, tmp)
+        call writecross(crossname(n), tmp)
+      case ('trctop')
+        call calctop(tracer, tmp)
+        call writecross(crossname(n), tmp)
+      case ('trcdept')
+        call calcdepth(tracer, tmp)
+        call writecross(crossname(n), tmp)
       end select
     end do
 
@@ -466,5 +520,96 @@ contains
       end do
     end do
   end subroutine calcintpath
+
+  subroutine calcbase(varin, varout)
+    use grid, only : nzp, nxp, nyp, zt
+    use modnetcdf, only : fillvalue_double
+    real, intent(in), dimension(:,:,:) :: varin
+    real, intent(out), dimension(3:,3:)  :: varout
+    integer :: i, j, k, km1
+    varout = fillvalue_double
+    do j = 3, nyp - 2
+      do i = 3, nxp - 2
+        base:do k = 2, nzp - 1
+          if (varin(k,i,j) > 0.) then
+            varout(i,j) = zt(k)
+            exit base
+          end if
+        end do base
+      end do
+    end do
+  end subroutine calcbase
+  
+  subroutine calctop(varin, varout)
+    use grid, only : nzp, nxp, nyp, zt
+    use modnetcdf, only : fillvalue_double
+    real, intent(in), dimension(:,:,:) :: varin
+    real, intent(out), dimension(3:,3:)  :: varout
+    integer :: i, j, k, km1
+    varout = fillvalue_double
+    do j = 3, nyp - 2
+      do i = 3, nxp - 2
+        top:do k = nzp - 1, 2, -1
+          if (varin(k,i,j) > 0.) then
+            varout(i,j) = zt(k)
+            exit top
+          end if
+        end do top
+      end do
+    end do
+  end subroutine calctop
+  
+  subroutine calcdepth(varin, varout)
+    use grid, only : nzp, nxp, nyp, zm
+    use modnetcdf, only : fillvalue_double
+    real, intent(in), dimension(:,:,:) :: varin
+    real, intent(out), dimension(3:,3:)  :: varout
+    integer :: i, j, k, km1
+    varout = 0.
+    do j = 3, nyp - 2
+      do i = 3, nxp - 2
+        do k = 2, nzp - 1
+          km1=max(1,k-1)
+          if (varin(k,i,j) > 0.) then
+            varout(i,j) = varout(i,j) + zm(k)-zm(k-1)
+          end if
+        end do
+        if (varout(i,j) == 0.) varout(i,j) = fillvalue_double
+      end do
+    end do
+  end subroutine calcdepth
+   
+!The output is the number of std. deviations over 1 that the local value of the local value 
+!is larger than the slab average. Only for points with an upward positive velocity.
+  subroutine scalexcess(varin, varout)
+    use grid, only : nzp, nxp, nyp, zm, zt, a_wp
+    use util, only : get_avg3, get_var3
+    real, intent(in), dimension(:,:,:) :: varin
+    real, intent(out), dimension(:,:,:)  :: varout
+    real, dimension(nzp) :: mean, div, divmin
+    integer :: i, j, k, km1
+    varout = 0.
+    divmin = 0.
+    call get_avg3(nzp, nyp, nxp,varin,mean)
+    call get_var3(nzp, nyp, nxp,varin,mean, div)
+    div = sqrt(div)
+    
+    do k = 2, nzp -1
+      divmin(k) = divmin(k) + div(k) * 0.05 * (zm(k)-zm(k-1))/zt(k)
+      div(k) = 1./max(1e-10, max(divmin(k), div(k)))
+    end do
+    do j=3,nyp-2
+      do i=3,nxp-2
+        do k=2,nzp-1
+          if (0.5 * (a_wp(k,i,j) + a_wp(k-1,i,j) )> 0.) then
+            varout(k,i,j) = (varin(k,i,j) - mean(k)) * div(k) - 1. 
+            varout(k,i,j) = max(0.,varout(k,i,j))
+          end if
+        enddo
+      end do
+    end do
+  end subroutine scalexcess
+  
+ 
 end module modcross
 

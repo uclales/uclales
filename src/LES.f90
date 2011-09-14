@@ -83,14 +83,14 @@ contains
     !use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon, sst
     use step, only : timmax, timrsm, istpfl, corflg, outflg, frqanl, frqhis,          &
          frqcross , strtim, radfrq, cntlat,& 
-         case_name,lsvarflg, sst, div, wctime                   !irina
+         case_name,lsvarflg, sst, div, wctime , tau                  !irina
 !cgils         
     use modnetcdf, only : lsync
     use modcross, only : lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars
     use forc, only : lstendflg, sfc_albedo     
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
-         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype, CCN, lwaterbudget
+         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype, CCN, lwaterbudget, lcouvreux
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,irsflg, iseed, hfilin,   &
          zrand
     use stat, only : ssam_intvl, savg_intvl
@@ -134,7 +134,8 @@ contains
          lnudge, tnudgefac, ltimedep, &             !thijs: Nudging
          SolarConstant, & ! SolarConstant (In case of prescribed TOA radiation
          lrandommicro, microseq,timenuc ,nin_set,cloud_type, &  !thijs: sequence of variables for microphysics
-         lwaterbudget                 ! axel: flag for liquid water budget diagnostics (only level=3)
+         lwaterbudget, &                 ! axel: flag for liquid water budget diagnostics (only level=3)
+         lcouvreux , tau                     ! The Couvreux 'radioactive' scalar
 
     ps       = 0.
     ts       = th00
