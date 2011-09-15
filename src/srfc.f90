@@ -26,6 +26,8 @@ module srfc
   real    :: ubmin  =  0.20
   real    :: dthcon = 100.0
   real    :: drtcon = 0.0
+  real    :: rh_srf = 1.
+  real    :: drag   = -1.
 
 contains 
   !
@@ -123,8 +125,13 @@ contains
    !cgils  : drag coeff C = 0.0012*6.75 m/s = 0.0081 m/s
              !a_tstar(i,j) =  0.0081*dtdz(i,j)/a_ustar(i,j)
              !a_rstar(i,j) =  0.0081*drdz(i,j)/a_ustar(i,j)
-             a_tstar(i,j) =  dthcon * wspd(i,j)*dtdz(i,j)/a_ustar(i,j)
-             a_rstar(i,j) =  drtcon * wspd(i,j)*drdz(i,j)/a_ustar(i,j)
+             if (drag > 0) then
+               a_tstar(i,j) =  drag*dtdz(i,j)/a_ustar(i,j)
+               a_rstar(i,j) =  drag*drdz(i,j)/a_ustar(i,j)
+             else
+               a_tstar(i,j) =  dthcon * wspd(i,j)*dtdz(i,j)/a_ustar(i,j)
+               a_rstar(i,j) =  drtcon * wspd(i,j)*drdz(i,j)/a_ustar(i,j)
+             endif
              bfct(i,j) = g*zt(2)/(a_theta(2,i,j)*wspd(i,j)**2)
           end do
        end do

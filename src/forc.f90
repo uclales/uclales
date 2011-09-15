@@ -26,6 +26,7 @@ module forc
   !cgils
   use grid, only : wfls,dthldtls,dqtdtls
   use modnudge, only : nudge 
+  use stat, only : sflg
   implicit none
 
    !character (len=5), parameter :: case_name = 'xxxx'
@@ -54,7 +55,7 @@ contains
     use grid, only: nxp, nyp, nzp, zm, zt, dzi_t, dzi_m, dn0, iradtyp, liquid  &
          , a_rflx, a_sflx, albedo, a_tt, a_tp, a_rt, a_rp, a_pexnr, a_scr1 &
          , vapor, a_rpp,a_ricep,a_nicep,a_rgrp, CCN, pi0, pi1, level, a_ut, a_up, a_vt, a_vp,a_theta,&
-          a_lflxu, a_lflxd, a_sflxu, a_sflxd,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa
+          a_lflxu, a_lflxd, a_sflxu, a_sflxd,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa,a_lflxu_ca, a_lflxd_ca, a_sflxu_ca, a_sflxd_ca, lflxd_toa_ca, lflxu_toa_ca, sflxd_toa_ca, sflxu_toa_ca
 
     use mpi_interface, only : myid, appl_abort
 
@@ -65,7 +66,7 @@ contains
 !irina
     real :: xref1, xref2
     integer :: i, j, k, kp1
-
+    real, dimension(nzp,nxp,nyp) :: dum0, dum1, dum2, dum3, dum4
 
 !irina
     select case(iradtyp)
@@ -121,15 +122,28 @@ contains
              xref2 = xref2 + a_sflx(nzp,3,3)
              albedo(3,3) = xref2/xref1
           end select
-
-       else
+          if (sflg) then
+            dum0 = 0.
+            dum1 = 0.
+            dum2 = 0.
+            dum3 = 0.
+            dum4 = 0.
+            call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
+               dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, dum0, dum1,&
+               dum2, dum3, a_lflxu_ca, a_lflxd_ca,a_sflxu_ca,a_sflxd_ca, albedo, &
+               rr=dum4,sflxu_toa=sflxu_toa_ca,sflxd_toa=sflxd_toa_ca,&
+               lflxu_toa=lflxu_toa_ca,lflxd_toa=lflxd_toa_ca)
+          end if
+        else
           if (myid == 0) print *, '  ABORTING: inproper call to radiation'
           call appl_abort(0)
        end if
-       
-    end select 
-!cgils: Nudging
-    call nudge(time_in)
+    end select
+!irina 
+          !
+          ! subsidence
+          !
+!cgils          
     if (lstendflg) then
 
       do j=3,nyp-2
@@ -144,6 +158,10 @@ contains
           enddo
        enddo
     end if
+
+
+!cgils: Nudging
+    call nudge(time_in)
 
     
   end subroutine forcings

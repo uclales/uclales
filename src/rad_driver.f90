@@ -33,7 +33,9 @@ module radiation
 
   integer :: k,i,j, npts
   real    :: ee, u0, day, time, alat, zz
-
+  logical :: fixed_sun = .false.
+  real    :: radius = 1.03 
+!   real    :: radius = 1.
   contains
 
     subroutine d4stream(n1, n2, n3, alat, time, sknt, sfc_albedo, CCN, dn0, &
@@ -71,9 +73,11 @@ module radiation
       ! determine the solar geometery, as measured by u0, the cosine of the 
       ! solar zenith angle
       !
-      u0 = zenith(alat,time)
+      if (.not. fixed_sun) then
+        u0 = zenith(alat,time)
+      end if
     !cgils
-!       u0 = 1.
+      
       !
       ! call the radiation 
       !
@@ -93,7 +97,7 @@ module radiation
              !  pt(kk) = tk(k,i,j)
                ph(kk) = rv(k,i,j)
                plwc(kk) = 1000.*dn0(k)*max(0.,rc(k,i,j))
-               pre(kk)  = 1.e6*(plwc(kk)/(1000.*prw*CCN*dn0(k)))**(1./3.)
+               pre(kk)  = radius*1.e6*(plwc(kk)/(1000.*prw*CCN*dn0(k)))**(1./3.)
                if (plwc(kk).le.0.) pre(kk) = 0.
                if (present(rr)) then
                  prwc(kk) = 1000.*dn0(k)*rr(k,i,j)
@@ -102,7 +106,7 @@ module radiation
                end if
                if (present(ice)) then
                  piwc(kk) = 1000.*dn0(k)*ice(k,i,j)
-                 pde(kk)  = 1.e6*(piwc(kk)/(1000.*prw*nice(k,i,j)*dn0(k)))**(1./3.)
+                 pde(kk)  = radius* 1.e6*(piwc(kk)/(1000.*prw*nice(k,i,j)*dn0(k)))**(1./3.)
                else
                   piwc(kk) = 0.
                end if

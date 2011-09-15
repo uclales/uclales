@@ -79,7 +79,7 @@ contains
     use defs, only : SolarConstant
     use sgsm, only : csx, prndtl
     !irina
-    use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon
+    use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon, rh_srf, drag
     !use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon, sst
     use step, only : timmax, timrsm, istpfl, corflg, outflg, frqanl, frqhis,          &
          frqcross , strtim, radfrq, cntlat,& 
@@ -95,7 +95,8 @@ contains
          zrand
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
-    use modnudge, only : lnudge,tnudgefac
+    use radiation, only : u0, fixed_sun    
+    use modnudge, only : lnudge,tnudgefac, qfloor, zfloor
     use modtimedep, only : ltimedep
     use mcrp, only : microseq,lrandommicro,timenuc,nin_set,cloud_type
 
@@ -131,8 +132,9 @@ contains
          lsvarflg,                  & !irina:flag for time bvarying large scale forcing  
          lstendflg,                  & !irina:flag for time large scale advective tendencies  
          div,  &                       !irina: divergence
-         lnudge, tnudgefac, ltimedep, &             !thijs: Nudging
-         SolarConstant, & ! SolarConstant (In case of prescribed TOA radiation
+         lnudge, tnudgefac, ltimedep, qfloor, zfloor,  &             !thijs: Nudging
+         rh_srf, drag, &
+         SolarConstant,u0,fixed_sun, & ! SolarConstant (In case of prescribed TOA radiation
          lrandommicro, microseq,timenuc ,nin_set,cloud_type, &  !thijs: sequence of variables for microphysics
          lwaterbudget, &                 ! axel: flag for liquid water budget diagnostics (only level=3)
          lcouvreux , tau                     ! The Couvreux 'radioactive' scalar

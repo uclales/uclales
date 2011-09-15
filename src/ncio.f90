@@ -929,8 +929,8 @@ contains
        if (itype==0) ncinfo =  'Top of Atmosphere Longwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
-    case('lflxdt')
-       if (itype==0) ncinfo =  'Top of Atmosphere Longwave Radiative flux DW'
+    case('lflxutc')
+       if (itype==0) ncinfo =  'Clear AirTop of Atmosphere Longwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
     case('rflx2')
@@ -958,12 +958,16 @@ contains
        if (itype==0) ncinfo =  'Clear Air Shortwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-   case('sflxut')
+    case('sflxut')
        if (itype==0) ncinfo = 'Top of Atmosphere Shortwave radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
     case('sflxdt')
        if (itype==0) ncinfo = 'Top of Atmosphere Shortwave radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('sflxutc')
+       if (itype==0) ncinfo = 'Clear Air Top of Atmosphere Shortwave radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
     case('sflx2')

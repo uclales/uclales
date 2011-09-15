@@ -30,7 +30,7 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 45, nvar2 = 109 ! number of time series and profiles
+  integer, parameter :: nvar1 = 47, nvar2 = 113 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2, nv1=nvar1, nv2=nvar2
   real, save         :: fsttm, lsttm, nsmp = 0
 
@@ -48,7 +48,7 @@ module stat
        'CCN    ','nrain  ','nrcnt  ','zcmn   ','zbmn   ','tkeint ', & !25
        'lflxut ','lflxdt ','sflxut ','sflxdt ','thl_int','wvp_bar', & !31
        'wvp_var','iwp_bar','iwp_var','swp_bar','swp_var','gwp_bar', & !37
-       'gwp_var','hwp_bar','hwp_var'/),                             & !43
+       'gwp_var','hwp_bar','hwp_var','lflxutc','sflxutc'/),        & !43
        s2(nvar2)=(/                                                 &
        'time   ','zt     ','zm     ','dn0    ','u0     ','v0     ', & ! 1
        'fsttm  ','lsttm  ','nsmp   ','u      ','v      ','t      ', & ! 7
@@ -68,7 +68,7 @@ module stat
        'frc_ran','hst_srf','lflxu  ','lflxd  ','sflxu  ','sflxd  ',& !91
        'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel',& !97
        'rsup   ','prc_c  ','prc_i  ','prc_s  ','prc_g  ','prc_h  ',& !103
-       'hail   '/)                                                    !109
+       'hail   ','lwuca  ','lwdca  ','swuca  ','swdca  '/)           !109
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:), svctr(:,:), ssclr(:)
@@ -152,7 +152,7 @@ contains
   ! statistical quantities.  These are stored in two arrays:  SVCTR,
   ! and SSCLR (which accumulate scalar and vector statistics respectively
   !
-  subroutine statistics(time)
+  subroutine statistics(time,cntlat,sst)
 
 !irina
     use grid, only : a_up, a_vp, a_wp, liquid, a_theta, a_scr1, a_scr2       &
@@ -160,9 +160,10 @@ contains
          , vmean, dn0, prc_c,prc_g,prc_i,prc_r,prc_s, prc_h, a_rpp, a_npp, albedo, CCN, iradtyp, a_rflx    &
          , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa &
          , a_ricep, a_rsnowp, a_rgrp, a_rhailp, a_nicep, a_nsnowp, a_ngrp, a_nhailp &
-         , vapor
-
+         , vapor, a_lflxu_ca,a_lflxd_ca,a_sflxu_ca,a_sflxd_ca, a_pexnr, pi0, pi1 &
+          , lflxu_toa_ca, lflxd_toa_ca, sflxu_toa_ca, sflxd_toa_ca
     real, intent (in) :: time
+    real, intent (in),optional :: cntlat,sst
 
     if (nsmp == 0.) fsttm = time
     nsmp=nsmp+1.
@@ -184,8 +185,13 @@ contains
     end if
     if (iradtyp >2) then
        call accum_rad(nzp, nxp, nyp, a_rflx, sflx=a_sflx, alb=albedo,lflxu=a_lflxu,&
-       lflxd=a_lflxd,sflxu=a_sflxu, sflxd=a_sflxd,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
-       lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
+       lflxd=a_lflxd,sflxu=a_sflxu, sflxd=a_sflxd,lflxu_ca=a_lflxu_ca,&
+       lflxd_ca=a_lflxd_ca,sflxu_ca=a_sflxu_ca, sflxd_ca=a_sflxd_ca,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
+       lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa,sflxu_toa_ca=sflxu_toa_ca,sflxd_toa_ca=sflxd_toa_ca,&
+       lflxu_toa_ca=lflxu_toa_ca,lflxd_toa_ca=lflxd_toa_ca,dn0=dn0,dzt=dzi_t,pi0=pi0,&
+       pi1=pi1,sst=sst,time_in=time,vapor=vapor,radtyp=iradtyp,&
+       a_pexnr=a_pexnr,a_theta=a_theta,CCN=CCN,cntlat=cntlat)
+
     end if
 
     if (debug) WRITE (0,*) 'statistics: rad ok      myid=',myid
@@ -399,17 +405,22 @@ contains
   ! SUBROUTINE ACCUM_STAT: Accumulates various statistics over an 
   ! averaging period for radiation variables
   !
-  subroutine accum_rad(n1,n2,n3,rflx,sflx,alb,lflxu,lflxd,sflxu,sflxd,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa)
-
+  subroutine accum_rad(n1,n2,n3,rflx,sflx,alb,lflxu,lflxd,sflxu,sflxd,lflxu_ca,lflxd_ca,sflxu_ca,sflxd_ca,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa,sflxu_toa_ca,sflxd_toa_ca,lflxu_toa_ca,lflxd_toa_ca,dn0,dzt,pi0,pi1,sst,time_in,vapor,radtyp,a_pexnr,a_theta,CCN,cntlat)
+    use radiation, only : d4stream
     integer, intent (in) :: n1,n2,n3
     real, intent (in)    :: rflx(n1,n2,n3)
  !irina   
     real, optional, intent (in) :: sflx(n1,n2,n3), alb(n2,n3), lflxu(n1,n2,n3),&
-                                   lflxd(n1,n2,n3),sflxu(n1,n2,n3),sflxd(n1,n2,n3) ,&
-                                   sflxu_toa(n2,n3),sflxd_toa(n2,n3),lflxu_toa(n2,n3),lflxd_toa(n2,n3)
+                                   lflxd(n1,n2,n3),sflxu(n1,n2,n3),sflxd(n1,n2,n3), lflxu_ca(n1,n2,n3),&
+                                   lflxd_ca(n1,n2,n3),sflxu_ca(n1,n2,n3),sflxd_ca(n1,n2,n3) ,&
+                                   sflxu_toa(n2,n3),sflxd_toa(n2,n3),lflxu_toa(n2,n3),lflxd_toa(n2,n3),&
+                                   sflxu_toa_ca(n2,n3),sflxd_toa_ca(n2,n3),lflxu_toa_ca(n2,n3),lflxd_toa_ca(n2,n3),&
+                                   dn0(n1),dzt(n1),pi0(n1),pi1(n1),a_pexnr(n1,n2,n3),a_theta(n1,n2,n3),CCN,cntlat,sst,time_in,vapor(n1,n2,n3)
+   integer, optional,intent(in) :: radtyp
 
     integer :: k
-    real    :: a1(n1),a2(n1)
+    real    :: a1(n1),a2(n1),albedo(n2,n3)
+
 
     call get_avg3(n1,n2,n3,rflx,a1)
     call get_var3(n1,n2,n3,rflx,a1,a2)
@@ -455,14 +466,39 @@ contains
     if (present(lflxu_toa)) then
       ssclr(31) = get_avg(1,n2,n3,1,lflxu_toa)
     end if
-    if (present(lflxd_toa)) then
-      ssclr(32) = get_avg(1,n2,n3,1,lflxd_toa)
-    end if
     if (present(sflxu_toa)) then
-      ssclr(33) = get_avg(1,n2,n3,1,sflxu_toa)
+      ssclr(32) = get_avg(1,n2,n3,1,sflxu_toa)
     end if
-    if (present(sflxd_toa)) then
-      ssclr(34) = get_avg(1,n2,n3,1,sflxd_toa)
+
+    if (present(lflxu_toa_ca)) then
+      ssclr(33) = get_avg(1,n2,n3,1,lflxu_toa_ca)
+    end if
+    if (present(sflxu_toa_ca)) then
+      ssclr(34) = get_avg(1,n2,n3,1,sflxu_toa_ca)
+    end if
+    if (present(lflxu_ca)) then
+       call get_avg3(n1,n2,n3,lflxu_ca,a1)
+          do k=1,n1
+                svctr(k,98)=svctr(k,98) + a1(k)
+          end do
+    end if
+       if (present(lflxd_ca)) then
+          call get_avg3(n1,n2,n3,lflxd_ca,a1)
+          do k=1,n1
+                svctr(k,99)=svctr(k,99) + a1(k)
+          end do
+    end if
+        if (present(sflxu_ca)) then
+          call get_avg3(n1,n2,n3,sflxu_ca,a1)
+          do k=1,n1
+                svctr(k,100)=svctr(k,100) + a1(k)
+          end do
+    end if
+       if (present(sflxd_ca)) then
+          call get_avg3(n1,n2,n3,sflxd_ca,a1)
+          do k=1,n1
+                svctr(k,101)=svctr(k,101) + a1(k)
+          end do
     end if
 
   end subroutine accum_rad
