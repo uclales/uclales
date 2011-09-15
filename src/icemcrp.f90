@@ -210,8 +210,9 @@ contains
 
           prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)) * dt / 3.
 
-          if (debug.and.lwaterbudget) then
+          if (debug.and.lwaterbudget.and. .false.) then
              ! standard output of liquid water budget
+             ! (only useful if acc-variables are not set to zero in modcross)
              call calcintpath(a_rct,tmp)
              if (istep.le.1) then
                 rct_acc = - sum(tmp)*dt
