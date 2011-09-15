@@ -925,6 +925,10 @@ contains
        if (itype==0) ncinfo =  'Clear Air Longwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
+    case('lflxdt')
+       if (itype==0) ncinfo =  'Top of Atmosphere Longwave Radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
     case('lflxut')
        if (itype==0) ncinfo =  'Top of Atmosphere Longwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'

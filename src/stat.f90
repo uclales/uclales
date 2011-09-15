@@ -466,38 +466,44 @@ contains
     if (present(lflxu_toa)) then
       ssclr(31) = get_avg(1,n2,n3,1,lflxu_toa)
     end if
+    if (present(lflxd_toa)) then
+      ssclr(32) = get_avg(1,n2,n3,1,lflxd_toa)
+    end if
     if (present(sflxu_toa)) then
-      ssclr(32) = get_avg(1,n2,n3,1,sflxu_toa)
+      ssclr(33) = get_avg(1,n2,n3,1,sflxu_toa)
+    end if
+    if (present(sflxd_toa)) then
+      ssclr(34) = get_avg(1,n2,n3,1,sflxd_toa)
     end if
 
     if (present(lflxu_toa_ca)) then
-      ssclr(33) = get_avg(1,n2,n3,1,lflxu_toa_ca)
+      ssclr(46) = get_avg(1,n2,n3,1,lflxu_toa_ca)
     end if
     if (present(sflxu_toa_ca)) then
-      ssclr(34) = get_avg(1,n2,n3,1,sflxu_toa_ca)
+      ssclr(47) = get_avg(1,n2,n3,1,sflxu_toa_ca)
     end if
     if (present(lflxu_ca)) then
        call get_avg3(n1,n2,n3,lflxu_ca,a1)
           do k=1,n1
-                svctr(k,98)=svctr(k,98) + a1(k)
+                svctr(k,110)=svctr(k,110) + a1(k)
           end do
     end if
        if (present(lflxd_ca)) then
           call get_avg3(n1,n2,n3,lflxd_ca,a1)
           do k=1,n1
-                svctr(k,99)=svctr(k,99) + a1(k)
+                svctr(k,111)=svctr(k,111) + a1(k)
           end do
     end if
         if (present(sflxu_ca)) then
           call get_avg3(n1,n2,n3,sflxu_ca,a1)
           do k=1,n1
-                svctr(k,100)=svctr(k,100) + a1(k)
+                svctr(k,112)=svctr(k,112) + a1(k)
           end do
     end if
        if (present(sflxd_ca)) then
           call get_avg3(n1,n2,n3,sflxd_ca,a1)
           do k=1,n1
-                svctr(k,101)=svctr(k,101) + a1(k)
+                svctr(k,113)=svctr(k,113) + a1(k)
           end do
     end if
 
