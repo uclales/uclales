@@ -124,7 +124,7 @@ contains
     lwnudge = any(abs(wnudge)>1e-8)
     lthlnudge = any(abs(thlnudge)>1e-8)
     lqtnudge  = any(abs(qtnudge)>1e-8)
-
+   
   end subroutine initnudge
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -162,11 +162,11 @@ contains
     call get_avg3(nzp, nxp, nyp,a_vp,vav)
     call get_avg3(nzp, nxp, nyp,a_tp,tav)
     call get_avg3(nzp, nxp, nyp,a_rp,qav)
-    
+
     do j=3,nyp-2
     do i=3,nxp-2
     do k=2,nzp-1
-
+     currtnudge = max(dt,tnudge(k,t)*dtp+tnudge(k,t+1)*dtm)
       if(lunudge  ) a_ut(k,i,j)=a_ut(k,i,j)-&
           (uav(k)-(unudge  (k,t)*dtp+unudge  (k,t+1)*dtm))/currtnudge
       if(lvnudge  ) a_vt(k,i,j)=a_vt(k,i,j)-&
@@ -187,7 +187,7 @@ contains
         else
           nudgefac = qtnudge  (k,t)*dtp+qtnudge  (k,t+1)*dtm
         end if
-        a_rt(k,i,j)=- (qav(k)-nudgefac)/currtnudge
+        a_rt(k,i,j)= a_rt(k,i,j) - (qav(k)-nudgefac)/currtnudge
       end if
     end do
     end do
