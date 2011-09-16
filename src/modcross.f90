@@ -550,7 +550,7 @@ contains
   
   subroutine exitcross
     use modnetcdf, only : close_nc
-    call close_nc(nccrossid)
+    if (lcross) call close_nc(nccrossid)
   end subroutine exitcross
 
   subroutine calcintpath(varin, varout)
