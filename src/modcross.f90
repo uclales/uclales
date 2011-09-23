@@ -22,18 +22,20 @@ implicit none
   logical            :: lcross = .false., ldocross, lxy = .false., lxz = .false., lyz = .false.
   real               :: dtcross = 60, xcross = 0., ycross = 0., zcross = 0.
   integer            :: icross,jcross,kcross
-  real               :: threstracer = 2
+  real               :: threstracer = 1.5
+  real               :: thres_rw    = 1.e-8
   integer :: ncross = 0
   character(len=7), allocatable, dimension(:) :: crossname
-  integer, parameter :: nvar_all = 34
+  integer, parameter :: nvar_all = 37
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
          'l      ','rp     ','np     ','ricep  ','nicep  ', & !6-10
          'rsnowp ','rgrpp  ','nsnowp ','ngrpp  ','rhailp ', & !11-15
          'nhailp ','lwp    ','rwp    ','iwp    ','swp    ', & !16-20
          'gwp    ','hwp    ','prc_acc','cnd_acc','cev_acc', & !21-25
-         'rev_acc','cldbase','cldtop ','clddept','tracer ', & !26-30
-         'trcpath','trcbase','trctop ','trcdept'/)           !31-34
+         'rev_acc','cldbase','cldtop ','clddept','cldbase', & !26-30
+         'cldtop ','clddept','tracer ','trcpath','trcbase', & !31-35
+         'trctop ','trcdept'/)                                !36-37
   integer :: nccrossid, nccrossrec, nvar
   
   interface writecross
@@ -242,6 +244,18 @@ contains
         if (level < 2) return
         longname = 'Cloud depth'
         unit = 'm'          
+      case ('rwpbase')
+        if (level < 2) return
+        longname = 'Rain base height'
+        unit = 'm'          
+      case ('rwptop')
+        if (level < 2) return
+        longname = 'Rain top height'
+        unit = 'm'          
+      case ('rwpdept')
+        if (level < 2) return
+        longname = 'Rain depth'
+        unit = 'm'          
       case ('trcpath')
         if (.not.lcouvreux) return
         longname = 'Tracer path'
@@ -447,7 +461,7 @@ contains
         call calcintpath(liquid, tmp)
         call writecross(crossname(n), tmp)
       case('rwp')
-        call calcintpath(a_rpp, tmp)
+        call calcintpath(a_rpp, tmp, thres_rw)
         call writecross(crossname(n), tmp)
       case('iwp')
         call calcintpath(a_ricep, tmp)
@@ -485,6 +499,15 @@ contains
         call writecross(crossname(n), tmp)
       case ('clddept')
         call calcdepth(liquid, tmp)
+        call writecross(crossname(n), tmp)
+      case ('rwpbase')
+        call calcbase(liquid, tmp, thres_rw)
+        call writecross(crossname(n), tmp)
+      case ('rwptop')
+        call calctop(liquid, tmp, thres_rw)
+        call writecross(crossname(n), tmp)
+      case ('rwpdept')
+        call calcdepth(liquid, tmp, thres_rw)
         call writecross(crossname(n), tmp)
       case('trcpath')
         call calcintpath(tracer, tmp)
@@ -553,34 +576,50 @@ contains
     call close_nc(nccrossid)
   end subroutine exitcross
 
-  subroutine calcintpath(varin, varout)
+  subroutine calcintpath(varin, varout, threshold)
     use modnetcdf, only : fillvalue_double
     use grid, only : nzp, nxp, nyp, dn0, zm
     real, intent(in), dimension(:,:,:) :: varin
     real, intent(out), dimension(3:,3:)  :: varout
+    real, intent(in), optional :: threshold
     integer :: i, j, k, km1
+    real :: thres
     varout = 0.
+    if (present(threshold)) then
+      thres = threshold
+    else
+      thres = 0.0
+    end if
     do j=3,nyp-2
       do i=3,nxp-2
         do k=2,nzp-1
           km1=max(1,k-1)
-          varout(i,j) = varout(i,j)+varin(k,i,j)*(zm(k)-zm(km1))*dn0(k)
+          if (varin(k,i,j) > thres) then
+            varout(i,j) = varout(i,j)+varin(k,i,j)*(zm(k)-zm(km1))*dn0(k)
+          end if
         enddo
       end do
     end do
   end subroutine calcintpath
 
-  subroutine calcbase(varin, varout)
+  subroutine calcbase(varin, varout, threshold)
     use grid, only : nzp, nxp, nyp, zt
     use modnetcdf, only : fillvalue_double
     real, intent(in), dimension(:,:,:) :: varin
     real, intent(out), dimension(3:,3:)  :: varout
+    real, intent(in), optional :: threshold
     integer :: i, j, k, km1
+    real :: thres
     varout = fillvalue_double
+    if (present(threshold)) then
+      thres = threshold
+    else
+      thres = 0.0
+    end if
     do j = 3, nyp - 2
       do i = 3, nxp - 2
         base:do k = 2, nzp - 1
-          if (varin(k,i,j) > 0.) then
+          if (varin(k,i,j) > thres) then
             varout(i,j) = zt(k)
             exit base
           end if
@@ -589,17 +628,24 @@ contains
     end do
   end subroutine calcbase
   
-  subroutine calctop(varin, varout)
+  subroutine calctop(varin, varout, threshold)
     use grid, only : nzp, nxp, nyp, zt
     use modnetcdf, only : fillvalue_double
     real, intent(in), dimension(:,:,:) :: varin
     real, intent(out), dimension(3:,3:)  :: varout
+    real, intent(in), optional :: threshold
     integer :: i, j, k, km1
+    real :: thres
     varout = fillvalue_double
+    if (present(threshold)) then
+      thres = threshold
+    else
+      thres = 0.0
+    end if
     do j = 3, nyp - 2
       do i = 3, nxp - 2
         top:do k = nzp - 1, 2, -1
-          if (varin(k,i,j) > 0.) then
+          if (varin(k,i,j) > thres) then
             varout(i,j) = zt(k)
             exit top
           end if
@@ -608,18 +654,25 @@ contains
     end do
   end subroutine calctop
   
-  subroutine calcdepth(varin, varout)
+  subroutine calcdepth(varin, varout, threshold)
     use grid, only : nzp, nxp, nyp, zm
     use modnetcdf, only : fillvalue_double
     real, intent(in), dimension(:,:,:) :: varin
     real, intent(out), dimension(3:,3:)  :: varout
+    real, intent(in), optional :: threshold
     integer :: i, j, k, km1
+    real :: thres
     varout = 0.
+    if (present(threshold)) then
+      thres = threshold
+    else
+      thres = 0.0
+    end if
     do j = 3, nyp - 2
       do i = 3, nxp - 2
         do k = 2, nzp - 1
           km1=max(1,k-1)
-          if (varin(k,i,j) > 0.) then
+          if (varin(k,i,j) > thres) then
             varout(i,j) = varout(i,j) + zm(k)-zm(k-1)
           end if
         end do
