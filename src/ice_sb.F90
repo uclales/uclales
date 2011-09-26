@@ -14451,8 +14451,12 @@ CONTAINS
                 tau_h_i  = zdt/qvsidiff*dep_hail(i,j,k)
                 
                 Xi_i = ( tau_i_i + tau_s_i + tau_g_i + tau_h_i ) 
-             
-                Xfac =  qvsidiff / Xi_i * (1.0 - EXP(- dt_local*Xi_i))
+                
+                if (Xi_i.lt.eps) then
+                 Xfac=0.d0
+                else
+                 Xfac =  qvsidiff / Xi_i * (1.0 - EXP(- dt_local*Xi_i))
+                end if
                 
                 dep_ice(i,j,k)     = Xfac * tau_i_i
                 dep_snow(i,j,k)    = Xfac * tau_s_i
