@@ -47,7 +47,8 @@ module grid
   integer           :: iradtyp = 0         ! radiation model type
   integer           :: level   = 0         ! thermodynamic level
   integer           :: naddsc  = 0         ! number of additional scalars
-  logical           :: lwaterbudget        ! switch for liquid water budget diagnostics
+
+  logical           :: lwaterbudget = .false.  ! switch for liquid water budget diagnostics
 
   integer           :: nfpt = 10           ! number of rayleigh friction points
   real              :: distim = 300.0      ! dissipation timescale
@@ -253,8 +254,7 @@ contains
       ! for liquid water budget and precipitation efficiency diagnostic
       a_cld=>a_xp(:,:,:,8)
       a_cld(:,:,:) = 0.
-      allocate (prc_acc(nxp,nyp),cnd_acc(nxp,nyp),cev_acc(nxp,nyp),rev_acc(nxp,nyp))
-      prc_acc(:,:) = 0.   ! accumulated precipitation                [kg/m2]
+      allocate (cnd_acc(nxp,nyp),cev_acc(nxp,nyp),rev_acc(nxp,nyp))
       cnd_acc(:,:) = 0.   ! accumulated condensation                 [kg/m2]
       cev_acc(:,:) = 0.   ! accumulated evaporation of cloud water   [kg/m2]
       rev_acc(:,:) = 0.   ! accumulated evaporation of raindwater    [kg/m2]
