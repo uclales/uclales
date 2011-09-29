@@ -22,7 +22,7 @@ implicit none
   logical            :: lcross = .false., ldocross, lxy = .false., lxz = .false., lyz = .false.
   real               :: dtcross = 60, xcross = 0., ycross = 0., zcross = 0.
   integer            :: icross,jcross,kcross
-  real               :: threstracer = 1.5
+  real               :: threstracer = 2
   real               :: thres_rw    = 1.e-8
   integer :: ncross = 0
   character(len=7), allocatable, dimension(:) :: crossname
@@ -33,8 +33,8 @@ implicit none
          'rsnowp ','rgrpp  ','nsnowp ','ngrpp  ','rhailp ', & !11-15
          'nhailp ','lwp    ','rwp    ','iwp    ','swp    ', & !16-20
          'gwp    ','hwp    ','prc_acc','cnd_acc','cev_acc', & !21-25
-         'rev_acc','cldbase','cldtop ','clddept','cldbase', & !26-30
-         'cldtop ','clddept','tracer ','trcpath','trcbase', & !31-35
+         'rev_acc','cldbase','cldtop ','clddept','rwpbase', & !26-30
+         'rwptop ','rwpdept','tracer ','trcpath','trcbase', & !31-35
          'trctop ','trcdept'/)                                !36-37
   integer :: nccrossid, nccrossrec, nvar
   
