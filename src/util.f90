@@ -265,21 +265,30 @@ contains
   !
   subroutine get_var3(n1,n2,n3,a,b,avg)
 
-    integer n1,n2,n3,k,i,j
-    real a(n1,n2,n3),b(n1),avg(n1),x
 
-    do k=1,n1
-       avg(k) = 0.
-    end do
-    x = 1./real((n3-4)*(n2-4))
+    use mpi_interface, only : nypg,nxpg,double_array_par_sum
 
+    integer,intent(in) :: n1,n2,n3
+    real,intent(in) :: a(n1,n2,n3)
+    real,intent(in) :: b(n1)
+    real,intent(out) :: avg(n1)
+
+    integer      :: k,i,j
+    real(kind=8) :: lavg(n1),gavg(n1),x
+
+    x = 1./(real(nypg-4)*real(nxpg-4))
+    gavg(:) = 0.
     do j=3,n3-2
        do i=3,n2-2
           do k=1,n1
-             avg(k)=avg(k)+((a(k,i,j)-b(k))**2 )*x
+             gavg(k)=gavg(k)+(a(k,i,j)-b(k))**2
           end do
-       enddo
-    enddo
+       end do
+    end do
+    lavg = gavg
+    call double_array_par_sum(lavg,gavg,n1)
+    avg(:) = real(gavg(:) * x)
+
 
   end subroutine get_var3
   ! 
