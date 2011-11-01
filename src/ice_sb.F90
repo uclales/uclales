@@ -12368,8 +12368,11 @@ CONTAINS
             d_trenn = dmin_wetgrowth_graupel(p_a,T_a,qw_a,qi_a)
 
             !.. Bereich im Graupelspektrum mit D > d_trenn wird zu Hagel:
-            xmin = (d_trenn/graupel%a_geo)**(1.0d0/graupel%b_geo)
-
+            if (d_trenn.gt.0) then
+             xmin = (d_trenn/graupel%a_geo)**(1.0d0/graupel%b_geo)
+            else
+             xmin=0.
+            end if
 ! UB_20081202>>            IF (xmin > graupel%x_min .AND. d_trenn < 10.0d0 * D_g) THEN
             IF (xmin > eps2 .AND. d_trenn < 10.0d0 * D_g) THEN
 
@@ -12487,8 +12490,11 @@ CONTAINS
             d_trenn = dmin_wg_gr_ltab_equi(p_a,T_a,qw_a,qi_a,ltabdminwgg)
 
             !.. Bereich im Graupelspektrum mit D > d_trenn wird zu Hagel:
+            if (d_trenn.gt.0) then
             xmin = (d_trenn/graupel%a_geo)**(1.0d0/graupel%b_geo)
-
+            else
+            xmin=0.0
+            end if
 ! UB_20081202            IF (xmin > graupel%x_min .AND. d_trenn < 10.0d0 * D_g) THEN
             IF (xmin > eps2 .AND. d_trenn < 10.0d0 * D_g) THEN
 

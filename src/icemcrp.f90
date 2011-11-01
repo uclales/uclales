@@ -3384,7 +3384,7 @@ contains
       DO i=3,ie-2
         IF (ANY(qh(1:ke,j,i).gt.0.0)) THEN
           DO ii=1,ntsedi
-            call sedimentation (ke,phail,qh(1:ke,j,i),qnh(1:ke,j,i),rrate = prec_g(1:ke,j,i),dtopt=dt/ntsedi)
+            call sedimentation (ke,phail,qh(1:ke,j,i),qnh(1:ke,j,i),rrate = prec_h(1:ke,j,i),dtopt=dt/ntsedi)
           end do
         ENDIF
       end do
