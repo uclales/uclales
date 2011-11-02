@@ -64,7 +64,8 @@ contains
     select case(isfctyp)
 
        !
-       ! set surface gradients
+       ! use prescribed surface gradients dthcon, drton from NAMELIST
+       ! use then similarity theory to compute the fluxes 
        !
     case(1)
        call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,a_up,a_vp,umean,vmean)
@@ -74,22 +75,21 @@ contains
              drdz(i,j)=drtcon
           end do
        end do
-       zs = zt(2)/zrough
+       zs = zrough
        call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,drdz,a_ustar,a_tstar     &
             ,a_rstar)
        call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,a_rstar  &
             ,uw_sfc,vw_sfc,wt_sfc,wq_sfc,ww_sfc)
 
        !
-       ! get fluxes from profiles
+       ! use prescribed SST and assume qsurf=qsat (i.e. ocean) to compute
+       ! gradients. Then use similarity theory to predict the fluxes. 
        !
     case(2)
        call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,a_up,a_vp,umean,vmean)
        usum = 0.
        do j=3,nyp-2
           do i=3,nxp-2
-!irina
- !      print *,'input sf fluxes',i,j,a_theta(2,i,j),vapor(2,i,j), sst, rslf(psrf,sst), wspd(i,j)
              dtdz(i,j) = a_theta(2,i,j) - sst*(p00/psrf)**rcp
              drdz(i,j) = vapor(2,i,j) - rslf(psrf,sst)
              bfct(i,j) = g*zt(2)/(a_theta(2,i,j)*wspd(i,j)**2)
@@ -97,7 +97,7 @@ contains
           end do
        end do
        usum = max(ubmin,usum/float((nxp-4)*(nyp-4)))
-       zs = (zrough/100.)
+       zs = zrough
        if (zrough <= 0.) zs = max(0.0001,(0.016/g)*usum**2)
        call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,drdz,a_ustar,a_tstar     &
             ,a_rstar)
@@ -105,7 +105,9 @@ contains
             ,uw_sfc,vw_sfc,wt_sfc,wq_sfc,ww_sfc)
        !
        ! get fluxes from bulk formulae with coefficients given by dthcon and
-       ! drtcon
+       ! drtcon (wq=Ch*u*dth, Garrat p.55) and using prescribed sst 
+       !  and qsurf=qsat (ocean); note that here zrough is not the roughness
+       ! length but the drag coefficient
        !
    case(3)
        call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,a_up,a_vp,umean,vmean)
@@ -132,6 +134,7 @@ contains
             ,uw_sfc,vw_sfc,wt_sfc,wq_sfc,ww_sfc)
        !
        ! fix surface temperature to yield a constant surface buoyancy flux
+       ! dthcon
        !
    case(4)
 
@@ -177,53 +180,9 @@ contains
              a_tstar(i,j) = wt_sfc(i,j)/a_ustar(i,j)
           end do
        end do   
-case(5)
-       Vbulk = 0.01
-
-       bfl(:) = 0.
-       do j=3,nyp-2
-          do i=3,nxp-2
-             bfl(1) = bfl(1)+a_theta(2,i,j)
-             bfl(2) = bfl(2)+vapor(2,i,j)
-          end do
-       end do
-       call double_array_par_sum(bfl,bfg,2)
-
-       bfg(2) = bfg(2)/real((nxpg-4)*(nypg-4))
-       bfg(1) = bfg(1)/real((nxpg-4)*(nypg-4))
-       sst=289.
-       iterate=0
-       bflx0=0.0007
-       bflx=g/bfg(1)*Vbulk*((sst-bfg(1))+ep2*bfg(1)*(rslf(psrf,sst)-bfg(2)))
-       do while (abs(bflx-bflx0)>0.00001.and.iterate<800)
-        sst=sst+0.01
-        bflx=g/bfg(1)*Vbulk*((sst-bfg(1))+ep2*bfg(1)*(rslf(psrf,sst)-bfg(2)))
-        iterate=iterate+1
-       end do
-       if (iterate.eq.799) print*,'WARNING'
-       if (sst.lt.289) print*,'WRONG SST'
-       do j=3,nyp-2
-          do i=3,nxp-2
-             wt_sfc(i,j) = Vbulk * (sst -a_theta(2,i,j))
-             wq_sfc(i,j) = Vbulk * (rslf(psrf,sst) - vapor(2,i,j))
-             wspd(i,j)    = max(0.1,                                    &
-                  sqrt((a_up(2,i,j)+umean)**2+(a_vp(2,i,j)+vmean)**2))
-             bflx         = wt_sfc(i,j)*g/bfg(1) + g*ep2*wq_sfc(i,j)
-             a_ustar(i,j) = diag_ustar(zt(2),zrough,bflx,wspd(i,j))
-             uw_sfc(i,j)  = -a_ustar(i,j)*a_ustar(i,j)                  &
-                  *(a_up(2,i,j)+umean)/wspd(i,j)
-             vw_sfc(i,j)  = -a_ustar(i,j)*a_ustar(i,j)                  &
-                  *(a_vp(2,i,j)+vmean)/wspd(i,j)
-             ww_sfc(i,j)  = 0.
-             a_rstar(i,j) = wq_sfc(i,j)/a_ustar(i,j)
-             a_tstar(i,j) = wt_sfc(i,j)/a_ustar(i,j)
-          end do
-       end do   
-
-
        !
        ! fix thermodynamic fluxes at surface given values in energetic 
-       ! units and calculate  momentum fluxes from winds
+       ! units and calculate  momentum fluxes from similarity theory
        !
     case default
        ffact = 1.
@@ -238,7 +197,7 @@ case(5)
              end do
           end do
           usum = max(ubmin,usum/float((nxp-4)*(nyp-4)))
-          zs = max(0.0001,(0.016/g)*usum**2)
+          zs = max(0.0001,(0.016/g)*usum**2) !Charnock for flow over sea
        else
           zs = zrough
        end if
@@ -262,8 +221,8 @@ case(5)
              uw_sfc(i,j)  = -ffact*(a_up(2,i,j)+umean)
              vw_sfc(i,j)  = -ffact*(a_vp(2,i,j)+vmean)
              ww_sfc(i,j)  = 0.
-             a_rstar(i,j) = wq_sfc(i,j)/a_ustar(i,j)
-             a_tstar(i,j) = wt_sfc(i,j)/a_ustar(i,j)
+             a_rstar(i,j) = -wq_sfc(i,j)/a_ustar(i,j)
+             a_tstar(i,j) = -wt_sfc(i,j)/a_ustar(i,j)
           end do
        end do
 
@@ -412,26 +371,22 @@ case(5)
        do i=3,n2-2
           dtv = dth(i,j) + ep2*th00*drt(i,j)
           !
-          ! stable case
+          ! stable case  ! Stable case is not tested!!
           !
           if (dtv > 0.) then
-             x     = (betg*u(i,j)**2)/dtv
-             y     = (am - 0.5*x)/lnz
-             x     = (x*ah - am**2)/(lnz**2)
+             x     = pr*(betg*u(i,j)**2)/dtv
+             y     = (am*z - 0.5*x)/lnz
+             x     = (x*ah*z - am**2*z*z)/(lnz**2)
              lmo   = -y + sqrt(x+y**2)
              zeta  = z/lmo
              ustar(i,j) =  vonk*u(i,j)  /(lnz + am*zeta)
              tstar(i,j) = (vonk*dtv/(lnz + ah*zeta))/pr
-!irina
- !            print *,"stable", i,j, ustar(i,j), tstar(i,j), (lnz + am*zeta), (lnz + ah*zeta), pr
              !
              ! Neutral case
              ! 
           elseif (dtv == 0.) then
              ustar =  vonk*u(i,j)  /lnz
              tstar =  vonk*dtv/(pr*lnz)
-!irina
- !            print *,"neutral", i,j, ustar, tstar, lnz , pr
              !
              ! ustable case, start iterations from values at previous tstep, 
              ! unless the sign has changed or if it is the first call, then 
@@ -441,8 +396,6 @@ case(5)
              if (first_call .or. tstar(i,j)*dtv <= 0.) then
                 ustar(i,j) = u(i,j)*klnz
                 tstar(i,j) = (dtv*klnz/pr)
-!irina
- !            print *,"unstable", i,j, ustar(i,j), tstar(i,j),klnz,pr
              end if
 
              do iterate = 1,3
@@ -451,13 +404,11 @@ case(5)
                 x     = sqrt( sqrt( 1.0 - bm*zeta ) )
                 psi1  = 2.*log(1.0+x) + log(1.0+x*x) - 2.*atan(x) + cnst1
                 y     = sqrt(1.0 - bh*zeta)
-                psi2  = log(1.0 + y) + cnst2
+                psi2  = 2.*log(1.0 + y) +2.*cnst2
                 ustar(i,j) = u(i,j)*vonk/(lnz - psi1)
                 tstar(i,j) = (dtv*vonk/pr)/(lnz - psi2)
              end do
           end if
-!irina
- !            print *,"finval", i,j, ustar(i,j), tstar(i,j), (lnz - psi1), (lnz - psi2)
 
           rstar(i,j) = tstar(i,j)*drt(i,j)/(dtv + eps)
           tstar(i,j) = tstar(i,j)*dth(i,j)/(dtv + eps)
