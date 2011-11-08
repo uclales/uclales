@@ -66,7 +66,7 @@ contains
       kcross = k
     end if
     if (lxz) then
-      if (ycross < ym(3) .or. ycross >= ym(nyp - 1)) then
+      if (ycross < ym(2) .or. ycross >= ym(nyp - 2)) then
         lxz = .false.
       else
         do j=3,nyp-2
@@ -76,7 +76,7 @@ contains
       end if
     end if
     if (lyz) then
-      if (xcross < xm(3) .or. xcross >= xm(nxp - 1)) then
+      if (xcross < xm(2) .or. xcross >= xm(nxp - 2)) then
         lyz = .false.
       else
         do i=3,nxp-2
@@ -85,14 +85,12 @@ contains
         icross = i
       end if
     end if
-
 !     if (.not.(lxy .or. lxz .or. lyz)) lcross = .false.
     if (lcross) call open_nc(trim(expname)//'.out.cross.'//cmpicoordx//'.'//cmpicoordy//'.nc', nccrossid, nccrossrec, rtimee)
   
     do n=1,nvar_all
       call addcross(crossvars(n))
     end do
-
   end subroutine initcross
 
   subroutine addcross(name)
@@ -112,7 +110,7 @@ contains
     real, allocatable, dimension(:,:) :: dimvalues
     integer, dimension(3)             :: loc, dimsize
     integer :: n
-
+    logical :: ldoxy, ldoxz, ldoyz
     if (lcross) then
       loc = (/ictr, ictr, ictr/)
       unit = 'kg/kg'
@@ -122,92 +120,181 @@ contains
           loc = (/ictr, ihlf, ictr/)
           longname =  'Zonal wind'
           unit = 'm/s'
+          ldoxz = lxz
+          ldoyz = lyz
+          ldoxy = lxy
         case('v')
           loc = (/ictr, ictr, ihlf/)
           longname =  'Meridional wind'
           unit = 'm/s'
+          ldoxz = lxz
+          ldoyz = lyz
+          ldoxy = lxy
         case('w')
           loc = (/ihlf, ictr, ictr/)
           longname =  'Meridional wind'
           unit = 'm/s'
+          ldoxz = lxz
+          ldoyz = lyz
+          ldoxy = lxy
         case('t')
           longname =  'Liquid water potential temperature'
           unit = 'K'
+          ldoxz = lxz
+          ldoyz = lyz
+          ldoxy = lxy
         case('r')
           if (level < 1) return
           longname =  'Total water content'
+          ldoxz = lxz
+          ldoyz = lyz
+          ldoxy = lxy
         case('l')
           if (level < 2) return
           longname =  'Liquid water content'
+          ldoxz = lxz
+          ldoyz = lyz
+          ldoxy = lxy
         case('rp')
           if (level < 3) return
           longname =  'Rain water content'
+          ldoxz = lxz
+          ldoyz = lyz
+          ldoxy = lxy
         case('np')
           if (level < 3) return
           longname =  'Rain water number density'
+          ldoxz = lxz
+          ldoyz = lyz
+          ldoxy = lxy
         case('ricep')
           if (level < 4) return
           longname =  'Cloud ice content'
+          ldoxz = lxz
+          ldoyz = lyz
+          ldoxy = lxy
         case('nicep')
           if (level < 4) return
           longname =  'Cloud ice number density'
+          ldoxz = lxz
+          ldoyz = lyz
+          ldoxy = lxy
         case('rsnowp')
           if (level < 4) return
           longname =  'Snow content'
+          ldoxz = lxz
+          ldoyz = lyz
+          ldoxy = lxy
         case('nsnowp')
           if (level < 5) return
           longname =  'Snow number density'
+          ldoxz = lxz
+          ldoyz = lyz
+          ldoxy = lxy
         case('rgrpp')
           if (level < 4) return
           longname =  'Graupel content'
+          ldoxz = lxz
+          ldoyz = lyz
+          ldoxy = lxy
         case('ngrpp')
           if (level < 5) return
           longname =  'Graupel number density'
+          ldoxz = lxz
+          ldoyz = lyz
+          ldoxy = lxy
         case('rhailp')
           if (level < 5) return
           longname =  'Hail content'
+          ldoxz = lxz
+          ldoyz = lyz
+          ldoxy = lxy
         case('nhailp')
           if (level < 5) return
           longname =  'Hail number density'
+          ldoxz = lxz
+          ldoyz = lyz
+          ldoxy = lxy
         case('lwp')
           if (level < 2) return
           longname = 'Liquid water path'
           unit = 'kg/m2'
+          ldoxz = .false.
+          ldoyz = .false.
+          ldoxy = lxy
+          if (.not. ldoxy) return
         case('rwp')
           if (level < 3) return
           longname = 'Rain water path'
           unit = 'kg/m2'
+          ldoxz = .false.
+          ldoyz = .false.
+          ldoxy = lxy
+          if (.not. ldoxy) return
         case('iwp')
           if (level < 4) return
           longname = 'Ice water path'
           unit = 'kg/m2'
+          ldoxz = .false.
+          ldoyz = .false.
+          ldoxy = lxy
+          if (.not. ldoxy) return
         case('swp')
           if (level < 4) return
           longname = 'Snow water path'
           unit = 'kg/m2'
+          ldoxz = .false.
+          ldoyz = .false.
+          ldoxy = lxy
+          if (.not. ldoxy) return
         case('gwp')
           if (level < 4) return
           longname = 'Graupel water path'
           unit = 'kg/m2'
+          ldoxz = .false.
+          ldoyz = .false.
+          ldoxy = lxy
+          if (.not. ldoxy) return
         case('hwp')
           if (level < 5) return
           longname = 'Hail water path'
           unit = 'kg/m2'
+          ldoxz = .false.
+          ldoyz = .false.
+          ldoxy = lxy
+          if (.not. ldoxy) return
         case ('prc_acc')
+          if (.not.lwaterbudget) return
           longname = 'acc. precip'
           unit = 'kg/m2'
+          ldoxz = .false.
+          ldoyz = .false.
+          ldoxy = lxy
+          if (.not. ldoxy) return
         case ('cnd_acc')
           if (.not.lwaterbudget) return
           longname = 'acc. condensation'
           unit = 'kg/m2'          
+          ldoxz = .false.
+          ldoyz = .false.
+          ldoxy = lxy
+          if (.not. ldoxy) return
         case ('cev_acc')
           if (.not.lwaterbudget) return
           longname = 'acc. evaporation of cloud water'
           unit = 'kg/m2'          
+          ldoxz = .false.
+          ldoyz = .false.
+          ldoxy = lxy
+          if (.not. ldoxy) return
         case ('rev_acc')
           if (.not.lwaterbudget) return
           longname = 'acc. evaporation of rain water'
           unit = 'kg/m2'          
+          ldoxz = .false.
+          ldoyz = .false.
+          ldoxy = lxy
+          if (.not. ldoxy) return
         case default
           return
         end select
@@ -217,8 +304,6 @@ contains
         deallocate(crossname)
       end if
       ncross   = ncross + 1
-
-
       allocate(crossname(ncross))
       if (ncross > 1) crossname(1:ncross-1) = ctmp
       crossname(ncross)     = name
@@ -230,7 +315,7 @@ contains
       dimsize    = 0
       dimvalues  = 0
 
-      if (lxz) then
+      if (ldoxz) then
         dimunit(1) = zunit
         dimunit(2) = xunit
         dimsize(1) = nzp - 2
@@ -257,7 +342,7 @@ contains
         unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
         crossname(ncross) = name
       end if
-      if (lyz) then
+      if (ldoyz) then
         dimunit(1) = zunit
         dimunit(2) = yunit
         dimsize(1) = nzp - 2
@@ -285,7 +370,7 @@ contains
         crossname(ncross) = name
       end if
       
-      if (lxy) then
+      if (ldoxy) then
         dimunit(1) = xunit
         dimunit(2) = yunit
         dimsize(1) = nxp - 4
@@ -324,7 +409,6 @@ contains
     real, intent(in) :: rtimee
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
     integer :: n
-    
     if (.not. lcross) return
     call writevar_nc(nccrossid, tname, rtimee, nccrossrec)
     do n = 1, ncross
@@ -441,6 +525,7 @@ contains
 
     character(*), intent(in)                :: crossname
     real, dimension(:,:), intent(in) :: am
+    print *, crossname
     call writevar_nc(nccrossid, trim(crossname)//'xy', am, nccrossrec)
 
   end subroutine writecross_2D
