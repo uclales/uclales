@@ -101,8 +101,11 @@ contains
             ,a_rstar,obl)
        call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,a_rstar  &
             ,uw_sfc,vw_sfc,wt_sfc,wq_sfc,ww_sfc)
+<<<<<<< HEAD
 	print*,wt_sfc(55,3),wq_sfc(55,3)
 	
+=======
+>>>>>>> 94e7c77567bd0739dfe62a6710bc9f5f62927627
 
   !
   ! ----------------------------------------------------------------------
@@ -235,8 +238,13 @@ contains
    case(6)
 
        !roughness length for momentum and heat (future: from NAMELIST)
+<<<<<<< HEAD
        z0m(:,:) = 0.1
        z0h(:,:) = 0.1
+=======
+       z0m(:,:) = 0.01
+       z0h(:,:) = 0.01
+>>>>>>> 94e7c77567bd0739dfe62a6710bc9f5f62927627
        zs = zrough
 
        do j=3,nyp-2
@@ -247,16 +255,23 @@ contains
              drdz(i,j) = vapor(2,i,j) - rslf(psrf,sst)
           end do
        end do
+<<<<<<< HEAD
 	!print*,wspd(55,3),dtdz(55,3),drdz(55,3)
 
        call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,drdz,a_ustar,a_tstar    &
             ,a_rstar,obl)
 	!print*,a_ustar(55,3),a_tstar(55,3),a_rstar(55,3),obl(55,3)
+=======
+
+       call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,drdz,a_ustar,a_tstar     &
+            ,a_rstar,obl)
+>>>>>>> 94e7c77567bd0739dfe62a6710bc9f5f62927627
 
        !Calculate the drag coefficients and aerodynamic resistance
        do j=2,nyp-2
           do i=2,nxp-2
 
+<<<<<<< HEAD
              cm(i,j) =  vonk**2. / (log(zt(2)/z0m(i,j)) - psim(zt(2) / &
 			obl(i,j)) + psim(z0m(i,j) / obl(i,j))) ** 2.
              cs(i,j) =  vonk**2. / (log(zt(2)/z0m(i,j)) - psim(zt(2) / &
@@ -273,30 +288,59 @@ contains
        tskin(:,:) = sst*(p00/psrf)**rcp 	!call do_lsm
        qskin(:,:) = rslf(psrf,sst)		!call qtsurf
 	!print*,tskin(55,3),qskin(55,3)
+=======
+             cm(i,j) = vonk ** 2. / (log(zt(2)/z0m(i,j)) - psim(zt(2) / &
+			obl(i,j)) + psim(z0m(i,j) / obl(i,j))) ** 2.
+             cs(i,j) = vonk ** 2. / (log(zt(2) / z0m(i,j)) - psim(zt(2) / &
+			obl(i,j)) + psim(z0m(i,j) / obl(i,j))) / (log(zt(2) / &
+			z0h(i,j)) - psih(zt(2) / obl(i,j)) + psih(z0h(i,j) / &
+			obl(i,j)))
+             ra(i,j) = 1. / (cs(i,j) * wspd(i,j))
+
+          end do
+       end do
+ 
+       !Get skin temperature and humidity from land surface model
+       tskin(:,:) = sst*(p00/psrf)**rcp 	!call do_lsm
+       qskin(:,:) = rslf(psrf,sst)		!call qtsurf
+>>>>>>> 94e7c77567bd0739dfe62a6710bc9f5f62927627
 
        !Calculate the surface fluxes with bulk law (Fairall, 2003)
        do j=3, nyp-2
           do i=3, nxp-2
 
+<<<<<<< HEAD
 	     wt_sfc(i,j) = -(a_theta(2,i,j) - tskin(i,j)) / ra(i,j) 
              wq_sfc(i,j) = -(vapor(2,i,j) - qskin(i,j)) / ra(i,j)
+=======
+	     wt_sfc(i,j) = - (a_theta(2,i,j) - tskin(i,j)) / ra(i,j) 
+             wq_sfc(i,j) = - (vapor(2,i,j) - qskin(i,j)) / ra(i,j)
+>>>>>>> 94e7c77567bd0739dfe62a6710bc9f5f62927627
              uw_sfc(i,j)  = -a_ustar(i,j)*a_ustar(i,j)                  &
                   *(a_up(2,i,j)+umean)/wspd(i,j)
              vw_sfc(i,j)  = -a_ustar(i,j)*a_ustar(i,j)                  &
                   *(a_vp(2,i,j)+vmean)/wspd(i,j)
              ww_sfc(i,j)  = 0.
+<<<<<<< HEAD
              a_rstar(i,j) = -wq_sfc(i,j)/a_ustar(i,j)
              a_tstar(i,j) = -wt_sfc(i,j)/a_ustar(i,j)
+=======
+             a_rstar(i,j) = wq_sfc(i,j)/a_ustar(i,j)
+             a_tstar(i,j) = wt_sfc(i,j)/a_ustar(i,j)
+>>>>>>> 94e7c77567bd0739dfe62a6710bc9f5f62927627
 
           end do
        end do
 
+<<<<<<< HEAD
 	!print*,a_rstar(55,3),a_tstar(55,3)
 	print*,wt_sfc(55,3),wq_sfc(55,3)
 	!print*,uw_sfc(55,3),vw_sfc(55,3)
 	!print*,ra(55,3),cm(55,3),cs(55,3)
 
 	
+=======
+>>>>>>> 94e7c77567bd0739dfe62a6710bc9f5f62927627
   !
   ! ----------------------------------------------------------------------
   ! fix thermodynamic fluxes at surface given values in energetic 
@@ -511,7 +555,10 @@ contains
           elseif (dtv == 0.) then
              ustar =  vonk*u(i,j)/lnz
              tstar =  vonk*dtv/(pr*lnz)
+<<<<<<< HEAD
              lmo = -1.e10
+=======
+>>>>>>> 94e7c77567bd0739dfe62a6710bc9f5f62927627
           !
           ! Unstable case, start iterations from values at previous tstep, 
           ! unless the sign has changed or if it is the first call, then 
@@ -537,7 +584,11 @@ contains
              end do
           end if
 
+<<<<<<< HEAD
           obl(i,j) = lmo
+=======
+          !obl(i,j) = lmo
+>>>>>>> 94e7c77567bd0739dfe62a6710bc9f5f62927627
           rstar(i,j) = tstar(i,j)*drt(i,j)/(dtv + eps)
           tstar(i,j) = tstar(i,j)*dth(i,j)/(dtv + eps)
 
@@ -605,6 +656,7 @@ contains
     real, intent(in) :: zeta
     real             :: x
 
+<<<<<<< HEAD
     real    :: cnst1, cnst2
     cnst2 = -log(2.)
     cnst1 = 3.14159/2. + 3.*cnst2
@@ -613,6 +665,14 @@ contains
       x    = (1. - 19.3 * zeta) ** (0.25)
       psim = 2.*log(1.0+x) + log(1.0+x*x) - 2.*atan(x) + cnst1
       !psim = 3.14159265/2. - 2.*atan(x) + log( (1.+x)**2. * (1. + x ** 2.) / 8.)
+=======
+    if(zeta <= 0) then
+      x     = (1. - 16. * zeta) ** (0.25)
+      psim  = 3.14159265 / 2. - 2. * atan(x) + log( (1.+x) ** 2. * (1. + x ** 2.) / 8.)
+      ! CvH use Wilson, 2001 rather than Businger-Dyer for correct free convection limit
+      !x     = (1. + 3.6 * abs(zeta) ** (2./3.)) ** (-0.5)
+      !psim = 3. * log( (1. + 1. / x) / 2.)
+>>>>>>> 94e7c77567bd0739dfe62a6710bc9f5f62927627
     else
       psim  = -2./3. * (zeta - 5./0.35)*exp(-0.35 * zeta) - zeta - (10./3.) / 0.35
     end if
@@ -620,7 +680,10 @@ contains
     return
   end function psim
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 94e7c77567bd0739dfe62a6710bc9f5f62927627
   !
   ! ----------------------------------------------------------------------
   ! Malte: Integrated stability function psi_h
@@ -633,6 +696,7 @@ contains
     real, intent(in) :: zeta
     real             :: x
 
+<<<<<<< HEAD
     real    :: cnst1, cnst2
     cnst2 = -log(2.)
     cnst1 = 3.14159/2. + 3.*cnst2
@@ -644,6 +708,16 @@ contains
       !psih  = 2. * log( (1. + x ** 2.) / 2. )
     else
       psih  = -2./3.*(zeta - 5./0.35)*exp(-0.35 * zeta) - (1. + (2./3.)*zeta) ** (1.5) - (10./3.) / 0.35 + 1.
+=======
+    if(zeta <= 0) then
+      x     = (1. - 16. * zeta) ** (0.25)
+      psih  = 2. * log( (1. + x ** 2.) / 2. )
+      ! CvH use Wilson, 2001
+      !x     = (1. + 7.9 * abs(zeta) ** (2./3.)) ** (-0.5)
+      !psih  = 3. * log( (1. + 1. / x) / 2.)
+    else
+      psih  = -2./3. * (zeta - 5./0.35)*exp(-0.35 * zeta) - (1. + (2./3.) * zeta) ** (1.5) - (10./3.) / 0.35 + 1.
+>>>>>>> 94e7c77567bd0739dfe62a6710bc9f5f62927627
     end if
 
     return
