@@ -380,7 +380,8 @@ contains
 
 !> Write down a number of variables that depend on (possibly) time and 1 other dimension.
   subroutine writevar0D_nc(ncid,ncname,var,nrec)
-    use netcdf, only : nf90_inquire, nf90_inquire_dimension, nf90_inquire_variable, nf90_inq_varid, nf90_put_var, nf90_noerr
+    use netcdf, only : nf90_inquire, nf90_inquire_dimension, nf90_inquire_variable, nf90_inq_varid, &
+                       nf90_put_var, nf90_noerr, nf90_erange
     integer, intent(in)              :: ncid   !< Netcdf file number
     character(len=*),intent(in)      :: ncname !< The variable names
     real,intent(in)                  :: var    !< The variables to be written to file
@@ -411,14 +412,14 @@ contains
     else
       iret = nf90_put_var(ncid, VarID, var,loc)
     end if      
-    if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
+    if (iret /= nf90_noerr .and. iret /= nf90_erange) call nchandle_error(ncid, iret)
 
     iret = sync_nc(ncid)
   end subroutine writevar0D_nc
 
 !> Write down a number of variables that depend on (possibly) time and 1 other dimension.
   subroutine writevar1D_nc(ncid,ncname,var,nrec)
-    use netcdf, only : nf90_inquire_dimension, nf90_inquire_variable, nf90_inq_varid, nf90_put_var, nf90_noerr
+    use netcdf, only : nf90_inquire_dimension, nf90_inquire_variable, nf90_inq_varid, nf90_put_var, nf90_noerr, nf90_erange
     integer, intent(in)           :: ncid   !< Netcdf file number
     character(len=*),intent(in)   :: ncname !< The variable names
     real,dimension(:),intent(in)  :: var    !< The variables to be written to file
@@ -453,7 +454,7 @@ contains
     else
       iret = nf90_put_var(ncid, VarID, var(1:dimsize(1)),loc,dimsize)
     end if      
-    if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
+    if (iret /= nf90_noerr .and. iret /= nf90_erange) call nchandle_error(ncid, iret)
 
     iret = sync_nc(ncid)
     if (allocated(var_i)) deallocate(var_i)
@@ -461,7 +462,7 @@ contains
 
 !> Write down a number of variables that depend on (possibly) time and 2 other dimension.
   subroutine writevar2D_nc(ncid,ncname,var,nrec)
-    use netcdf, only : nf90_inquire_dimension, nf90_inquire_variable, nf90_inq_varid, nf90_put_var, nf90_noerr
+    use netcdf, only : nf90_inquire_dimension, nf90_inquire_variable, nf90_inq_varid, nf90_put_var, nf90_noerr, nf90_erange
     integer, intent(in)             :: ncid   !< Netcdf file number
     character(len=*),intent(in)     :: ncname !< The variable names
     real,dimension(:,:),intent(in)  :: var    !< The variables to be written to file
@@ -499,7 +500,7 @@ contains
     else
       iret = nf90_put_var(ncid, VarID, var(1:dimsize(1),1:dimsize(2)),loc,dimsize)
     end if      
-    if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
+    if (iret /= nf90_noerr .and. iret /= nf90_erange) call nchandle_error(ncid, iret)
 
     iret = sync_nc(ncid)
     
@@ -507,7 +508,7 @@ contains
 
 !> Write down a number of variables that depend on (possibly) time and 3 other dimension.
   subroutine writevar3D_nc(ncid,ncname,var,nrec)
-    use netcdf, only : nf90_inquire_dimension, nf90_inquire_variable, nf90_inq_varid, nf90_put_var, nf90_noerr
+    use netcdf, only : nf90_inquire_dimension, nf90_inquire_variable, nf90_inq_varid, nf90_put_var, nf90_noerr, nf90_erange
     integer, intent(in)              :: ncid   !< Netcdf file number
     character(len=*),intent(in)      :: ncname !< The variable names
     real,dimension(:,:,:),intent(in) :: var    !< The variables to be written to file
@@ -547,7 +548,7 @@ contains
     else
       iret = nf90_put_var(ncid, VarID, var(1:dimsize(1),1:dimsize(2),1:dimsize(3)),loc,dimsize)
     end if      
-    if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
+    if (iret /= nf90_noerr .and. iret /= nf90_erange) call nchandle_error(ncid, iret)
 
     iret = sync_nc(ncid)
     
@@ -1315,7 +1316,7 @@ contains
       iret = getatt_nc(ncid, 'title', fname)
       if (iret /= nf90_noerr) fname = ''
       print *, 'NetCDF error in file ' // trim(fname)
-      print *, trim(nf90_strerror(status))
+      print *, status, trim(nf90_strerror(status))
       call appl_finalize (-1)
     end if
   end subroutine nchandle_error

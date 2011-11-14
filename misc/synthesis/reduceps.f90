@@ -8,7 +8,7 @@
 ! Assume number of time steps nt smaller than 10000, number of levels nlev smaller than 150
 ! and number of variables nv smaller than 100 ! otherwise need to be changed
         integer, parameter :: nv=200,nma=7,nmi=2,nsu=28
-	integer :: nt, nlev, zid
+	      integer :: nt, nlev, zid
 
         character(100) stem,nm,nm2
         character(20) pref,name,dimname,cnx,cny
@@ -95,7 +95,7 @@
         status=nf90_close(ncid)
         print *, 'Number of timesteps ', nt
         allocate(var(nv,nlev,nt), varout(nv,nlev,nt), cnt(nv,nlev,nt))
-        allocate(time(nlev),zt(nlev),zm(nlev),dn0(nlev),u0(nlev),v0(nlev),fsttm(nlev),lsttm(nlev),nsmp(nlev))
+        allocate(time(nt),zt(nlev),zm(nlev),dn0(nlev),u0(nlev),v0(nlev),fsttm(nt),lsttm(nt),nsmp(nt))
         varout(:,:,:)=0.
         cnt(:,:,:)=0
         var(:,:,:)=0.
