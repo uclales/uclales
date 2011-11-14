@@ -1,0 +1,27 @@
+#!/bin/bash
+#-----------------------------------------------------------------------------
+# SGE directives
+#
+#$ -S /bin/bash
+#$ -o output
+#$ -cwd
+#$ -q cluster
+#$ -j n
+#$ -N LESRUN
+#$ -pe orte8 8
+#-----------------------------------------------------------------------------
+# user command section
+
+export MPIROOT=/sw/sles10-x64/ofed/openmpi-1.4.0-intel11
+export PATH=$MPIROOT/bin:$PATH
+
+echo -n " Job started at: "
+date
+echo -n " Executed by host: "
+hostname
+#-----------------------------------------------------------------------------
+mpiexec -np 8 ./uclales
+#-----------------------------------------------------------------------------
+echo -n " Job completed at: "
+date
+#-----------------------------------------------------------------------------

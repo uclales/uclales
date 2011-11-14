@@ -22,6 +22,7 @@
         character(len=10) minnms(nmi)
         character(len=10) sumnms(nsu)
         character(len=100) namout(nv),lname(nv),uname(nv)
+        real fval(nv)
         real, allocatable, dimension(:) :: time(:),zt(:),zm(:),dn0(:),u0(:),v0(:),fsttm(:),lsttm(:),nsmp(:)
         real, dimension(:,:,:), allocatable ::  var,varout
         integer, dimension(:,:,:), allocatable :: cnt
@@ -148,6 +149,11 @@
              if (status.ne.nf90_noerr) print*,nf90_strerror(status)
             status=nf90_get_att(ncid,k,'units',uname(k))
              if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+            status=nf90_get_att(ncid,k,'_FillValue',fval(k))
+             if (status.ne.nf90_noerr) then 
+               print*,nf90_strerror(status)
+               fval(k) = -999.
+             end if
 !            print*,k,trim(namout(k)),' ',trim(lname(k)),' ',trim(uname(k))
             do kk=1,nma
               if (trim(name).eq.trim(maxnms(kk))) flag(k)=2
@@ -276,7 +282,7 @@
       end if
        status=nf90_put_att(ncidw,varid,'longname',trim(lname(k)))
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
-!       status=nf90_put_att(ncidw,varid,'_FillValue',-999.0)
+      status=nf90_put_att(ncidw,varid,'_FillValue',fval(k))
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
        status=nf90_put_att(ncidw,varid,'units',trim(uname(k)))
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)

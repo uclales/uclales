@@ -2,7 +2,7 @@
 # MESOHH CMAKE FILE
 # Supports (thusfar) GNU, Intel and IBM compilers
 # To set the compiler to a specific one, set the FC environment variable
-# NETCDF and FFTW libraries can be set using the following environment variables:
+# NETCDF can be set in the config/default.cmake, or through command line options
 # NETCDF_INCLUDE, NETCDF_LIB, FFTW_INCLUDE and FFTW_LIB, respectively.
 # Command line options are fed to CMake using the -D switch
 # Options include:
@@ -11,7 +11,7 @@
 # * CMAKE_BUILD_TYPE (RELEASE/DEBUG) to build in optimized or debug mode. Default is RELEASE
 # All options are persistent in the sense that once set, they will last until changed by the user.
 # For daily use "cmake .. && make" should suffice to build the code, but a command line could look like:
-# export FC="gfortran" && cmake -DMPI=TRUE -PROFILER=SCALASCA -CMAKE_BUILD_TYPE=DEBUG .. && make
+# export FC="gfortran" && cmake -D SYST=tornado -D MPI=TRUE -D PROFILER=SCALASCA -D CMAKE_BUILD_TYPE=DEBUG .. && make
 ############################
 INCLUDE(CMakeForceCompiler) #Necessary to change between MPI/parallel/profiler compilers, without having to do a make clean
 cmake_minimum_required (VERSION 2.8.1)
@@ -20,15 +20,7 @@ project (uclales Fortran)
 # Set the name of the executable, and build it into the build directory
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(target_name uclales)
-
-# Set the default paths for libraries
-set (CMAKE_PREFIX_PATH $ENV{HOME} /usr
-    CACHE STRING "Root dirs of the include and lib directories")
-set (CMAKE_LIBRARY_PATH /usr/lib64 $ENV{SARA_NETCDF_LIB} $ENV{NETCDF_LIB}
-    CACHE STRING "Specific library directories")
-set (CMAKE_INCLUDE_PATH $ENV{SARA_NETCDF_INCLUDE} $ENV{NETCDF_INCLUDE}
-    CACHE STRING "Specific include directories")
-set (FIND_LIBRARY_USE_LIB64_PATHS TRUE)
+set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/config)
 
 #  make sure that the default is a RELEASE
 if (NOT CMAKE_BUILD_TYPE)
@@ -47,6 +39,12 @@ else()
 endif()
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different ${mpifile} ${CMAKE_CURRENT_SOURCE_DIR}/src/mpi_interface.f90)
 
+#READ in local settings (e.g. paths)
+set (FIND_LIBRARY_USE_LIB64_PATHS TRUE)
+
+set (SYST default CACHE STRING "Choose the platform we are on.")
+
+include (${SYST} OPTIONAL)
 ######################
 # Retrieve the type of Fortran compiler. This is necassary to set the compiler options.
 ######################
@@ -55,115 +53,61 @@ if (Fortran_COMPILER_NAME STREQUAL "GNU")
   if(MPI)
     set (COMPILER_WRAPPER mpif90)
   endif()
-  set (CMAKE_Fortran_FLAGS " -finit-real=nan -fdefault-real-8 -ffree-line-length-none")
-  set (CMAKE_Fortran_FLAGS_RELEASE "-funroll-all-loops -fno-f2c -O3")
-  set (CMAKE_Fortran_FLAGS_DEBUG   " -Wuninitialized -O -fbounds-check -fbacktrace -fno-f2c -O0 -g -ffpe-trap=invalid,zero,overflow")
+  set (CMAKE_Fortran_FLAGS "-fbacktrace -finit-real=nan -fdefault-real-8  -fno-f2c -ffree-line-length-none")
+  set (CMAKE_Fortran_FLAGS_RELEASE "-funroll-all-loops -O3")
+  set (CMAKE_Fortran_FLAGS_DEBUG   "-W -Wall -Wuninitialized -fcheck=all -fbacktrace -O0 -g -ffpe-trap=invalid,zero,overflow")
+  set (PROFILER_FLAG "-pg")
+elseif (Fortran_COMPILER_NAME STREQUAL "NAG")
+  if(MPI)
+    set (COMPILER_WRAPPER mpif90)
+  endif()
+  set (CMAKE_PREFIX_PATH "")
+  set (CMAKE_Fortran_FLAGS "-kind=byte -colour -C -f2003 -nan -r8 -free -w=x95 -wmismatch=mpi_allreduce ")
+  set (CMAKE_Fortran_FLAGS_RELEASE "-O4")
+  set (CMAKE_Fortran_FLAGS_DEBUG   "-O0 -gline -g")
+  set (PROFILER_FLAG "-pg")
 elseif (Fortran_COMPILER_NAME STREQUAL "Intel")
   if(MPI)
     set (COMPILER_WRAPPER mpif90)
   endif()
-    set(CMAKE_Fortran_FLAGS "-r8 -ftz -extend_source")
-    set (CMAKE_Fortran_FLAGS_RELEASE "-O3 -no-prec-div -xHost")
-    set (CMAKE_Fortran_FLAGS_DEBUG   "-traceback -fpe0 -O0 -g -check all -check noarg_temp_created")
+  set(CMAKE_Fortran_FLAGS "-r8 -ftz -extend_source")
+  set (CMAKE_Fortran_FLAGS_RELEASE "-O3 -no-prec-div -xHost")
+  set (CMAKE_Fortran_FLAGS_DEBUG   " -traceback -fpe0 -O0 -g -check all -check noarg_temp_created")
+  set (PROFILER_FLAG "-p")
 elseif (Fortran_COMPILER_NAME STREQUAL "XL")
   if(MPI)
     set (COMPILER_WRAPPER mpfort)
   endif()
-    set(CMAKE_Fortran_FLAGS "-qsmp=omp:noauto -qfree=F90 -qrealsize=8  -qwarn64 -qnosave -qinitauto=FFF00000 -qflttrap=en:ov:zero:inv:imp -qflag=w:e")
-    set(CMAKE_Fortran_FLAGS_RELEASE "-O4 -qnoipa -qstrict=none:exceptions  ")
-    set(CMAKE_Fortran_FLAGS_DEBUG "-O2 -g -qfullpath -C -qflttrp=enable:nanq:overflow:zerodivide -qsigtrap -qinitauto=ff")
+  set(CMAKE_Fortran_FLAGS "-qthreaded -qsmp -qfree=F90 -qrealsize=8  -qwarn64 -qnosave -qinitauto=FFF00000 -qflttrap=en:ov:zero:inv:imp -qflag=w:e")
+  set(CMAKE_Fortran_FLAGS_RELEASE "-O4 -qnoipa -qstrict=none:exceptions -qinitauto=ff -qsigtrap")
+  set(CMAKE_Fortran_FLAGS_DEBUG "-O2 -qfullpath -C -qflttrp=enable:inexact:invalid:nanq:overflow:zerodivide -qsigtrap -qinitauto")
+  set (PROFILER_FLAG "-pg")
 endif ()
 
 
 # Set Profiler
-set (PROFILER CACHE STRING "Enable a profiler. Options: SCALASCA or MARMOT")
-if(PROFILER STREQUAL "SCALASCA")
+set (PROFILER CACHE STRING "Enable a profiler. Options: NONE, GPROF, SCALASCA or MARMOT")
+if(PROFILER STREQUAL "GPROF")
+  set (CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${PROFILER_FLAG}")
+elseif(PROFILER STREQUAL "SCALASCA")
   set (COMPILER_WRAPPER scalf90)
 elseif(PROFILER STREQUAL "MARMOT")
   set (COMPILER_WRAPPER marmotf90)
 endif()
 
+
+find_package(NETCDF REQUIRED COMPONENTS F90)
+set (UCLALES_INCLUDE_DIRS ${NETCDF_INCLUDE_DIRS})
+set (UCLALES_LIBRARIES ${NETCDF_LIBRARIES} ${HDF5_LIBRARIES})
+
+
 # Set the compiler name to the wrapper, if necessary
-if (NOT ${COMPILER_WRAPPER} STREQUAL "")
+if (NOT ${COMPILER_WRAPPER}  STREQUAL "")
   CMAKE_FORCE_Fortran_COMPILER(${COMPILER_WRAPPER} ${Fortran_COMPILER_NAME})
 endif ()
 MESSAGE(STATUS "Compiler " ${CMAKE_Fortran_COMPILER})
-
-# FIND NETCDF
-find_path(NETCDF_INCLUDE_DIR netcdf.mod NETCDF.mod
-  DOC "NetCDF include directory (must contain netcdf.mod)"
-  PATHS
-  $ENV{NETCDF_INCLUDE}
-  $ENV{HOME}/include
-  /usr/include
-  /usr/lib64/gfortran/modules
-  $ENV{SARA_NETCDF_INCLUDE}
-)
-if(NETCDF_INCLUDE_DIR)
-  MESSAGE(STATUS "NETCDF module found in " ${NETCDF_INCLUDE_DIR})
-else()
-  MESSAGE(STATUS "WARNING: No NETCDF bindings are found.")
-endif()
-
-find_library(NETCDF_C_LIB netcdf
-  DOC "NetCDF C library"
-  PATHS
-  $ENV{NETCDF_LIB}
-#   $ENV{HOME}/lib
-#   $ENV{HOME}/lib64
-  /usr/lib
-  /usr/lib64
-  $ENV{SARA_NETCDF_LIB}
-)
-if(NETCDF_C_LIB)
-  set(NETCDF_LIBS ${NETCDF_C_LIB})
-  MESSAGE(STATUS "NETCDF C library: " ${NETCDF_C_LIB})
-else()
-  MESSAGE(STATUS "WARNING: No NETCDF bindings are found.")
-endif()
-
-find_library(NETCDF_FORTRAN_LIB netcdff
-  DOC "NetCDF Fortran library"
-  PATHS
-  $ENV{NETCDF_LIB}
-#   $ENV{HOME}/lib
-#   $ENV{HOME}/lib64
-  /usr/lib
-  /usr/lib64
-  $ENV{SARA_NETCDF_LIB}
-)
-if(NETCDF_FORTRAN_LIB)
-  set(NETCDF_LIBS ${NETCDF_LIBS} ${NETCDF_FORTRAN_LIB})
-  MESSAGE(STATUS "NETCDF Fortran library: " ${NETCDF_FORTRAN_LIB})
-else()
-  MESSAGE(STATUS "WARNING: No Fortran NETCDF bindings are found. This is not always fatal.")
-endif()
-
-
-if(NETCDF_INCLUDE_DIR)
-else(NETCDF_INCLUDE_DIR)
-  MESSAGE(STATUS "WARNING: No NETCDF bindings are found.")
-endif(NETCDF_INCLUDE_DIR)
-
-if(NETCDF_C_LIB)
-  set(NETCDF_LIBS ${NETCDF_C_LIB})
-else(NETCDF_C_LIB)
-  MESSAGE(STATUS "WARNING: No NETCDF bindings are found.")
-endif(NETCDF_C_LIB)
-
-if(NETCDF_FORTRAN_LIB)
-  set(NETCDF_LIBS ${NETCDF_LIBS} ${NETCDF_FORTRAN_LIB})
-else(NETCDF_FORTRAN_LIB)
-  MESSAGE(STATUS "WARNING: No Fortran NETCDF bindings are found.")
-endif(NETCDF_FORTRAN_LIB)
-
-#####################
-# CONCATENATE INCLUDE DIRECTORIES
-#####################
-include_directories(${NETCDF_INCLUDE_DIR})
 
 #####################
 # COMPILE SRC DIR
 #####################
 ADD_SUBDIRECTORY( src)
-
