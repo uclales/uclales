@@ -76,8 +76,8 @@ contains
           if (yt(j)>ycross) exit
         end do
         jcross = j
+        call open_nc(trim(expname)//'.out.xz.'//cmpicoordx//'.'//cmpicoordy//'.nc', nccrossxzid, nccrossrec, rtimee)
       end if
-      call open_nc(trim(expname)//'.out.xz.'//cmpicoordx//'.'//cmpicoordy//'.nc', nccrossxzid, nccrossrec, rtimee)
     end if
     if (lyz) then
       if (xcross < xm(2) .or. xcross >= xm(nxp - 2)) then
@@ -87,8 +87,8 @@ contains
           if (xt(i)>xcross) exit
         end do
         icross = i
+        call open_nc(trim(expname)//'.out.yz.'//cmpicoordx//'.'//cmpicoordy//'.nc', nccrossyzid, nccrossrec, rtimee)
       end if
-      call open_nc(trim(expname)//'.out.yz.'//cmpicoordx//'.'//cmpicoordy//'.nc', nccrossyzid, nccrossrec, rtimee)
     end if
 
 !     if (.not.(lxy .or. lxz .or. lyz)) lcross = .false.
