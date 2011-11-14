@@ -69,7 +69,7 @@ contains
       kcross = k
     end if
     if (lxz) then
-      if (ycross < ym(3) .or. ycross >= ym(nyp - 1)) then
+      if (ycross < ym(2) .or. ycross >= ym(nyp - 2)) then
         lxz = .false.
       else
         do j=3,nyp-2
@@ -80,7 +80,7 @@ contains
       call open_nc(trim(expname)//'.out.xz.'//cmpicoordx//'.'//cmpicoordy//'.nc', nccrossxzid, nccrossrec, rtimee)
     end if
     if (lyz) then
-      if (xcross < xm(3) .or. xcross >= xm(nxp - 1)) then
+      if (xcross < xm(2) .or. xcross >= xm(nxp - 2)) then
         lyz = .false.
       else
         do i=3,nxp-2
