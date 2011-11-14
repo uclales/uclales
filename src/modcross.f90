@@ -36,7 +36,7 @@ implicit none
          'rev_acc','cldbase','cldtop ','clddept','rwpbase', & !26-30
          'rwptop ','rwpdept','tracer ','trcpath','trcbase', & !31-35
          'trctop ','trcdept'/)                                !36-37
-  integer :: nccrossid, nccrossrec, nvar
+  integer :: nccrossxzid,nccrossyzid,nccrossxyid, nccrossrec, nvar
   
   interface writecross
     module procedure writecross_2D
@@ -77,6 +77,7 @@ contains
         end do
         jcross = j
       end if
+      call open_nc(trim(expname)//'.out.xz.'//cmpicoordx//'.'//cmpicoordy//'.nc', nccrossxzid, nccrossrec, rtimee)
     end if
     if (lyz) then
       if (xcross < xm(3) .or. xcross >= xm(nxp - 1)) then
@@ -87,10 +88,11 @@ contains
         end do
         icross = i
       end if
+      call open_nc(trim(expname)//'.out.yz.'//cmpicoordx//'.'//cmpicoordy//'.nc', nccrossyzid, nccrossrec, rtimee)
     end if
 
 !     if (.not.(lxy .or. lxz .or. lyz)) lcross = .false.
-    if (lcross) call open_nc(trim(expname)//'.out.cross.'//cmpicoordx//'.'//cmpicoordy//'.nc', nccrossid, nccrossrec, rtimee)
+    if (lcross) call open_nc(trim(expname)//'.out.xy.'//cmpicoordx//'.'//cmpicoordy//'.nc', nccrossxyid, nccrossrec, rtimee)
     do n=1,nvar_all
       call addcross(crossvars(n))
     end do
@@ -316,7 +318,7 @@ contains
             dimname(2)            = xhname
             dimlongname(2)        = xhlongname
           end if
-          call addvar_nc(nccrossid, trim(name)//'xz', 'xz crosssection of '//trim(longname), &
+          call addvar_nc(nccrossxzid, trim(name)//'xz', 'xz crosssection of '//trim(longname), &
           unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
           crossname(ncross) = name
         end if
@@ -343,7 +345,7 @@ contains
             dimname(2)            = yhname
             dimlongname(2)        = yhlongname
           end if
-          call addvar_nc(nccrossid, trim(name)//'yz', 'yz crosssection of '//trim(longname), &
+          call addvar_nc(nccrossyzid, trim(name)//'yz', 'yz crosssection of '//trim(longname), &
           unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
           crossname(ncross) = name
         end if
@@ -371,7 +373,7 @@ contains
             dimname(2)            = yhname
             dimlongname(2)        = yhlongname
           end if
-          call addvar_nc(nccrossid, trim(name)//'xy', 'xy crosssection of '//trim(longname), &
+          call addvar_nc(nccrossxyid, trim(name)//'xy', 'xy crosssection of '//trim(longname), &
           unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
           crossname(ncross) = name
         end if      
@@ -398,7 +400,7 @@ contains
           dimname(2)            = yhname
           dimlongname(2)        = yhlongname
         end if
-        call addvar_nc(nccrossid, trim(name), trim(longname), &
+        call addvar_nc(nccrossxyid, trim(name), trim(longname), &
         unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
         crossname(ncross) = name
       end if
@@ -417,7 +419,10 @@ contains
     integer :: n, i, j, k
     
     if (.not. lcross) return
-    call writevar_nc(nccrossid, tname, rtimee, nccrossrec)
+    call writevar_nc(nccrossxyid, tname, rtimee, nccrossrec)
+    if (lxz) call writevar_nc(nccrossxzid, tname, rtimee, nccrossrec)
+    if (lyz) call writevar_nc(nccrossyzid, tname, rtimee, nccrossrec)
+
     if (lcouvreux) then
       call scalexcess(a_cvrxp, tracer)
     end if
@@ -538,7 +543,7 @@ contains
     if (lxz) then
       allocate(cross(2:nzp-1, 3:nxp-2))
       cross = am(2:nzp-1, 3:nxp-2, jcross)
-      call writevar_nc(nccrossid, trim(crossname)//'xz', cross, nccrossrec)
+      call writevar_nc(nccrossxzid, trim(crossname)//'xz', cross, nccrossrec)
       deallocate(cross)
     end if
 
@@ -546,7 +551,7 @@ contains
     if (lyz) then
       allocate(cross(2:nzp-1, 3:nyp-2))
       cross = am(2:nzp-1, icross, 3:nyp-2)
-      call writevar_nc(nccrossid, trim(crossname)//'yz', cross, nccrossrec)
+      call writevar_nc(nccrossyzid, trim(crossname)//'yz', cross, nccrossrec)
       deallocate(cross)
     end if
 
@@ -554,7 +559,7 @@ contains
     if (lxy) then
       allocate(cross(3:nxp-2, 3:nyp-2))
       cross = am(kcross, 3:nxp-2, 3:nyp-2)
-      call writevar_nc(nccrossid, trim(crossname)//'xy', cross, nccrossrec)
+      call writevar_nc(nccrossxyid, trim(crossname)//'xy', cross, nccrossrec)
       deallocate(cross)
     end if
 
@@ -567,13 +572,15 @@ contains
 
     character(*), intent(in)                :: crossname
     real, dimension(:,:), intent(in) :: am
-    call writevar_nc(nccrossid, trim(crossname), am, nccrossrec)
+    call writevar_nc(nccrossxyid, trim(crossname), am, nccrossrec)
 
   end subroutine writecross_2D
   
   subroutine exitcross
     use modnetcdf, only : close_nc
-    call close_nc(nccrossid)
+    call close_nc(nccrossxyid)
+    call close_nc(nccrossxzid)
+    call close_nc(nccrossyzid)
   end subroutine exitcross
 
   subroutine calcintpath(varin, varout, threshold)
@@ -598,6 +605,7 @@ contains
             varout(i,j) = varout(i,j)+varin(k,i,j)*(zm(k)-zm(km1))*dn0(k)
           end if
         enddo
+        if (varout(i,j) > 1e10) varout(i,j) = fillvalue_double
       end do
     end do
   end subroutine calcintpath
