@@ -457,7 +457,6 @@ contains
       call scalexcess(a_cvrxp, tracer)
     end if
     do n = 1, ncross
-print *, crossname(n)    
       select case(trim(crossname(n)))
       case('u')
         call writecross(crossname(n), a_up)
@@ -563,27 +562,22 @@ print *, crossname(n)
         call calclevel(liquid, ct, 'top')
         call calclevel(liquid, cb, 'base')
         call calcdev(a_tp, cb, ct, tmp)
-!         call writecross(crossname(n), tmp)
+        call writecross(crossname(n), tmp)
       case ('tdev_sc')
         call calclevel(liquid, cb, 'base')
-!         call calcdev(a_tp, 2, cb-1, tmp)
-!         call writecross(crossname(n), tmp)
+        call calcdev(a_tp, 2, cb-1, tmp)
+        call writecross(crossname(n), tmp)
       case ('qdev_cl')
         call calclevel(liquid, ct, 'top')
         call calclevel(liquid, cb, 'base')
         call calcdev(a_rp, cb, ct, tmp)
-!         call writecross(crossname(n), tmp)
+        call writecross(crossname(n), tmp)
       case ('qdev_sc')
-print *, 'a'
         call calclevel(liquid, cb, 'base')
-print *, 'a', cb
-!         call calcdev(a_rp, 2, cb-1, tmp)
-print *, 'b'
-!         call writecross(crossname(n), tmp)
-print *, 'c'
+        call calcdev(a_rp, 2, cb-1, tmp)
+        call writecross(crossname(n), tmp)
       end select
     end do
-print *, 'end'
   end subroutine triggercross
 
   subroutine writecross_3D(crossname, am)
@@ -805,7 +799,7 @@ print *, 'end'
     use modnetcdf, only : fillvalue_double
     real, intent(in), dimension(:,:,:) :: varin
     integer, intent(in) :: base, top
-    real, intent(out), dimension(:,:)  :: varout
+    real, intent(out), dimension(3:,3:)  :: varout
     real, dimension(nzp) :: mean, div, divmin
     integer :: i, j, k, km1
     varout = 0.
