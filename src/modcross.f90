@@ -26,7 +26,7 @@ implicit none
   real               :: thres_rw    = 1.e-8
   integer :: ncross = 0
   character(len=7), allocatable, dimension(:) :: crossname
-  integer, parameter :: nvar_all = 41
+  integer, parameter :: nvar_all = 42
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
          'l      ','rp     ','np     ','ricep  ','nicep  ', & !6-10
@@ -36,7 +36,7 @@ implicit none
          'rev_acc','cldbase','cldtop ','clddept','rwpbase', & !26-30
          'rwptop ','rwpdept','tracer ','trcpath','trcbase', & !31-35
          'trctop ','trcdept','tdev_cl','tdev_sc','qdev_cl', & !36-40
-         'qdev_sc'/)                                          !41
+         'qdev_sc','cvrx   '/)                                !41-42
   integer :: nccrossxzid,nccrossyzid,nccrossxyid, nccrossrec, nvar
   
   interface writecross
@@ -150,6 +150,10 @@ contains
       case('l')
         if (level < 2) return
         longname =  'Liquid water content'
+        iscross = .true.
+      case('cvrx')
+        if (.not. lcouvreux) return
+        longname =  'Couvreux Scalar'
         iscross = .true.
       case('rp')
         if (level < 3) return
@@ -453,6 +457,7 @@ contains
       call scalexcess(a_cvrxp, tracer)
     end if
     do n = 1, ncross
+print *, crossname(n)    
       select case(trim(crossname(n)))
       case('u')
         call writecross(crossname(n), a_up)
@@ -466,6 +471,8 @@ contains
         call writecross(crossname(n), a_rp)
       case('l')
         call writecross(crossname(n), liquid)
+      case('cvrx')
+        call writecross(crossname(n), a_cvrxp)
       case('rp')
         call writecross(crossname(n), a_rpp)
       case('np')
@@ -556,23 +563,27 @@ contains
         call calclevel(liquid, ct, 'top')
         call calclevel(liquid, cb, 'base')
         call calcdev(a_tp, cb, ct, tmp)
-        call writecross(crossname(n), tmp)
+!         call writecross(crossname(n), tmp)
       case ('tdev_sc')
         call calclevel(liquid, cb, 'base')
-        call calcdev(a_tp, 2, cb-1, tmp)
-        call writecross(crossname(n), tmp)
+!         call calcdev(a_tp, 2, cb-1, tmp)
+!         call writecross(crossname(n), tmp)
       case ('qdev_cl')
         call calclevel(liquid, ct, 'top')
         call calclevel(liquid, cb, 'base')
         call calcdev(a_rp, cb, ct, tmp)
-        call writecross(crossname(n), tmp)
+!         call writecross(crossname(n), tmp)
       case ('qdev_sc')
+print *, 'a'
         call calclevel(liquid, cb, 'base')
-        call calcdev(a_rp, 2, cb-1, tmp)
-        call writecross(crossname(n), tmp)
+print *, 'a', cb
+!         call calcdev(a_rp, 2, cb-1, tmp)
+print *, 'b'
+!         call writecross(crossname(n), tmp)
+print *, 'c'
       end select
     end do
-
+print *, 'end'
   end subroutine triggercross
 
   subroutine writecross_3D(crossname, am)

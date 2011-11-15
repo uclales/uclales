@@ -149,7 +149,7 @@ contains
           call thermo(level)
           call triggercross(time)
        end if
-
+print *, 'step'
        if(myid == 0) then
           call cpu_time(t2)           !t1=timing()
           if (mod(istp,istpfl) == 0 ) print "('   Timestep # ',i5," //     &
