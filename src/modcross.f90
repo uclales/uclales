@@ -26,7 +26,7 @@ implicit none
   real               :: thres_rw    = 1.e-8
   integer :: ncross = 0
   character(len=7), allocatable, dimension(:) :: crossname
-  integer, parameter :: nvar_all = 37
+  integer, parameter :: nvar_all = 41
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
          'l      ','rp     ','np     ','ricep  ','nicep  ', & !6-10
@@ -35,7 +35,8 @@ implicit none
          'gwp    ','hwp    ','prc_acc','cnd_acc','cev_acc', & !21-25
          'rev_acc','cldbase','cldtop ','clddept','rwpbase', & !26-30
          'rwptop ','rwpdept','tracer ','trcpath','trcbase', & !31-35
-         'trctop ','trcdept'/)                                !36-37
+         'trctop ','trcdept','tdev_cl','tdev_sc','qdev_cl', & !36-40
+         'qdev_sc'/)                                          !41
   integer :: nccrossxzid,nccrossyzid,nccrossxyid, nccrossrec, nvar
   
   interface writecross
@@ -78,6 +79,7 @@ contains
         jcross = j
         call open_nc(trim(expname)//'.out.xz.'//cmpicoordx//'.'//cmpicoordy//'.nc', nccrossxzid, nccrossrec, rtimee)
       end if
+
     end if
     if (lyz) then
       if (xcross < xm(2) .or. xcross >= xm(nxp - 2)) then
@@ -238,6 +240,22 @@ contains
         if (level < 2) return
         longname = 'Cloud base height'
         unit = 'm'          
+      case ('tdev_cl')
+        if (level < 2) return
+        longname = 'Av. Cloud layer temperature deviation'
+        unit = 'K'          
+      case ('tdev_sc')
+        if (level < 2) return
+        longname = 'SubCloud layer temperature deviation'
+        unit = 'K'          
+      case ('qdev_cl')
+        if (level < 2) return
+        longname = 'Av. Cloud layer humidity deviation'
+        unit = 'kg/kg'          
+      case ('qdev_sc')
+        if (level < 2) return
+        longname = 'SubCloud layer humidity deviation'
+        unit = 'kg/kg'          
       case ('cldtop')
         if (level < 2) return
         longname = 'Cloud top height'
@@ -318,7 +336,7 @@ contains
             dimname(2)            = xhname
             dimlongname(2)        = xhlongname
           end if
-          call addvar_nc(nccrossxzid, trim(name)//'xz', 'xz crosssection of '//trim(longname), &
+          call addvar_nc(nccrossxzid, trim(name), 'xz crosssection of '//trim(longname), &
           unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
           crossname(ncross) = name
         end if
@@ -345,7 +363,7 @@ contains
             dimname(2)            = yhname
             dimlongname(2)        = yhlongname
           end if
-          call addvar_nc(nccrossyzid, trim(name)//'yz', 'yz crosssection of '//trim(longname), &
+          call addvar_nc(nccrossyzid, trim(name), 'yz crosssection of '//trim(longname), &
           unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
           crossname(ncross) = name
         end if
@@ -373,7 +391,7 @@ contains
             dimname(2)            = yhname
             dimlongname(2)        = yhlongname
           end if
-          call addvar_nc(nccrossxyid, trim(name)//'xy', 'xy crosssection of '//trim(longname), &
+          call addvar_nc(nccrossxyid, trim(name), 'xy crosssection of '//trim(longname), &
           unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
           crossname(ncross) = name
         end if      
@@ -416,12 +434,20 @@ contains
     real, intent(in) :: rtimee
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
     real, dimension(nzp,nxp,nyp) :: tracer
-    integer :: n, i, j, k
+    integer :: n, i, j, k, ct, cb
     
     if (.not. lcross) return
+    
     call writevar_nc(nccrossxyid, tname, rtimee, nccrossrec)
-    if (lxz) call writevar_nc(nccrossxzid, tname, rtimee, nccrossrec)
-    if (lyz) call writevar_nc(nccrossyzid, tname, rtimee, nccrossrec)
+    if (lxz) then 
+      nccrossrec = nccrossrec - 1
+      call writevar_nc(nccrossxzid, tname, rtimee, nccrossrec)
+    end if
+    if (lyz) then 
+      nccrossrec = nccrossrec - 1
+      call writevar_nc(nccrossyzid, tname, rtimee, nccrossrec)
+    end if
+
 
     if (lcouvreux) then
       call scalexcess(a_cvrxp, tracer)
@@ -526,6 +552,24 @@ contains
       case ('trcdept')
         call calcdepth(tracer, tmp)
         call writecross(crossname(n), tmp)
+      case ('tdev_cl')
+        call calclevel(liquid, ct, 'top')
+        call calclevel(liquid, cb, 'base')
+        call calcdev(a_tp, cb, ct, tmp)
+        call writecross(crossname(n), tmp)
+      case ('tdev_sc')
+        call calclevel(liquid, cb, 'base')
+        call calcdev(a_tp, 2, cb-1, tmp)
+        call writecross(crossname(n), tmp)
+      case ('qdev_cl')
+        call calclevel(liquid, ct, 'top')
+        call calclevel(liquid, cb, 'base')
+        call calcdev(a_rp, cb, ct, tmp)
+        call writecross(crossname(n), tmp)
+      case ('qdev_sc')
+        call calclevel(liquid, cb, 'base')
+        call calcdev(a_rp, 2, cb-1, tmp)
+        call writecross(crossname(n), tmp)
       end select
     end do
 
@@ -534,16 +578,17 @@ contains
   subroutine writecross_3D(crossname, am)
     use grid,     only : nxp, nyp, nzp
     use modnetcdf,       only : writevar_nc
-
+    use mpi_interface,   only : wrxid, wryid
     character(*), intent(in)                :: crossname
     real, dimension(1:nzp, 1:nxp, 1:nyp), intent(in) :: am
     real, dimension(:,:), allocatable  :: cross
 
   ! XZ crosssection
+
     if (lxz) then
       allocate(cross(2:nzp-1, 3:nxp-2))
       cross = am(2:nzp-1, 3:nxp-2, jcross)
-      call writevar_nc(nccrossxzid, trim(crossname)//'xz', cross, nccrossrec)
+      call writevar_nc(nccrossxzid, trim(crossname), cross, nccrossrec)
       deallocate(cross)
     end if
 
@@ -551,7 +596,7 @@ contains
     if (lyz) then
       allocate(cross(2:nzp-1, 3:nyp-2))
       cross = am(2:nzp-1, icross, 3:nyp-2)
-      call writevar_nc(nccrossyzid, trim(crossname)//'yz', cross, nccrossrec)
+      call writevar_nc(nccrossyzid, trim(crossname), cross, nccrossrec)
       deallocate(cross)
     end if
 
@@ -559,7 +604,7 @@ contains
     if (lxy) then
       allocate(cross(3:nxp-2, 3:nyp-2))
       cross = am(kcross, 3:nxp-2, 3:nyp-2)
-      call writevar_nc(nccrossxyid, trim(crossname)//'xy', cross, nccrossrec)
+      call writevar_nc(nccrossxyid, trim(crossname), cross, nccrossrec)
       deallocate(cross)
     end if
 
@@ -578,9 +623,9 @@ contains
   
   subroutine exitcross
     use modnetcdf, only : close_nc
-    call close_nc(nccrossxyid)
-    call close_nc(nccrossxzid)
-    call close_nc(nccrossyzid)
+    if (lcross) call close_nc(nccrossxyid)
+    if (lxz)    call close_nc(nccrossxzid)
+    if (lyz)    call close_nc(nccrossyzid)
   end subroutine exitcross
 
   subroutine calcintpath(varin, varout, threshold)
@@ -689,6 +734,84 @@ contains
     end do
   end subroutine calcdepth
    
+  subroutine calclevel(varin,varout,location, threshold)
+    use grid, only : nzp, nxp, nyp, zt
+    use mpi_interface, only : double_scalar_par_max, double_scalar_par_min
+    real, intent(in), dimension(:,:,:) :: varin
+    real, intent(in), optional :: threshold
+    integer, intent(out) :: varout
+    integer :: klocal
+    real :: rlocal, rglobal
+    character(*), intent(in) :: location
+    integer :: i, j, k, km1
+    real :: thres
+    
+
+     if (present(threshold)) then
+      thres = threshold
+    else
+      thres = 0.0
+    end if
+   
+    select case(location)
+    case ('top')
+      klocal = 0
+      do j = 3, nyp - 2
+        do i = 3, nxp - 2
+          top:do k = nzp - 1, 2, -1
+            if (varin(k,i,j) > thres) then
+              klocal = max(klocal, k)
+              exit top
+            end if
+          end do top
+        end do
+      end do
+      rlocal = klocal
+      call double_scalar_par_max(rlocal,rglobal) 
+      varout = rglobal
+    case ('base')
+      klocal = nzp 
+      do j = 3, nyp - 2
+        do i = 3, nxp - 2
+          base:do k = 2, nzp - 1
+            if (varin(k,i,j) > thres) then
+              klocal = min(klocal, k)
+              exit base
+            end if
+          end do base
+        end do
+      end do
+      rlocal = klocal
+      call double_scalar_par_min(rlocal,rglobal) 
+      varout = rglobal
+
+    end select
+  end subroutine calclevel
+  
+  subroutine calcdev(varin, base, top, varout)
+    use grid, only : nzp, nxp, nyp, zm, zt, a_wp, dzi_t
+    use util, only : get_avg3
+    use modnetcdf, only : fillvalue_double
+    real, intent(in), dimension(:,:,:) :: varin
+    integer, intent(in) :: base, top
+    real, intent(out), dimension(:,:)  :: varout
+    real, dimension(nzp) :: mean, div, divmin
+    integer :: i, j, k, km1
+    varout = 0.
+    divmin = 0.
+    if (base >= nzp-2 .or. base <= 1 .or. top >= nzp-2 .or. top <= 1 ) then
+      varout = fillvalue_double
+      return
+    end if
+    call get_avg3(nzp, nyp, nxp,varin,mean)
+      do j=3,nyp-2
+        do i=3,nxp-2
+          do k=base,top
+            varout(i,j) = varout(i,j) + (varin(k,i,j) - mean(k))/(dzi_t(k) * (zm(top) - zm(base-1))) 
+          end do
+        end do
+      end do
+  end subroutine calcdev
 !The output is the number of std. deviations over 1 that the local value of the local value 
 !is larger than the slab average. Only for points with an upward positive velocity.
   subroutine scalexcess(varin, varout)
