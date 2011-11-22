@@ -234,20 +234,19 @@ contains
 
        !roughness length for momentum and heat (future: from NAMELIST)
 
-       z0m(:,:) = 0.01
-       z0h(:,:) = 0.01
+       z0m(:,:) = zrough
+       z0h(:,:) = zrough/10.
 
        zs = zrough
 
        do j=3,nyp-2
           do i=3,nxp-2
-             wspd(i,j) = max(0.1,                                            &
-                         sqrt((a_up(2,i,j)+umean)**2+(a_vp(2,i,j)+vmean)**2))
              dtdz(i,j) = a_theta(2,i,j) - sst*(p00/psrf)**rcp
              drdz(i,j) = vapor(2,i,j) - rslf(psrf,sst)
           end do
        end do
 
+       call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,a_up,a_vp,umean,vmean)
        call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,drdz,a_ustar,a_tstar    &
             ,a_rstar,obl)
 
@@ -289,7 +288,6 @@ contains
 
           end do
        end do
-
 	
   !
   ! ----------------------------------------------------------------------
