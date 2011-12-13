@@ -235,9 +235,10 @@ contains
        !roughness length for momentum and heat (future: from NAMELIST)
 
        z0m(:,:) = zrough
-       z0h(:,:) = zrough/10.
-
+       z0h(:,:) = zrough
        zs = zrough
+
+       call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,a_up,a_vp,umean,vmean)
 
        do j=3,nyp-2
           do i=3,nxp-2
@@ -246,7 +247,6 @@ contains
           end do
        end do
 
-       call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,a_up,a_vp,umean,vmean)
        call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,drdz,a_ustar,a_tstar    &
             ,a_rstar,obl)
 
@@ -452,11 +452,11 @@ contains
 
     implicit none
 
-    real, parameter     :: ah   =  7.8   ! stability function parameter
-    real, parameter     :: bh   = 12.0   !   "          "         "
-    real, parameter     :: am   =  4.8   !   "          "         "
-    real, parameter     :: bm   = 19.3   !   "          "         "
-    real, parameter     :: pr   = 0.74   ! prandlt number
+    real, parameter     :: ah   =  5.0   ! stability function parameter
+    real, parameter     :: bh   = 16.0   !   "          "         "
+    real, parameter     :: am   =  5.0   !   "          "         "
+    real, parameter     :: bm   = 16.0   !   "          "         "
+    real, parameter     :: pr   = 1.0   ! prandlt number
     real, parameter     :: eps  = 1.e-10 ! non-zero, small number
 
     integer, intent(in) :: n2,n3         ! span of indicies covering plane
@@ -522,12 +522,8 @@ contains
              do iterate = 1,3
                 lmo   = betg*ustar(i,j)**2/(vonk*tstar(i,j))
                 zeta  = z/lmo
-                x     = sqrt( sqrt( 1.0 - bm*zeta ) )
-                psi1  = 2.*log(1.0+x) + log(1.0+x*x) - 2.*atan(x) + cnst1
-                y     = sqrt(1.0 - bh*zeta)
-                psi2  = log(1.0 + y) + cnst2
-                ustar(i,j) = u(i,j)*vonk/(lnz - psi1)
-                tstar(i,j) = (dtv*vonk/pr)/(lnz - psi2)
+                ustar(i,j) = u(i,j)*vonk/(lnz - psim(zeta))
+                tstar(i,j) = (dtv*vonk/pr)/(lnz - psih(zeta))
              end do
           end if
 
@@ -592,15 +588,14 @@ contains
     real             :: psim
     real, intent(in) :: zeta
     real             :: x
-    real    :: cnst1, cnst2
-    cnst2 = -log(2.)
-    cnst1 = 3.14159/2. + 3.*cnst2
+    real    :: cnst1
+    cnst1 = 3.14159/2. - 3.*log(2.)
 
     if(zeta <= 0) then
-      x    = (1. - 19.3 * zeta) ** (0.25)
+      x    = (1. - 16.0 * zeta) ** (0.25)
       psim = 2.*log(1.0+x) + log(1.0+x*x) - 2.*atan(x) + cnst1
     else
-      psim  = -2./3. * (zeta - 5./0.35)*exp(-0.35 * zeta) - zeta - (10./3.) / 0.35
+      psim  = -5.0*zeta
     end if
 
     return
@@ -618,18 +613,11 @@ contains
     real, intent(in) :: zeta
     real             :: x
 
-
-    real    :: cnst1, cnst2
-    cnst2 = -log(2.)
-    cnst1 = 3.14159/2. + 3.*cnst2
-
     if(zeta <= 0) then
-      x     = sqrt(1.0 - 12.*zeta)
-      psih  = log(1.0 + x) + cnst2
-      !x     = (1. - 16. * zeta) ** (0.25)
-      !psih  = 2. * log( (1. + x ** 2.) / 2. )
+      x     = sqrt(1.0 - 16.0*zeta)
+      psih  = 2*log(1.0 + x) - 2*log(2.)
     else
-      psih  = -2./3.*(zeta - 5./0.35)*exp(-0.35 * zeta) - (1. + (2./3.)*zeta) ** (1.5) - (10./3.) / 0.35 + 1.
+      psih  = -5.0*zeta
     end if
 
     return
