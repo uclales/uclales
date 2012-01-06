@@ -30,7 +30,7 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 45, nvar2 = 113 ! number of time series and profiles
+  integer, parameter :: nvar1 = 45, nvar2 = 114 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2, nv1=nvar1, nv2=nvar2
   real, save         :: fsttm, lsttm, nsmp = 0
 
@@ -68,7 +68,7 @@ module stat
        'frc_ran','hst_srf','lflxu  ','lflxd  ','sflxu  ','sflxd  ', & !91
        'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel', & !97
        'rsup   ','prc_c  ','prc_i  ','prc_s  ','prc_g  ','prc_h  ', & !103
-       'hail   ','qt_th  ','s_1    ','s_2    ','s_3    '/)            !109-113
+       'hail   ','qt_th  ','s_1    ','s_2    ','s_3    ','RH     '/) !109-113
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:), svctr(:,:), ssclr(:)
@@ -550,6 +550,7 @@ contains
        svctr(k,60)=svctr(k,60) + a2(k)
        svctr(k,61)=svctr(k,61) + a3(k)/REAL((n2-4)*(n3-4))
     end do
+    
 
     !
     ! s variable (extended liquid water specific humidity)
@@ -597,6 +598,20 @@ contains
        end do
     end do
     call get_avg3(n1,n2,n3,tv,tvbar)
+
+! RELATIVE HUMIDITY
+    do j=3,n3-2
+       do i=3,n2-2
+          do k=1,n1
+            svar(k,i,j)  = 1.+(rt(k,i,j) - rs(k,i,j))/rs(k,i,j)
+          end do
+       end do
+    end do
+    call get_avg3(n1,n2,n3,svar,svar1)
+
+    do k=1,n1
+       svctr(k,114)=svctr(k,114) + svar1(k)                     
+    end do
 
     if (debug) WRITE (0,*) 'accum_lvl2: sampling, tv2    myid=',myid
     xy1mx = 0.
