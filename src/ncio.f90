@@ -547,7 +547,6 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('q')
        if (itype==0) ncinfo = 'Total water mixing ratio'
-!irina
        if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
     case('l')
@@ -557,6 +556,10 @@ contains
     case('r')
        if (itype==0) ncinfo = 'Rain-water mixing ratio'
        if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('RH')
+       if (itype==0) ncinfo = 'Relative Humidity'
+       if (itype==1) ncinfo = '-'
        if (itype==2) ncinfo = 'tttt'
     case('inuc')
        if (itype==0) ncinfo = 'Number of ice nuclei'
