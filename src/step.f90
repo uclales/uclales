@@ -61,7 +61,7 @@ contains
     use grid, only : dt, dtlong, zt, zm, nzp, dn0, u0, v0, level, &
          write_hist
     use ncio, only : write_anal, close_anal
-    use modcross, only : triggercross, exitcross
+    use modcross, only : triggercross, exitcross, lcross
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
 
@@ -161,7 +161,7 @@ contains
 
     call write_hist(1, time)
     iret = close_anal()
-    call exitcross
+    if (lcross) call exitcross
     iret = close_stat()
 
   end subroutine stepper
