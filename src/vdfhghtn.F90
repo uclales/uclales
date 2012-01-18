@@ -108,10 +108,10 @@ SUBROUTINE VDFHGHTN (KIDIA   , KFDIA   , KLON    , KLEV   , KDRAFT  , PTMST  , K
 
 !     ------------------------------------------------------------------
 
-use garbage, only : foeewm, surf_inq
+use garbage, only : foeewm
 USE PARKIND1  ,ONLY : JPIM     ,JPRB
 
-USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
+! USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
 
 USE YOMCST   , ONLY : RG       ,RD       ,RCPD     ,RETV     ,RLVTT    ,&
                     & RLSTT    ,RATM     ,RTT      ,RLMLT
@@ -257,21 +257,21 @@ LOGICAL ::            LLCAPE, LLCAPETEST
 REAL(KIND=JPRB) ::    ZRHS(KLON), ZMASSCAPE(KLON), ZTAUBM, &
                     & ZFRACBCONG(KLON), ZMSCALE(KLON)
 		    
-REAL(KIND=JPRB) :: ZHOOK_HANDLE
-
-
-INTERFACE
-#include "surf_inq.h"
-END INTERFACE
-
-
-#include "vdfparcel.intfb.h"
-#include "vdfstcucrit.intfb.h"
-#include "vdfpdftable.intfb.h"
-#include "vdfbuoysort.intfb.h"
-
-#include "fcttre.h"
-
+! REAL(KIND=JPRB) :: ZHOOK_HANDLE
+! 
+! 
+! INTERFACE
+! #include "surf_inq.h"
+! END INTERFACE
+! 
+! 
+! #include "vdfparcel.intfb.h"
+! #include "vdfstcucrit.intfb.h"
+! #include "vdfpdftable.intfb.h"
+! #include "vdfbuoysort.intfb.h"
+! 
+! #include "fcttre.h"
+! 
 
 
 !     ------------------------------------------------------------------
@@ -279,7 +279,7 @@ END INTERFACE
 !*         1.     INITIALIZATION
 !                 --------------
 
-IF (LHOOK) CALL DR_HOOK('VDFHGHTN',0,ZHOOK_HANDLE)
+! IF (LHOOK) CALL DR_HOOK('VDFHGHTN',0,ZHOOK_HANDLE)
 
 !if (LCCN) then
 !  write(0,*) 'vdfhghtn: nc=',nc
@@ -321,7 +321,7 @@ ZSTABTHRESH = 20._JPRB     ! threshold stability (Klein & Hartmann criteria) [K]
 ZBIRTHRESH  = 0.1_JPRB     ! threshold BIR (TKE decoupling criteria) [1]
 ZTVLIM      = 0.1_JPRB     ! cloud fraction limit in Tv,env calculation
 
-CALL SURF_INQ(PREPUST=ZREPUST)
+! CALL SURF_INQ(PREPUST=ZREPUST)
                  
 !-- switch for moist mass flux depth limiter --      
 !LLMASSCAP     = .TRUE.
@@ -1716,6 +1716,6 @@ ENDIF
   ENDIF !LLDIAG
 
 
-IF (LHOOK) CALL DR_HOOK('VDFHGHTN',1,ZHOOK_HANDLE)
+! IF (LHOOK) CALL DR_HOOK('VDFHGHTN',1,ZHOOK_HANDLE)
 
 END SUBROUTINE VDFHGHTN

@@ -96,7 +96,7 @@ SUBROUTINE VDFCLOUD ( KIDIA    , KFDIA   , KLON    , KLEV     , KDRAFT   , &
 
 USE PARKIND1  ,ONLY : JPIM     ,JPRB
 
-USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
+! USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
 
 USE YOMCST   , ONLY : RG       ,RCPD
 
@@ -174,10 +174,10 @@ REAL(KIND=JPRB) ::    ZQLWAKEFAC
 
 REAL(KIND=JPRB) ::    ZHOOK_HANDLE
 
-
-#include "vdfpdftable.intfb.h"
-#include "vdfsat.intfb.h"
-#include "vdfthermo.intfb.h"
+! 
+! #include "vdfpdftable.intfb.h"
+! #include "vdfsat.intfb.h"
+! #include "vdfthermo.intfb.h"
 
 
 
@@ -187,7 +187,7 @@ REAL(KIND=JPRB) ::    ZHOOK_HANDLE
 !                 --------------------
 !
 
-IF (LHOOK) CALL DR_HOOK('VDFCLOUD',0,ZHOOK_HANDLE)
+! IF (LHOOK) CALL DR_HOOK('VDFCLOUD',0,ZHOOK_HANDLE)
 
 
 !-- Cloud wake parameterization --
@@ -591,7 +591,7 @@ DO JK=1,KLEV
 ENDDO
          
         
-IF (LHOOK) CALL DR_HOOK('VDFCLOUD',1,ZHOOK_HANDLE)
+! IF (LHOOK) CALL DR_HOOK('VDFCLOUD',1,ZHOOK_HANDLE)
 
 RETURN
 END SUBROUTINE VDFCLOUD

@@ -289,9 +289,9 @@ SUBROUTINE VDFMAIN    ( CDCONF, &
 !     FOR DETAILS ABOUT THE MATHEMATICS OF THIS ROUTINE.
 
 !     ------------------------------------------------------------------
-use garbage, only : foealfa, foeewm, foeldcpm, surfpp, surfexcdriver, vdfdpbl, vdftofdc, vdffblend
+use garbage, only : foealfa, foeewm, foeldcpm
 USE PARKIND1  ,ONLY : JPIM     ,JPRB
-USE YOMHOOK   ,ONLY : LHOOK    ,DR_HOOK
+! USE YOMHOOK   ,ONLY : LHOOK    ,DR_HOOK
 
 USE YOMCT0   , ONLY : LSCMEC   ,LSFCFLX  ,REXTSHF  ,REXTLHF
 USE YOEVDF   , ONLY : RVDIFTS  ,LLDIAG
@@ -525,27 +525,27 @@ REAL(KIND=JPRB) ::    ZDUMMY2, ZDUMMY3, ZCFNC1, ZMGEOM
 
 REAL(KIND=JPRB) ::    ZDETR(KLON,KLEV), ZAWAKE(KLON,KLEV)
 
-REAL(KIND=JPRB) ::    ZHOOK_HANDLE
+! REAL(KIND=JPRB) ::    ZHOOK_HANDLE
 
-INTERFACE
-#include "surfexcdriver.h"
-#include "surfpp.h"
-END INTERFACE
-
-#include "vdfdifh.intfb.h"
-#include "vdfdifh5.intfb.h"
-#include "vdfdifm.intfb.h"
-#include "vdfdifm2.intfb.h"
-#include "vdfdifc.intfb.h"
-#include "vdfdpbl.intfb.h"
-#include "vdfexcu.intfb.h"
-#include "vdfhghtn.intfb.h"
-#include "vdfincr.intfb.h"
-#include "vdffblend.intfb.h"
-#include "vdfcloud.intfb.h"
-#include "vdftofdc.intfb.h"
-
-#include "fcttre.h"
+! INTERFACE
+! #include "surfexcdriver.h"
+! #include "surfpp.h"
+! END INTERFACE
+! 
+! #include "vdfdifh.intfb.h"
+! #include "vdfdifh5.intfb.h"
+! #include "vdfdifm.intfb.h"
+! #include "vdfdifm2.intfb.h"
+! #include "vdfdifc.intfb.h"
+! #include "vdfdpbl.intfb.h"
+! #include "vdfexcu.intfb.h"
+! #include "vdfhghtn.intfb.h"
+! #include "vdfincr.intfb.h"
+! #include "vdffblend.intfb.h"
+! #include "vdfcloud.intfb.h"
+! #include "vdftofdc.intfb.h"
+! 
+! #include "fcttre.h"
 
 
 
@@ -554,7 +554,7 @@ END INTERFACE
 !*         1.     INITIALIZE CONSTANTS
 !                 --------------------
 
-IF (LHOOK) CALL DR_HOOK('VDFMAIN',0,ZHOOK_HANDLE)
+! IF (LHOOK) CALL DR_HOOK('VDFMAIN',0,ZHOOK_HANDLE)
 
 ZTMST       = PTSPHY
 ZRTMST      = 1.0_JPRB/PTSPHY    ! optimization
@@ -683,73 +683,73 @@ ENDDO
 
 !*         3.  Compute all surface related quantities
 !          ------------------------------------------
-
-DO JL=KIDIA,KFDIA
-  DO JK = 1,KTILES
-    ZTSKINTIOLD(JL,JK) = PTSKTI(JL,JK)
-  ENDDO   
-ENDDO   
-
-CALL SURFEXCDRIVER(CDCONF=CDCONF, &
- & KIDIA=KIDIA, KFDIA=KFDIA, KLON=KLON, KLEVS=KLEVS, KTILES=KTILES, KSTEP=KSTEP, &
- & KLEVSN=KLEVSN, KLEVI=KLEVI, KDHVTLS=KDHVTLS, KDHFTLS=KDHFTLS, &
- & KDHVTSS=KDHVTSS, KDHFTSS=KDHFTSS, KDHVTTS=KDHVTTS, KDHFTTS=KDHFTTS, &
- & KDHVTIS=KDHVTIS, KDHFTIS=KDHFTIS, K_VMASS=N_VMASS, &
- & PTSTEP=PTSPHY, PRVDIFTS=RVDIFTS, &
-! input data, non-tiled
- & KTVL=KTVL, KTVH=KTVH, PCVL=PCVL, PCVH=PCVH, &
- & PUMLEV=PUM1(:,KLEV), PVMLEV=PVM1(:,KLEV), PTMLEV=PTM1(:,KLEV), &
- & PQMLEV=PQM1(:,KLEV), PAPHMS=PAPHM1(:,KLEV), PGEOMLEV=PGEOM1(:,KLEV), &
- & PCPTGZLEV=ZCPTGZ(:,KLEV), PSST=PSST, PTSKM1M=PTSKM1M, PCHAR=PCHAR, &
- & PSSRFL=PSSRFL, PSLRFL=PSLRFL, PEMIS=PEMIS, PTICE=PTICE, PTSNOW=PTSNOW, &
- & PWLMX=PWLMX, PUCURR=PUCURR, PVCURR=PVCURR, &
-! input data, soil
- & PTSAM1M=PTSAM1M, PWSAM1M=PWSAM1M, &
-! input data, tiled
- & PFRTI=PFRTI, PALBTI=PALBTI, &
-! updated data, tiled
- & PUSTRTI=PUSTRTI, PVSTRTI=PVSTRTI, PAHFSTI=PAHFSTI, PEVAPTI=PEVAPTI, &
- & PTSKTI=PTSKTI, &
-! updated data, non-tiled
- & PZ0M=PZ0M, PZ0H=PZ0H, &
-! output data, tiled
- & PSSRFLTI=PSSRFLTI, PQSTI=ZQSTI, PDQSTI=ZDQSTI, PCPTSTI=ZCPTSTI, &
- & PCFHTI=ZCFHTI, PCFQTI=ZCFQTI, PCSATTI=ZCSATTI, PCAIRTI=ZCAIRTI, &
-! output data, non-tiled
- & PKHLEV=PKH(:,KLEV), PCFMLEV=ZCFM(:,KLEV), PKMFL=ZKMFL, PKHFL=ZKHFL, &
- & PKQFL=ZKQFL, PEVAPSNW=PEVAPSNW, PZ0MW=ZZ0MW, PZ0HW=ZZ0HW, PZ0QW=ZZ0QW, &
- & PBLENDPP=ZBLEND, PCPTSPP=ZZCPTS, PQSAPP=ZZQSA, PBUOMPP=ZZBUOM, &
- & PZDLPP=ZZZDL, &
-! output data, diagnostics
- & PDHTLS=PDHTLS, PDHTSS=PDHTSS, PDHTTS=PDHTTS, PDHTIS=PDHTIS &
- & )
-
-
-                       
-!RN --- surface heat flux check ---
-DO JL=KIDIA,KFDIA
-!  If (.false.) THEN
-  IF (ZKHFL(JL).lt.-10._JPRB.or.ZKQFL(JL).lt.-10._JPRB) then
-        
-!    write(0,'(a,i,f10.6)') 'vdfmain:',JL,PTSKM1M(JL)
-    write(0,'(a,2f10.6)')   '  vdfmain: sfluxes:',ZKHFL(JL),ZKQFL(JL)
-    
-!    DO JK = 1,KTILES
-!     write(0,'(a,i,2f10.6)')'  vdfmain: Tskin:',JK,PFRTI(JL,JK),PTSKTI(JL,JK)
-!    ENDDO   
-    
-  ENDIF
-!  ENDIF
-ENDDO
-
-
-!RN --- surface heat flux limiters ---
-!DO JL=KIDIA,KFDIA
-!  ZKHFL(JL) = MAX( ZKHFL(JL), -1000.0_JPRB / RCPD)
-!  ZKQFL(JL) = MAX( ZKQFL(JL), -2000.0_JPRB / RLVTT )
-!ENDDO
-
-
+! 
+! DO JL=KIDIA,KFDIA
+!   DO JK = 1,KTILES
+!     ZTSKINTIOLD(JL,JK) = PTSKTI(JL,JK)
+!   ENDDO   
+! ENDDO   
+! 
+! CALL SURFEXCDRIVER(CDCONF=CDCONF, &
+!  & KIDIA=KIDIA, KFDIA=KFDIA, KLON=KLON, KLEVS=KLEVS, KTILES=KTILES, KSTEP=KSTEP, &
+!  & KLEVSN=KLEVSN, KLEVI=KLEVI, KDHVTLS=KDHVTLS, KDHFTLS=KDHFTLS, &
+!  & KDHVTSS=KDHVTSS, KDHFTSS=KDHFTSS, KDHVTTS=KDHVTTS, KDHFTTS=KDHFTTS, &
+!  & KDHVTIS=KDHVTIS, KDHFTIS=KDHFTIS, K_VMASS=N_VMASS, &
+!  & PTSTEP=PTSPHY, PRVDIFTS=RVDIFTS, &
+! ! input data, non-tiled
+!  & KTVL=KTVL, KTVH=KTVH, PCVL=PCVL, PCVH=PCVH, &
+!  & PUMLEV=PUM1(:,KLEV), PVMLEV=PVM1(:,KLEV), PTMLEV=PTM1(:,KLEV), &
+!  & PQMLEV=PQM1(:,KLEV), PAPHMS=PAPHM1(:,KLEV), PGEOMLEV=PGEOM1(:,KLEV), &
+!  & PCPTGZLEV=ZCPTGZ(:,KLEV), PSST=PSST, PTSKM1M=PTSKM1M, PCHAR=PCHAR, &
+!  & PSSRFL=PSSRFL, PSLRFL=PSLRFL, PEMIS=PEMIS, PTICE=PTICE, PTSNOW=PTSNOW, &
+!  & PWLMX=PWLMX, PUCURR=PUCURR, PVCURR=PVCURR, &
+! ! input data, soil
+!  & PTSAM1M=PTSAM1M, PWSAM1M=PWSAM1M, &
+! ! input data, tiled
+!  & PFRTI=PFRTI, PALBTI=PALBTI, &
+! ! updated data, tiled
+!  & PUSTRTI=PUSTRTI, PVSTRTI=PVSTRTI, PAHFSTI=PAHFSTI, PEVAPTI=PEVAPTI, &
+!  & PTSKTI=PTSKTI, &
+! ! updated data, non-tiled
+!  & PZ0M=PZ0M, PZ0H=PZ0H, &
+! ! output data, tiled
+!  & PSSRFLTI=PSSRFLTI, PQSTI=ZQSTI, PDQSTI=ZDQSTI, PCPTSTI=ZCPTSTI, &
+!  & PCFHTI=ZCFHTI, PCFQTI=ZCFQTI, PCSATTI=ZCSATTI, PCAIRTI=ZCAIRTI, &
+! ! output data, non-tiled
+!  & PKHLEV=PKH(:,KLEV), PCFMLEV=ZCFM(:,KLEV), PKMFL=ZKMFL, PKHFL=ZKHFL, &
+!  & PKQFL=ZKQFL, PEVAPSNW=PEVAPSNW, PZ0MW=ZZ0MW, PZ0HW=ZZ0HW, PZ0QW=ZZ0QW, &
+!  & PBLENDPP=ZBLEND, PCPTSPP=ZZCPTS, PQSAPP=ZZQSA, PBUOMPP=ZZBUOM, &
+!  & PZDLPP=ZZZDL, &
+! ! output data, diagnostics
+!  & PDHTLS=PDHTLS, PDHTSS=PDHTSS, PDHTTS=PDHTTS, PDHTIS=PDHTIS &
+!  & )
+! 
+! 
+!                        
+! !RN --- surface heat flux check ---
+! DO JL=KIDIA,KFDIA
+! !  If (.false.) THEN
+!   IF (ZKHFL(JL).lt.-10._JPRB.or.ZKQFL(JL).lt.-10._JPRB) then
+!         
+! !    write(0,'(a,i,f10.6)') 'vdfmain:',JL,PTSKM1M(JL)
+!     write(0,'(a,2f10.6)')   '  vdfmain: sfluxes:',ZKHFL(JL),ZKQFL(JL)
+!     
+! !    DO JK = 1,KTILES
+! !     write(0,'(a,i,2f10.6)')'  vdfmain: Tskin:',JK,PFRTI(JL,JK),PTSKTI(JL,JK)
+! !    ENDDO   
+!     
+!   ENDIF
+! !  ENDIF
+! ENDDO
+! 
+! 
+! !RN --- surface heat flux limiters ---
+! !DO JL=KIDIA,KFDIA
+! !  ZKHFL(JL) = MAX( ZKHFL(JL), -1000.0_JPRB / RCPD)
+! !  ZKQFL(JL) = MAX( ZKQFL(JL), -2000.0_JPRB / RLVTT )
+! !ENDDO
+! 
+! 
 
 !     ------------------------------------------------------------------
 
@@ -781,10 +781,10 @@ ENDIF
 
 
 !*         4.5  BOUNDARY LAYER HEIGHT FOR DIANOSTICS ONLY
-
-CALL VDFDPBL(KIDIA,KFDIA,KLON,KLEV,&
- & PUM1,PVM1,PTM1,PQM1,PGEOM1,&
- & ZKMFL,ZKHFL,ZKQFL,PBLH)  
+! 
+! CALL VDFDPBL(KIDIA,KFDIA,KLON,KLEV,&
+!  & PUM1,PVM1,PTM1,PQM1,PGEOM1,&
+!  & ZKMFL,ZKHFL,ZKQFL,PBLH)  
 
 
 !*         4.6  ORGANIZED UPDRAFTS
@@ -899,14 +899,14 @@ DO JD=2,IDRAFT
   
 ENDDO
 
-
-!*         4.9     TURBULENT OROGRAPHIC DRAG COEFFICIENTS 
-
-CALL VDFTOFDC(KIDIA,KFDIA,KLON,KLEV,ZTMST,&
- & PUM1,PVM1,PGEOM1,PSIGFLT,&
- & ZTOFDC)  
-
-
+! 
+! !*         4.9     TURBULENT OROGRAPHIC DRAG COEFFICIENTS 
+! 
+! CALL VDFTOFDC(KIDIA,KFDIA,KLON,KLEV,ZTMST,&
+!  & PUM1,PVM1,PGEOM1,PSIGFLT,&
+!  & ZTOFDC)  
+! 
+! 
 
 !     ------------------------------------------------------------------
 
@@ -1042,71 +1042,71 @@ ENDIF
 !*                  and gustiness
 
 !  Compute wind speed at blending height
-
-CALL VDFFBLEND(KIDIA,KFDIA,KLON,KLEV, &
- & PUM1, PVM1, PGEOM1, PUCURR, PVCURR, ZBLEND, &
- & ZFBLEND)
+! 
+! CALL VDFFBLEND(KIDIA,KFDIA,KLON,KLEV, &
+!  & PUM1, PVM1, PGEOM1, PUCURR, PVCURR, ZBLEND, &
+!  & ZFBLEND)
 
 ! Wrap-up computations for the surface and 2T/2D/10U/10V/gustiness computation
 
-CALL SURFPP( KIDIA=KIDIA,KFDIA=KFDIA,KLON=KLON,KTILES=KTILES, &
- & KDHVTLS=KDHVTLS,KDHFTLS=KDHFTLS, &
- & PTSTEP=PTSPHY, &
-! input
- & PFRTI=PFRTI, PAHFLTI=ZAHFLTI, PG0TI=ZG0, &
- & PSTRTULEV=PSTRTU(:,KLEV), PSTRTVLEV=PSTRTV(:,KLEV), PTSKM1M=PTSKM1M, &
- & PUMLEV=PUM1(:,KLEV), PVMLEV=PVM1(:,KLEV), PQMLEV=PQM1(:,KLEV), &
- & PGEOMLEV=PGEOM1(:,KLEV), PCPTSPP=ZZCPTS, PCPTGZLEV=ZCPTGZ(:,KLEV), &
- & PAPHMS=PAPHM1(:,KLEV), PZ0MW=ZZ0MW, PZ0HW=ZZ0HW, PZ0QW=ZZ0QW, &
- & PZDL=ZZZDL, PQSAPP=ZZQSA, PBLEND=ZBLEND, PFBLEND=ZFBLEND, PBUOM=ZZBUOM, &
- & PZ0M=PZ0M, PEVAPSNW=PEVAPSNW,PSSRFLTI=PSSRFLTI, PSLRFL=PSLRFL, PSST=PSST, &
- & PUCURR=PUCURR, PVCURR=PVCURR, &
-! updated
- & PAHFSTI=PAHFSTI, PEVAPTI=PEVAPTI, PTSKE1=PTSKE1,PTSKTIP1=ZTSKTIP1, &
-! output
- & PDIFTSLEV=PDIFTS(:,KLEV), PDIFTQLEV=PDIFTQ(:,KLEV), PUSTRTI=PUSTRTI, &
- & PVSTRTI=PVSTRTI,  PTSKTI=PTSKTI, PAHFLEV=PAHFLEV, PAHFLSB=PAHFLSB, &
- & PFWSB=PFWSB, PU10M=PU10M, PV10M=PV10M, PT2M=PT2M, PD2M=PD2M, PQ2M=PQ2M, &
- & PGUST=PGUST, PZIDLWV=PZIDLWV, &
-! output DDH
- & PDHTLS=PDHTLS &
- & )
-
-PDIFTL  (KIDIA:KFDIA,KLEV) = 0.0_JPRB
-PDIFTI  (KIDIA:KFDIA,KLEV) = 0.0_JPRB
-ZDIFTQT (KIDIA:KFDIA,KLEV) = 0.0_JPRB
-ZDIFTSLG(KIDIA:KFDIA,KLEV) = 0.0_JPRB
-ZDIFTQT (KIDIA:KFDIA,KLEV) = PDIFTQ(KIDIA:KFDIA,KLEV)
-ZDIFTSLG(KIDIA:KFDIA,KLEV) = PDIFTS(KIDIA:KFDIA,KLEV)
-
-
-
-!     ------------------------------------------------------------------
-
-!*         8.     SLG, QT, U, V FLUX COMPUTATIONS AND T,SKIN TENDENCY
-!                 ---------------------------------------------------
-
-DO JL=KIDIA,KFDIA
-  ZDIFTQT (JL,0) = 0.0_JPRB
-  PDIFTQ  (JL,0) = 0.0_JPRB
-  PDIFTL  (JL,0) = 0.0_JPRB
-  PDIFTI  (JL,0) = 0.0_JPRB
-  PDIFTS  (JL,0) = 0.0_JPRB
-  ZDIFTSLG(JL,0) = 0.0_JPRB
-  PSTRTU  (JL,0) = 0.0_JPRB
-  PSTRTV  (JL,0) = 0.0_JPRB
-ENDDO
-
-DO JK=KLEV-1,1,-1
-  DO JL=KIDIA,KFDIA
-    ZGDPH = - (PAPHM1(JL,JK)-PAPHM1(JL,JK+1)) * ZRG
-!...change in slg,qt,u,v tendencies are converted to fluxes
-    ZDIFTSLG(JL,JK) = ( ZSLGEWODIS(JL,JK+1) - ZSLGEA(JL,JK+1) ) * ZGDPH &
-                    & + ZDIFTSLG(JL,JK+1)  
-    ZDIFTQT(JL,JK)  = (ZQTE (JL,JK+1)-ZQTEA(JL,JK+1))*ZGDPH + ZDIFTQT(JL,JK+1)
-  ENDDO
-ENDDO
-
+! CALL SURFPP( KIDIA=KIDIA,KFDIA=KFDIA,KLON=KLON,KTILES=KTILES, &
+!  & KDHVTLS=KDHVTLS,KDHFTLS=KDHFTLS, &
+!  & PTSTEP=PTSPHY, &
+! ! input
+!  & PFRTI=PFRTI, PAHFLTI=ZAHFLTI, PG0TI=ZG0, &
+!  & PSTRTULEV=PSTRTU(:,KLEV), PSTRTVLEV=PSTRTV(:,KLEV), PTSKM1M=PTSKM1M, &
+!  & PUMLEV=PUM1(:,KLEV), PVMLEV=PVM1(:,KLEV), PQMLEV=PQM1(:,KLEV), &
+!  & PGEOMLEV=PGEOM1(:,KLEV), PCPTSPP=ZZCPTS, PCPTGZLEV=ZCPTGZ(:,KLEV), &
+!  & PAPHMS=PAPHM1(:,KLEV), PZ0MW=ZZ0MW, PZ0HW=ZZ0HW, PZ0QW=ZZ0QW, &
+!  & PZDL=ZZZDL, PQSAPP=ZZQSA, PBLEND=ZBLEND, PFBLEND=ZFBLEND, PBUOM=ZZBUOM, &
+!  & PZ0M=PZ0M, PEVAPSNW=PEVAPSNW,PSSRFLTI=PSSRFLTI, PSLRFL=PSLRFL, PSST=PSST, &
+!  & PUCURR=PUCURR, PVCURR=PVCURR, &
+! ! updated
+!  & PAHFSTI=PAHFSTI, PEVAPTI=PEVAPTI, PTSKE1=PTSKE1,PTSKTIP1=ZTSKTIP1, &
+! ! output
+!  & PDIFTSLEV=PDIFTS(:,KLEV), PDIFTQLEV=PDIFTQ(:,KLEV), PUSTRTI=PUSTRTI, &
+!  & PVSTRTI=PVSTRTI,  PTSKTI=PTSKTI, PAHFLEV=PAHFLEV, PAHFLSB=PAHFLSB, &
+!  & PFWSB=PFWSB, PU10M=PU10M, PV10M=PV10M, PT2M=PT2M, PD2M=PD2M, PQ2M=PQ2M, &
+!  & PGUST=PGUST, PZIDLWV=PZIDLWV, &
+! ! output DDH
+!  & PDHTLS=PDHTLS &
+!  & )
+! 
+! PDIFTL  (KIDIA:KFDIA,KLEV) = 0.0_JPRB
+! PDIFTI  (KIDIA:KFDIA,KLEV) = 0.0_JPRB
+! ZDIFTQT (KIDIA:KFDIA,KLEV) = 0.0_JPRB
+! ZDIFTSLG(KIDIA:KFDIA,KLEV) = 0.0_JPRB
+! ZDIFTQT (KIDIA:KFDIA,KLEV) = PDIFTQ(KIDIA:KFDIA,KLEV)
+! ZDIFTSLG(KIDIA:KFDIA,KLEV) = PDIFTS(KIDIA:KFDIA,KLEV)
+! 
+! 
+! 
+! !     ------------------------------------------------------------------
+! 
+! !*         8.     SLG, QT, U, V FLUX COMPUTATIONS AND T,SKIN TENDENCY
+! !                 ---------------------------------------------------
+! 
+! DO JL=KIDIA,KFDIA
+!   ZDIFTQT (JL,0) = 0.0_JPRB
+!   PDIFTQ  (JL,0) = 0.0_JPRB
+!   PDIFTL  (JL,0) = 0.0_JPRB
+!   PDIFTI  (JL,0) = 0.0_JPRB
+!   PDIFTS  (JL,0) = 0.0_JPRB
+!   ZDIFTSLG(JL,0) = 0.0_JPRB
+!   PSTRTU  (JL,0) = 0.0_JPRB
+!   PSTRTV  (JL,0) = 0.0_JPRB
+! ENDDO
+! 
+! DO JK=KLEV-1,1,-1
+!   DO JL=KIDIA,KFDIA
+!     ZGDPH = - (PAPHM1(JL,JK)-PAPHM1(JL,JK+1)) * ZRG
+! !...change in slg,qt,u,v tendencies are converted to fluxes
+!     ZDIFTSLG(JL,JK) = ( ZSLGEWODIS(JL,JK+1) - ZSLGEA(JL,JK+1) ) * ZGDPH &
+!                     & + ZDIFTSLG(JL,JK+1)  
+!     ZDIFTQT(JL,JK)  = (ZQTE (JL,JK+1)-ZQTEA(JL,JK+1))*ZGDPH + ZDIFTQT(JL,JK+1)
+!   ENDDO
+! ENDDO
+! 
 
 
 !     ------------------------------------------------------------------
@@ -1555,5 +1555,5 @@ DO JK=1,KLEV
 ENDDO    
 
 
-IF (LHOOK) CALL DR_HOOK('VDFMAIN',1,ZHOOK_HANDLE)
+! IF (LHOOK) CALL DR_HOOK('VDFMAIN',1,ZHOOK_HANDLE)
 END SUBROUTINE VDFMAIN

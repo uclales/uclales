@@ -78,9 +78,9 @@ SUBROUTINE VDFEXCU(KIDIA  , KFDIA  , KLON   , KLEV   , KDRAFT , PTMST  , PZ0MM  
 !     SEE DOCUMENTATION
 
 !     ------------------------------------------------------------------
-use garbage, only : surf_inq, phims, phihs, phimu, phihu, vrec
+use garbage, only : vrec, phims, phihs, phimu, phihu
 USE PARKIND1  ,ONLY : JPIM     ,JPRB
-USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
+! ! USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
 
 USE YOMCST   , ONLY : RG       ,RD       ,RCPD     ,RETV     ,RATM
 USE YOETHF   , ONLY : RVTMP2
@@ -173,12 +173,12 @@ REAL(KIND=JPRB) ::    ZTMP3(KFDIA-KIDIA+1+N_VMASS)
 REAL(KIND=JPRB) ::    ZTMP4(KFDIA-KIDIA+1+N_VMASS)
 REAL(KIND=JPRB) ::    ZTMP5(KFDIA-KIDIA+1+N_VMASS)
 REAL(KIND=JPRB) ::    ZHOOK_HANDLE
-
-INTERFACE
-#include "surf_inq.h"
-END INTERFACE
-
-#include "fcvdfs.h"
+! 
+! INTERFACE
+! #include "surf_inq.h"
+! END INTERFACE
+! 
+! #include "fcvdfs.h"
 
 
 
@@ -187,7 +187,7 @@ END INTERFACE
 !*         1.     INITIALIZE CONSTANTS
 !                 --------------------
 
-IF (LHOOK) CALL DR_HOOK('VDFEXCU',0,ZHOOK_HANDLE)
+! IF (LHOOK) CALL DR_HOOK('VDFEXCU',0,ZHOOK_HANDLE)
 
 ZENTRSFC  = 0.2_JPRB       ! factor for surface based top entrainment 
 ZENTRRAD  = 0.2_JPRB       ! factor for radiative based top entrainment 
@@ -204,7 +204,7 @@ LLRICU = .TRUE.   ! switch for top-entrainment efficiency closure using Ri^cu at
 ZKFACEDMF = 0.8_JPRB     !aup = 5%   !cy32r3
 !ZKFACEDMF = 0.692_JPRB   !aup = 10%
 
-CALL SURF_INQ(PREPUST=ZREPUST)
+! CALL SURF_INQ(PREPUST=ZREPUST)
 
 ! optimization
 ZRG       = 1.0_JPRB/RG
@@ -700,5 +700,5 @@ ENDIF
 !***
 
 
-IF (LHOOK) CALL DR_HOOK('VDFEXCU',1,ZHOOK_HANDLE)
+! IF (LHOOK) CALL DR_HOOK('VDFEXCU',1,ZHOOK_HANDLE)
 END SUBROUTINE VDFEXCU

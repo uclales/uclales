@@ -73,7 +73,7 @@ SUBROUTINE VDFBUOYSORT ( KIDIA    , KFDIA   , KLON    , KLEV     , KDRAFT   , &
 
 USE PARKIND1  ,ONLY : JPIM   , JPRB
 
-USE YOMHOOK   ,ONLY : LHOOK  , DR_HOOK
+! USE YOMHOOK   ,ONLY : LHOOK  , DR_HOOK
 
 USE YOMCST   , ONLY : RG     , RCPD    , RLVTT
 
@@ -154,12 +154,12 @@ INTEGER(KIND=JPIM) :: JK, JL, JP, JD
 LOGICAL ::            LLPBL(KLON,KLEV)
 
 
-REAL(KIND=JPRB) ::    ZHOOK_HANDLE
+! REAL(KIND=JPRB) ::    ZHOOK_HANDLE
 
-
-#include "vdfpdftable.intfb.h"
-#include "vdfsat.intfb.h"
-#include "vdfthermo.intfb.h"
+! 
+! #include "vdfpdftable.intfb.h"
+! #include "vdfsat.intfb.h"
+! #include "vdfthermo.intfb.h"
 
 
 
@@ -169,7 +169,7 @@ REAL(KIND=JPRB) ::    ZHOOK_HANDLE
 !                 --------------------
 !
 
-IF (LHOOK) CALL DR_HOOK('VDFBUOYSORT',0,ZHOOK_HANDLE)
+! IF (LHOOK) CALL DR_HOOK('VDFBUOYSORT',0,ZHOOK_HANDLE)
 
 ZRG = 1._JPRB/RG
 
@@ -475,7 +475,7 @@ ENDDO
   
         
         
-IF (LHOOK) CALL DR_HOOK('VDFBUOYSORT',1,ZHOOK_HANDLE)
+! IF (LHOOK) CALL DR_HOOK('VDFBUOYSORT',1,ZHOOK_HANDLE)
 
 RETURN
 END SUBROUTINE VDFBUOYSORT

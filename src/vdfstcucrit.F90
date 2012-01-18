@@ -82,7 +82,7 @@ SUBROUTINE VDFSTCUCRIT (KIDIA   , KFDIA   , KLON    , KLEV    , KDRAFT  , &
 use garbage   ,only : foeewm, foealfa
 USE PARKIND1  ,ONLY : JPIM     , JPRB
 
-USE YOMHOOK   ,ONLY : LHOOK    , DR_HOOK
+! USE YOMHOOK   ,ONLY : LHOOK    , DR_HOOK
 
 USE YOMCST   , ONLY : RD       , RG      , RCPD     , RETV     , RLVTT, &
                      &RLSTT    ,RTT
@@ -129,13 +129,13 @@ INTEGER(KIND=JPIM) :: IS, JK, JL, JD
 
 INTEGER(KIND=JPIM) :: I700(KLON)
 
-REAL(KIND=JPRB) ::    ZHOOK_HANDLE
+! REAL(KIND=JPRB) ::    ZHOOK_HANDLE
 
 
 !#include "cuadjtq.intfb.h"
 
 !DIR$ VFUNCTION EXPHF
-#include "fcttre.h"
+! #include "fcttre.h"
 
 
 
@@ -144,7 +144,7 @@ REAL(KIND=JPRB) ::    ZHOOK_HANDLE
 !*         1.     SET SOME CONSTANTS
 !                 --------------------
 
-IF (LHOOK) CALL DR_HOOK('VDFSTCUCRIT',0,ZHOOK_HANDLE)
+! IF (LHOOK) CALL DR_HOOK('VDFSTCUCRIT',0,ZHOOK_HANDLE)
 
 ! optimization
 ZRG         = 1.0_JPRB/RG
@@ -267,5 +267,5 @@ ZRG         = 1.0_JPRB/RG
 
 
 
-IF (LHOOK) CALL DR_HOOK('VDFSTCUCRIT',1,ZHOOK_HANDLE)
+! IF (LHOOK) CALL DR_HOOK('VDFSTCUCRIT',1,ZHOOK_HANDLE)
 END SUBROUTINE VDFSTCUCRIT

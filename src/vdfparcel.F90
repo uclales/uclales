@@ -108,7 +108,7 @@ SUBROUTINE VDFPARCEL (KIDIA   , KFDIA   , KLON    , KLEV    , KDRAFT  , &
 use garbage, only : foealfa, cuadjtq
 USE PARKIND1  ,ONLY : JPIM     , JPRB
 
-USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
+! USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
 
 USE YOETHF   , ONLY : R2ES     , R3LES    , R3IES    , &
                      &R4LES    , R4IES    , R5LES    , R5IES     , RVTMP2  , & 
@@ -181,11 +181,11 @@ INTEGER(KIND=JPIM) :: IS, JK, JL, JKMAX, JKMIN
 
 REAL(KIND=JPRB) ::    ZDQSUDZ, ZDQTUDZ, ZLCLFAC(KLON), ZEPSCFLFAC, ZQLWORK, ZLCRIT
 
-REAL(KIND=JPRB) ::    ZHOOK_HANDLE
+! REAL(KIND=JPRB) ::    ZHOOK_HANDLE
 
 !DIR$ VFUNCTION EXPHF
-#include "fcttre.h"
-#include "cuadjtq.intfb.h"
+! #include "fcttre.h"
+! #include "cuadjtq.intfb.h"
 
 
 !     -----------------------------------------------------------------
@@ -193,7 +193,7 @@ REAL(KIND=JPRB) ::    ZHOOK_HANDLE
 !*         1.     SET SOME CONSTANTS
 !                 --------------------
 
-IF (LHOOK) CALL DR_HOOK('VDFPARCEL',0,ZHOOK_HANDLE)
+! IF (LHOOK) CALL DR_HOOK('VDFPARCEL',0,ZHOOK_HANDLE)
 
 !  Constant of proportionality between updraft induced pressure term and
 !     updraft vertical acceleration (Siebesma, Soares and Teixeira, JAS 2007)
@@ -484,5 +484,5 @@ ZLCRIT = 0.001_JPRB     !cy32r3
   ENDDO
 
 
-IF (LHOOK) CALL DR_HOOK('VDFPARCEL',1,ZHOOK_HANDLE)
+! IF (LHOOK) CALL DR_HOOK('VDFPARCEL',1,ZHOOK_HANDLE)
 END SUBROUTINE VDFPARCEL
