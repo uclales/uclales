@@ -31,6 +31,7 @@ $(LES_ARC)(ncio.o)   \
 $(LES_ARC)(stat.o)   \
 $(LES_ARC)(sgsm.o)   \
 $(LES_ARC)(prss.o)   \
+$(LES_ARC)(lsmdata.o)   \
 $(LES_ARC)(srfc.o)   \
 $(LES_ARC)(advf.o)   \
 $(LES_ARC)(advl.o)   \
@@ -91,3 +92,4 @@ step.o:		icemcrp.o mpi_interface.o
 init.o:		grid.o ncio.o step.o icemcrp.o
 ncio.o:		grid.o mpi_interface.o icemcrp.o
 lsvar.o:	forc.o
+srfc.o: 	lsmdata.o

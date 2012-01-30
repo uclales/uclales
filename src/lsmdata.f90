@@ -1,0 +1,366 @@
+! Module to define and initialize all land surface variables
+! Adopted from DALES (vanHeerwarden)
+!----------------------------------------------------------------------------
+!
+
+module lsmdata
+
+  SAVE
+
+  integer           :: nradtime  = 60.
+
+  ! Flags
+  ! ----------------------------------------------------------
+  logical           :: init_lsm    = .true.   !<   Flag for initializing LSM
+  logical           :: lmostlocal  = .false.  !<  Switch to MOST locally to get local Obukhov length
+  logical           :: lsmoothflux = .false.  !<  Create uniform sensible & latent heat over domain
+  logical           :: lneutral    = .false.  !<  Disable stability corrections
+  logical           :: lmlfilter   = .false.  !<  Filter variables at 3 dx to  prevent peak in
+                                              !<  dimensionless wind profile if MOST-local is enabled
+
+  ! Soil properties
+  ! ----------------------------------------------------------
+
+  ! Domain-uniform properties
+  integer,parameter :: ksoilmax = 4       !<  Number of soil layers [-]
+
+  real              :: lambdasat          !<  heat conductivity saturated soil [W/m/K]
+  real              :: Ke                 !<  Kersten number [-]
+
+  real, allocatable :: zsoil  (:)         !<  Height of bottom soil layer from surface [m]
+  real, allocatable :: zsoilc (:)         !<  Height of center soil layer from surface [m]
+  real, allocatable :: dzsoil (:)         !<  Depth of soil layer [m]
+  real, allocatable :: dzsoilh(:)         !<  Depth of soil layer between center of layers [m]
+
+  ! Spatially varying properties
+  real, allocatable :: lambda  (:,:,:)    !<  Heat conductivity soil layer [W/m/K]
+  real, allocatable :: lambdah (:,:,:)    !<  Heat conductivity soil layer half levels [W/m/K]
+
+  real, allocatable :: lambdas (:,:,:)    !<  Soil moisture diffusivity soil layer 
+  real, allocatable :: lambdash(:,:,:)    !<  Soil moisture diffusivity soil half levels 
+
+  real, allocatable :: gammas  (:,:,:)    !<  Soil moisture conductivity soil layer 
+  real, allocatable :: gammash (:,:,:)    !<  Soil moisture conductivity soil half levels 
+
+  real, allocatable :: rootf   (:,:,:)    !<  Root fraction per soil layer [-]
+  real              :: rootfav (ksoilmax) !<  Average root fraction per soil layer [-]
+
+  real, allocatable :: phiw    (:,:,:)    !<  Water content soil matrix [-]
+  real              :: phiwav  (ksoilmax) !<  Average water content soil matrix [-]
+
+  real, allocatable :: phiwm   (:,:,:)    !<  Water content soil matrix previous time step [-]
+  real, allocatable :: phifrac (:,:,:)    !<  Relative water content per layer [-]
+  real, allocatable :: phitot  (:,:)      !<  Total soil water content [-]
+  real, allocatable :: pCs     (:,:,:)    !<  Volumetric heat capacity [J/m3/K]
+  real, allocatable :: Dh      (:,:,:)    !<  Heat diffusivity
+
+  real, allocatable :: sflxd_avn (:,:,:)  !<  Radiation of nradtime timesteps
+  real, allocatable :: sflxu_avn (:,:,:)  !<  Radiation of nradtime timesteps
+  real, allocatable :: lflxd_avn (:,:,:)  !<  Radiation of nradtime timesteps
+  real, allocatable :: lflxu_avn (:,:,:)  !<  Radiation of nradtime timesteps
+
+  real, allocatable :: tsoil   (:,:,:)    !<  Soil temperature [K]
+  real, allocatable :: tsoilm  (:,:,:)    !<  Soil temperature previous time step [K]
+  real              :: tsoilav (ksoilmax) !<  Average Soil temperature [K]
+
+  real, allocatable :: tsoildeep (:,:)    !<  Deep soil temperature [K]
+  real              :: tsoildeepav = 283. !< Average deep soil temperature [K]
+
+  ! Soil related constants [adapted from ECMWF]
+  real, parameter   :: phi       = 0.472  !<  volumetric soil porosity [-]
+  real, parameter   :: phifc     = 0.323  !<  volumetric moisture at field capacity [-]
+  real, parameter   :: phiwp     = 0.171  !<  volumetric moisture at wilting point [-]
+
+  real, parameter   :: pCm       = 2.19e6 !<  Volumetric soil heat capacity [J/m3/K]
+  real, parameter   :: pCw       = 4.2e6  !<  Volumetric water heat capacity [J/m3/K]
+
+  real, parameter   :: lambdadry = 0.190  !<  Heat conductivity dry soil [W/m/K]
+  real, parameter   :: lambdasm  = 3.11   !<  Heat conductivity soil matrix [W/m/K]
+  real, parameter   :: lambdaw   = 0.57   !<  Heat conductivity water [W/m/K]
+
+  real, parameter   :: bc        = 6.04     !< Clapp and Hornberger non-dimensional exponent [-]
+  real, parameter   :: gammasat  = 0.57e-6  !< Hydraulic conductivity at saturation [m s-1]
+  real, parameter   :: psisat    = -0.388   !< Matrix potential at saturation [m]
+
+  ! Land surface properties
+  ! ----------------------------------------------------------
+
+  ! Surface properties
+  real, allocatable :: z0m        (:,:) !<  Roughness length for momentum [m]
+  real              :: z0mav    = 0.1
+
+  real, allocatable :: z0h        (:,:) !<  Roughness length for heat [m]
+  real              :: z0hav    = 0.025
+
+  real, allocatable :: albedo     (:,:) !<  Surface albedo [-]
+  real              :: albedoav = 0.25
+
+  real, allocatable :: LAI        (:,:) !<  Leaf area index vegetation [-]
+  real              :: LAIav    = 2.
+
+  real, allocatable :: Cskin      (:,:) !<  Heat capacity skin layer [J]
+  real              :: Cskinav  = 20000.
+
+  real, allocatable :: cveg       (:,:) !<  Vegetation cover [-]
+  real              :: cvegav   = 0.9
+
+  real, allocatable :: lambdaskin (:,:) !<  Heat conductivity skin layer [W/m/K]
+  real              :: lambdaskinav = 5.
+
+  real, allocatable :: Wl         (:,:) !<  Liquid water reservoir [m]
+  real              :: Wlav    = 0.     
+                             
+  real, parameter   :: Wmax    = 0.0002 !<  Maximum layer of liquid water on surface [m]
+  real, allocatable :: Wlm        (:,:) !<  Liquid water reservoir previous timestep [m]
+
+  real, allocatable :: cliq       (:,:) !<  Fraction of vegetated surface covered with liquid water 
+  real, allocatable :: tskin      (:,:) !<  Skin temperature [K]
+  real, allocatable :: tskinm     (:,:) !<  Skin temperature previous timestep [K]
+  real, allocatable :: qskin      (:,:) !<  Skin specific humidity [kg/kg]
+  real              :: tskinavg = 0.    !<  Slab average of tskin used by srfcsclrs 
+
+  ! Surface energy balance
+  real, allocatable :: Qnet     (:,:)   !<  Net radiation [W/m2]
+  real              :: Qnetav   = 300.
+
+  real, allocatable :: rsmin    (:,:)   !<  Minimum vegetation resistance [s/m]
+  real              :: rsminav = 110.
+
+  real, allocatable :: rssoilmin(:,:)   !<  Minimum soil evaporation resistance [s/m]
+  real              :: rssoilminav = 50.
+
+  real, allocatable :: gD       (:,:)   !<  Response factor vegetation to vapor pressure deficit [-]
+  real              :: gDav	= 0.
+
+  real, allocatable :: LE       (:,:)   !<  Latent heat flux [W/m2]
+  real, allocatable :: H        (:,:)   !<  Sensible heat flux [W/m2]
+  real, allocatable :: G0       (:,:)   !<  Ground heat flux [W/m2]
+  real, allocatable :: ra       (:,:)   !<  Aerodynamic resistance [s/m]
+  real, allocatable :: rs       (:,:)   !<  Composite resistance [s/m]
+  real, allocatable :: rsveg    (:,:)   !<  Vegetation resistance [s/m]
+  real, allocatable :: rssoil   (:,:)   !<  Soil evaporation resistance [s/m]
+  real, allocatable :: tendskin (:,:)   !<  Tendency of skin [W/m2]
+  !real              :: rsisurf2 = 0.    !<  Vegetation resistance [s/m] if isurf2 is used
+
+  ! Turbulent exchange variables
+  real              :: oblav            !<  Spatially averaged obukhov length [m]
+  real, allocatable :: cm      (:,:)    !<  Drag coefficient for momentum [-]
+  real, allocatable :: cs      (:,:)    !<  Drag coefficient for scalars [-]
+
+  !real, allocatable :: u0bar    (:,:)   !<  Filtered u-wind component
+  !real, allocatable :: v0bar    (:,:)   !<  Filtered v-wind component
+  !real, allocatable :: a_thetabar  (:,:)   !<  Filtered liquid water pot temp at first level
+  !real, allocatable :: vaporbar   (:,:)   !<  Filtered specific humidity at first full level
+  !real, allocatable :: tskinbar (:,:)   !<  Filtered surface temperature
+  !real, allocatable :: qskinbar (:,:)   !<  Filtered surface specific humidity
+
+  !real, allocatable :: thlflux (:,:)    !<  Kinematic temperature flux [K m/s]
+  !real, allocatable :: qtflux  (:,:)    !<  Kinematic specific humidity flux [kg/kg m/s]
+  !real, allocatable :: svflux  (:,:,:)  !<  Kinematic scalar flux [- m/s]
+
+  ! Surface properties in case of prescribed conditions (previous isurf 2, 3 and 4)
+  !real              :: thls  = -1       !<  Surface liquid water potential temperature [K]
+  !real              :: qts              !<  Surface specific humidity [kg/kg]
+  !real              :: thvs             !<  Surface virtual temperature [K]
+  !real, allocatable :: svs   (:)        !<  Surface scalar concentration [-]
+
+  ! Prescribed surface fluxes
+  !real              :: ustin  = -1      !<  Prescribed friction velocity [m/s]
+  !real              :: wtsurf = -1      !<  Prescribed kinematic temperature flux [K m/s]
+  !real              :: wqsurf = -1      !<  Prescribed kinematic moisture flux [kg/kg m/s]
+  !real              :: wsvsurf(100) = 0 !<  Prescribed surface scalar(n) flux [- m/s]
+
+  contains
+
+  !
+  ! ----------------------------------------------------------
+  ! Malte: initialize LSM and surface layer
+  ! Adopted from DALES (vanHeerwaarden)
+  !
+  subroutine initlsm
+    use grid, only : nxp, nyp, th00, vapor, iradtyp
+    use init, only : rts
+    integer :: k, ierr
+
+    ! --------------------------------------------------------
+    ! Allocate surface arrays
+    ! 
+    allocate(ra(nxp,nyp))
+    allocate(rs(nxp,nyp))
+    allocate(z0m(nxp,nyp))
+    allocate(z0h(nxp,nyp))
+    allocate(tskin(nxp,nyp))
+    allocate(qskin(nxp,nyp))
+    allocate(cm(nxp,nyp))
+    allocate(cs(nxp,nyp))
+    allocate(albedo(nxp,nyp))
+
+    if(iradtyp == 4) then
+      allocate(sflxd_avn(nxp,nyp,nradtime))
+      allocate(sflxu_avn(nxp,nyp,nradtime))
+      allocate(lflxd_avn(nxp,nyp,nradtime))
+      allocate(lflxu_avn(nxp,nyp,nradtime))
+      
+      sflxd_avn (:,:,:) = 0
+      sflxu_avn (:,:,:) = 0
+      lflxd_avn (:,:,:) = 0
+      lflxu_avn (:,:,:) = 0
+    end if
+
+    ! Allocate LSM arrays
+    allocate(zsoil(ksoilmax))
+    allocate(zsoilc(ksoilmax))
+    allocate(dzsoil(ksoilmax))
+    allocate(dzsoilh(ksoilmax))
+    allocate(lambda(nxp,nyp,ksoilmax))
+    allocate(lambdah(nxp,nyp,ksoilmax))
+    allocate(lambdas(nxp,nyp,ksoilmax))
+    allocate(lambdash(nxp,nyp,ksoilmax))
+    allocate(gammas(nxp,nyp,ksoilmax))
+    allocate(gammash(nxp,nyp,ksoilmax))
+    allocate(Dh(nxp,nyp,ksoilmax))
+    allocate(phiw(nxp,nyp,ksoilmax))
+    allocate(phiwm(nxp,nyp,ksoilmax))
+    allocate(phifrac(nxp,nyp,ksoilmax))
+    allocate(pCs(nxp,nyp,ksoilmax))
+    allocate(rootf(nxp,nyp,ksoilmax))
+    allocate(tsoil(nxp,nyp,ksoilmax))
+    allocate(tsoilm(nxp,nyp,ksoilmax))
+    allocate(tsoildeep(nxp,nyp))
+    allocate(phitot(nxp,nyp))
+
+    allocate(Qnet(nxp,nyp))
+    allocate(LE(nxp,nyp))
+    allocate(H(nxp,nyp))
+    allocate(G0(nxp,nyp))
+
+    allocate(rsveg(nxp,nyp))
+    allocate(rsmin(nxp,nyp))
+    allocate(rssoil(nxp,nyp))
+    allocate(rssoilmin(nxp,nyp))
+    allocate(cveg(nxp,nyp))
+    allocate(cliq(nxp,nyp))
+    allocate(tendskin(nxp,nyp))
+    allocate(tskinm(nxp,nyp))
+    allocate(Cskin(nxp,nyp))
+    allocate(lambdaskin(nxp,nyp))
+    allocate(LAI(nxp,nyp))
+    allocate(gD(nxp,nyp))
+    allocate(Wl(nxp,nyp))
+    allocate(Wlm(nxp,nyp))
+
+    ! Allocate filtered variables
+    !if (lmostlocal) then
+    !  allocate(u0bar      (2-ih:i1+ih,2-jh:j1+jh))
+    !  allocate(v0bar      (2-ih:i1+ih,2-jh:j1+jh))
+    !  allocate(a_thetabar (2-ih:i1+ih,2-jh:j1+jh))
+    !  allocate(vaporbar   (2-ih:i1+ih,2-jh:j1+jh))
+    !  allocate(tskinbar(nxp,nyp))
+    !  allocate(qskinbar(nxp,nyp))
+    !end if
+
+    ! --------------------------------------------------------
+    ! Read LSM-specific NAMELIST (SURFNAMELIST)
+    !
+    namelist/SURFNAMELIST/ & 
+    !< Switches
+    lmostlocal, lmlfilter, lsmoothflux, lneutral, &
+    !< Soil related variables
+    tsoilav, tsoildeepav, phiwav, rootfav, &
+    !< Land surface related variables
+    z0mav, z0hav, rsisurf2, &
+    Cskinav, lambdaskinav, albedoav, Qnetav, cvegav, Wlav, &
+    !< Jarvis-Steward related variables
+    rsminav, rssoilminav, LAIav, gDav
+
+    open(17,file='SURFNAMELIST',status='old',iostat=ierr)
+    read (17,SURFNAMELIST,iostat=ierr)
+    if (ierr > 0) then
+      print *, 'Problem in namoptions SURFNAMELIST'
+      print *, 'iostat error: ', ierr
+      stop 'ERROR: Problem in namoptions SURFNAMELIST'
+    endif
+    write(6 ,SURFNAMELIST)
+    close(17)
+
+    ! --------------------------------------------------------
+    ! Initialize arrays
+    ! 
+    tskinm	= th00
+    tskin	= th00
+    qskin	= rts(1)
+    qskinn	= rts(1)
+    albedo	= albedoav
+    z0m		= z0mav
+    z0h		= z0hav
+
+    dzsoil(1) = 0.07		!< First test, pick ECMWF config
+    dzsoil(2) = 0.21
+    dzsoil(3) = 0.72
+    dzsoil(4) = 1.89
+
+    ! Calculate vertical layer properties
+    zsoil(1)  = dzsoil(1)
+    do k = 2, ksoilmax
+      zsoil(k) = zsoil(k-1) + dzsoil(k)
+    end do
+    zsoilc = -(zsoil-0.5*dzsoil)
+    do k = 1, ksoilmax-1
+      dzsoilh(k) = 0.5 * (dzsoil(k+1) + dzsoil(k))
+    end do
+    dzsoilh(ksoilmax) = 0.5 * dzsoil(ksoilmax)
+
+    ! Set evaporation related properties
+    ! Set water content of soil - constant in this scheme
+    phiw(:,:,1) = phiwav(1)
+    phiw(:,:,2) = phiwav(2)
+    phiw(:,:,3) = phiwav(3)
+    phiw(:,:,4) = phiwav(4)
+    
+    phiwm(:,:,1) = phiwav(1)
+    phiwm(:,:,2) = phiwav(2)
+    phiwm(:,:,3) = phiwav(3)
+    phiwm(:,:,4) = phiwav(4)    
+
+    phitot = 0.0
+    do k = 1, ksoilmax
+      phitot(:,:) = phitot(:,:) + phiw(:,:,k) * dzsoil(k)
+    end do
+    phitot(:,:) = phitot(:,:) / zsoil(ksoilmax)
+    do k = 1, ksoilmax
+      phifrac(:,:,k) = phiw(:,:,k) * dzsoil(k) / zsoil(ksoilmax) / phitot(:,:)
+    end do
+
+    ! Set root fraction per layer for short grass
+    rootf(:,:,1) = rootfav(1)
+    rootf(:,:,2) = rootfav(2)
+    rootf(:,:,3) = rootfav(3)
+    rootf(:,:,4) = rootfav(4)
+
+    tsoil(:,:,1)   = tsoilav(1)
+    tsoil(:,:,2)   = tsoilav(2)
+    tsoil(:,:,3)   = tsoilav(3)
+    tsoil(:,:,4)   = tsoilav(4)
+    tsoilm(:,:,1)   = tsoilav(1)
+    tsoilm(:,:,2)   = tsoilav(2)
+    tsoilm(:,:,3)   = tsoilav(3)
+    tsoilm(:,:,4)   = tsoilav(4)
+    tsoildeep(:,:) = tsoildeepav
+
+    ! Calculate conductivity saturated soil
+    lambdasat = lambdasm ** (1. - phi) * lambdaw ** (phi)
+
+    Qnet       = Qnetav
+    Cskin      = Cskinav
+    lambdaskin = lambdaskinav
+    rsmin      = rsminav
+    rssoilmin  = rssoilminav
+    LAI        = LAIav
+    gD         = gDav
+    cveg       = cvegav
+    cliq       = 0.
+    Wl         = Wlav
+
+  end subroutine initlsm
+
+end module lsmdata
