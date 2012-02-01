@@ -98,7 +98,7 @@ contains
     use modnudge, only : lnudge,tnudgefac
     use modtimedep, only : ltimedep
     use mcrp, only : microseq,lrandommicro,timenuc,nin_set,cloud_type
-
+    use vdf, only : ledmfdiag, leddiag
     implicit none
 
     namelist /model/  &
@@ -135,8 +135,8 @@ contains
          SolarConstant, & ! SolarConstant (In case of prescribed TOA radiation
          lrandommicro, microseq,timenuc ,nin_set,cloud_type, &  !thijs: sequence of variables for microphysics
          lwaterbudget, &                 ! axel: flag for liquid water budget diagnostics (only level=3)
-         lcouvreux , tau                     ! The Couvreux 'radioactive' scalar
-
+         lcouvreux , tau ,&                    ! The Couvreux 'radioactive' scalar
+         ledmfdiag, leddiag
     ps       = 0.
     ts       = th00
     !

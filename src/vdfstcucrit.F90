@@ -84,7 +84,7 @@ USE PARKIND1  ,ONLY : JPIM     , JPRB
 
 ! USE YOMHOOK   ,ONLY : LHOOK    , DR_HOOK
 
-USE YOMCST   , ONLY : RD       , RG      , RCPD     , RETV     , RLVTT, &
+USE yos_cst   , ONLY : RD       , RG      , RCPD     , RETV     , RLVTT, &
                      &RLSTT    ,RTT
 
 USE YOETHF   , ONLY : R2ES     ,R3LES    ,R3IES    ,R4LES    ,R4IES   ,R5LES    ,R5IES, &

@@ -191,6 +191,7 @@ contains
     use forc, only : forcings
     use lsvar, only : varlscale
     use util, only : velset,get_avg
+    use vdf, only :vdfouter, ledmfdiag
     use modtimedep, only : timedep
 
     logical, parameter :: debug = .false.
@@ -244,6 +245,7 @@ contains
        call thermo (level)
        if (debug) WRITE (0,*) 't_step statflg statistics, myid=',myid
        call statistics (time+dt)
+       if (ledmfdiag) call vdfouter(dt)
        sflg = .False.
     end if
   end subroutine t_step

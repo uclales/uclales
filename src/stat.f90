@@ -30,7 +30,8 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 45, nvar2 = 114 ! number of time series and profiles
+  integer, parameter :: nvar1 = 45, nvar2 = 114
+  integer, parameter ::nedmf_ts_start=46, nedmf_ts_end=46, nedmf_ps_start=115, nedmf_ps_end= 115! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2, nv1=nvar1, nv2=nvar2
   real, save         :: fsttm, lsttm, nsmp = 0
 
@@ -68,7 +69,8 @@ module stat
        'frc_ran','hst_srf','lflxu  ','lflxd  ','sflxu  ','sflxd  ', & !91
        'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel', & !97
        'rsup   ','prc_c  ','prc_i  ','prc_s  ','prc_g  ','prc_h  ', & !103
-       'hail   ','qt_th  ','s_1    ','s_2    ','s_3    ','RH     '/) !109-113
+       'hail   ','qt_th  ','s_1    ','s_2    ','s_3    ','RH     '/) !109-114
+!        'edmf   '/)
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:), svctr(:,:), ssclr(:)

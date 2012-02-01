@@ -113,7 +113,7 @@ USE PARKIND1  ,ONLY : JPIM     ,JPRB
 
 ! USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
 
-USE YOMCST   , ONLY : RG       ,RD       ,RCPD     ,RETV     ,RLVTT    ,&
+USE yos_cst   , ONLY : RG       ,RD       ,RCPD     ,RETV     ,RLVTT    ,&
                     & RLSTT    ,RATM     ,RTT      ,RLMLT
 
 USE YOETHF   , ONLY : R2ES     ,R3LES    ,R3IES    ,R4LES    ,&
@@ -123,7 +123,7 @@ USE YOETHF   , ONLY : R2ES     ,R3LES    ,R3IES    ,R4LES    ,&
 	      
 USE YOEVDF   , ONLY : RKAP     ,RVDIFTS  ,LLDIAG
 USE YOECUMF  , ONLY : RTAUMEL
-
+use yos_exc, only : repust
 !USE YOMGF1C  , ONLY : NC
 !USE YOMLOG1C , ONLY : LCCN
 
@@ -241,7 +241,7 @@ REAL(KIND=JPRB) ::    ZTAUEPS , ZCLDDEPTH     , &
                     & ZW2THRESH               , ZSTABTHRESH    , ZBIRTHRESH , &
                     & ZTVLIM  , ZCLDDEPTHDP   , ZDZCLOUD(KLON) , ZW2H       , &
                     & ZZFUNC  , ZZFUNC3(KLON) , ZZFUNC4(KLON)  , ZDHRI(KLON)    , ZDHCL      , &
-                    & ZDTHVDZ , ZREPUST       , ZGHM1
+                    & ZDTHVDZ        , ZGHM1
 		    
 REAL(KIND=JPRB) ::    ZZI(KLON)
 
@@ -321,8 +321,6 @@ ZSTABTHRESH = 20._JPRB     ! threshold stability (Klein & Hartmann criteria) [K]
 ZBIRTHRESH  = 0.1_JPRB     ! threshold BIR (TKE decoupling criteria) [1]
 ZTVLIM      = 0.1_JPRB     ! cloud fraction limit in Tv,env calculation
 
-! CALL SURF_INQ(PREPUST=ZREPUST)
-                 
 !-- switch for moist mass flux depth limiter --      
 !LLMASSCAP     = .TRUE.
 LLMASSCAP     = .FALSE.    
@@ -575,7 +573,7 @@ ENDIF
      
       !* 3.2    SURFACE LAYER SCALING
       !*
-      ZUSTAR(JL)  = MAX( SQRT(PKMFL(JL)), ZREPUST )               !u* (repust=10e-4)
+      ZUSTAR(JL)  = MAX( SQRT(PKMFL(JL)), REPUST )               !u* (repust=10e-4)
       ZWSTAR(JL)  = (- ZKHVFL(JL) * RG / PTM1(JL,KLEV) * 1000._JPRB ) &   !zi=1000m
                        & ** ( 1._JPRB/3._JPRB) 
       ZWSIGMA(JL)      = 1.2_JPRB &
@@ -1674,8 +1672,8 @@ ENDIF
     PEXTRA(JL,1:KLEV,29) = ZBUOF(JL,:,3)
 
     !  updraft mass flux
-    PEXTRA(JL,:,30) = PMFLX(JL,:,2) / (ZCFNC1(JL,:) * ZMGEOM(JL,:) * ZRG )  
-    PEXTRA(JL,:,31) = PMFLX(JL,:,3) / (ZCFNC1(JL,:) * ZMGEOM(JL,:) * ZRG )
+    PEXTRA(JL,1:KLEV,30) = PMFLX(JL,0:KLEV-1,2) / (ZCFNC1(JL,0:KLEV-1) * ZMGEOM(JL,0:KLEV-1) * ZRG )  
+    PEXTRA(JL,1:KLEV,31) = PMFLX(JL,0:KLEV-1,3) / (ZCFNC1(JL,0:KLEV-1) * ZMGEOM(JL,0:KLEV-1) * ZRG )
     
     !  updraft excesses
     PEXTRA(JL,:,32) = 1000._JPRB * CEILING(ZFRAC(JL,:,2)) * ( PQTUH(JL,:,2)  - ZQTENH(JL,:)  )
@@ -1696,20 +1694,20 @@ ENDIF
     PEXTRA(JL,:,41) = ZEPS(JL,:,3)
     
     !  updraft qt flux
-    PEXTRA(JL,:,44) =  RLVTT * ( PMFLX(JL,:,2) * (PQTUH(JL,:,2) - ZQTENH(JL,:)) ) / (ZCFNC1(JL,:) * ZMGEOM(JL,:) * ZRG )
-    PEXTRA(JL,:,45) =  RLVTT * ( PMFLX(JL,:,3) * (PQTUH(JL,:,3) - ZQTENH(JL,:)) ) / (ZCFNC1(JL,:) * ZMGEOM(JL,:) * ZRG )
-    PEXTRA(JL,:,46) =  RLVTT * ( PMFLX(JL,:,2) * (PQTUH(JL,:,2) - ZQTENH(JL,:)) + &
-                    &  PMFLX(JL,:,3) * (PQTUH(JL,:,3) - ZQTENH(JL,:)) ) / (ZCFNC1(JL,:) * ZMGEOM(JL,:) * ZRG ) 
+    PEXTRA(JL,1:KLEV,44) =  RLVTT * ( PMFLX(JL,0:KLEV-1,2) * (PQTUH(JL,0:KLEV-1,2) - ZQTENH(JL,0:KLEV-1)) ) / (ZCFNC1(JL,0:KLEV-1) * ZMGEOM(JL,0:KLEV-1) * ZRG )
+    PEXTRA(JL,1:KLEV,45) =  RLVTT * ( PMFLX(JL,0:KLEV-1,3) * (PQTUH(JL,0:KLEV-1,3) - ZQTENH(JL,0:KLEV-1)) ) / (ZCFNC1(JL,0:KLEV-1) * ZMGEOM(JL,0:KLEV-1) * ZRG )
+    PEXTRA(JL,1:KLEV,46) =  RLVTT * ( PMFLX(JL,0:KLEV-1,2) * (PQTUH(JL,0:KLEV-1,2) - ZQTENH(JL,0:KLEV-1)) + &
+                    &  PMFLX(JL,0:KLEV-1,3) * (PQTUH(JL,0:KLEV-1,3) - ZQTENH(JL,0:KLEV-1)) ) / (ZCFNC1(JL,0:KLEV-1) * ZMGEOM(JL,0:KLEV-1) * ZRG ) 
 
     !  updraft condensate
     PEXTRA(JL,:,47) = 1000._JPRB * ZQCUH(JL,:,2)
     PEXTRA(JL,:,48) = 1000._JPRB * ZQCUH(JL,:,3)
             
     !  updraft thl flux
-    PEXTRA(JL,:,51) =  ( PMFLX(JL,:,2) * (PSLGUH(JL,:,2) - ZSLGENH(JL,:)) ) / (ZCFNC1(JL,:) * ZMGEOM(JL,:) * ZRG )
-    PEXTRA(JL,:,52) =  ( PMFLX(JL,:,3) * (PSLGUH(JL,:,3) - ZSLGENH(JL,:)) ) / (ZCFNC1(JL,:) * ZMGEOM(JL,:) * ZRG )
-    PEXTRA(JL,:,53) =  ( PMFLX(JL,:,2) * (PSLGUH(JL,:,2) - ZSLGENH(JL,:)) + &
-                    &    PMFLX(JL,:,3) * (PSLGUH(JL,:,3) - ZSLGENH(JL,:)) ) / (ZCFNC1(JL,:) * ZMGEOM(JL,:) * ZRG )
+    PEXTRA(JL,1:KLEV,51) =  ( PMFLX(JL,0:KLEV-1,2) * (PSLGUH(JL,0:KLEV-1,2) - ZSLGENH(JL,0:KLEV-1)) ) / (ZCFNC1(JL,0:KLEV-1) * ZMGEOM(JL,0:KLEV-1) * ZRG )
+    PEXTRA(JL,1:KLEV,52) =  ( PMFLX(JL,0:KLEV-1,3) * (PSLGUH(JL,0:KLEV-1,3) - ZSLGENH(JL,0:KLEV-1)) ) / (ZCFNC1(JL,0:KLEV-1) * ZMGEOM(JL,0:KLEV-1) * ZRG )
+    PEXTRA(JL,1:KLEV,53) =  ( PMFLX(JL,0:KLEV-1,2) * (PSLGUH(JL,0:KLEV-1,2) - ZSLGENH(JL,0:KLEV-1)) + &
+                    &    PMFLX(JL,0:KLEV-1,3) * (PSLGUH(JL,0:KLEV-1,3) - ZSLGENH(JL,0:KLEV-1)) ) / (ZCFNC1(JL,0:KLEV-1) * ZMGEOM(JL,0:KLEV-1) * ZRG )
     
   ENDDO !JL
   

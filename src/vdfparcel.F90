@@ -116,7 +116,7 @@ USE YOETHF   , ONLY : R2ES     , R3LES    , R3IES    , &
 		     &RTWAT    , RTICE    , RTICECU  , R5ALVCP   , R5ALSCP , & 
                      &RTWAT_RTICE_R       , RTWAT_RTICECU_R
                      
-USE YOMCST   , ONLY : RG  , RLSTT , RCPD , RLVTT , RETV ,RTT         
+USE yos_cst   , ONLY : RG  , RLSTT , RCPD , RLVTT , RETV ,RTT         
 
 
 

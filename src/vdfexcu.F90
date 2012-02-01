@@ -78,11 +78,11 @@ SUBROUTINE VDFEXCU(KIDIA  , KFDIA  , KLON   , KLEV   , KDRAFT , PTMST  , PZ0MM  
 !     SEE DOCUMENTATION
 
 !     ------------------------------------------------------------------
-use garbage, only : vrec, phims, phihs, phimu, phihu
+use garbage, only : phims, phihs, phimu, phihu
 USE PARKIND1  ,ONLY : JPIM     ,JPRB
 ! ! USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
 
-USE YOMCST   , ONLY : RG       ,RD       ,RCPD     ,RETV     ,RATM
+USE yos_cst   , ONLY : RG       ,RD       ,RCPD     ,RETV     ,RATM
 USE YOETHF   , ONLY : RVTMP2
 USE YOEVDF   , ONLY : RLAM     ,RKAP     ,RVDIFTS  ,REPDU2   ,LLDIAG   
 USE YOEVDFS  , ONLY : JPRITBL  ,RITBL    ,ARITBL   ,RCHBA    ,&
@@ -91,6 +91,7 @@ USE YOEVDFS  , ONLY : JPRITBL  ,RITBL    ,ARITBL   ,RCHBA    ,&
                     & DRITBL   ,DRI26  
 USE YOEPHLI  , ONLY : RLPMIXL  ,RLPBETA
 USE YOMJFH   , ONLY : N_VMASS
+use yos_exc, only : repust
 
 IMPLICIT NONE
 
@@ -155,7 +156,7 @@ REAL(KIND=JPRB) ::    ZENTRSFC, ZENTRRAD, ZENTRTOP, &
                     & ZLIM, ZLIM2, ZPHIKH, ZPHIKM, ZSCF, &
                     & ZX2, ZZ, ZWTVENTR, ZKH, ZCFHNEW, &
                     & ZML, ZBASE, ZVSC, ZKCLD, &
-                    & ZREPUST,ZKFACEDMF, ZTAUX, ZTAUY
+                    & ZKFACEDMF, ZTAUX, ZTAUY
 
 REAL(KIND=JPRB) ::    ZZH, ZIFLTGM, ZIFLTGH, ZIFMOM, ZIFMOH, ZBM, ZBH, ZCM, ZCH, ZDUDZ
                     
@@ -204,8 +205,6 @@ LLRICU = .TRUE.   ! switch for top-entrainment efficiency closure using Ri^cu at
 ZKFACEDMF = 0.8_JPRB     !aup = 5%   !cy32r3
 !ZKFACEDMF = 0.692_JPRB   !aup = 10%
 
-! CALL SURF_INQ(PREPUST=ZREPUST)
-
 ! optimization
 ZRG       = 1.0_JPRB/RG
 ZCONS13   = 1.0_JPRB/3._JPRB
@@ -223,7 +222,7 @@ ENDIF
 !                 ----------------------------
 
   DO JL=KIDIA,KFDIA
-    ZUST  (JL)=MAX(SQRT(PKMFL(JL)),ZREPUST)
+    ZUST  (JL)=SQRT(MAX(PKMFL(JL),REPUST**2))
     ZKHVFL(JL)=PKHFL(JL)+RETV*PTM1(JL,KLEV)*PKQFL(JL)
 
     PTAUXCG(JL,KLEV)=0.0_JPRB
@@ -367,9 +366,9 @@ ENDIF
          & *(PCPTGZ(JL,JK)+PCPTGZ(JL,JK+1)) ) * (1.0_JPRB/RCPD)
         ZMGEOM(JL)=PGEOM1(JL,JK)-PGEOM1(JL,JK+1)
       ENDDO
-
-      CALL VREC(ZTMP4,ZDU2(KIDIA),JLEN)
-      CALL VREC(ZTMP5,ZTMP2,JLEN)
+! 
+!       CALL VREC(ZTMP4,ZDU2(KIDIA),JLEN)
+!       CALL VREC(ZTMP5,ZTMP2,JLEN)
 
       DO JL=KIDIA,KFDIA
         ZDRORO= 2.0_JPRB * (PCPTGZ(JL,JK)-PCPTGZ(JL,JK+1))&

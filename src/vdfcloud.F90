@@ -98,7 +98,7 @@ USE PARKIND1  ,ONLY : JPIM     ,JPRB
 
 ! USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
 
-USE YOMCST   , ONLY : RG       ,RCPD
+USE yos_cst   , ONLY : RG       ,RCPD
 
 USE YOEVDF   , ONLY : LLDIAG
 
