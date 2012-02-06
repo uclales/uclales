@@ -28,15 +28,18 @@ end function interpolate
   
 subroutine vdfouter(sst)
 use parkind1, only : jprb, jpim
-use grid,  only : nzp, nxp, nyp, liquid, a_up, a_vp, a_tp, th00, a_rp, dt, press,zm, zt, wt_sfc, wq_sfc
+use grid,  only : nzp, nxp, nyp, liquid, a_up, a_vp, a_theta, a_pexnr, pi0, pi1, a_rp, dt, press,zm, zt, wt_sfc, wq_sfc, dn0
+use defs, only : g,alvl, cp
 use srfc, only : zrough
 use util, only : get_avg3, get_avg
-use stat, only : sflg!, stat_edmf
+use stat, only : sflg, updtst !, stat_edmf
 use yomct0, only : rextlhf, rextshf
 use yoevdfs, only : firsttime, suvdfs
+use thrm, only : fll_tkrs
 ! implicit none
-real, dimension(nzp, nxp, nyp) :: ccover
+real, dimension(nzp, nxp, nyp) :: a_scr1
 real, dimension(nzp) :: a1
+real, dimension(nzp-1) ::a1h
 real, intent(in) :: sst
 real(kind=jprb), dimension(1,nzp-2) :: pum1,pvm1,ptm1,pqm1,plm1,pim1,pam1, papm1,pfhpvl, pfhpvn,  pfplvn, psobeta, psoteu, psotev, ptskti,pevapti,pahfsti,pssrflti,&
  pvdis  , pvdisg , pstrtu , pstrtv , pstrsou, pstrsov , ptofdu , ptofdv, pdiftq, pdiftl, pdifti, pdifts,&
@@ -59,26 +62,30 @@ real(kind=jprb)   :: pextr2(1,kfldx2), pextra(1,nzp-1,kfldx)
      pum1(1,:) = flip(a1(2:nzp-1))
      call get_avg3(nzp,nxp,nyp, a_vp,a1)
      pvm1(1,:) = flip(a1(2:nzp-1))
-     call get_avg3(nzp,nxp,nyp, a_tp,a1)
-     ptm1(1,:) = flip(a1(2:nzp-1))+th00
+     call fll_tkrs(nzp,nxp,nyp,a_theta,a_pexnr,pi0,pi1,a_scr1)
+
+     call get_avg3(nzp,nxp,nyp, a_scr1,a1)
+     ptm1(1,:) = flip(a1(2:nzp-1))
      call get_avg3(nzp,nxp,nyp, a_rp,a1)
      pqm1(1,:) = flip(a1(2:nzp-1))
      call get_avg3(nzp,nxp,nyp, liquid,a1)
-     plm1(1,:) = flip(a1(2:nzp-1))
+     plm1(1,:) = 0.!flip(a1(2:nzp-1))
      pim1(1,:) = 0.
-     ccover = 0
-     where(liquid>0) ccover = 1
-     call get_avg3(nzp,nxp,nyp, ccover,a1)
-     pam1(1,:) = flip(a1(2:nzp-1))
+     a_scr1 = 0
+     where(liquid>0) a_scr1 = 1
+     call get_avg3(nzp,nxp,nyp, a_scr1,a1)
+     pam1(1,:) = 0.!flip(a1(2:nzp-1))
      call get_avg3(nzp,nxp,nyp, press,a1)
      papm1(1,:) = flip(a1(2:nzp-1))
-     paphm1(1,:) = interpolate(a1)
+     a1h = 0.
+     a1h = interpolate(a1)
+     paphm1(1,:) = flip(a1h(2:nzp))
      psst = sst
      ptskti = sst
      z0   = zrough
      pcm1 = 0
-    pgeom1(1,:)  = flip(zt(2:nzp-1))
-    pgeoh(1,:)   = flip(zm(1:nzp-1))
+    pgeom1(1,:)  = g*flip(zt(2:nzp-1))
+    pgeoh(1,:)   = g*flip(zm(2:nzp))
     phrlw   = 0
     phrsw   = 0
     psobeta = 0
@@ -86,14 +93,25 @@ real(kind=jprb)   :: pextr2(1,kfldx2), pextra(1,nzp-1,kfldx)
     psotev  = 0
     pevapti  = 0
     pahfsti  = 0
+    pte     = 0
+    pqe     = 0
+    ple     = 0
+    pie     = 0
+    pae     = 0
+    pvom    = 0 
+    pvol    = 0  
     pssrflti  = 0
-    rextshf =  get_avg(1,nxp,nyp,1,wt_sfc)
-    rextlhf =  get_avg(1,nxp,nyp,1,wq_sfc)
-                                    
+    pstrtu = 0
+    pstrtv = 0
+    ptofdu = 0
+    ptofdv = 0
+    rextshf =-  get_avg(1,nxp,nyp,1,wt_sfc)*cp*(dn0(1)+dn0(2))*0.5 
+    rextlhf =-  get_avg(1,nxp,nyp,1,wq_sfc)*alvl*(dn0(1)+dn0(2))*0.5
   else
     stop
   end if
   if (firsttime) call suvdfs
+  firsttime = .false.
   call vdfmain(   &
   cdconf = 'a', &
   kidia  = 1,     &
@@ -138,6 +156,13 @@ real(kind=jprb)   :: pextr2(1,kfldx2), pextra(1,nzp-1,kfldx)
   ldnodecp = (/.false./), &
   pz0m    = z0, & !inout
   pz0h    = z0, & 
+  pte     = pte, & 
+  pqe     = pqe, & 
+  ple     = ple, & 
+  pie     = pie, & 
+  pae     = pae, & 
+  pvom    = pvom, & 
+  pvol    = pvol, &  
   ptskti  = ptskti, &
   pevapti  = pevapti, &
   pahfsti  = pahfsti, &
@@ -151,13 +176,6 @@ real(kind=jprb)   :: pextr2(1,kfldx2), pextra(1,nzp-1,kfldx)
   pfhpvl  = pfhpvl, & 
   pfhpvn  = pfhpvn, & 
   pwuavg  = pwuavg, & 
-  pte     = pte, & 
-  pqe     = pqe, & 
-  ple     = ple, & 
-  pie     = pie, & 
-  pae     = pae, & 
-  pvom    = pvom, & 
-  pvol    = pvol, &  
   pkh   = pkh, & 
   pssrflti  = pssrflti, &
   khpbln   = khpbln, & 
@@ -169,9 +187,13 @@ real(kind=jprb)   :: pextr2(1,kfldx2), pextra(1,nzp-1,kfldx)
  pvdis = pvdis , pvdisg = pvdisg, pstrtu = pstrtu, pstrtv = pstrtv, pstrsou = pstrsou, pstrsov =pstrsov, ptofdu = ptofdu , ptofdv = ptofdv, &
  pdiftq = pdiftq, pdiftl = pdiftl, pdifti = pdifti, pdifts = pdifts &
   )
-!   if (sflg) call stat_edmf(pzinv, pstrtu, pstrtv, 
-  !output parametes
-print *, pfplvl
+  if (sflg) then
+    a1 = 0.
+    a1(2:nzp) = flip(pextra(1,:,67)) !Cloud Fraction
+    call updtst(nzp,'edm',1,a1,1) 
+    a1(2:nzp) = flip(pextra(1,:,68)) !Liquid water
+    call updtst(nzp,'edm',2,a1,1) 
+  end if
 end subroutine vdfouter
 subroutine vdfmain    ( cdconf, &
  & kidia  , kfdia  , klon   , klev   , klevs  , kstep  , ktiles , &
@@ -748,7 +770,6 @@ lltropdamp = .false.
 llperturb = .false.
 kperturb = 2*96
 
-
 !*         1.0  scm: fixed fluxes for flux boundary condition ([w/m^2] downward)
 
 if (lscmec) then
@@ -764,7 +785,6 @@ endif
 
 !*         1.1  store initial tendencies for flux calculation
 !*              and initialize variable.
-
 do jk=1,klev
   do jl=kidia,kfdia
     zqea(jl,jk)=pqe(jl,jk)
@@ -825,7 +845,6 @@ enddo
 !  
 !endif  
 
-
 do jk=1,klev
   do jl=kidia,kfdia
 
@@ -849,8 +868,6 @@ do jk=1,klev
     
   enddo
 enddo
-
-
 
 !     ------------------------------------------------------------------
 
@@ -889,14 +906,9 @@ enddo
 !  & pssrflti=pssrflti, pqsti=zqsti, pdqsti=zdqsti, pcptsti=zcptsti, &
 !  & pcfhti=zcfhti, pcfqti=zcfqti, pcsatti=zcsatti, pcairti=zcairti, &
 ! ! output data, non-tiled
-!  & pkhlev=pkh(:,klev), pcfmlev=zcfm(:,klev), pkmfl=zkmfl, pkhfl=zkhfl, &
-!  & pkqfl=zkqfl, pevapsnw=pevapsnw, pz0mw=zz0mw, pz0hw=zz0hw, pz0qw=zz0qw, &
-!  & pblendpp=zblend, pcptspp=zzcpts, pqsapp=zzqsa, pbuompp=zzbuom, &
-!  & pzdlpp=zzzdl, &
-! ! output data, diagnostics
-!  & pdhtls=pdhtls, pdhtss=pdhtss, pdhtts=pdhtts, pdhtis=pdhtis &
-!  & )
-! 
+zcfm(:,klev) = 0.
+zcfh(:,klev) = 0.
+  
 ! 
 !                        
 ! !rn --- surface heat flux check ---
@@ -947,11 +959,10 @@ if (llsfcflx) then
   do jl=kidia,kfdia
     !fixed prescribed surface fluxes
     zrho = paphm1(jl,klev)/( rd*ptm1(jl,klev)*(1.0_jprb+retv*pqm1(jl,klev)) )
-    zkhfl(jl) = zextshf(jl) !/ ( rcpd*(1.0_jprb+rvtmp2*pqm1(jl,klev)) ) / zrho
-    zkqfl(jl) = zextlhf(jl) !/ rlvtt / zrho
+    zkhfl(jl) = zextshf(jl) / ( rcpd*(1.0_jprb+rvtmp2*pqm1(jl,klev)) ) / zrho
+    zkqfl(jl) = zextlhf(jl) / rlvtt / zrho
   enddo
 endif
-
 
 !*         4.5  boundary layer height for dianostics only
 ! 
@@ -974,8 +985,6 @@ call vdfhghtn (kidia   , kfdia   , klon    , klev    , idraft   , ztmst , kstep,
              & pwuavg  , zricui  , zmcu    , zdthv   , &
              & pfplvl  , pfplvn  , zdetr   , &
              & pbir    , ldnodecp, llrundry, kpbltype, zwqt2 )
-
-
 !--- set some pbl heights based on i) pbl type and ii) various updraft properties ---
 do jl=kidia,kfdia
     
@@ -1033,9 +1042,7 @@ do jk=1,klev
   enddo
 enddo
 
-
 !*         4.7  exchange coefficients above the surface layer
-
 call vdfexcu(kidia  , kfdia  , klon   , klev    , idraft  , ztmst  , pz0m   , &
            & phrlw  , phrsw  , &
            & pum1   , pvm1   , ptm1   , pqm1    , plm1    , pim1   , &
@@ -1046,7 +1053,6 @@ call vdfexcu(kidia  , kfdia  , klon   , klev    , idraft  , ztmst  , pz0m   , &
            & zkmfl  , zkhfl  , zkqfl  , zcfm    , zcfh    , ztauxcg, ztauycg, &
            & zricui , zmcu   , zdthv  , zmflx   , kvartop , &
            & pzinv  , khpbln , pkh    , zcldbase, zcldtop , kpbltype)  
-
 
 !*         4.8  mass flux modifications (for solver stability)
 
@@ -1099,7 +1105,7 @@ zsoc(kidia:kfdia,1:klev)=psobeta(kidia:kfdia,1:klev)!*zhu1
 !            & ztmst, pum1 , pvm1 , paphm1, zcfm, ztofdc, &
 !            & ztauxcg, ztauycg, psoteu,psotev,zsoc ,&
 !            & pvom,pvol,pucurr,pvcurr,zudif,zvdif)
-
+zcfm(1,1) = 0
 call vdfdifm (kidia, kfdia, klon , klev  , idraft , itop  , &
             & ztmst, pum1 , pvm1 , paphm1, zcfm   , zmflxm, zuuh , zvuh ,&
             & ztofdc,psoteu,psotev,zsoc  , &
@@ -1107,7 +1113,7 @@ call vdfdifm (kidia, kfdia, klon , klev  , idraft , itop  , &
 
 
 !*         5.2  generalized liquid water static energy and total water
-
+zcfh(1,1) = 0
 call vdfdifh (kidia  , kfdia  , klon   , klev   , idraft , itop   , ktiles, &
             & ztmst  , zextshf, zextlhf, llsfcflx, &
             & pfrti  , pssrflti,pslrfl , pemis  , pevapsnw, &
@@ -1117,7 +1123,6 @@ call vdfdifh (kidia  , kfdia  , klon   , klev   , idraft , itop   , ktiles, &
             & zdqsti , ptskti , ptskrad, ptsam1m(1,1)    , ptsnow , ptice  , psst, &
             & ztsktip1,zslge  , pte    , zqte, &
             & pevapti, pahfsti, zahflti, zstr   , zg0)
-
 !...fully upstream m (phi_up - phi_bar) term
 !call vdfdifh5(kidia  , kfdia  , klon   , klev   , idraft , itop   , ktiles, &
 !            & ztmst  , zextshf, zextlhf, llsfcflx, &
@@ -1132,7 +1137,6 @@ call vdfdifh (kidia  , kfdia  , klon   , klev   , idraft , itop   , ktiles, &
 
 !*         5.3  incrementation of u and v tendencies, storage of
 !*              the dissipation, computation of multilevel fluxes.
-
 call vdfincr (kidia  , kfdia  , klon   , klev   , itop   , ztmst  , &
             & pum1   , pvm1   , zslgm1 , ptm1   , zqtm1  , paphm1 , pgeom1 , &
             & zcfm   , ztofdc , psoteu , psotev , zsoc   ,&
@@ -1140,9 +1144,7 @@ call vdfincr (kidia  , kfdia  , klon   , klev   , itop   , ztmst  , &
             & pvom   , pvol   , zslge  , zqte   , zslgewodis, &
             & pvdis  , pvdisg , pstrtu , pstrtv , pstrsou, pstrsov , ptofdu , ptofdv)  
 
-
 !          5.4  solve for tracers
-
 if (lvdftrac .and. ktrac > 0) then 
   call vdfdifc(kidia,kfdia,klon,klev,itop,ktrac,&
              & ztmst,pcm1,ptenc,paphm1,zcfh,pcflx)
@@ -1204,7 +1206,6 @@ endif
 
     enddo
   enddo
-
 
 
 !     ------------------------------------------------------------------
@@ -1306,7 +1307,6 @@ endif
       
     enddo
   enddo
-
 
   !-- calculate saturation specific humidity --
   do jk=1,klev
@@ -1520,7 +1520,6 @@ endif
     enddo
   enddo
   
-  
   call vdfcloud ( kidia     , kfdia   , klon    , klev   , idraft , &
                 & papm1     , pgeom1  , pgeoh   , &
                 & zqtupd    , zslgupd , &
@@ -1600,14 +1599,14 @@ endif
 
 
       !--- t-check ---
-      if ( ztupd(jl,jk).gt.400._jprb.or.ztupd(jl,jk).lt.100._jprb) then
-      
+!       if ( ztupd(jl,jk).gt.400._jprb.or.ztupd(jl,jk).lt.100._jprb) then
+      if (jk>46) then
         write(0,'(a,3i5)')    'vdfmain t alarm:',kcnt,jl,jk
-        write(0,'(a,3i5)')    '               : ', kpbltype(jl),kvartop(jl),khpbln(jl)
+        write(0,'(a,3i5)')    ' pbl type      : ', kpbltype(jl),kvartop(jl),khpbln(jl)
         write(0,'(a,2f10.6)')    '        sfluxes: ', zkhfl(jl),zkqfl(jl)
-        write(0,'(a,2f10.6)')    '    cld heights: ', zcldbase(jl),zcldtop(jl)
-        write(0,'(a,4f10.6)')    '             t: ',&
-           & ptm1(jl,jk),ztupd(jl,jk),pte(jl,jk)*ztmst,ztea(jl,jk)*ztmst
+        write(0,'(a,2f12.6)')    '    cld heights: ', zcldbase(jl),zcldtop(jl)
+        write(0,'(a,5f10.6)')    '             t: ',&
+           & ptm1(jl,jk),ztupd(jl,jk),pte(jl,jk)*ztmst,ztea(jl,jk)*ztmst, ztmst
         write(0,'(a,5f10.6)')    '           slg: ',&
            & zslgm1(jl,jk)/rcpd       , zslgupd(jl,jk)/rcpd      , &
            & zslge(jl,jk)*ztmst/rcpd  , zslgea(jl,jk)*ztmst/rcpd , &
@@ -1642,13 +1641,13 @@ endif
 	
       endif
       
-      
-      !--- q-check ----
-      if (zqtupd(jl,jk).lt.0._jprb.or.zqtupd(jl,jk).gt.0.05_jprb) then
-        write(0,'(3i5,a,4f10.6,a,3i5,2f10.6)') kcnt,jl,jk,'  terror! q=',&
-           & zqtupd(jl,jk),zqtm1(jl,jk),zlupd(jl,jk),plm1(jl,jk),' - ',&
-           & kvartop(jl),khpbln(jl),kpbltype(jl),zcldbase(jl),zcldtop(jl)
-      endif
+!       
+!       !--- q-check ----
+!       if (zqtupd(jl,jk).lt.0._jprb.or.zqtupd(jl,jk).gt.0.05_jprb) then
+!         write(0,'(3i5,a,4f10.6,a,3i5,2f10.6)') kcnt,jl,jk,'  terror! q=',&
+!            & zqtupd(jl,jk),zqtm1(jl,jk),zlupd(jl,jk),plm1(jl,jk),' - ',&
+!            & kvartop(jl),khpbln(jl),kpbltype(jl),zcldbase(jl),zcldtop(jl)
+!       endif
 
     enddo
   enddo
@@ -1685,14 +1684,14 @@ endif
   
 !     ----------- output --------------------------------------
 
-!  if (lldiag) then
-!    do jl=kidia,kfdia
-!      pextra(jl,1:klev,67) = 100._jprb * zcldfrac(jl,:)
-!      pextra(jl,1:klev,69) = 1000._jprb * zqlav(jl,:)
-!      pextra(jl,:,54) = zdiftqt(jl,:)
-!      pextra(jl,:,55) = zdiftslg(jl,:)
-!    enddo
-!  endif
+ if (lldiag) then
+   do jl=kidia,kfdia
+     pextra(jl,1:klev,67) = 100._jprb * zcldfrac(jl,:)
+     pextra(jl,1:klev,69) = 1000._jprb * zqlav(jl,:)
+     pextra(jl,:,54) = zdiftqt(jl,:)
+     pextra(jl,:,55) = zdiftslg(jl,:)
+   enddo
+ endif
   
       
 

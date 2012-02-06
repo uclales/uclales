@@ -1241,6 +1241,14 @@ contains
        if (itype==0) ncinfo = 'Third moment of s (extended liquid water specific humidity)'
        if (itype==1) ncinfo = ''
        if (itype==2) ncinfo = 'tttt'
+    case('edmf_cf')    
+       if (itype==0) ncinfo = 'EDMF Cloud Fraction'
+       if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('edmf_ql')    
+       if (itype==0) ncinfo = 'EDMF Liquid water content'
+       if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
 
     case default
        if (myid==0) print *, 'ABORTING: variable not found in ncinfo, ',trim(short_name)

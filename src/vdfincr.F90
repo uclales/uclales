@@ -1,269 +1,269 @@
-SUBROUTINE VDFINCR(KIDIA  , KFDIA  , KLON   , KLEV  , KTOP  ,PTMST  , &
- & PUM1   , PVM1   , PSLGM1 , PTM1   , PQTM1  , PAPHM1 , PGEOM1 , &
- & PCFM   , PTODC  , PSOTEU , PSOTEV , PSOC   ,&
- & PUDIF  , PVDIF  ,PUCURR ,PVCURR ,PSLGDIF, PQTDIF , &
- & PVOM   , PVOL   , PSLGE  , PQTE   , PSLGEWODIS, &
- & PVDIS  , PVDISG, PSTRTU , PSTRTV , PSTRSOU , PSTRSOV , PTOFDU , PTOFDV)  
+subroutine vdfincr(kidia  , kfdia  , klon   , klev  , ktop  ,ptmst  , &
+ & pum1   , pvm1   , pslgm1 , ptm1   , pqtm1  , paphm1 , pgeom1 , &
+ & pcfm   , ptodc  , psoteu , psotev , psoc   ,&
+ & pudif  , pvdif  ,pucurr ,pvcurr ,pslgdif, pqtdif , &
+ & pvom   , pvol   , pslge  , pqte   , pslgewodis, &
+ & pvdis  , pvdisg, pstrtu , pstrtv , pstrsou , pstrsov , ptofdu , ptofdv)  
 !     ------------------------------------------------------------------
 
-!**   *VDFINCR* - INCREMENTS U,V,T AND Q-TENDENCIES; COMPUTE MULTILEVEL
-!                 FLUXES AND DISSIPATION.
+!**   *vdfincr* - increments u,v,t and q-tendencies; compute multilevel
+!                 fluxes and dissipation.
 
-!     A.C.M. BELJAARS  18/01/90   DERIVED FROM VDIFF (CY34)
-!     A.C.M. BELJAARS  26/03/90   OBUKHOV-L UPDATE
-!     M. Ko"hler        3/12/2004 Conserved variables (qt and slg)
-!     A. Beljaars       4/04/2005 TURBULENT OROGR. DRAG ACMB
-!     A  Beljaars      30/09/2005 Include Subgr. Oro. in solver  
-!     OCEAN CURRENT B.C.    ACMB          12/11/02.
-!     P. Lopez         02/06/2005 Removed option for linearized
+!     a.c.m. beljaars  18/01/90   derived from vdiff (cy34)
+!     a.c.m. beljaars  26/03/90   obukhov-l update
+!     m. ko"hler        3/12/2004 conserved variables (qt and slg)
+!     a. beljaars       4/04/2005 turbulent orogr. drag acmb
+!     a  beljaars      30/09/2005 include subgr. oro. in solver  
+!     ocean current b.c.    acmb          12/11/02.
+!     p. lopez         02/06/2005 removed option for linearized
 !                                 physics (now called separately)
 !                                  
-!     PURPOSE
+!     purpose
 !     -------
 
-!     INCREMENT U,V,T AND Q; COMPUTE MULTILEVEL FLUXES AND DISSIPATION
+!     increment u,v,t and q; compute multilevel fluxes and dissipation
 
-!     INTERFACE
+!     interface
 !     ---------
 
-!     *VDFINCR* IS CALLED BY *VDFMAIN*
+!     *vdfincr* is called by *vdfmain*
 
-!     INPUT PARAMETERS (INTEGER):
+!     input parameters (integer):
 
-!     *KIDIA*        START POINT
-!     *KFDIA*        END POINT
-!     *KLEV*         NUMBER OF LEVELS
-!     *KLON*         NUMBER OF GRID POINTS PER PACKET
-!     *KTOP*         FIRST LEVEL INDEX WITHOUT ZERO-DIFFUSION
+!     *kidia*        start point
+!     *kfdia*        end point
+!     *klev*         number of levels
+!     *klon*         number of grid points per packet
+!     *ktop*         first level index without zero-diffusion
 
 
-!     INPUT PARAMETERS (REAL):
+!     input parameters (real):
 
-!     *PTMST*        DOUBLE TIME STEP (SINGLE AT 1TH STEP)
-!     *PUM1*         X-VELOCITY COMPONENT AT T-1
-!     *PVM1*         Y-VELOCITY COMPONENT AT T-1
-!     *PSLGM1*       GENERALIZED LIQUID WATER STATIC ENERGY (SLG) AT T-1
-!     *PTM1*         TEMPERATURE AT T-1
-!     *PQTM1*        TOTAL WATER AT T-1
-!     *PAPHM1*       PRESSURE AT T-1
-!     *PGEOM1*       GEOPOTENTIAL AT T-1
-!     *PCFM*         PROP. TO EXCH. COEFF. FOR MOMENTUM (C-STAR IN DOC.)
-!     *PTODC*        TURBULENT OROGRAPHIC DRAG COEFFICIENT
-!     *PSOTEU*       Explicit part of U-tendency from subgrid orography scheme    
-!     *PSOTEV*       Explicit part of V-tendency from subgrid orography scheme     
-!     *PSOC*         Implicit part of subgrid orography (df/dt=PSOTE-PSOC*f/alpha)
-!     *PUDIF*        U-DOUBLE TILDE DEVIDED BY ALFA
-!     *PVDIF*        V-DOUBLE TILDE DEVIDED BY ALFA
-!     *PUCURR*       U-OCEAN CURRENT
-!     *PVCURR*       V-OCEAN CURRENT
+!     *ptmst*        double time step (single at 1th step)
+!     *pum1*         x-velocity component at t-1
+!     *pvm1*         y-velocity component at t-1
+!     *pslgm1*       generalized liquid water static energy (slg) at t-1
+!     *ptm1*         temperature at t-1
+!     *pqtm1*        total water at t-1
+!     *paphm1*       pressure at t-1
+!     *pgeom1*       geopotential at t-1
+!     *pcfm*         prop. to exch. coeff. for momentum (c-star in doc.)
+!     *ptodc*        turbulent orographic drag coefficient
+!     *psoteu*       explicit part of u-tendency from subgrid orography scheme    
+!     *psotev*       explicit part of v-tendency from subgrid orography scheme     
+!     *psoc*         implicit part of subgrid orography (df/dt=psote-psoc*f/alpha)
+!     *pudif*        u-double tilde devided by alfa
+!     *pvdif*        v-double tilde devided by alfa
+!     *pucurr*       u-ocean current
+!     *pvcurr*       v-ocean current
 
-!     UPDATED PARAMETERS (REAL):
+!     updated parameters (real):
 
-!     *PSLGDIF*      SLG-DOUBLE TILDE DEVIDED BY ALFA (ON ENTRY)
-!                    SLG-SINGLE TILDE                 (ON EXIT)
-!     *PQTDIF*       QT-DOUBLE TILDE DEVIDED BY ALFA  (ON ENTRY)
-!                    QT-SINGLE TILDE                  (ON EXIT)
-!     *PVOM*         U-TENDENCY
-!     *PVOL*         V-TENDENCY
-!     *PSLGE*        SLG-TENDENCY
-!     *PQTE*         QT-TENDENCY
+!     *pslgdif*      slg-double tilde devided by alfa (on entry)
+!                    slg-single tilde                 (on exit)
+!     *pqtdif*       qt-double tilde devided by alfa  (on entry)
+!                    qt-single tilde                  (on exit)
+!     *pvom*         u-tendency
+!     *pvol*         v-tendency
+!     *pslge*        slg-tendency
+!     *pqte*         qt-tendency
 
-!     OUTPUT PARAMETERS (REAL):
+!     output parameters (real):
 
-!     *PVDIS*        TURBULENT DISSIPATION
-!     *PVDISG*       SUBGRID OROGRAPHY DISSIPATION
-!     *PSTRTU*       TURBULENT FLUX OF U-MOMEMTUM         KG*(M/S)/(M2*S)
-!     *PSTRTV*       TURBULENT FLUX OF V-MOMEMTUM         KG*(M/S)/(M2*S)
-!     *PSTRSOU*      SUBGRID OROGRAPHY FLUX OF U-MOMEMTUM KG*(M/S)/(M2*S)
-!     *PSTRSOV*      SUBGRID OROGRAPHY FLUX OF V-MOMEMTUM KG*(M/S)/(M2*S)
-!     *PSLGEWODIS*   SLG-TENDENCY MINUS (TOTAL) DISSIPATION
-!     *PTOFDU*       TOFD COMP. OF TURBULENT FLUX OF U-MOMEMTUM    KG*(M/S)/(M2*S)
-!     *PTOFDV*       TOFD COMP. OF TURBULENT FLUX OF V-MOMEMTUM    KG*(M/S)/(M2*S)
+!     *pvdis*        turbulent dissipation
+!     *pvdisg*       subgrid orography dissipation
+!     *pstrtu*       turbulent flux of u-momemtum         kg*(m/s)/(m2*s)
+!     *pstrtv*       turbulent flux of v-momemtum         kg*(m/s)/(m2*s)
+!     *pstrsou*      subgrid orography flux of u-momemtum kg*(m/s)/(m2*s)
+!     *pstrsov*      subgrid orography flux of v-momemtum kg*(m/s)/(m2*s)
+!     *pslgewodis*   slg-tendency minus (total) dissipation
+!     *ptofdu*       tofd comp. of turbulent flux of u-momemtum    kg*(m/s)/(m2*s)
+!     *ptofdv*       tofd comp. of turbulent flux of v-momemtum    kg*(m/s)/(m2*s)
 
-!     METHOD
+!     method
 !     ------
 
-!     SEE DOCUMENTATION
+!     see documentation
 
 !     ------------------------------------------------------------------
 
-USE PARKIND1  ,ONLY : JPIM     ,JPRB
-! USE YOMHOOK   ,ONLY : LHOOK    ,DR_HOOK
+use parkind1  ,only : jpim     ,jprb
+! use yomhook   ,only : lhook    ,dr_hook
 
-USE yos_cst   , ONLY : RG
-USE YOEVDF   , ONLY : RVDIFTS
+use yos_cst   , only : rg
+use yoevdf   , only : rvdifts
 
-IMPLICIT NONE
+implicit none
 
 
-!*         0.1    GLOBAL VARIABLES
+!*         0.1    global variables
 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KLON 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KLEV 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KIDIA 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KFDIA 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KTOP 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PTMST 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PUM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PVM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PSLGM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PTM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PQTM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PAPHM1(KLON,0:KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PGEOM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PCFM(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PTODC(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PSOTEU(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PSOTEV(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PSOC(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PUDIF(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PVDIF(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PUCURR(KLON) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PVCURR(KLON) 
-REAL(KIND=JPRB)   ,INTENT(INOUT) :: PSLGDIF(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(INOUT) :: PQTDIF(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(INOUT) :: PVOM(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(INOUT) :: PVOL(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(OUT)   :: PSLGE(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(OUT)   :: PQTE(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(OUT)   :: PSLGEWODIS(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(OUT)   :: PVDIS(KLON)
-REAL(KIND=JPRB)   ,INTENT(OUT)   :: PVDISG(KLON) 
-REAL(KIND=JPRB)   ,INTENT(OUT)   :: PSTRTU(KLON,0:KLEV) 
-REAL(KIND=JPRB)   ,INTENT(OUT)   :: PSTRTV(KLON,0:KLEV) 
-REAL(KIND=JPRB)   ,INTENT(OUT)   :: PSTRSOU(KLON,0:KLEV) 
-REAL(KIND=JPRB)   ,INTENT(OUT)   :: PSTRSOV(KLON,0:KLEV) 
-REAL(KIND=JPRB)   ,INTENT(OUT)   :: PTOFDU(KLON) 
-REAL(KIND=JPRB)   ,INTENT(OUT)   :: PTOFDV(KLON) 
+integer(kind=jpim),intent(in)    :: klon 
+integer(kind=jpim),intent(in)    :: klev 
+integer(kind=jpim),intent(in)    :: kidia 
+integer(kind=jpim),intent(in)    :: kfdia 
+integer(kind=jpim),intent(in)    :: ktop 
+real(kind=jprb)   ,intent(in)    :: ptmst 
+real(kind=jprb)   ,intent(in)    :: pum1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pvm1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pslgm1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: ptm1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pqtm1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: paphm1(klon,0:klev) 
+real(kind=jprb)   ,intent(in)    :: pgeom1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pcfm(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: ptodc(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: psoteu(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: psotev(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: psoc(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pudif(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pvdif(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pucurr(klon) 
+real(kind=jprb)   ,intent(in)    :: pvcurr(klon) 
+real(kind=jprb)   ,intent(inout) :: pslgdif(klon,klev) 
+real(kind=jprb)   ,intent(inout) :: pqtdif(klon,klev) 
+real(kind=jprb)   ,intent(inout) :: pvom(klon,klev) 
+real(kind=jprb)   ,intent(inout) :: pvol(klon,klev) 
+real(kind=jprb)   ,intent(out)   :: pslge(klon,klev) 
+real(kind=jprb)   ,intent(out)   :: pqte(klon,klev) 
+real(kind=jprb)   ,intent(out)   :: pslgewodis(klon,klev) 
+real(kind=jprb)   ,intent(out)   :: pvdis(klon)
+real(kind=jprb)   ,intent(out)   :: pvdisg(klon) 
+real(kind=jprb)   ,intent(out)   :: pstrtu(klon,0:klev) 
+real(kind=jprb)   ,intent(out)   :: pstrtv(klon,0:klev) 
+real(kind=jprb)   ,intent(out)   :: pstrsou(klon,0:klev) 
+real(kind=jprb)   ,intent(out)   :: pstrsov(klon,0:klev) 
+real(kind=jprb)   ,intent(out)   :: ptofdu(klon) 
+real(kind=jprb)   ,intent(out)   :: ptofdv(klon) 
 
-!*         0.2    LOCAL VARIABLES
+!*         0.2    local variables
 
-REAL(KIND=JPRB) ::    ZTOFDU(KLON),ZTOFDV(KLON),&
-                     &ZSOU(KLON),ZSOV(KLON)
+real(kind=jprb) ::    ztofdu(klon),ztofdv(klon),&
+                     &zsou(klon),zsov(klon)
 
-INTEGER(KIND=JPIM) :: JK, JL
+integer(kind=jpim) :: jk, jl
 
-REAL(KIND=JPRB) ::    ZCONS1, ZCONS2, &
-                    & ZDUDT, ZDVDT, ZVDFDIS, ZSODIS, ZTPFAC2, ZTPFAC3, ZTPFAC4,&
-                    & ZDP, ZRG, ZGDPH, ZTETOFDU,ZTETOFDV,&
-                    & ZTESOU,ZTESOV,ZHU2,ZHU3,ZU1,ZU2,ZU3,ZV1,ZV2,ZV3
-! REAL(KIND=JPRB) ::    ZHOOK_HANDLE
+real(kind=jprb) ::    zcons1, zcons2, &
+                    & zdudt, zdvdt, zvdfdis, zsodis, ztpfac2, ztpfac3, ztpfac4,&
+                    & zdp, zrg, zgdph, ztetofdu,ztetofdv,&
+                    & ztesou,ztesov,zhu2,zhu3,zu1,zu2,zu3,zv1,zv2,zv3
+! real(kind=jprb) ::    zhook_handle
 
-LOGICAL         ::    LLOCONS
+logical         ::    llocons
 
 
 !     ------------------------------------------------------------------
 
-!*         1.     INITIALIZE CONSTANTS
+!*         1.     initialize constants
 !                 --------------------
 
-! IF (LHOOK) CALL DR_HOOK('VDFINCR',0,ZHOOK_HANDLE)
-ZTPFAC2 = 1.0_JPRB/RVDIFTS
-ZTPFAC3 = 1.0_JPRB-ZTPFAC2
-ZTPFAC4 = 1.0_JPRB+ZTPFAC3
+! if (lhook) call dr_hook('vdfincr',0,zhook_handle)
+ztpfac2 = 1.0_jprb/rvdifts
+ztpfac3 = 1.0_jprb-ztpfac2
+ztpfac4 = 1.0_jprb+ztpfac3
 
-ZCONS1  = 1.0_JPRB/PTMST
-ZCONS2  = 1.0_JPRB/(RG*PTMST)
+zcons1  = 1.0_jprb/ptmst
+zcons2  = 1.0_jprb/(rg*ptmst)
 
-ZRG     = 1.0_JPRB/RG
-LLOCONS  = .TRUE.
+zrg     = 1.0_jprb/rg
+llocons  = .true.
 
 !     ------------------------------------------------------------------
 
-!*         2.    COMPUTE TENDENCIES AND BUDGETS
+!*         2.    compute tendencies and budgets
 !                ------------------------------
 
-DO JL=KIDIA,KFDIA
-  PVDIS(JL)    =0.0_JPRB
-  PVDISG(JL)   =0.0_JPRB
-  PSTRTU(JL,0) =0.0_JPRB
-  PSTRTV(JL,0) =0.0_JPRB
-  PSTRSOU(JL,0)=0.0_JPRB
-  PSTRSOV(JL,0)=0.0_JPRB
-  ZTOFDU(JL)   =0.0_JPRB
-  ZTOFDV(JL)   =0.0_JPRB
-  ZSOU(JL)   =0.0_JPRB
-  ZSOV(JL)   =0.0_JPRB
-ENDDO
+do jl=kidia,kfdia
+  pvdis(jl)    =0.0_jprb
+  pvdisg(jl)   =0.0_jprb
+  pstrtu(jl,0) =0.0_jprb
+  pstrtv(jl,0) =0.0_jprb
+  pstrsou(jl,0)=0.0_jprb
+  pstrsov(jl,0)=0.0_jprb
+  ztofdu(jl)   =0.0_jprb
+  ztofdv(jl)   =0.0_jprb
+  zsou(jl)   =0.0_jprb
+  zsov(jl)   =0.0_jprb
+enddo
 
-!*         2.1  VERTICAL LOOP
+!*         2.1  vertical loop
 
-DO JK=1,KLEV
-  DO JL=KIDIA,KFDIA
+do jk=1,klev
+  do jl=kidia,kfdia
 
-!   Compute total tendencies (dynamics + vertical diffusion + SO) 
-    ZDUDT          = ( PUDIF(JL,JK) - ZTPFAC2 * PUM1(JL,JK) ) * ZCONS1
-    ZDVDT          = ( PVDIF(JL,JK) - ZTPFAC2 * PVM1(JL,JK) ) * ZCONS1
+!   compute total tendencies (dynamics + vertical diffusion + so) 
+    zdudt          = ( pudif(jl,jk) - ztpfac2 * pum1(jl,jk) ) * zcons1
+    zdvdt          = ( pvdif(jl,jk) - ztpfac2 * pvm1(jl,jk) ) * zcons1
      
-    ZDP            = PAPHM1(JL,JK)-PAPHM1(JL,JK-1)
-    ZGDPH          = -ZDP*ZRG
+    zdp            = paphm1(jl,jk)-paphm1(jl,jk-1)
+    zgdph          = -zdp*zrg
 
-!   TOFD-tendencies 
-    ZHU2=-PTODC(JL,JK)*ZCONS1
-    ZTETOFDU=PUDIF(JL,JK)*ZHU2
-    ZTETOFDV=PVDIF(JL,JK)*ZHU2
-    ZTOFDU(JL)=ZTOFDU(JL)+ZGDPH*ZTETOFDU
-    ZTOFDV(JL)=ZTOFDV(JL)+ZGDPH*ZTETOFDV
-    PTOFDU(JL)=ZTOFDU(JL)
-    PTOFDV(JL)=ZTOFDV(JL)
+!   tofd-tendencies 
+    zhu2=-ptodc(jl,jk)*zcons1
+    ztetofdu=pudif(jl,jk)*zhu2
+    ztetofdv=pvdif(jl,jk)*zhu2
+    ztofdu(jl)=ztofdu(jl)+zgdph*ztetofdu
+    ztofdv(jl)=ztofdv(jl)+zgdph*ztetofdv
+    ptofdu(jl)=ztofdu(jl)
+    ptofdv(jl)=ztofdv(jl)
 
-!   Implicit part of SO-tendencies 
-    ZHU3=-PSOC(JL,JK)*ZCONS1
-    ZTESOU=PUDIF(JL,JK)*ZHU3
-    ZTESOV=PVDIF(JL,JK)*ZHU3
-    ZSOU(JL)=ZSOU(JL)+ZGDPH*ZTESOU
-    ZSOV(JL)=ZSOV(JL)+ZGDPH*ZTESOV
+!   implicit part of so-tendencies 
+    zhu3=-psoc(jl,jk)*zcons1
+    ztesou=pudif(jl,jk)*zhu3
+    ztesov=pvdif(jl,jk)*zhu3
+    zsou(jl)=zsou(jl)+zgdph*ztesou
+    zsov(jl)=zsov(jl)+zgdph*ztesov
     
-!   Velocity before VDF 
-    ZU1=PUM1(JL,JK)+PVOM(JL,JK)*PTMST
-    ZV1=PVM1(JL,JK)+PVOL(JL,JK)*PTMST
-!   Velocity after VDF 
-    ZU2=PUM1(JL,JK)+(ZDUDT-PSOTEU(JL,JK)-ZTESOU)*PTMST
-    ZV2=PVM1(JL,JK)+(ZDVDT-PSOTEV(JL,JK)-ZTESOV)*PTMST
-!   Velocity after SO 
-    ZU3=PUM1(JL,JK)+ZDUDT*PTMST   
-    ZV3=PVM1(JL,JK)+ZDVDT*PTMST   
-    ZVDFDIS=0.5_JPRB*(ZU1-ZU2)*(ZU1+ZU2) + 0.5_JPRB*(ZV1-ZV2)*(ZV1+ZV2)
-    ZSODIS =0.5_JPRB*(ZU2-ZU3)*(ZU2+ZU3) + 0.5_JPRB*(ZV1-ZV2)*(ZV1+ZV2)
+!   velocity before vdf 
+    zu1=pum1(jl,jk)+pvom(jl,jk)*ptmst
+    zv1=pvm1(jl,jk)+pvol(jl,jk)*ptmst
+!   velocity after vdf 
+    zu2=pum1(jl,jk)+(zdudt-psoteu(jl,jk)-ztesou)*ptmst
+    zv2=pvm1(jl,jk)+(zdvdt-psotev(jl,jk)-ztesov)*ptmst
+!   velocity after so 
+    zu3=pum1(jl,jk)+zdudt*ptmst   
+    zv3=pvm1(jl,jk)+zdvdt*ptmst   
+    zvdfdis=0.5_jprb*(zu1-zu2)*(zu1+zu2) + 0.5_jprb*(zv1-zv2)*(zv1+zv2)
+    zsodis =0.5_jprb*(zu2-zu3)*(zu2+zu3) + 0.5_jprb*(zv1-zv2)*(zv1+zv2)
 
 
-!   Integrate VDF-tendencies (including TOFD) to find VDF-stress profile
-    PSTRTU(JL,JK)  = (ZDUDT-PVOM(JL,JK)-PSOTEU(JL,JK)-ZTESOU)*ZGDPH+PSTRTU(JL,JK-1)
-    PSTRTV(JL,JK)  = (ZDVDT-PVOL(JL,JK)-PSOTEV(JL,JK)-ZTESOV)*ZGDPH+PSTRTV(JL,JK-1)
+!   integrate vdf-tendencies (including tofd) to find vdf-stress profile
+    pstrtu(jl,jk)  = (zdudt-pvom(jl,jk)-psoteu(jl,jk)-ztesou)*zgdph+pstrtu(jl,jk-1)
+    pstrtv(jl,jk)  = (zdvdt-pvol(jl,jk)-psotev(jl,jk)-ztesov)*zgdph+pstrtv(jl,jk-1)
 
-!   Integrate SO-tendencies to find SO-stress profile
-    PSTRSOU(JL,JK)  = (PSOTEU(JL,JK)+ZTESOU)*ZGDPH+PSTRSOU(JL,JK-1)
-    PSTRSOV(JL,JK)  = (PSOTEV(JL,JK)+ZTESOV)*ZGDPH+PSTRSOV(JL,JK-1)
+!   integrate so-tendencies to find so-stress profile
+    pstrsou(jl,jk)  = (psoteu(jl,jk)+ztesou)*zgdph+pstrsou(jl,jk-1)
+    pstrsov(jl,jk)  = (psotev(jl,jk)+ztesov)*zgdph+pstrsov(jl,jk-1)
 
     
-    PVOM(JL,JK)    = ZDUDT
-    PVOL(JL,JK)    = ZDVDT
-    PVDIS(JL)      = PVDIS(JL) +ZVDFDIS*ZDP
-    PVDISG(JL)     = PVDISG(JL)+ZSODIS*ZDP
+    pvom(jl,jk)    = zdudt
+    pvol(jl,jk)    = zdvdt
+    pvdis(jl)      = pvdis(jl) +zvdfdis*zdp
+    pvdisg(jl)     = pvdisg(jl)+zsodis*zdp
    
-    PQTDIF(JL,JK)  =   PQTDIF(JL,JK) + ZTPFAC3 * PQTM1(JL,JK)
-    PQTE(JL,JK)    = ( PQTDIF(JL,JK) - PQTM1(JL,JK) ) * ZCONS1
+    pqtdif(jl,jk)  =   pqtdif(jl,jk) + ztpfac3 * pqtm1(jl,jk)
+    pqte(jl,jk)    = ( pqtdif(jl,jk) - pqtm1(jl,jk) ) * zcons1
 
 !----------------------------------------------------
-!  MPBL - Liquid water static energy
-!    Input:  PSLGDIF liquid static energy first guess
-!            PQTDIF  total water first guess
-!    Output: PSLGE   liquid static energy tendency
+!  mpbl - liquid water static energy
+!    input:  pslgdif liquid static energy first guess
+!            pqtdif  total water first guess
+!    output: pslge   liquid static energy tendency
 !----------------------------------------------------
 
-      PSLGDIF(JL,JK)   =   PSLGDIF(JL,JK) + ZTPFAC3 * PSLGM1(JL,JK)
-      PSLGE(JL,JK)     = ( PSLGDIF(JL,JK) + ZVDFDIS+ZSODIS-PSLGM1(JL,JK) ) * ZCONS1
-      PSLGEWODIS(JL,JK)= ( PSLGDIF(JL,JK)          - PSLGM1(JL,JK) ) * ZCONS1
+      pslgdif(jl,jk)   =   pslgdif(jl,jk) + ztpfac3 * pslgm1(jl,jk)
+      pslge(jl,jk)     = ( pslgdif(jl,jk) + zvdfdis+zsodis-pslgm1(jl,jk) ) * zcons1
+      pslgewodis(jl,jk)= ( pslgdif(jl,jk)          - pslgm1(jl,jk) ) * zcons1
 
-  ENDDO
-ENDDO
-
-
-DO JL=KIDIA,KFDIA
-  PVDIS(JL) =PVDIS(JL) *ZCONS2
-  PVDISG(JL)=PVDISG(JL)*ZCONS2
-ENDDO
+  enddo
+enddo
 
 
-! IF (LHOOK) CALL DR_HOOK('VDFINCR',1,ZHOOK_HANDLE)
-END SUBROUTINE VDFINCR
+do jl=kidia,kfdia
+  pvdis(jl) =pvdis(jl) *zcons2
+  pvdisg(jl)=pvdisg(jl)*zcons2
+enddo
+
+
+! if (lhook) call dr_hook('vdfincr',1,zhook_handle)
+end subroutine vdfincr

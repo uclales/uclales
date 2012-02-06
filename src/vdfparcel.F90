@@ -1,488 +1,486 @@
-!OPTIONS XOPT(HSFUN)
-SUBROUTINE VDFPARCEL (KIDIA   , KFDIA   , KLON    , KLEV    , KDRAFT  , &
-                    & PGEOH   , PGEOM1  , PAPHM1  , &
-                    & PUM1    , PVM1    , PQTM1   , PSLGM1  , PTVEN   , &
-                    & PUUH    , PVUH    , PSLGUH  , PQTUH   , PWU2H   , PQCUH  , PBUOF , & 
-                    & PQUH    , PTUH    , PEPS    , PFACEXC , &
-                    & PZPLCL  , KPLCL   , PZPTOP  , KPTOP   , KPLZB   , &
-                    & KD      , PUPGENL , PUPGENN , &
-                    & PTAUEPS , PW2THRESH, LDDONE , KPBLTYPE)  
+!options xopt(hsfun)
+subroutine vdfparcel (kidia   , kfdia   , klon    , klev    , kdraft  , &
+                    & pgeoh   , pgeom1  , paphm1  , &
+                    & pum1    , pvm1    , pqtm1   , pslgm1  , ptven   , &
+                    & puuh    , pvuh    , pslguh  , pqtuh   , pwu2h   , pqcuh  , pbuof , & 
+                    & pquh    , ptuh    , peps    , pfacexc , &
+                    & pzplcl  , kplcl   , pzptop  , kptop   , kplzb   , &
+                    & kd      , pupgenl , pupgenn , &
+                    & ptaueps , pw2thresh, lddone , kpbltype)  
 !     ------------------------------------------------------------------
 
-!**   *VDFPARCEL* - VERTICAL INTEGRATION FOR PARCEL ASCENT
+!**   *vdfparcel* - vertical integration for parcel ascent
 !
-!     based on original VDFHGHTN.F90 (CY29R1 and earlier) by
-!             A.P. SIEBESMA    30/06/99  
-!             M. Ko"hler       3/12/2004 
-!             Roel Neggers     12/04/2005     separated from VDFHGHTN
+!     based on original vdfhghtn.f90 (cy29r1 and earlier) by
+!             a.p. siebesma    30/06/99  
+!             m. ko"hler       3/12/2004 
+!             roel neggers     12/04/2005     separated from vdfhghtn
 !                              15/10/2005     pressure term added
-!                              12/04/2006     debugged interpolation of LCL height
+!                              12/04/2006     debugged interpolation of lcl height
 !                              30/11/2006     updraft precipitation generation added
 !                                             level of zero buoyancy determination
 
 
-!     PURPOSE
+!     purpose
 !     -------
 
-!     DETERMINE PBL HEIGHT AND UPDRAFT FIELDS
+!     determine pbl height and updraft fields
 
-!     INTERFACE
+!     interface
 !     ---------
 
-!     *VDFPARCEL* IS CALLED BY *VDFHGHTN*
+!     *vdfparcel* is called by *vdfhghtn*
 
-!     PARAMETER     DESCRIPTION                                   UNITS
+!     parameter     description                                   units
 !     ---------     -----------                                   -----
-!     INPUT PARAMETERS (INTEGER):
+!     input parameters (integer):
 
-!     *KIDIA*        START POINT
-!     *KFDIA*        END POINT
-!     *KLEV*         NUMBER OF LEVELS
-!     *KLON*         NUMBER OF GRID POINTS PER PACKET
-!     *KDRAFT*       NUMBER OF EXPLICITLY MODELED DRAFTS - CURRENTLY 3:
+!     *kidia*        start point
+!     *kfdia*        end point
+!     *klev*         number of levels
+!     *klon*         number of grid points per packet
+!     *kdraft*       number of explicitly modeled drafts - currently 3:
 !                    1: test parcel
 !                    2: rising dry thermals which stop at cloud base or inversion
 !                    3: rising dry thermals which become cloudy
 !                    (4: downdrafts .. to be done)
-!     *KD*           Draft index
-!     *KPBLTYPE*    -1: not defined yet
-!                    0: stable PBL
-!                    1: dry convective PBL (no cloud below parcel top)
+!     *kd*           draft index
+!     *kpbltype*    -1: not defined yet
+!                    0: stable pbl
+!                    1: dry convective pbl (no cloud below parcel top)
 !                    2: stratocumulus
 !                    3: shallow cumulus
 !                    4: deep cumulus
 
 
 
-!     INPUT PARAMETERS (REAL):
+!     input parameters (real):
 
-!     *PGEOH*        GEOPOTENTIAL AT HALF LEVEL                   M2/S2
-!     *PGEOM1*       GEOPOTENTIAL AT T-1                          M2/S2
-!     *PAPHM1*       PRESSURE AT HALF LEVEL AT T-1                PA
-!     *PUM1*         X-VELOCITY COMPONENT AT T-1                  M/S
-!     *PVM1*         Y-VELOCITY COMPONENT AT T-1                  M/S
-!     *PQTM1*        MEAN SPECIFIC TOTAL WATER AT FULL LEVEL      KG/KG
-!     *PSLGM1*       MEAN LIQUID STATIC ENERGY AT FULL LEVEL      M2/S2
-!     *PTVEN*        ENVIRONMENTAL VIRTUAL TEMPERATURE            K
-!     *PTAUEPS*      UPDRAFT ENTRAINMENT TIMESCALE                S
-!     *PW2THRESH*    THRESHOLD UPDRAFT VELOCITY SQUARED           M2/S2
-
-
-!     INPUT PARAMETERS (LOGICAL):
-!     *LDDONE*       PARCEL LIFTOFF CONFIRMATION (.TRUE. means 'don't launch parcel')
+!     *pgeoh*        geopotential at half level                   m2/s2
+!     *pgeom1*       geopotential at t-1                          m2/s2
+!     *paphm1*       pressure at half level at t-1                pa
+!     *pum1*         x-velocity component at t-1                  m/s
+!     *pvm1*         y-velocity component at t-1                  m/s
+!     *pqtm1*        mean specific total water at full level      kg/kg
+!     *pslgm1*       mean liquid static energy at full level      m2/s2
+!     *ptven*        environmental virtual temperature            k
+!     *ptaueps*      updraft entrainment timescale                s
+!     *pw2thresh*    threshold updraft velocity squared           m2/s2
 
 
-!     OUTPUT PARAMETERS (REAL):
+!     input parameters (logical):
+!     *lddone*       parcel liftoff confirmation (.true. means 'don't launch parcel')
 
-!     *PUUH*         UPDRAFT X-MOMENTUM
-!     *PVUH*         UPDRAFT Y-MOMENTUM
-!     *PSLGUH*       UPDRAFT GENERALIZED LIQUID STATIC ENERGY (SLG)
-!                    AT HALF LEVEL                                   M2/S2
-!     *PQTUH*        UPDRAFT TOTAL SPECIFIC HUMIDITY AT HALF LEVEL   KG/KG
-!     *PWU2H*        UPDRAFT VERTICAL VELOCITY SQUARE AT HALF LEVEL  M2/S2
-!     *PQCUH*        UPDRAFT LIQUID WATER AT HALF LEVEL              KG/KG
-!     *PQUH*         UPDRAFT SPECIFIC HUMIDITY AT HALF LEVEL         KG/KG
-!     *PTUH*         UPDRAFT TEMPERATURE AT HALF LEVEL               K
-!     *PBUOF*        UPDRAFT BUOYANCY AT FULL LEVEL                  M/S2
-!     *PEPS*         UPDRAFT ENTRAINMENT RATE                        1/M
-!     *PZPLCL*       HEIGHT OF LIFTING CONDENSATION LEVEL OF UPDRAFT          M
-!     *PZPTOP*       HEIGHT OF LEVEL OF ZERO KINETIC ENERGY (W=0) OF UPDRAFT  M
-!     *PUPGENL*      UPDRAFT RAIN GENERATION                         KG/KG /S
-!     *PUPGENN*      UPDRAFT SNOW GENERATION                         KG/KG /S
+
+!     output parameters (real):
+
+!     *puuh*         updraft x-momentum
+!     *pvuh*         updraft y-momentum
+!     *pslguh*       updraft generalized liquid static energy (slg)
+!                    at half level                                   m2/s2
+!     *pqtuh*        updraft total specific humidity at half level   kg/kg
+!     *pwu2h*        updraft vertical velocity square at half level  m2/s2
+!     *pqcuh*        updraft liquid water at half level              kg/kg
+!     *pquh*         updraft specific humidity at half level         kg/kg
+!     *ptuh*         updraft temperature at half level               k
+!     *pbuof*        updraft buoyancy at full level                  m/s2
+!     *peps*         updraft entrainment rate                        1/m
+!     *pzplcl*       height of lifting condensation level of updraft          m
+!     *pzptop*       height of level of zero kinetic energy (w=0) of updraft  m
+!     *pupgenl*      updraft rain generation                         kg/kg /s
+!     *pupgenn*      updraft snow generation                         kg/kg /s
 !
-!     OUTPUT PARAMETERS (INTEGER):
+!     output parameters (integer):
 
-!     *KPLCL*        FIRST HALF LEVEL ABOVE REAL HEIGHT OF UPRAFT LCL
-!     *KPTOP*        HIGHEST HALF LEVEL BELOW PZTOP, AND
-!                    UPDRAFT TOP FULL LEVEL (PZTOP IS WITHIN THAT LAYER)
-!     *KPLZB*        LEVEL OF UPRAFT ZERO BUOYANCY (HIGHEST FULL LEVEL THAT IS POS. BUOYANT)
+!     *kplcl*        first half level above real height of upraft lcl
+!     *kptop*        highest half level below pztop, and
+!                    updraft top full level (pztop is within that layer)
+!     *kplzb*        level of upraft zero buoyancy (highest full level that is pos. buoyant)
 
-!     METHOD
+!     method
 !     ------
 
-!     SEE DOCUMENTATION
+!     see documentation
 
 !     ------------------------------------------------------------------
 
 !#include "tsmbkind.h"
 use garbage, only : foealfa, cuadjtq
-USE PARKIND1  ,ONLY : JPIM     , JPRB
+use parkind1  ,only : jpim     , jprb
 
-! USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
+! use yomhook   ,only : lhook,   dr_hook
 
-USE YOETHF   , ONLY : R2ES     , R3LES    , R3IES    , &
-                     &R4LES    , R4IES    , R5LES    , R5IES     , RVTMP2  , & 
-                     &RALVDCP  , RALSDCP  , &
-		     &RTWAT    , RTICE    , RTICECU  , R5ALVCP   , R5ALSCP , & 
-                     &RTWAT_RTICE_R       , RTWAT_RTICECU_R
+use yoethf   , only : r2es     , r3les    , r3ies    , &
+                     &r4les    , r4ies    , r5les    , r5ies     , rvtmp2  , & 
+                     &ralvdcp  , ralsdcp  , &
+         &rtwat    , rtice    , rticecu  , r5alvcp   , r5alscp , & 
+                     &rtwat_rtice_r       , rtwat_rticecu_r
                      
-USE yos_cst   , ONLY : RG  , RLSTT , RCPD , RLVTT , RETV ,RTT         
+use yos_cst   , only : rg  , rlstt , rcpd , rlvtt , retv ,rtt         
 
 
 
-IMPLICIT NONE
+implicit none
 
 
-!*         0.1    GLOBAL VARIABLES
+!*         0.1    global variables
 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KLON 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KLEV 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KDRAFT
-INTEGER(KIND=JPIM),INTENT(IN)    :: KIDIA 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KFDIA 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KD
-INTEGER(KIND=JPIM),INTENT(INOUT) :: KPLCL(KLON,KDRAFT)
-INTEGER(KIND=JPIM),INTENT(INOUT) :: KPTOP(KLON,KDRAFT)
-INTEGER(KIND=JPIM),INTENT(INOUT) :: KPLZB(KLON,KDRAFT)
-INTEGER(KIND=JPIM),INTENT(IN)    :: KPBLTYPE(KLON)
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PGEOH(KLON,0:KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PGEOM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PAPHM1(KLON,0:KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PUM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PVM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PQTM1 (KLON,KLEV)
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PSLGM1(KLON,KLEV)
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PTVEN(KLON,KLEV)
-REAL(KIND=JPRB)   ,INTENT(INOUT)   :: PUUH(KLON,0:KLEV,KDRAFT) 
-REAL(KIND=JPRB)   ,INTENT(INOUT)   :: PVUH(KLON,0:KLEV,KDRAFT) 
-REAL(KIND=JPRB)   ,INTENT(INOUT)   :: PSLGUH(KLON,0:KLEV,KDRAFT) 
-REAL(KIND=JPRB)   ,INTENT(INOUT)   :: PQTUH(KLON,0:KLEV,KDRAFT) 
-REAL(KIND=JPRB)   ,INTENT(INOUT)   :: PWU2H(KLON,0:KLEV,KDRAFT) 
-REAL(KIND=JPRB)   ,INTENT(INOUT)   :: PQCUH(KLON,0:KLEV,KDRAFT) 
-REAL(KIND=JPRB)   ,INTENT(INOUT)   :: PQUH(KLON,0:KLEV,KDRAFT) 
-REAL(KIND=JPRB)   ,INTENT(INOUT)   :: PTUH(KLON,0:KLEV,KDRAFT) 
-REAL(KIND=JPRB)   ,INTENT(INOUT)   :: PEPS(KLON,0:KLEV,KDRAFT) 
-REAL(KIND=JPRB)   ,INTENT(IN)      :: PFACEXC(KLON,KDRAFT)
-REAL(KIND=JPRB)   ,INTENT(INOUT)   :: PZPTOP(KLON,KDRAFT) 
-REAL(KIND=JPRB)   ,INTENT(INOUT)   :: PZPLCL(KLON,KDRAFT) 
-REAL(KIND=JPRB)   ,INTENT(IN)      :: PTAUEPS
-REAL(KIND=JPRB)   ,INTENT(IN)      :: PW2THRESH
-LOGICAL           ,INTENT(INOUT)   :: LDDONE(KLON,KDRAFT) 
-REAL(KIND=JPRB)   ,INTENT(INOUT)   :: PBUOF(KLON,KLEV,KDRAFT) 
-REAL(KIND=JPRB)   ,INTENT(INOUT)   :: PUPGENL(KLON,KLEV,KDRAFT)
-REAL(KIND=JPRB)   ,INTENT(INOUT)   :: PUPGENN(KLON,KLEV,KDRAFT)
+integer(kind=jpim),intent(in)    :: klon 
+integer(kind=jpim),intent(in)    :: klev 
+integer(kind=jpim),intent(in)    :: kdraft
+integer(kind=jpim),intent(in)    :: kidia 
+integer(kind=jpim),intent(in)    :: kfdia 
+integer(kind=jpim),intent(in)    :: kd
+integer(kind=jpim),intent(inout) :: kplcl(klon,kdraft)
+integer(kind=jpim),intent(inout) :: kptop(klon,kdraft)
+integer(kind=jpim),intent(inout) :: kplzb(klon,kdraft)
+integer(kind=jpim),intent(in)    :: kpbltype(klon)
+real(kind=jprb)   ,intent(in)    :: pgeoh(klon,0:klev) 
+real(kind=jprb)   ,intent(in)    :: pgeom1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: paphm1(klon,0:klev) 
+real(kind=jprb)   ,intent(in)    :: pum1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pvm1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pqtm1 (klon,klev)
+real(kind=jprb)   ,intent(in)    :: pslgm1(klon,klev)
+real(kind=jprb)   ,intent(in)    :: ptven(klon,klev)
+real(kind=jprb)   ,intent(inout)   :: puuh(klon,0:klev,kdraft) 
+real(kind=jprb)   ,intent(inout)   :: pvuh(klon,0:klev,kdraft) 
+real(kind=jprb)   ,intent(inout)   :: pslguh(klon,0:klev,kdraft) 
+real(kind=jprb)   ,intent(inout)   :: pqtuh(klon,0:klev,kdraft) 
+real(kind=jprb)   ,intent(inout)   :: pwu2h(klon,0:klev,kdraft) 
+real(kind=jprb)   ,intent(inout)   :: pqcuh(klon,0:klev,kdraft) 
+real(kind=jprb)   ,intent(inout)   :: pquh(klon,0:klev,kdraft) 
+real(kind=jprb)   ,intent(inout)   :: ptuh(klon,0:klev,kdraft) 
+real(kind=jprb)   ,intent(inout)   :: peps(klon,0:klev,kdraft) 
+real(kind=jprb)   ,intent(in)      :: pfacexc(klon,kdraft)
+real(kind=jprb)   ,intent(inout)   :: pzptop(klon,kdraft) 
+real(kind=jprb)   ,intent(inout)   :: pzplcl(klon,kdraft) 
+real(kind=jprb)   ,intent(in)      :: ptaueps
+real(kind=jprb)   ,intent(in)      :: pw2thresh
+logical           ,intent(inout)   :: lddone(klon,kdraft) 
+real(kind=jprb)   ,intent(inout)   :: pbuof(klon,klev,kdraft) 
+real(kind=jprb)   ,intent(inout)   :: pupgenl(klon,klev,kdraft)
+real(kind=jprb)   ,intent(inout)   :: pupgenn(klon,klev,kdraft)
 
-!*         0.2    LOCAL VARIABLES
+!*         0.2    local variables
 
-LOGICAL ::            LLDOIT(KLON), LLCLOUD(KLON), LLPREC
+logical ::            lldoit(klon), llcloud(klon), llprec
 
-REAL(KIND=JPRB) ::    ZRG   , ZDZ   , ZTVUF , ZQUF    , ZQCUF   , ZMU, ZB, &
-                    & ZQLUF , ZQIUF , ZQTUF , ZTUF  , ZSLGUF  , &
-		    & ZMIX  (KLON,0:KLEV), ZMIXW (KLON,0:KLEV) !,ZBUOF(KLON,KLEV)
+real(kind=jprb) ::    zrg   , zdz   , ztvuf , zquf    , zqcuf   , zmu, zb, &
+                    & zqluf , zqiuf , zqtuf , ztuf  , zslguf  , &
+        & zmix  (klon,0:klev), zmixw (klon,0:klev) !,zbuof(klon,klev)
 
-REAL(KIND=JPRB) ::    ZWUH  (KLON,0:KLEV)   , ZQUH  (KLON,0:KLEV)    , ZPH  (KLON), &
-                    & ZTTEMP(KLON,KLEV)     , ZQTEMP(KLON,KLEV)      
+real(kind=jprb) ::    zwuh  (klon,0:klev)   , zquh  (klon,0:klev)    , zph  (klon), &
+                    & zttemp(klon,klev)     , zqtemp(klon,klev)      
 		    
-REAL(KIND=JPRB) ::    ZALFAW  , ZFACW   , ZFACI   , ZFAC    , ZTEMP ,&
-                    & ZESDP   , ZCOR    , ZDQSDTEMP(KLON)   , ZQS(KLON,0:KLEV), &
-                    & ZPGENUP , ZWUHTEMP(KLON), ZTAUEPS(KLON), ZCEPSZ(KLON)
+real(kind=jprb) ::    zalfaw  , zfacw   , zfaci   , zfac    , ztemp ,&
+                    & zesdp   , zcor    , zdqsdtemp(klon)   , zqs(klon,0:klev), &
+                    & zpgenup , zwuhtemp(klon), ztaueps(klon), zcepsz(klon)
 
-INTEGER(KIND=JPIM) :: IS, JK, JL, JKMAX, JKMIN
+integer(kind=jpim) :: is, jk, jl, jkmax, jkmin
 
-REAL(KIND=JPRB) ::    ZDQSUDZ, ZDQTUDZ, ZLCLFAC(KLON), ZEPSCFLFAC, ZQLWORK, ZLCRIT
+real(kind=jprb) ::    zdqsudz, zdqtudz, zlclfac(klon), zepscflfac, zqlwork, zlcrit
 
-! REAL(KIND=JPRB) ::    ZHOOK_HANDLE
+! real(kind=jprb) ::    zhook_handle
 
-!DIR$ VFUNCTION EXPHF
+!dir$ vfunction exphf
 ! #include "fcttre.h"
 ! #include "cuadjtq.intfb.h"
 
 
 !     -----------------------------------------------------------------
 
-!*         1.     SET SOME CONSTANTS
+!*         1.     set some constants
 !                 --------------------
 
-! IF (LHOOK) CALL DR_HOOK('VDFPARCEL',0,ZHOOK_HANDLE)
+! if (lhook) call dr_hook('vdfparcel',0,zhook_handle)
 
-!  Constant of proportionality between updraft induced pressure term and
-!     updraft vertical acceleration (Siebesma, Soares and Teixeira, JAS 2007)
-!ZMU = 0._JPRB  
-ZMU = 0.15_JPRB   !cy32r3
+!  constant of proportionality between updraft induced pressure term and
+!     updraft vertical acceleration (siebesma, soares and teixeira, jas 2007)
+!zmu = 0._jprb  
+zmu = 0.15_jprb   !cy32r3
 
-!  Constant of proportionality between kinematic and thermodynamic entrainment
-!ZB = 1.0_JPRB
-ZB = 0.5_JPRB   !cy32r3
+!  constant of proportionality between kinematic and thermodynamic entrainment
+!zb = 1.0_jprb
+zb = 0.5_jprb   !cy32r3
 
-!  CFL criterion factor for updraft lateral entrainment
-ZEPSCFLFAC = 0.6_JPRB   
-!ZEPSCFLFAC = 1.0_JPRB
+!  cfl criterion factor for updraft lateral entrainment
+zepscflfac = 0.6_jprb   
+!zepscflfac = 1.0_jprb
 
-!  Optimization
-ZRG         = 1.0_JPRB/RG 
+!  optimization
+zrg         = 1.0_jprb/rg 
 
-!  Updraft precipitation switch
-LLPREC=.TRUE.
-!LLPREC=.FALSE.
+!  updraft precipitation switch
+llprec=.true.
+!llprec=.false.
 
-!  Critical updraft condensate [kg/kg] in Sundqvist precipitation generation
-!ZLCRIT = 0.0005_JPRB  
-ZLCRIT = 0.001_JPRB     !cy32r3
-!ZLCRIT = 0.0015_JPRB   
+!  critical updraft condensate [kg/kg] in sundqvist precipitation generation
+!zlcrit = 0.0005_jprb  
+zlcrit = 0.001_jprb     !cy32r3
+!zlcrit = 0.0015_jprb   
 
 
 
 !     -----------------------------------------------------------------
 
-!*         2.     SOME FINAL INITIALIZATION
+!*         2.     some final initialization
 !                 ------------------------
 
-  DO JL=KIDIA,KFDIA
-    LLCLOUD(JL)        = .FALSE.
-    PBUOF (JL,KLEV,KD) = 0.0_JPRB
-    ZLCLFAC(JL)        = 0.0_JPRB
-    KPLZB(JL,KD)       = KLEV-1
-    ZTAUEPS(JL)        = PTAUEPS
+  do jl=kidia,kfdia
+    llcloud(jl)        = .false.
+    pbuof (jl,klev,kd) = 0.0_jprb
+    zlclfac(jl)        = 0.0_jprb
+    kplzb(jl,kd)       = klev-1
+    ztaueps(jl)        = ptaueps
     
     !  1/z scaling factor in eps
-    ZCEPSZ(JL) = 0._JPRB
-    !IF (KD==2 .AND. KPBLTYPE(JL)==1) THEN
-    !  ZCEPSZ(JL) = 0.4_JPRB
-    !ENDIF
-    !IF (.NOT.LDDONE(JL,KD)) THEN
-    !  ZCEPSZ(JL) = ( 2._JPRB * PFACEXC(JL,KD) )**(-1._JPRB)
-    !ENDIF  
-    !write(0,'(a,i,2f)') '    ',KD,PFACEXC(JL,KD),ZCEPSZ(JL)
+    zcepsz(jl) = 0._jprb
+    !if (kd==2 .and. kpbltype(jl)==1) then
+    !  zcepsz(jl) = 0.4_jprb
+    !endif
+    !if (.not.lddone(jl,kd)) then
+    !  zcepsz(jl) = ( 2._jprb * pfacexc(jl,kd) )**(-1._jprb)
+    !endif  
+    !write(0,'(a,i,2f)') '    ',kd,pfacexc(jl,kd),zcepsz(jl)
     
-  ENDDO
+  enddo
     
   !integration over total depth for now: 
-  !    Note that limiting JKMIN to KPLCL/KPTOP for KD=2 could speed things up a bit..
-  JKMAX = KLEV-2
-  JKMIN = 1
+  !    note that limiting jkmin to kplcl/kptop for kd=2 could speed things up a bit..
+  jkmax = klev-2
+  jkmin = 1
 
 
 !     -----------------------------------------------------------------
 
-!*         3.     VERTICAL ASCENT UNTIL VELOCITY BECOMES NEGATIVE
+!*         3.     vertical ascent until velocity becomes negative
 !                 -----------------------------------------------
   
-  DO JK=JKMAX,JKMIN,-1
-  
-    IS=0
-    DO JL=KIDIA,KFDIA
-      IF (.NOT.LDDONE(JL,KD)) THEN
-        IS            = IS+1
+  do jk=jkmax,jkmin,-1
+    is=0
+    do jl=kidia,kfdia
+      if (.not.lddone(jl,kd)) then
+        is            = is+1
 
 
-!*         3.1  Updraft entrainment
+!*         3.1  updraft entrainment
         
-        ZWUH(JL,JK+1) = SQRT( MAX( PWU2H(JL,JK+1,KD), 0.01_JPRB) ) ! w,up > 0.1 m/s (safety)
-        PEPS(JL,JK+1,KD) = 1.0_JPRB / ( ZWUH(JL,JK+1) * ZTAUEPS(JL) ) !& ! eps=1/(w,up*tau)
+        zwuh(jl,jk+1) = sqrt( max( pwu2h(jl,jk+1,kd), 0.01_jprb) ) ! w,up > 0.1 m/s (safety)
+        peps(jl,jk+1,kd) = 1.0_jprb / ( zwuh(jl,jk+1) * ztaueps(jl) ) !& ! eps=1/(w,up*tau)
         
-        !RN numerical entrainment limiter: maximally c_e/Dz
-        ZDZ           = (PGEOH(JL,JK) - PGEOH(JL,JK+1))*ZRG
-        PEPS(JL,JK+1,KD) = MIN( ZEPSCFLFAC/ZDZ, PEPS(JL,JK+1,KD) )
-        PEPS(JL,JK+1,KD) = MAX( PEPS(JL,JK+1,KD), ZCEPSZ(JL) * RG/PGEOH(JL,JK+1) )
+        !rn numerical entrainment limiter: maximally c_e/dz
+        zdz           = (pgeoh(jl,jk) - pgeoh(jl,jk+1))*zrg
+        peps(jl,jk+1,kd) = min( zepscflfac/zdz, peps(jl,jk+1,kd) )
+        peps(jl,jk+1,kd) = max( peps(jl,jk+1,kd), zcepsz(jl) * rg/pgeoh(jl,jk+1) )
         
 
-!*         3.2  Ascent of slg and qt (exact)
+!*         3.2  ascent of slg and qt (exact)
  
-        ZMIX(JL,JK+1) = exp( - ZDZ * PEPS(JL,JK+1,KD) )
-        PQTUH(JL,JK,KD)  = ( PQTUH (JL,JK+1,KD) - PQTM1 (JL,JK+1) ) * ZMIX(JL,JK+1) &
-                    & + PQTM1 (JL,JK+1)
-        PSLGUH(JL,JK,KD) = ( PSLGUH(JL,JK+1,KD) - PSLGM1(JL,JK+1) ) * ZMIX(JL,JK+1) &
-                    & + PSLGM1(JL,JK+1)
-        PUUH(JL,JK,KD)   = ( PUUH (JL,JK+1,KD)  - PUM1  (JL,JK+1) ) * ZMIX(JL,JK+1) &
-                    & + PUM1 (JL,JK+1)
-        PVUH(JL,JK,KD)   = ( PVUH (JL,JK+1,KD)  - PVM1  (JL,JK+1) ) * ZMIX(JL,JK+1) &
-                    & + PVM1 (JL,JK+1)
+        zmix(jl,jk+1) = exp( - zdz * peps(jl,jk+1,kd) )
+        pqtuh(jl,jk,kd)  = ( pqtuh (jl,jk+1,kd) - pqtm1 (jl,jk+1) ) * zmix(jl,jk+1) &
+                    & + pqtm1 (jl,jk+1)
+        pslguh(jl,jk,kd) = ( pslguh(jl,jk+1,kd) - pslgm1(jl,jk+1) ) * zmix(jl,jk+1) &
+                    & + pslgm1(jl,jk+1)
+        puuh(jl,jk,kd)   = ( puuh (jl,jk+1,kd)  - pum1  (jl,jk+1) ) * zmix(jl,jk+1) &
+                    & + pum1 (jl,jk+1)
+        pvuh(jl,jk,kd)   = ( pvuh (jl,jk+1,kd)  - pvm1  (jl,jk+1) ) * zmix(jl,jk+1) &
+                    & + pvm1 (jl,jk+1)
                     
 
-!*         3.3  Condensation - diagnose T, qv, ql
-!*         (Taylor, becomes more inaccurate for states far from q*
+!*         3.3  condensation - diagnose t, qv, ql
+!*         (taylor, becomes more inaccurate for states far from q*
 !*          -> double condensation step)
 
 !          cuadjtq initialization (assume qv=qt)
 
-        PQUH(JL,JK,KD)   = PQTUH(JL,JK,KD)
-        PQCUH(JL,JK,KD)  = 0.0_JPRB
+        pquh(jl,jk,kd)   = pqtuh(jl,jk,kd)
+        pqcuh(jl,jk,kd)  = 0.0_jprb
 
 !          cuadjtq initialization (assume qv=qv(jk+1) for speed)
 
-!       IF ( ZQUH(JL,JK+1) < PQTUH(JL,JK) ) THEN
-!         ZQUH(JL,JK) = ZQUH(JL,JK+1)
-!         ZQCUH(JL,JK)= PQTUH(JL,JK) - ZQUH(JL,JK+1)
-!       ENDIF
+!       if ( zquh(jl,jk+1) < pqtuh(jl,jk) ) then
+!         zquh(jl,jk) = zquh(jl,jk+1)
+!         zqcuh(jl,jk)= pqtuh(jl,jk) - zquh(jl,jk+1)
+!       endif
 
-        PTUH(JL,JK,KD)   = ( PSLGUH(JL,JK,KD) - PGEOH(JL,JK) + RLVTT*PQCUH(JL,JK,KD) ) &
-                    & / RCPD      ! assume liquid phase!
-        ZPH(JL)       = PAPHM1(JL,JK)
-        ZQTEMP(JL,JK) = PQUH(JL,JK,KD)
-        ZTTEMP(JL,JK) = PTUH(JL,JK,KD)
+        ptuh(jl,jk,kd)   = ( pslguh(jl,jk,kd) - pgeoh(jl,jk) + rlvtt*pqcuh(jl,jk,kd) ) &
+                    & / rcpd      ! assume liquid phase!
+        zph(jl)       = paphm1(jl,jk)
+        zqtemp(jl,jk) = pquh(jl,jk,kd)
+        zttemp(jl,jk) = ptuh(jl,jk,kd)
 	
-      ENDIF
+      endif
       
-      LLDOIT(JL)      = .NOT. LDDONE(JL,KD)
+      lldoit(jl)      = .not. lddone(jl,kd)
       
-      IF ( KD==2 ) THEN    ! condensation not done for dry subcloud thermal
-        LLDOIT(JL)    = .FALSE.
-      ENDIF
+      if ( kd==2 ) then    ! condensation not done for dry subcloud thermal
+        lldoit(jl)    = .false.
+      endif
       
-    ENDDO
+    enddo
 
 
-    CALL CUADJTQ &
-     & ( KIDIA,    KFDIA,    KLON,     0,       KLEV,&
-     &   JK,&
-     &   ZPH,      ZTTEMP,   ZQTEMP,   LLDOIT,  4)  
+    call cuadjtq &
+     & ( kidia,    kfdia,    klon,     0,       klev,&
+     &   jk,&
+     &   zph,      zttemp,   zqtemp,   lldoit,  4)  
 
 
-    DO JL=KIDIA,KFDIA
-      IF ( LLDOIT(JL) ) THEN
-        IF ( ZQTEMP(JL,JK) < PQTUH(JL,JK,KD) ) THEN !allow evaporation up to qt
-          PQUH(JL,JK,KD) = ZQTEMP(JL,JK)
-          PQCUH(JL,JK,KD)= PQTUH(JL,JK,KD) - PQUH(JL,JK,KD)
-          PTUH(JL,JK,KD) = ZTTEMP(JL,JK)
-        ELSE                          !case where qv(initial)<qt but qv(final)>qt
-          PQUH(JL,JK,KD) = PQTUH(JL,JK,KD)  !(unusual!)
-          PQCUH(JL,JK,KD)= 0.0_JPRB
-          PTUH(JL,JK,KD) = ( PSLGUH(JL,JK,KD) - PGEOH(JL,JK) + RLVTT*PQCUH(JL,JK,KD) ) &
-                    & / RCPD
-        ENDIF
-      ENDIF
-    ENDDO
+    do jl=kidia,kfdia
+      if ( lldoit(jl) ) then
+        if ( zqtemp(jl,jk) < pqtuh(jl,jk,kd) ) then !allow evaporation up to qt
+          pquh(jl,jk,kd) = zqtemp(jl,jk)
+          pqcuh(jl,jk,kd)= pqtuh(jl,jk,kd) - pquh(jl,jk,kd)
+          ptuh(jl,jk,kd) = zttemp(jl,jk)
+        else                          !case where qv(initial)<qt but qv(final)>qt
+          pquh(jl,jk,kd) = pqtuh(jl,jk,kd)  !(unusual!)
+          pqcuh(jl,jk,kd)= 0.0_jprb
+          ptuh(jl,jk,kd) = ( pslguh(jl,jk,kd) - pgeoh(jl,jk) + rlvtt*pqcuh(jl,jk,kd) ) &
+                    & / rcpd
+        endif
+      endif
+    enddo
 
 
-    DO JL=KIDIA,KFDIA
+    do jl=kidia,kfdia
 
 
-!*         3.4  Updraft microphysics                *experimental* RN 
+!*         3.4  updraft microphysics                *experimental* rn 
 !*
-      !Precip generation tendency (Sundqvist,1978) 
+      !precip generation tendency (sundqvist,1978) 
       !    [kg/kg /s]    in full level below current half level
-      IF (LLPREC .AND. LLCLOUD(JL)) THEN
+      if (llprec .and. llcloud(jl)) then
 
-        ZDZ = (PGEOH(JL,JK) - PGEOH(JL,JK+1)) * ZRG
-        ZQLWORK = PQCUH(JL,JK,KD)
-        !ZQLWORK = PQCUH(JL,JK+1,KD)
-        !ZQLWORK = ( PQCUH(JL,JK,KD) + PQCUH(JL,JK+1,KD) ) / 2._JPRB
-        ZPGENUP = 0.0015_JPRB * ZQLWORK * (1._JPRB - EXP(-(ZQLWORK/ZLCRIT)**2) )
-        ZPGENUP = MIN( ZPGENUP, PQCUH(JL,JK,KD)/ZDZ )              
+        zdz = (pgeoh(jl,jk) - pgeoh(jl,jk+1)) * zrg
+        zqlwork = pqcuh(jl,jk,kd)
+        !zqlwork = pqcuh(jl,jk+1,kd)
+        !zqlwork = ( pqcuh(jl,jk,kd) + pqcuh(jl,jk+1,kd) ) / 2._jprb
+        zpgenup = 0.0015_jprb * zqlwork * (1._jprb - exp(-(zqlwork/zlcrit)**2) )
+        zpgenup = min( zpgenup, pqcuh(jl,jk,kd)/zdz )              
 
-        ZALFAW = FOEALFA(PTUH(JL,JK,KD))
-        PUPGENL(JL,JK+1,KD) = ZPGENUP * ZALFAW
-        PUPGENN(JL,JK+1,KD) = ZPGENUP * (1._JPRB - ZALFAW)
+        zalfaw = foealfa(ptuh(jl,jk,kd))
+        pupgenl(jl,jk+1,kd) = zpgenup * zalfaw
+        pupgenn(jl,jk+1,kd) = zpgenup * (1._jprb - zalfaw)
         
         !adjust the associated updraft state variables (integrate tendency over layer)      
-        PQCUH(JL,JK,KD)  = PQCUH(JL,JK,KD)  - ZPGENUP * ZDZ
-        PQTUH(JL,JK,KD)  = PQTUH(JL,JK,KD)  - ZPGENUP * ZDZ
-        PSLGUH(JL,JK,KD) = PSLGUH(JL,JK,KD) + ZDZ * &
-           & (RLVTT * PUPGENL(JL,JK+1,KD) + RLSTT * PUPGENN(JL,JK+1,KD) )
+        pqcuh(jl,jk,kd)  = pqcuh(jl,jk,kd)  - zpgenup * zdz
+        pqtuh(jl,jk,kd)  = pqtuh(jl,jk,kd)  - zpgenup * zdz
+        pslguh(jl,jk,kd) = pslguh(jl,jk,kd) + zdz * &
+           & (rlvtt * pupgenl(jl,jk+1,kd) + rlstt * pupgenn(jl,jk+1,kd) )
 
-      ENDIF
+      endif
 
 
-!*         3.5  Interpolation of updraft LCL
+!*         3.5  interpolation of updraft lcl
 
-      IF ( PQCUH(JL,JK,KD) > 0.0_JPRB  .AND.  .NOT. LLCLOUD(JL) ) THEN
+      if ( pqcuh(jl,jk,kd) > 0.0_jprb  .and.  .not. llcloud(jl) ) then
 
-        LLCLOUD(JL)   = .TRUE.
+        llcloud(jl)   = .true.
 	
 	!cloud base level is first level with ql>0
-        KPLCL(JL,KD)  = JK
+        kplcl(jl,kd)  = jk
 
-        !RN --- new interpolation method incorporating dqt/dz *AND* dqsat/dz ---
-        ZDQSUDZ = ( ZQTEMP(JL,JK)   - ZQTEMP(JL,JK+1)   ) * RG / ( PGEOH(JL,JK) - PGEOH(JL,JK+1) )
-        ZDQTUDZ = ( PQTUH(JL,JK,KD) - PQTUH(JL,JK+1,KD) ) * RG / ( PGEOH(JL,JK) - PGEOH(JL,JK+1) )
+        !rn --- new interpolation method incorporating dqt/dz *and* dqsat/dz ---
+        zdqsudz = ( zqtemp(jl,jk)   - zqtemp(jl,jk+1)   ) * rg / ( pgeoh(jl,jk) - pgeoh(jl,jk+1) )
+        zdqtudz = ( pqtuh(jl,jk,kd) - pqtuh(jl,jk+1,kd) ) * rg / ( pgeoh(jl,jk) - pgeoh(jl,jk+1) )
         
-        PZPLCL(JL,KD) = PGEOH(JL,JK)*ZRG 
-        IF (ZDQSUDZ-ZDQTUDZ.LT.0._JPRB) THEN
-          PZPLCL(JL,KD) = PGEOH(JL,JK)*ZRG + PQCUH(JL,JK,KD)/(ZDQSUDZ-ZDQTUDZ)
-        ENDIF
+        pzplcl(jl,kd) = pgeoh(jl,jk)*zrg 
+        if (zdqsudz-zdqtudz.lt.0._jprb) then
+          pzplcl(jl,kd) = pgeoh(jl,jk)*zrg + pqcuh(jl,jk,kd)/(zdqsudz-zdqtudz)
+        endif
         
-        IF ( KPLCL(JL,KD) < KLEV ) THEN
-          PZPLCL(JL,KD) = MAX( PZPLCL(JL,KD), PGEOH(JL,KPLCL(JL,KD)+1)*ZRG )
-        ELSE
-          PZPLCL(JL,KD) = MAX( PZPLCL(JL,KD), 0.0_JPRB )
-        ENDIF
+        if ( kplcl(jl,kd) < klev ) then
+          pzplcl(jl,kd) = max( pzplcl(jl,kd), pgeoh(jl,kplcl(jl,kd)+1)*zrg )
+        else
+          pzplcl(jl,kd) = max( pzplcl(jl,kd), 0.0_jprb )
+        endif
         
-        ZLCLFAC(JL) = ( PGEOH(JL,JK) - PZPLCL(JL,KD)*RG  ) / ( PGEOH(JL,JK) - PGEOH(JL,JK+1) )
-        ZLCLFAC(JL) = MAX(0._JPRB, MIN(1._JPRB, ZLCLFAC(JL)) )
+        zlclfac(jl) = ( pgeoh(jl,jk) - pzplcl(jl,kd)*rg  ) / ( pgeoh(jl,jk) - pgeoh(jl,jk+1) )
+        zlclfac(jl) = max(0._jprb, min(1._jprb, zlclfac(jl)) )
+      endif
 
-      ENDIF
 
-
-!*         3.6  Updraft buoyancy
+!*         3.6  updraft buoyancy
 !*         (at full level k+1 from interpolation of slg, q, qc)
 
-      IF ( .NOT. LDDONE(JL,KD) ) THEN
+      if ( .not. lddone(jl,kd) ) then
 
-        ZSLGUF        = 0.5_JPRB * ( PSLGUH(JL,JK,KD) + PSLGUH(JL,JK+1,KD) )
-        ZQTUF         = 0.5_JPRB * ( PQTUH (JL,JK,KD) + PQTUH (JL,JK+1,KD) )
-        ZQCUF         = 0.5_JPRB * ( PQCUH (JL,JK,KD) + PQCUH (JL,JK+1,KD) )
+        zslguf        = 0.5_jprb * ( pslguh(jl,jk,kd) + pslguh(jl,jk+1,kd) )
+        zqtuf         = 0.5_jprb * ( pqtuh (jl,jk,kd) + pqtuh (jl,jk+1,kd) )
+        zqcuf         = 0.5_jprb * ( pqcuh (jl,jk,kd) + pqcuh (jl,jk+1,kd) )
 	
-	! At first full level above real cloud base, interpolate ql between 
-	! height of real cloud base and the half level of KPLCL
-        IF ( JK == KPLCL(JL,KD) ) THEN
-          ZQCUF = ZQCUF * ZLCLFAC(JL)
-        ENDIF
+  ! at first full level above real cloud base, interpolate ql between 
+  ! height of real cloud base and the half level of kplcl
+        if ( jk == kplcl(jl,kd) ) then
+          zqcuf = zqcuf * zlclfac(jl)
+        endif
         
-	ZQUF          = ZQTUF - ZQCUF
-        ZTUF          = ( ZSLGUF - PGEOM1(JL,JK+1) & ! preliminary estimate:
-                    & + RLVTT * ZQCUF ) / RCPD       ! all liquid 
-        ZALFAW        = FOEALFA( ZTUF )
-        ZQLUF         = ZALFAW            * ZQCUF
-        ZQIUF         = (1.0_JPRB-ZALFAW) * ZQCUF
-        ZTUF          = ( ZSLGUF - PGEOM1(JL,JK+1) &
-                    & + RLVTT * ZQLUF + RLSTT * ZQIUF ) / RCPD  
-        ZTVUF         = ZTUF * ( 1.0_JPRB + RETV * ZQUF - ZQCUF )  
-        PBUOF(JL,JK+1,KD) = RG * ( ZTVUF - PTVEN(JL,JK+1) ) / PTVEN(JL,JK+1)
+  zquf          = zqtuf - zqcuf
+        ztuf          = ( zslguf - pgeom1(jl,jk+1) & ! preliminary estimate:
+                    & + rlvtt * zqcuf ) / rcpd       ! all liquid 
+        zalfaw        = foealfa( ztuf )
+        zqluf         = zalfaw            * zqcuf
+        zqiuf         = (1.0_jprb-zalfaw) * zqcuf
+        ztuf          = ( zslguf - pgeom1(jl,jk+1) &
+                    & + rlvtt * zqluf + rlstt * zqiuf ) / rcpd  
+        ztvuf         = ztuf * ( 1.0_jprb + retv * zquf - zqcuf )  
+        pbuof(jl,jk+1,kd) = rg * ( ztvuf - ptven(jl,jk+1) ) / ptven(jl,jk+1)
         
         !update level of zero buoyancy
-        IF ( PBUOF(JL,JK+1,KD)>0._JPRB ) THEN
-          KPLZB(JL,KD) = JK+1
-        ENDIF
+        if ( pbuof(jl,jk+1,kd)>0._jprb ) then
+          kplzb(jl,kd) = jk+1
+        endif
 
 
-!*         3.7  Kinetic energy equation (exact)
+!*         3.7  kinetic energy equation (exact)
         
-        ZDZ           = (PGEOH(JL,JK) - PGEOH(JL,JK+1))*ZRG
-        ZTEMP         = PBUOF(JL,JK+1,KD) / (ZB*PEPS(JL,JK+1,KD))
-!        PWU2H(JL,JK,KD)  = ( PWU2H(JL,JK+1,KD) - ZTEMP ) * ZMIX(JL,JK+1)**2 + ZTEMP
-        ZMIXW(JL,JK+1) = exp( - ZDZ * (ZB*PEPS(JL,JK+1,KD)) / (1._JPRB - 2._JPRB*ZMU) )
-        PWU2H(JL,JK,KD)  = ( PWU2H(JL,JK+1,KD) - ZTEMP ) * ZMIXW(JL,JK+1)**2 + ZTEMP
+        zdz           = (pgeoh(jl,jk) - pgeoh(jl,jk+1))*zrg
+        ztemp         = pbuof(jl,jk+1,kd) / (zb*peps(jl,jk+1,kd))
+!        pwu2h(jl,jk,kd)  = ( pwu2h(jl,jk+1,kd) - ztemp ) * zmix(jl,jk+1)**2 + ztemp
+        zmixw(jl,jk+1) = exp( - zdz * (zb*peps(jl,jk+1,kd)) / (1._jprb - 2._jprb*zmu) )
+        pwu2h(jl,jk,kd)  = ( pwu2h(jl,jk+1,kd) - ztemp ) * zmixw(jl,jk+1)**2 + ztemp
         
 
-!*         3.8  Inversion height at w=0  (lin. interpolation in w^2)
+!*         3.8  inversion height at w=0  (lin. interpolation in w^2)
         
-        IF ( PWU2H(JL,JK,KD) < 0.0_JPRB  .AND.  PWU2H(JL,JK+1,KD) > 0.0_JPRB ) THEN 
+        if ( pwu2h(jl,jk,kd) < 0.0_jprb  .and.  pwu2h(jl,jk+1,kd) > 0.0_jprb ) then 
 	
 	  !set top level to last level with positive w
-          KPTOP(JL,KD)   = JK+1  
+          kptop(jl,kd)   = jk+1  
 	  
-          PZPTOP(JL,KD)   = PGEOH(JL,JK+1) * ZRG &
-                    & + ZDZ * PWU2H(JL,JK+1,KD) / ( PWU2H(JL,JK+1,KD) - PWU2H(JL,JK,KD) ) 
+          pzptop(jl,kd)   = pgeoh(jl,jk+1) * zrg &
+                    & + zdz * pwu2h(jl,jk+1,kd) / ( pwu2h(jl,jk+1,kd) - pwu2h(jl,jk,kd) ) 
                      
-        ENDIF
+        endif
 
-        IF ( PWU2H(JL,JK,KD) < PW2THRESH ) THEN   !allow parcel to overcome layers 
-          LDDONE(JL,KD)  = .TRUE.                 !with small negative kin. energy
-        ENDIF                                  !but remember last w(z)=0 (z=PZPTOP)
+        if ( pwu2h(jl,jk,kd) < pw2thresh ) then   !allow parcel to overcome layers 
+          lddone(jl,kd)  = .true.                 !with small negative kin. energy
+        endif                                  !but remember last w(z)=0 (z=pzptop)
 
 
-      ENDIF
-    ENDDO
-    IF (IS == 0) EXIT
+      endif
+    enddo
+    if (is == 0) exit
     
         
-  ENDDO !JK
+  enddo !jk
 
   
   !protect for updrafts that have reached top level (let's hope this is unnecessary!)
-  DO JL=KIDIA,KFDIA
-    IF ( .NOT. LDDONE(JL,KD) ) THEN
-      LDDONE(JL,KD) = .TRUE.
-      KPTOP(JL,KD)  = JKMIN+1
-      KPLZB(JL,KD)  = JKMIN+1
-      PZPTOP(JL,KD) = PGEOH(JL,JKMIN+1) * ZRG
-    ENDIF
+  do jl=kidia,kfdia
+    if ( .not. lddone(jl,kd) ) then
+      lddone(jl,kd) = .true.
+      kptop(jl,kd)  = jkmin+1
+      kplzb(jl,kd)  = jkmin+1
+      pzptop(jl,kd) = pgeoh(jl,jkmin+1) * zrg
+    endif
     
-    !RN testing RICO: 
-    !KPLCL(JL,KD) = 81
+    !rn testing rico: 
+    !kplcl(jl,kd) = 81
     
-  ENDDO
+  enddo
 
 
-! IF (LHOOK) CALL DR_HOOK('VDFPARCEL',1,ZHOOK_HANDLE)
-END SUBROUTINE VDFPARCEL
+! if (lhook) call dr_hook('vdfparcel',1,zhook_handle)
+end subroutine vdfparcel

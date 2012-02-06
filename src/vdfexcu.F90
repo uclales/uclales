@@ -1,183 +1,182 @@
-SUBROUTINE VDFEXCU(KIDIA  , KFDIA  , KLON   , KLEV   , KDRAFT , PTMST  , PZ0MM  , &
-                  &PHRLW  , PHRSW  , &
-                  &PUM1   , PVM1   , PTM1   , PQM1   , PLM1   , PIM1   , &
-                  &PAPHM1 , PAPM1  , PGEOM1 , PGEOH  , PCPTGZ , &
- ! DIAGNOSTIC OUTPUT
-                  &PEXTR2 , KFLDX2 , PEXTRA , KLEVX  , KFLDX  , &
+subroutine vdfexcu(kidia  , kfdia  , klon   , klev   , kdraft , ptmst  , pz0mm  , &
+                  &phrlw  , phrsw  , &
+                  &pum1   , pvm1   , ptm1   , pqm1   , plm1   , pim1   , &
+                  &paphm1 , papm1  , pgeom1 , pgeoh  , pcptgz , &
+ ! diagnostic output
+                  &pextr2 , kfldx2 , pextra , klevx  , kfldx  , &
  !
-                  &PKMFL  , PKHFL  , PKQFL  , &
-                  &PCFM   , PCFH   , PTAUXCG, PTAUYCG, &
-                  &PRICUI , PMCU   , PDTHV  , PMFLX  , KVARTOP, &
-                  &PZINV  , KHPBL  , PKH    , PZCLDBASE , PZCLDTOP     , KPBLTYPE)
+                  &pkmfl  , pkhfl  , pkqfl  , &
+                  &pcfm   , pcfh   , ptauxcg, ptauycg, &
+                  &pricui , pmcu   , pdthv  , pmflx  , kvartop, &
+                  &pzinv  , khpbl  , pkh    , pzcldbase , pzcldtop     , kpbltype)
 !     ------------------------------------------------------------------
 
-!**   *VDFEXCU* - DETERMINES THE EXCHANGE COEFFICIENTS BETWEEN THE
-!                 UPPER MODEL LEVELS WITH STABILITY AS A FUNCTION OF
-!                 OBUKHOV-L
+!**   *vdfexcu* - determines the exchange coefficients between the
+!                 upper model levels with stability as a function of
+!                 obukhov-l
 
-!     A.C.M. BELJAARS  26/03/90.  Original
-!     A.C.M. BELJAARS  26/03/99   Tiling of the land surface.
-!     J.HAGUE          13/01/2003 MASS Vector Functions
-!     M. Ko"hler        3/12/2004 Moist Advection-Diffusion incl.
-!                                 K,cloud and cloud top entrainment
-!     P. Lopez         02/06/2005 Removed option for linearized
+!     a.c.m. beljaars  26/03/90.  original
+!     a.c.m. beljaars  26/03/99   tiling of the land surface.
+!     j.hague          13/01/2003 mass vector functions
+!     m. ko"hler        3/12/2004 moist advection-diffusion incl.
+!                                 k,cloud and cloud top entrainment
+!     p. lopez         02/06/2005 removed option for linearized
 !                                 physics (now called separately)
-!     R. Neggers       01/06/2006 Reorganization (into internal & interface K-modes)
-!                                 Entrainment efficiency closure at cumulus PBL top
-!     A. Beljaars      29/03/2006 Counter gradient stresses (Brown and Grant, 1997)
+!     r. neggers       01/06/2006 reorganization (into internal & interface k-modes)
+!                                 entrainment efficiency closure at cumulus pbl top
+!     a. beljaars      29/03/2006 counter gradient stresses (brown and grant, 1997)
 !
-!     PURPOSE
+!     purpose
 !     -------
 
-!     DETERMINE EXCHANGE COEFFICIENTS BETWEEN THE UPPER MODEL LEVELS
+!     determine exchange coefficients between the upper model levels
 
-!     INTERFACE
+!     interface
 !     ---------
 
-!     *VDFEXCU* IS CALLED BY *VDFMAIN*
+!     *vdfexcu* is called by *vdfmain*
 
-!     INPUT PARAMETERS (INTEGER):
+!     input parameters (integer):
 
-!     *KIDIA*        START POINT
-!     *KFDIA*        END POINT
-!     *KLEV*         NUMBER OF LEVELS
-!     *KLON*         NUMBER OF GRID POINTS PER PACKET
+!     *kidia*        start point
+!     *kfdia*        end point
+!     *klev*         number of levels
+!     *klon*         number of grid points per packet
 
-!     INPUT PARAMETERS (REAL):
+!     input parameters (real):
 
-!     *PTMST*        DOUBLE TIME STEP (SINGLE AT 1TH STEP)
-!     *PUM1*         X-VELOCITY COMPONENT AT T-1
-!     *PVM1*         Y-VELOCITY COMPONENT AT T-1
-!     *PTM1*         TEMPERATURE AT T-1
-!     *PQM1*         SPECIFIC HUMUDITY AT T-1
-!     *PAPHM1*       PRESSURE AT HALF LEVELS AT T-1
-!     *PAPM1*        PRESSURE AT FULL LEVELS AT T-1
-!     *PGEOM1*       GEOPOTENTIAL AT T-1
-!     *PCPTGZ*       DRY STATIC ENERGY
-!     *PKMFL*        KINEMATIC MOMENTUM FLUX                [#]
-!     *PKHFL*        KINEMATIC HEAT FLUX                    [#]
-!     *PKQFL*        KINEMATIC MOISTURE FLUX                [#]
-!     *PZINV*        INVERSION HEIGHT              	    [M]
-!     *PKH*          TURB. DIFF. COEFF. FOR HEAT ABOVE SURF. LAY.  (M2/S)
+!     *ptmst*        double time step (single at 1th step)
+!     *pum1*         x-velocity component at t-1
+!     *pvm1*         y-velocity component at t-1
+!     *ptm1*         temperature at t-1
+!     *pqm1*         specific humudity at t-1
+!     *paphm1*       pressure at half levels at t-1
+!     *papm1*        pressure at full levels at t-1
+!     *pgeom1*       geopotential at t-1
+!     *pcptgz*       dry static energy
+!     *pkmfl*        kinematic momentum flux                [#]
+!     *pkhfl*        kinematic heat flux                    [#]
+!     *pkqfl*        kinematic moisture flux                [#]
+!     *pzinv*        inversion height                   [m]
+!     *pkh*          turb. diff. coeff. for heat above surf. lay.  (m2/s)
 
-!     OUTPUT PARAMETERS (REAL):
+!     output parameters (real):
 
-!     *PCFM*         PROP. TO EXCH. COEFF. FOR MOMENTUM (C-STAR IN DOC.)
-!     *PCFH*         PROP. TO EXCH. COEFF. FOR HEAT     (C-STAR IN DOC.)
-!                    (ONLY PCFM(*,1:KLEV-1) AND
-!                          PCFH(*,1:KLEV-1) ARE COMPUTED)
-!     *PTAUXCG*      COUNTER GRADIENT STRESS X-COMPONENT    (N/m2)
-!     *PTAUYCG*      COUNTER GRADIENT STRESS Y-COMPONENT    (N/m2)
+!     *pcfm*         prop. to exch. coeff. for momentum (c-star in doc.)
+!     *pcfh*         prop. to exch. coeff. for heat     (c-star in doc.)
+!                    (only pcfm(*,1:klev-1) and
+!                          pcfh(*,1:klev-1) are computed)
+!     *ptauxcg*      counter gradient stress x-component    (n/m2)
+!     *ptauycg*      counter gradient stress y-component    (n/m2)
 
-!     REMARK: [#] UNUSED PARAMETERS IN TANGENT LINEAR AND ADJOINT VERSIONS
+!     remark: [#] unused parameters in tangent linear and adjoint versions
 !     ------
 
-!     METHOD
+!     method
 !     ------
 
-!     SEE DOCUMENTATION
+!     see documentation
 
 !     ------------------------------------------------------------------
-use garbage, only : phims, phihs, phimu, phihu
-USE PARKIND1  ,ONLY : JPIM     ,JPRB
-! ! USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
+use parkind1  ,only : jpim     ,jprb
+! ! use yomhook   ,only : lhook,   dr_hook
 
-USE yos_cst   , ONLY : RG       ,RD       ,RCPD     ,RETV     ,RATM
-USE YOETHF   , ONLY : RVTMP2
-USE YOEVDF   , ONLY : RLAM     ,RKAP     ,RVDIFTS  ,REPDU2   ,LLDIAG   
-USE YOEVDFS  , ONLY : JPRITBL  ,RITBL    ,ARITBL   ,RCHBA    ,&
-                    & RCHBB    ,RCHBD    ,RCHB23A  ,RCHBBCD  ,RCHBCD   ,&
-                    & RCHETA   ,RCHETB   ,RCDHALF  ,RCDHPI2  ,RIMAX    ,&
-                    & DRITBL   ,DRI26  
-USE YOEPHLI  , ONLY : RLPMIXL  ,RLPBETA
-USE YOMJFH   , ONLY : N_VMASS
+use yos_cst   , only : rg       ,rd       ,rcpd     ,retv     ,ratm
+use yoethf   , only : rvtmp2
+use yoevdf   , only : rlam     ,rkap     ,rvdifts  ,repdu2   ,lldiag   
+use yoevdfs  , only : jpritbl  ,ritbl    ,aritbl   ,rchba    ,&
+                    & rchbb    ,rchbd    ,rchb23a  ,rchbbcd  ,rchbcd   ,&
+                    & rcheta   ,rchetb   ,rcdhalf  ,rcdhpi2  ,rimax    ,&
+                    & dritbl   ,dri26  ,phims, phihs, phimu, phihu
+use yoephli  , only : rlpmixl  ,rlpbeta
+use yomjfh   , only : n_vmass
 use yos_exc, only : repust
 
-IMPLICIT NONE
+implicit none
 
 
-!*         0.1    GLOBAL VARIABLES
+!*         0.1    global variables
 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KLON 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KLEV 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KIDIA 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KFDIA 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KDRAFT
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PTMST 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PZ0MM(KLON) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PHRLW(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PHRSW(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PUM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PVM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PTM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PQM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PLM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PIM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PAPHM1(KLON,0:KLEV) 
-REAL(KIND=JPRB)                  :: PAPM1(KLON,KLEV) ! Argument NOT used
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PGEOM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PGEOH(KLON,0:KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PCPTGZ(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PKMFL(KLON) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PKHFL(KLON) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PKQFL(KLON) 
-REAL(KIND=JPRB)   ,INTENT(INOUT) :: PCFM(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(INOUT) :: PCFH(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(INOUT) :: PTAUXCG(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(INOUT) :: PTAUYCG(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PZINV(KLON) 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KHPBL(KLON)
-REAL(KIND=JPRB)   ,INTENT(OUT)   :: PKH(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PZCLDBASE(KLON)
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PZCLDTOP(KLON)
-INTEGER(KIND=JPIM),INTENT(IN)    :: KPBLTYPE(KLON) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PRICUI(KLON) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PDTHV(KLON) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PMCU(KLON) 
-REAL(KIND=JPRB)   ,INTENT(INOUT) :: PMFLX(KLON,0:KLEV,KDRAFT) 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KVARTOP(KLON)
-!          DIAGNOSTIC OUTPUT
-INTEGER(KIND=JPIM),INTENT(IN)     :: KFLDX2, KLEVX, KFLDX
-REAL(KIND=JPRB)   ,INTENT(INOUT)  :: PEXTR2(KLON,KFLDX2), PEXTRA(KLON,KLEVX,KFLDX)
+integer(kind=jpim),intent(in)    :: klon 
+integer(kind=jpim),intent(in)    :: klev 
+integer(kind=jpim),intent(in)    :: kidia 
+integer(kind=jpim),intent(in)    :: kfdia 
+integer(kind=jpim),intent(in)    :: kdraft
+real(kind=jprb)   ,intent(in)    :: ptmst 
+real(kind=jprb)   ,intent(in)    :: pz0mm(klon) 
+real(kind=jprb)   ,intent(in)    :: phrlw(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: phrsw(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pum1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pvm1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: ptm1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pqm1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: plm1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pim1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: paphm1(klon,0:klev) 
+real(kind=jprb)                  :: papm1(klon,klev) ! argument not used
+real(kind=jprb)   ,intent(in)    :: pgeom1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pgeoh(klon,0:klev) 
+real(kind=jprb)   ,intent(in)    :: pcptgz(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pkmfl(klon) 
+real(kind=jprb)   ,intent(in)    :: pkhfl(klon) 
+real(kind=jprb)   ,intent(in)    :: pkqfl(klon) 
+real(kind=jprb)   ,intent(inout) :: pcfm(klon,klev) 
+real(kind=jprb)   ,intent(inout) :: pcfh(klon,klev) 
+real(kind=jprb)   ,intent(inout) :: ptauxcg(klon,klev) 
+real(kind=jprb)   ,intent(inout) :: ptauycg(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pzinv(klon) 
+integer(kind=jpim),intent(in)    :: khpbl(klon)
+real(kind=jprb)   ,intent(out)   :: pkh(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pzcldbase(klon)
+real(kind=jprb)   ,intent(in)    :: pzcldtop(klon)
+integer(kind=jpim),intent(in)    :: kpbltype(klon) 
+real(kind=jprb)   ,intent(in)    :: pricui(klon) 
+real(kind=jprb)   ,intent(in)    :: pdthv(klon) 
+real(kind=jprb)   ,intent(in)    :: pmcu(klon) 
+real(kind=jprb)   ,intent(inout) :: pmflx(klon,0:klev,kdraft) 
+integer(kind=jpim),intent(in)    :: kvartop(klon)
+!          diagnostic output
+integer(kind=jpim),intent(in)     :: kfldx2, klevx, kfldx
+real(kind=jprb)   ,intent(inout)  :: pextr2(klon,kfldx2), pextra(klon,klevx,kfldx)
 
-!*         0.2    LOCAL VARIABLES
+!*         0.2    local variables
 
-REAL(KIND=JPRB) ::    ZRI(KLON),ZMGEOM(KLON),ZUST(KLON),&
-                    & ZDTV(KLON),ZKHVFL(KLON),ZL(KLON),ZPHIM(KLON),&
-                    & ZPHIH(KLON),ZTAUXCG(KLON),ZTAUYCG(KLON)    
-REAL(KIND=JPRB) ::    ZDU2(KLON+N_VMASS)
+real(kind=jprb) ::    zri(klon),zmgeom(klon),zust(klon),&
+                    & zdtv(klon),zkhvfl(klon),zl(klon),zphim(klon),&
+                    & zphih(klon),ztauxcg(klon),ztauycg(klon)    
+real(kind=jprb) ::    zdu2(klon+n_vmass)
 
-INTEGER(KIND=JPIM) :: IRIB, JK, JL, JLEN
-REAL(KIND=JPRB) ::    ZENTRSFC, ZENTRRAD, ZENTRTOP, &
-                    & Z2GEOMF, ZA, ZALH2, ZALM2, ZB, ZCB, &
-                    & ZCD, ZCFNC1, ZRHO, ZUABS, &
-                    & ZCONS13, ZCONS1, ZHU1, ZHU2, ZWST3, ZRG, &
-                    & ZDH, ZDL, ZDRORO, ZEPS, ZETA, ZHLM2, &
-                    & ZLIM, ZLIM2, ZPHIKH, ZPHIKM, ZSCF, &
-                    & ZX2, ZZ, ZWTVENTR, ZKH, ZCFHNEW, &
-                    & ZML, ZBASE, ZVSC, ZKCLD, &
-                    & ZKFACEDMF, ZTAUX, ZTAUY
+integer(kind=jpim) :: irib, jk, jl, jlen
+real(kind=jprb) ::    zentrsfc, zentrrad, zentrtop, &
+                    & z2geomf, za, zalh2, zalm2, zb, zcb, &
+                    & zcd, zcfnc1, zrho, zuabs, &
+                    & zcons13, zcons1, zhu1, zhu2, zwst3, zrg, &
+                    & zdh, zdl, zdroro, zeps, zeta, zhlm2, &
+                    & zlim, zlim2, zphikh, zphikm, zscf, &
+                    & zx2, zz, zwtventr, zkh, zcfhnew, &
+                    & zml, zbase, zvsc, zkcld, &
+                    & zkfacedmf, ztaux, ztauy
 
-REAL(KIND=JPRB) ::    ZZH, ZIFLTGM, ZIFLTGH, ZIFMOM, ZIFMOH, ZBM, ZBH, ZCM, ZCH, ZDUDZ
+real(kind=jprb) ::    zzh, zifltgm, zifltgh, zifmom, zifmoh, zbm, zbh, zcm, zch, zdudz
                     
-LOGICAL ::         LLRICU
+logical ::         llricu
                     
-REAL(KIND=JPRB) :: ZDRADFLX(KLON), ZRADKBASE(KLON), ZRADKDEPTH(KLON), &
-                 & ZRADKFAC(KLON)
+real(kind=jprb) :: zdradflx(klon), zradkbase(klon), zradkdepth(klon), &
+                 & zradkfac(klon)
 
-REAL(KIND=JPRB) :: ZWECUTOP(KLON)  , ZDTHVCUTOP, &
-                 & ZTHVEN(KLON,KLEV), ZTHEN(KLON,KLEV), ZFAC
+real(kind=jprb) :: zwecutop(klon)  , zdthvcutop, &
+                 & zthven(klon,klev), zthen(klon,klev), zfac
 
-REAL(KIND=JPRB) ::    ZTMP1(KFDIA-KIDIA+1+N_VMASS)
-REAL(KIND=JPRB) ::    ZTMP2(KFDIA-KIDIA+1+N_VMASS)
-REAL(KIND=JPRB) ::    ZTMP3(KFDIA-KIDIA+1+N_VMASS)
-REAL(KIND=JPRB) ::    ZTMP4(KFDIA-KIDIA+1+N_VMASS)
-REAL(KIND=JPRB) ::    ZTMP5(KFDIA-KIDIA+1+N_VMASS)
-REAL(KIND=JPRB) ::    ZHOOK_HANDLE
+real(kind=jprb) ::    ztmp1(kfdia-kidia+1+n_vmass)
+real(kind=jprb) ::    ztmp2(kfdia-kidia+1+n_vmass)
+real(kind=jprb) ::    ztmp3(kfdia-kidia+1+n_vmass)
+real(kind=jprb) ::    ztmp4(kfdia-kidia+1+n_vmass)
+real(kind=jprb) ::    ztmp5(kfdia-kidia+1+n_vmass)
+real(kind=jprb) ::    zhook_handle
 ! 
-! INTERFACE
+! interface
 ! #include "surf_inq.h"
-! END INTERFACE
+! end interface
 ! 
 ! #include "fcvdfs.h"
 
@@ -185,519 +184,518 @@ REAL(KIND=JPRB) ::    ZHOOK_HANDLE
 
 !     ------------------------------------------------------------------
 
-!*         1.     INITIALIZE CONSTANTS
+!*         1.     initialize constants
 !                 --------------------
 
-! IF (LHOOK) CALL DR_HOOK('VDFEXCU',0,ZHOOK_HANDLE)
+! if (lhook) call dr_hook('vdfexcu',0,zhook_handle)
 
-ZENTRSFC  = 0.2_JPRB       ! factor for surface based top entrainment 
-ZENTRRAD  = 0.2_JPRB       ! factor for radiative based top entrainment 
-ZENTRTOP  = 0.4_JPRB       ! entrainment efficiency factor at cumulus PBL top, as proposed by Wyant et al (JAS, 1997)
+zentrsfc  = 0.2_jprb       ! factor for surface based top entrainment 
+zentrrad  = 0.2_jprb       ! factor for radiative based top entrainment 
+zentrtop  = 0.4_jprb       ! entrainment efficiency factor at cumulus pbl top, as proposed by wyant et al (jas, 1997)
 
-ZCD       = 1.0_JPRB
-ZCB       = 5.0_JPRB
-ZEPS      = 1.E-10_JPRB
+zcd       = 1.0_jprb
+zcb       = 5.0_jprb
+zeps      = 1.e-10_jprb
 
-LLRICU = .TRUE.   ! switch for top-entrainment efficiency closure using Ri^cu at cumulus PBL top
-!LLRICU = .FALSE.  
+llricu = .true.   ! switch for top-entrainment efficiency closure using ri^cu at cumulus pbl top
+!llricu = .false.  
 
-!ZKFACEDMF = 1.0_JPRB
-ZKFACEDMF = 0.8_JPRB     !aup = 5%   !cy32r3
-!ZKFACEDMF = 0.692_JPRB   !aup = 10%
+!zkfacedmf = 1.0_jprb
+zkfacedmf = 0.8_jprb     !aup = 5%   !cy32r3
+!zkfacedmf = 0.692_jprb   !aup = 10%
 
 ! optimization
-ZRG       = 1.0_JPRB/RG
-ZCONS13   = 1.0_JPRB/3._JPRB
-ZCONS1    = 0.5_JPRB*RKAP*ZRG/RLAM
-ZHLM2     = 1.0_JPRB / ((2.0_JPRB*RG*RLPMIXL)**2)
+zrg       = 1.0_jprb/rg
+zcons13   = 1.0_jprb/3._jprb
+zcons1    = 0.5_jprb*rkap*zrg/rlam
+zhlm2     = 1.0_jprb / ((2.0_jprb*rg*rlpmixl)**2)
 
-IF(N_VMASS > 0) THEN
-  JLEN=KFDIA-KIDIA+N_VMASS-MOD(KFDIA-KIDIA,N_VMASS)
-ENDIF
+if(n_vmass > 0) then
+  jlen=kfdia-kidia+n_vmass-mod(kfdia-kidia,n_vmass)
+endif
 
 
 !     ------------------------------------------------------------------
 
-!*         2.     PREPARE SCALING COEFFICIENTS
+!*         2.     prepare scaling coefficients
 !                 ----------------------------
 
-  DO JL=KIDIA,KFDIA
-    ZUST  (JL)=SQRT(MAX(PKMFL(JL),REPUST**2))
-    ZKHVFL(JL)=PKHFL(JL)+RETV*PTM1(JL,KLEV)*PKQFL(JL)
+  do jl=kidia,kfdia
+    zust  (jl)=sqrt(max(pkmfl(jl),repust**2))
+    zkhvfl(jl)=pkhfl(jl)+retv*ptm1(jl,klev)*pkqfl(jl)
 
-    PTAUXCG(JL,KLEV)=0.0_JPRB
-    PTAUYCG(JL,KLEV)=0.0_JPRB
+    ptauxcg(jl,klev)=0.0_jprb
+    ptauycg(jl,klev)=0.0_jprb
 
-    IF (ZKHVFL(JL)  <  0.0_JPRB) THEN
-      ZWST3=-ZKHVFL(JL)*PZINV(JL)*RG/PTM1(JL,KLEV)
-    ELSE
-      ZWST3=0.0_JPRB
-    ENDIF
-    ZRHO =PAPHM1(JL,KLEV)/( RD*PTM1(JL,KLEV)*(1.0_JPRB+RETV*PQM1(JL,KLEV)) )
-    ZUABS=MAX(0.1_JPRB,SQRT(PUM1(JL,KLEV)**2+PVM1(JL,KLEV)**2))
-    ZHU1 =ZRHO*PKMFL(JL)/ZUABS
-    ZTAUX=ZHU1*PUM1(JL,KLEV)
-    ZTAUY=ZHU1*PVM1(JL,KLEV)
+    if (zkhvfl(jl)  <  0.0_jprb) then
+      zwst3=-zkhvfl(jl)*pzinv(jl)*rg/ptm1(jl,klev)
+    else
+      zwst3=0.0_jprb
+    endif
+    zrho =paphm1(jl,klev)/( rd*ptm1(jl,klev)*(1.0_jprb+retv*pqm1(jl,klev)) )
+    zuabs=max(0.1_jprb,sqrt(pum1(jl,klev)**2+pvm1(jl,klev)**2))
+    zhu1 =zrho*pkmfl(jl)/zuabs
+    ztaux=zhu1*pum1(jl,klev)
+    ztauy=zhu1*pvm1(jl,klev)
 
-    ZHU2=2.7_JPRB*ZWST3/(ZUST(JL)**3+0.6_JPRB*ZWST3)
-    ZTAUXCG(JL)=ZTAUX*ZHU2
-    ZTAUYCG(JL)=ZTAUY*ZHU2
-  ENDDO
+    zhu2=2.7_jprb*zwst3/(zust(jl)**3+0.6_jprb*zwst3)
+    ztauxcg(jl)=ztaux*zhu2
+    ztauycg(jl)=ztauy*zhu2
+  enddo
   
   !calculate full level mean theta_v profile for later use
-  DO JK=KLEV,1,-1
-    DO JL=KIDIA,KFDIA
-      ZTHEN(JL,JK)   = ( PAPM1(JL,JK)/RATM )**(-RD/RCPD) * PTM1(JL,JK)
-      ZTHVEN(JL,JK)  = ZTHEN(JL,JK) * &
-                     & ( 1.0_JPRB + RETV * PQM1(JL,JK)   - PLM1(JL,JK)   - PIM1(JL,JK)   )
-    ENDDO
-  ENDDO
+  do jk=klev,1,-1
+    do jl=kidia,kfdia
+      zthen(jl,jk)   = ( papm1(jl,jk)/ratm )**(-rd/rcpd) * ptm1(jl,jk)
+      zthven(jl,jk)  = zthen(jl,jk) * &
+                     & ( 1.0_jprb + retv * pqm1(jl,jk)   - plm1(jl,jk)   - pim1(jl,jk)   )
+    enddo
+  enddo
 
-!  IF (LLDIAG) THEN
-!    DO JK=1,KLEV
-!    DO JL=KIDIA,KFDIA
-!      IF (JK>=KVARTOP(JL)-1) THEN
-!        PEXTRA(JL,JK,4) = ZTHVEN(JL,JK) - ZTHVEN(JL,KLEV)
-!        PEXTRA(JL,JK,5) = ZTHEN(JL,JK)  - ZTHEN(JL,KLEV)
-!      ENDIF  
-!    ENDDO
-!    ENDDO
-!  ENDIF  
+!  if (lldiag) then
+!    do jk=1,klev
+!    do jl=kidia,kfdia
+!      if (jk>=kvartop(jl)-1) then
+!        pextra(jl,jk,4) = zthven(jl,jk) - zthven(jl,klev)
+!        pextra(jl,jk,5) = zthen(jl,jk)  - zthen(jl,klev)
+!      endif  
+!    enddo
+!    enddo
+!  endif  
   
 
-!          Calculate PBL cloud top radiative flux jump [Km/s] (cooling)
-!          for top-driven K and entrainment velocity formulations.
+!          calculate pbl cloud top radiative flux jump [km/s] (cooling)
+!          for top-driven k and entrainment velocity formulations.
 
-  DO JL=KIDIA,KFDIA
-    SELECT CASE (KPBLTYPE(JL))
-      CASE(2)
-        ZRADKDEPTH(JL) = PZINV(JL)                               
-        ZRADKBASE(JL)  = 0._JPRB    
-        ZRADKFAC(JL)   = 1._JPRB                        
-      CASE(3)
-        ZRADKDEPTH(JL) = MAX( PZCLDTOP(JL) - PZCLDBASE(JL),  0._JPRB )
-        ZRADKBASE(JL)  = PZCLDTOP(JL) - ZRADKDEPTH(JL)
-        ZRADKFAC(JL)   = 0.25_JPRB                        
-      CASE DEFAULT
-        ZRADKDEPTH(JL) = -100._JPRB
-        ZRADKBASE(JL)  = -100._JPRB
-        ZRADKFAC(JL)   = 0._JPRB                        
-    END SELECT 
-  ENDDO
+  do jl=kidia,kfdia
+    select case (kpbltype(jl))
+      case(2)
+        zradkdepth(jl) = pzinv(jl)                               
+        zradkbase(jl)  = 0._jprb    
+        zradkfac(jl)   = 1._jprb                        
+      case(3)
+        zradkdepth(jl) = max( pzcldtop(jl) - pzcldbase(jl),  0._jprb )
+        zradkbase(jl)  = pzcldtop(jl) - zradkdepth(jl)
+        zradkfac(jl)   = 0.25_jprb                        
+      case default
+        zradkdepth(jl) = -100._jprb
+        zradkbase(jl)  = -100._jprb
+        zradkfac(jl)   = 0._jprb                        
+    end select 
+  enddo
 
 
-  ZDRADFLX(:) = 0.0_JPRB
-  DO JK=KLEV-1,1,-1
-    DO JL=KIDIA,KFDIA
+  zdradflx(:) = 0.0_jprb
+  do jk=klev-1,1,-1
+    do jl=kidia,kfdia
 
-!      IF ( KPBLTYPE(JL) == 2 ) THEN  !RN for now, only stratocumulus: extension to cumulus planned (for intermediate scenarios like ATEX)
+!      if ( kpbltype(jl) == 2 ) then  !rn for now, only stratocumulus: extension to cumulus planned (for intermediate scenarios like atex)
 
-        IF ( PGEOH(JL,JK)*ZRG <= ZRADKBASE(JL)+ZRADKDEPTH(JL) .AND. ZRADKBASE(JL)+ZRADKDEPTH(JL) < PGEOH(JL,JK-1)*ZRG ) THEN
-!          ZDRADFLX(JL) = -  PHRLW(JL,JK+1)                 * (PGEOH(JL,JK)-PGEOH(JL,JK+1))*ZRG   !use LW divergence only
-          ZDRADFLX(JL) = - (PHRLW(JL,JK+1)+PHRSW(JL,JK+1)) * (PGEOH(JL,JK)-PGEOH(JL,JK+1))*ZRG
+        if ( pgeoh(jl,jk)*zrg <= zradkbase(jl)+zradkdepth(jl) .and. zradkbase(jl)+zradkdepth(jl) < pgeoh(jl,jk-1)*zrg ) then
+!          zdradflx(jl) = -  phrlw(jl,jk+1)                 * (pgeoh(jl,jk)-pgeoh(jl,jk+1))*zrg   !use lw divergence only
+          zdradflx(jl) = - (phrlw(jl,jk+1)+phrsw(jl,jk+1)) * (pgeoh(jl,jk)-pgeoh(jl,jk+1))*zrg
 !         ... add solar heating at 2nd cld level
-          IF ( PZCLDBASE(JL) < PGEOH(JL,JK+1)*ZRG .AND. JK < KLEV-1 ) THEN 
-            ZDRADFLX(JL) = ZDRADFLX(JL) - PHRSW(JL,JK+2)   * (PGEOH(JL,JK+1)-PGEOH(JL,JK+2))*ZRG
-          ENDIF
-          ZDRADFLX(JL) = MAX( ZDRADFLX(JL), 0.0_JPRB )    !safety against rad. heating cases
-        ENDIF
+          if ( pzcldbase(jl) < pgeoh(jl,jk+1)*zrg .and. jk < klev-1 ) then 
+            zdradflx(jl) = zdradflx(jl) - phrsw(jl,jk+2)   * (pgeoh(jl,jk+1)-pgeoh(jl,jk+2))*zrg
+          endif
+          zdradflx(jl) = max( zdradflx(jl), 0.0_jprb )    !safety against rad. heating cases
+        endif
 
-!      ENDIF
+!      endif
 
-    ENDDO
-  ENDDO
+    enddo
+  enddo
 
 
 
 !     ------------------------------------------------------------------
 
-!*         3.     VERTICAL LOOP - non-linear physics
+!*         3.     vertical loop - non-linear physics
 !                 ----------------------------------
 
-  IF(N_VMASS > 0) THEN
-    IF(KFDIA-KIDIA+1 /= JLEN) THEN
-      ZTMP1(KFDIA-KIDIA+2:JLEN)=1.0_JPRB 
-      ZTMP2(KFDIA-KIDIA+2:JLEN)=1.0_JPRB 
-      ZTMP3(KFDIA-KIDIA+2:JLEN)=1.0_JPRB 
-      ZDU2(KFDIA+1:KIDIA+JLEN-1)=1.0_JPRB 
-    ENDIF
-  ENDIF
+  if(n_vmass > 0) then
+    if(kfdia-kidia+1 /= jlen) then
+      ztmp1(kfdia-kidia+2:jlen)=1.0_jprb 
+      ztmp2(kfdia-kidia+2:jlen)=1.0_jprb 
+      ztmp3(kfdia-kidia+2:jlen)=1.0_jprb 
+      zdu2(kfdia+1:kidia+jlen-1)=1.0_jprb 
+    endif
+  endif
 
 
 !***
-  DO JK=KLEV-1,1,-1
+  do jk=klev-1,1,-1
 !***
 
-    DO JL=KIDIA,KFDIA
-      PCFM(JL,JK)=0.0_JPRB
-      PCFH(JL,JK)=0.0_JPRB
-      PKH(JL,JK) =0.0_JPRB
-      PTAUXCG(JL,JK)=0.0_JPRB
-      PTAUYCG(JL,JK)=0.0_JPRB
-    ENDDO
+    do jl=kidia,kfdia
+      pcfm(jl,jk)=0.0_jprb
+      pcfh(jl,jk)=0.0_jprb
+      pkh(jl,jk) =0.0_jprb
+      ptauxcg(jl,jk)=0.0_jprb
+      ptauycg(jl,jk)=0.0_jprb
+    enddo
 
-    IF(N_VMASS <= 0) THEN   ! efficiency of exponentials
+    if(n_vmass <= 0) then   ! efficiency of exponentials
 
-!          COMPUTE RI-NUMBER
+!          compute ri-number
 
-      DO JL=KIDIA,KFDIA
-        ZDU2(JL)=MAX(REPDU2,(PUM1(JL,JK)-PUM1(JL,JK+1))**2&
-                         & +(PVM1(JL,JK)-PVM1(JL,JK+1))**2)  
-        ZDRORO= 2.0_JPRB * (PCPTGZ(JL,JK)-PCPTGZ(JL,JK+1))&
-         & / ( PCPTGZ(JL,JK)+PCPTGZ(JL,JK+1)&
-         &   - PGEOM1(JL,JK)-PGEOM1(JL,JK+1))&
-         & - (RVTMP2-RETV)*(PQM1(JL,JK)-PQM1(JL,JK+1))
-        ZDTV(JL)=( (PCPTGZ(JL,JK)-PCPTGZ(JL,JK+1))&
-         & - (RVTMP2-RETV)*0.5_JPRB * (PQM1(JL,JK)-PQM1(JL,JK+1))&
-         & * (PCPTGZ(JL,JK)+PCPTGZ(JL,JK+1)) ) * (1.0_JPRB/RCPD)  
-        ZMGEOM(JL)=PGEOM1(JL,JK)-PGEOM1(JL,JK+1)
-        ZRI(JL)=ZMGEOM(JL)*ZDRORO/ZDU2(JL)
-      ENDDO
+      do jl=kidia,kfdia
+        zdu2(jl)=max(repdu2,(pum1(jl,jk)-pum1(jl,jk+1))**2&
+                         & +(pvm1(jl,jk)-pvm1(jl,jk+1))**2)  
+        zdroro= 2.0_jprb * (pcptgz(jl,jk)-pcptgz(jl,jk+1))&
+         & / ( pcptgz(jl,jk)+pcptgz(jl,jk+1)&
+         &   - pgeom1(jl,jk)-pgeom1(jl,jk+1))&
+         & - (rvtmp2-retv)*(pqm1(jl,jk)-pqm1(jl,jk+1))
+        zdtv(jl)=( (pcptgz(jl,jk)-pcptgz(jl,jk+1))&
+         & - (rvtmp2-retv)*0.5_jprb * (pqm1(jl,jk)-pqm1(jl,jk+1))&
+         & * (pcptgz(jl,jk)+pcptgz(jl,jk+1)) ) * (1.0_jprb/rcpd)  
+        zmgeom(jl)=pgeom1(jl,jk)-pgeom1(jl,jk+1)
+        zri(jl)=zmgeom(jl)*zdroro/zdu2(jl)
+      enddo
 
-    ELSE
+    else
 
-      DO JL=KIDIA,KFDIA
-        ZDU2(JL)=MAX(REPDU2,(PUM1(JL,JK)-PUM1(JL,JK+1))**2&
-                         & +(PVM1(JL,JK)-PVM1(JL,JK+1))**2)
-        ZTMP2(JL-KIDIA+1)= PCPTGZ(JL,JK)+PCPTGZ(JL,JK+1)&
-                        & -PGEOM1(JL,JK)-PGEOM1(JL,JK+1)
-        ZDTV(JL)=( (PCPTGZ(JL,JK)-PCPTGZ(JL,JK+1))&
-         & -(RVTMP2-RETV)*0.5_JPRB* (PQM1(JL,JK)-PQM1(JL,JK+1))&
-         & *(PCPTGZ(JL,JK)+PCPTGZ(JL,JK+1)) ) * (1.0_JPRB/RCPD)
-        ZMGEOM(JL)=PGEOM1(JL,JK)-PGEOM1(JL,JK+1)
-      ENDDO
+      do jl=kidia,kfdia
+        zdu2(jl)=max(repdu2,(pum1(jl,jk)-pum1(jl,jk+1))**2&
+                         & +(pvm1(jl,jk)-pvm1(jl,jk+1))**2)
+        ztmp2(jl-kidia+1)= pcptgz(jl,jk)+pcptgz(jl,jk+1)&
+                        & -pgeom1(jl,jk)-pgeom1(jl,jk+1)
+        zdtv(jl)=( (pcptgz(jl,jk)-pcptgz(jl,jk+1))&
+         & -(rvtmp2-retv)*0.5_jprb* (pqm1(jl,jk)-pqm1(jl,jk+1))&
+         & *(pcptgz(jl,jk)+pcptgz(jl,jk+1)) ) * (1.0_jprb/rcpd)
+        zmgeom(jl)=pgeom1(jl,jk)-pgeom1(jl,jk+1)
+      enddo
 ! 
-!       CALL VREC(ZTMP4,ZDU2(KIDIA),JLEN)
-!       CALL VREC(ZTMP5,ZTMP2,JLEN)
+!       call vrec(ztmp4,zdu2(kidia),jlen)
+!       call vrec(ztmp5,ztmp2,jlen)
 
-      DO JL=KIDIA,KFDIA
-        ZDRORO= 2.0_JPRB * (PCPTGZ(JL,JK)-PCPTGZ(JL,JK+1))&
-         & *ZTMP5(JL-KIDIA+1)&
-         & - (RVTMP2-RETV)*(PQM1(JL,JK)-PQM1(JL,JK+1))  
-        ZRI(JL)=ZMGEOM(JL)*ZDRORO*ZTMP4(JL-KIDIA+1)
-      ENDDO
+      do jl=kidia,kfdia
+        zdroro= 2.0_jprb * (pcptgz(jl,jk)-pcptgz(jl,jk+1))&
+         & *ztmp5(jl-kidia+1)&
+         & - (rvtmp2-retv)*(pqm1(jl,jk)-pqm1(jl,jk+1))  
+        zri(jl)=zmgeom(jl)*zdroro*ztmp4(jl-kidia+1)
+      enddo
 
-    ENDIF
+    endif
 
-    DO JL=KIDIA,KFDIA
+    do jl=kidia,kfdia
 
-!          COMPUTE STABILITY FUNCTIONS
+!          compute stability functions
 
-      IF (ZRI(JL)  >  0.0_JPRB) THEN
+      if (zri(jl)  >  0.0_jprb) then
 
-!        INTERPLOLATE ETA WITH SPLINES FOR POSITIVE RICHARDSON
-!        NUMBERS
+!        interplolate eta with splines for positive richardson
+!        numbers
 
-        IRIB=INT(ZRI(JL)*(1.0_JPRB/DRITBL))+1
+        irib=int(zri(jl)*(1.0_jprb/dritbl))+1
         
-        IF (IRIB  >=  JPRITBL) THEN
-!           LINEAR EXTENSION OF LOOK-UP TABLE
-          ZETA = RITBL(JPRITBL)*(ZRI(JL)*(1.0_JPRB/RIMAX))
-        ELSE
-          ZX2  = IRIB*DRITBL
-          ZA   = (ZX2-ZRI(JL))*(1.0_JPRB/DRITBL)
-          ZB   = 1.0_JPRB-ZA
-          ZETA = ZA*RITBL(IRIB) + ZB*RITBL(IRIB+1)&
-           & +( (ZA**3-ZA)*ARITBL(IRIB)&
-           & +(  ZB**3-ZB)*ARITBL(IRIB+1) )*DRI26  
-        ENDIF
+        if (irib  >=  jpritbl) then
+!           linear extension of look-up table
+          zeta = ritbl(jpritbl)*(zri(jl)*(1.0_jprb/rimax))
+        else
+          zx2  = irib*dritbl
+          za   = (zx2-zri(jl))*(1.0_jprb/dritbl)
+          zb   = 1.0_jprb-za
+          zeta = za*ritbl(irib) + zb*ritbl(irib+1)&
+           & +( (za**3-za)*aritbl(irib)&
+           & +(  zb**3-zb)*aritbl(irib+1) )*dri26  
+        endif
 
-!        STABLE PHI-FUNCTIONS
+!        stable phi-functions
 
-        ZPHIM(JL) = PHIMS(ZETA)
-        ZPHIH(JL) = PHIHS(ZETA)
-      ELSE
+        zphim(jl) = phims(zeta)
+        zphih(jl) = phihs(zeta)
+      else
 
-!        UNSTABLE SITUATIONS
+!        unstable situations
 
-        ZETA  = ZRI(JL)
-        ZPHIM(JL) = PHIMU(ZETA)
-        ZPHIH(JL) = PHIHU(ZETA)
-      ENDIF
-    ENDDO
+        zeta  = zri(jl)
+        zphim(jl) = phimu(zeta)
+        zphih(jl) = phihu(zeta)
+      endif
+    enddo
+!   if(n_vmass <= 0) then ! vector mass taken out because completely changed code
 
-!   IF(N_VMASS <= 0) THEN ! Vector MASS taken out because completely changed code
+    do jl=kidia,kfdia
 
-    DO JL=KIDIA,KFDIA
-
-!-------- up to CY32R3 --------
+!-------- up to cy32r3 --------
 !
-!!          COMMON FACTORS FOR STABLE AND UNSTABLE
+!!          common factors for stable and unstable
 !
-!     Z2GEOMF=PGEOM1(JL,JK)+PGEOM1(JL,JK+1)+2.0_JPRB*RG*PZ0MM(JL)
-!     ZLIM=RLPBETA + (1.0_JPRB-RLPBETA)/(1.0_JPRB+Z2GEOMF*Z2GEOMF*ZHLM2)
-!     ZLIM2=ZLIM*ZLIM
-!     ZALM2=ZLIM2*(0.5_JPRB*RKAP*ZRG*Z2GEOMF/(1.0_JPRB+ZCONS1*Z2GEOMF))**2
-!     ZALH2=ZALM2
-!     ZCFNC1=RVDIFTS*PTMST*RG**2 * PAPHM1(JL,JK)&
-!      & /( 0.5_JPRB*RD * ZMGEOM(JL)&
-!      & *( PTM1(JL,JK  )*(1.0_JPRB+RETV*PQM1(JL,JK  ))&
-!      & +  PTM1(JL,JK+1)*(1.0_JPRB+RETV*PQM1(JL,JK+1))))  
-!     ZCFNC=RG*ZCFNC1*SQRT(ZDU2(JL))/ZMGEOM(JL)
+!     z2geomf=pgeom1(jl,jk)+pgeom1(jl,jk+1)+2.0_jprb*rg*pz0mm(jl)
+!     zlim=rlpbeta + (1.0_jprb-rlpbeta)/(1.0_jprb+z2geomf*z2geomf*zhlm2)
+!     zlim2=zlim*zlim
+!     zalm2=zlim2*(0.5_jprb*rkap*zrg*z2geomf/(1.0_jprb+zcons1*z2geomf))**2
+!     zalh2=zalm2
+!     zcfnc1=rvdifts*ptmst*rg**2 * paphm1(jl,jk)&
+!      & /( 0.5_jprb*rd * zmgeom(jl)&
+!      & *( ptm1(jl,jk  )*(1.0_jprb+retv*pqm1(jl,jk  ))&
+!      & +  ptm1(jl,jk+1)*(1.0_jprb+retv*pqm1(jl,jk+1))))  
+!     zcfnc=rg*zcfnc1*sqrt(zdu2(jl))/zmgeom(jl)
 !
-!!          DIMENSIONLESS COEFFICIENTS MULTIPLIED BY PRESSURE
-!!          THICKNESSES FOR MOMENTUM AND HEAT EXCHANGE.
+!!          dimensionless coefficients multiplied by pressure
+!!          thicknesses for momentum and heat exchange.
 !
-!     IF (ZRI(JL)  >  0.0_JPRB) THEN  ! statically stable
-!       ZSCF=SQRT(1.0_JPRB+ZCD*ZRI(JL))
-!       PCFM(JL,JK)=ZCFNC*ZALM2/(1.0_JPRB+2.0_JPRB*ZCB*ZRI(JL)/ZSCF)
-!       PCFH(JL,JK)=ZCFNC*ZALH2/(1.0_JPRB+2.0_JPRB*ZCB*ZRI(JL)*ZSCF)
-!     ELSE                            ! statically unstable
-!       PCFM(JL,JK)=ZCFNC*ZALM2/(ZPHIM(JL)**2)
-!       PCFH(JL,JK)=ZCFNC*ZALM2/(ZPHIM(JL)*ZPHIH(JL))
-!     ENDIF
+!     if (zri(jl)  >  0.0_jprb) then  ! statically stable
+!       zscf=sqrt(1.0_jprb+zcd*zri(jl))
+!       pcfm(jl,jk)=zcfnc*zalm2/(1.0_jprb+2.0_jprb*zcb*zri(jl)/zscf)
+!       pcfh(jl,jk)=zcfnc*zalh2/(1.0_jprb+2.0_jprb*zcb*zri(jl)*zscf)
+!     else                            ! statically unstable
+!       pcfm(jl,jk)=zcfnc*zalm2/(zphim(jl)**2)
+!       pcfh(jl,jk)=zcfnc*zalm2/(zphim(jl)*zphih(jl))
+!     endif
 !-----------------------------
 
-!-------- CY32R3 -------------
-! new K: K,LTG scales with l=kappa*z 
-!        K,MO  scales with l=150m above surface layer
+!-------- cy32r3 -------------
+! new k: k,ltg scales with l=kappa*z 
+!        k,mo  scales with l=150m above surface layer
 
-!          COMMON FACTORS FOR STABLE AND UNSTABLE
+!          common factors for stable and unstable
 
-      ZIFMOM  = 1.0_JPRB / (ZPHIM(JL)**2)                              !F(MO),M
-      ZIFMOH  = 1.0_JPRB / (ZPHIM(JL)*ZPHIH(JL))                       !F(MO),H
-      ZDUDZ   = SQRT(ZDU2(JL))/ZMGEOM(JL)*RG                           !shear
-      ZCFNC1=RVDIFTS*PTMST*RG**2 * PAPHM1(JL,JK)&                      !factor for vdfdifh/m
-       & /( 0.5_JPRB*RD * ZMGEOM(JL)&
-       & *( PTM1(JL,JK  )*(1.0_JPRB+RETV*PQM1(JL,JK  ))&
-       & +  PTM1(JL,JK+1)*(1.0_JPRB+RETV*PQM1(JL,JK+1))))  
+      zifmom  = 1.0_jprb / (zphim(jl)**2)                              !f(mo),m
+      zifmoh  = 1.0_jprb / (zphim(jl)*zphih(jl))                       !f(mo),h
+      zdudz   = sqrt(zdu2(jl))/zmgeom(jl)*rg                           !shear
+      zcfnc1=rvdifts*ptmst*rg**2 * paphm1(jl,jk)&                      !factor for vdfdifh/m
+       & /( 0.5_jprb*rd * zmgeom(jl)&
+       & *( ptm1(jl,jk  )*(1.0_jprb+retv*pqm1(jl,jk  ))&
+       & +  ptm1(jl,jk+1)*(1.0_jprb+retv*pqm1(jl,jk+1))))  
 
-!          DIMENSIONLESS COEFFICIENTS MULTIPLIED BY PRESSURE
-!          THICKNESSES FOR MOMENTUM AND HEAT EXCHANGE.
+!          dimensionless coefficients multiplied by pressure
+!          thicknesses for momentum and heat exchange.
 
-      IF ( ZRI(JL) > 0.0_JPRB ) THEN  ! statically stable
-        ZZH     = 0.5_JPRB * ZRG * (PGEOM1(JL,JK)+PGEOM1(JL,JK+1)) + PZ0MM(JL)
-        ZSCF    = SQRT(1.0_JPRB+ZCD*ZRI(JL))
-        ZIFLTGM = 1.0_JPRB / (1.0_JPRB + 2.0_JPRB *ZCB * ZRI(JL)/ZSCF) !F(LTG),M
-        ZIFLTGH = 1.0_JPRB / (1.0_JPRB + 2.0_JPRB *ZCB * ZRI(JL)*ZSCF) !F(LTG),H
-        ZBM     = RKAP * ZZH * SQRT(ZIFLTGM) 
-        ZBH     = RKAP * ZZH * SQRT(ZIFLTGH) 
-        ZCM     = 150.0_JPRB * SQRT(ZIFMOM )
-        ZCH     = 150.0_JPRB * SQRT(ZIFMOH )
+      if ( zri(jl) > 0.0_jprb ) then  ! statically stable
+        zzh     = 0.5_jprb * zrg * (pgeom1(jl,jk)+pgeom1(jl,jk+1)) + pz0mm(jl)
+        zscf    = sqrt(1.0_jprb+zcd*zri(jl))
+        zifltgm = 1.0_jprb / (1.0_jprb + 2.0_jprb *zcb * zri(jl)/zscf) !f(ltg),m
+        zifltgh = 1.0_jprb / (1.0_jprb + 2.0_jprb *zcb * zri(jl)*zscf) !f(ltg),h
+        zbm     = rkap * zzh * sqrt(zifltgm) 
+        zbh     = rkap * zzh * sqrt(zifltgh) 
+        zcm     = 150.0_jprb * sqrt(zifmom )
+        zch     = 150.0_jprb * sqrt(zifmoh )
 
-        PCFM(JL,JK) = ZCFNC1 * ZDUDZ * (ZBM*ZCM/(ZBM+ZCM))**2
-        PCFH(JL,JK) = ZCFNC1 * ZDUDZ * (ZBH*ZCH/(ZBH+ZCH))**2
-      ELSE                            ! statically unstable
-        PCFM(JL,JK) = ZCFNC1 * ZDUDZ * 150.0_JPRB**2 * ZIFMOM
-        PCFH(JL,JK) = ZCFNC1 * ZDUDZ * 150.0_JPRB**2 * ZIFMOH
-      ENDIF
+        pcfm(jl,jk) = zcfnc1 * zdudz * (zbm*zcm/(zbm+zcm))**2
+        pcfh(jl,jk) = zcfnc1 * zdudz * (zbh*zch/(zbh+zch))**2
+      else                            ! statically unstable
+        pcfm(jl,jk) = zcfnc1 * zdudz * 150.0_jprb**2 * zifmom
+        pcfh(jl,jk) = zcfnc1 * zdudz * 150.0_jprb**2 * zifmoh
+       
+      endif
 !-----------------------------
 
 
-      !  overwrite Ri-based K values within boundary layer
-      !IF ( JK >= KVARTOP(JL) .AND. KVARTOP(JL)>0 ) THEN 
-      !  PCFH(JL,JK) = 0._JPRB
-      !  PCFM(JL,JK) = 0._JPRB
-      !ENDIF
+      !  overwrite ri-based k values within boundary layer
+      !if ( jk >= kvartop(jl) .and. kvartop(jl)>0 ) then 
+      !  pcfh(jl,jk) = 0._jprb
+      !  pcfm(jl,jk) = 0._jprb
+      !endif
 
       
       
       !------------------------------------------------------------------
       !
-      !   3.1   INTERNAL K MODE OF MIXED LAYER
+      !   3.1   internal k mode of mixed layer
       !         ------------------------------
       !
-      !         Using a prescribed vertical structure.
+      !         using a prescribed vertical structure.
       !
       
-      ZZ     = PGEOH(JL,JK)*ZRG
+      zz     = pgeoh(jl,jk)*zrg
 
-      !IF (PGEOH(JL,JK-1)*ZRG <= PZINV(JL) .AND. ZKHVFL(JL)<0._JPRB ) THEN  ! up to level below entr. level
-      IF ( JK > KHPBL(JL) .AND. ZKHVFL(JL)<0._JPRB ) THEN 
+      !if (pgeoh(jl,jk-1)*zrg <= pzinv(jl) .and. zkhvfl(jl)<0._jprb ) then  ! up to level below entr. level
+      if ( jk > khpbl(jl) .and. zkhvfl(jl)<0._jprb ) then 
 
-        ZL(JL) = ZUST (JL)**3*PTM1(JL,KLEV)/(RKAP*RG*(ZKHVFL(JL)-ZEPS))
+        zl(jl) = zust (jl)**3*ptm1(jl,klev)/(rkap*rg*(zkhvfl(jl)-zeps))
 
-        ZDH    = ZZ/PZINV(JL)
-        ZDL    = ZZ/ZL(JL)
-        ZETA   = ZZ/ZL(JL)
-        ZPHIKH = (1-39._JPRB*ZDL)**(-ZCONS13)
-        ZPHIKM = (1-15._JPRB*ZDL)**(-ZCONS13)
+        zdh    = zz/pzinv(jl)
+        zdl    = zz/zl(jl)
+        zeta   = zz/zl(jl)
+        zphikh = (1-39._jprb*zdl)**(-zcons13)
+        zphikm = (1-15._jprb*zdl)**(-zcons13)
 
-        !   K,surface
+        !   k,surface
         
-        PCFH(JL,JK)  = ZKFACEDMF * ZCFNC1 * RKAP / ZPHIKH * ZUST(JL) * ZZ * (1.0_JPRB-ZDH)**2
-        PCFM(JL,JK)  = ZKFACEDMF * ZCFNC1 * RKAP / ZPHIKM * ZUST(JL) * ZZ * (1.0_JPRB-ZDH)**2
+        pcfh(jl,jk)  = zkfacedmf * zcfnc1 * rkap / zphikh * zust(jl) * zz * (1.0_jprb-zdh)**2
+        pcfm(jl,jk)  = zkfacedmf * zcfnc1 * rkap / zphikm * zust(jl) * zz * (1.0_jprb-zdh)**2
 
-        PTAUXCG(JL,JK)=ZDH*(1._JPRB-ZDH)**2*ZTAUXCG(JL)
-        PTAUYCG(JL,JK)=ZDH*(1._JPRB-ZDH)**2*ZTAUYCG(JL)
+        ptauxcg(jl,jk)=zdh*(1._jprb-zdh)**2*ztauxcg(jl)
+        ptauycg(jl,jk)=zdh*(1._jprb-zdh)**2*ztauycg(jl)
 
-      ENDIF
+      endif
       
       
       
       !------------------------------------------------------------------
       !
-      !   3.1   INTERNAL K MODE IN CUMULUS CLOUD LAYER
+      !   3.1   internal k mode in cumulus cloud layer
       !         ------------------------------
       !
       
-      IF ( KPBLTYPE(JL) == 3 .OR. KPBLTYPE(JL) == 4) THEN   
+      if ( kpbltype(jl) == 3 .or. kpbltype(jl) == 4) then   
 
-        IF ( JK < KHPBL(JL) .AND. JK >= KVARTOP(JL) ) THEN
-          IF ( JK > KVARTOP(JL) ) THEN 
-            !  K diffusion within cumulus layer
-            !PCFH(JL,JK)  = PCFH(JL,JK)          !testing: Ri diffusion 
-            !PCFM(JL,JK)  = PCFM(JL,JK)
-            PCFH(JL,JK)  = PCFH(JL,KHPBL(JL))   !cy32r3
-            PCFM(JL,JK)  = PCFM(JL,KHPBL(JL))
-          ELSE
-            !  Reset K 
-            PCFH(JL,JK)  = 0._JPRB 
-            PCFM(JL,JK)  = 0._JPRB
-          ENDIF
-        ENDIF
+        if ( jk < khpbl(jl) .and. jk >= kvartop(jl) ) then
+          if ( jk > kvartop(jl) ) then 
+            !  k diffusion within cumulus layer
+            !pcfh(jl,jk)  = pcfh(jl,jk)          !testing: ri diffusion 
+            !pcfm(jl,jk)  = pcfm(jl,jk)
+            pcfh(jl,jk)  = pcfh(jl,khpbl(jl))   !cy32r3
+            pcfm(jl,jk)  = pcfm(jl,khpbl(jl))
+          else
+            !  reset k 
+            pcfh(jl,jk)  = 0._jprb 
+            pcfm(jl,jk)  = 0._jprb
+          endif
+        endif
         
-        !  Protect top-entrainment of shallow cu topped mixed layers against a zero
+        !  protect top-entrainment of shallow cu topped mixed layers against a zero
         !    buoyancy jump (dthv) through the cloud base transition layer.
-        !    This can easily occur just before h grows one layer,due to dq
-        !    cancelling ds in dthv.    -RN
+        !    this can easily occur just before h grows one layer,due to dq
+        !    cancelling ds in dthv.    -rn
         !
-        ZDTV(JL) = MAX( ZDTV(JL), 0.2_JPRB ) 
+        zdtv(jl) = max( zdtv(jl), 0.2_jprb ) 
         
-      ENDIF
+      endif
 
 
 
       !------------------------------------------------------------------
       !
-      !   3.2    INTERNAL K MODE DRIVEN BY CLOUD-TOP COOLING
+      !   3.2    internal k mode driven by cloud-top cooling
       !          -------------------------------------------
       !
-      !          As in Lock et al. (2000, MWR p3187f), equ. 5:
-      !          Using simplified radiative velocity scale as in Lock, 1998, equ. 12
+      !          as in lock et al. (2000, mwr p3187f), equ. 5:
+      !          using simplified radiative velocity scale as in lock, 1998, equ. 12
       !                 and ignore buoyancy reversal velocity scale
       !
 
-      IF ( ZKHVFL(JL)<0._JPRB .AND. ZRADKDEPTH(JL)>0._JPRB) THEN
-        IF ( ZZ >= ZRADKBASE(JL)  .AND.  ZZ <= ZRADKBASE(JL)+ZRADKDEPTH(JL) ) THEN  
-          ZVSC  = ( RG / PTM1(JL,JK) * ZRADKDEPTH(JL) * ZDRADFLX(JL) ) ** ZCONS13 
-          !ZKCLD = 0.85_JPRB * RKAP * ZVSC &
-          ZKCLD = ZRADKFAC(JL) * 0.85_JPRB * RKAP * ZVSC &
-              & * (ZZ-ZRADKBASE(JL)) ** 2 / ZRADKDEPTH(JL) &
-              & * ( 1 - (ZZ-ZRADKBASE(JL)) / ZRADKDEPTH(JL) ) ** 0.5_JPRB 
-          IF (KPBLTYPE(JL)==2) THEN     
-            PCFH(JL,JK)  = PCFH(JL,JK) + ZCFNC1 * ZKCLD
-            PCFM(JL,JK)  = PCFM(JL,JK) + ZCFNC1 * ZKCLD * 0.75_JPRB
-          ENDIF  
-        ENDIF
-      ENDIF
+      if ( zkhvfl(jl)<0._jprb .and. zradkdepth(jl)>0._jprb) then
+        if ( zz >= zradkbase(jl)  .and.  zz <= zradkbase(jl)+zradkdepth(jl) ) then  
+          zvsc  = ( rg / ptm1(jl,jk) * zradkdepth(jl) * zdradflx(jl) ) ** zcons13 
+          !zkcld = 0.85_jprb * rkap * zvsc &
+          zkcld = zradkfac(jl) * 0.85_jprb * rkap * zvsc &
+              & * (zz-zradkbase(jl)) ** 2 / zradkdepth(jl) &
+              & * ( 1 - (zz-zradkbase(jl)) / zradkdepth(jl) ) ** 0.5_jprb 
+          if (kpbltype(jl)==2) then     
+            pcfh(jl,jk)  = pcfh(jl,jk) + zcfnc1 * zkcld
+            pcfm(jl,jk)  = pcfm(jl,jk) + zcfnc1 * zkcld * 0.75_jprb
+          endif  
+        endif
+      endif
 
 
 
       !------------------------------------------------------------------
       !
-      !   3.3   INTERFACE K AT CUMULUS PBL TOP
+      !   3.3   interface k at cumulus pbl top
       !         ------------------------------
       !
-      !         At top level, mass flux is replaced by diffusion, using an entrainment efficiency formulation.
-      !         This is important for representing the intermediate regime (StCu->Cu transitions)    -RN
+      !         at top level, mass flux is replaced by diffusion, using an entrainment efficiency formulation.
+      !         this is important for representing the intermediate regime (stcu->cu transitions)    -rn
       !
 
-      IF ( LLRICU .AND. JK == KVARTOP(JL) .AND. KPBLTYPE(JL) == 3) THEN 
+      if ( llricu .and. jk == kvartop(jl) .and. kpbltype(jl) == 3) then 
 
-        !entrainment efficiency - after Wyant et al. (JAS, 1997)
-        !ZWECUTOP(JL) = PMCU(JL) * ZENTRTOP * PRICUI(JL)
-        ZWECUTOP(JL) = 2._JPRB * PMCU(JL) * ZENTRTOP * PRICUI(JL)
-        ZWECUTOP(JL) = MAX(0.0_JPRB,ZWECUTOP(JL))
+        !entrainment efficiency - after wyant et al. (jas, 1997)
+        !zwecutop(jl) = pmcu(jl) * zentrtop * pricui(jl)
+        zwecutop(jl) = 2._jprb * pmcu(jl) * zentrtop * pricui(jl)
+        zwecutop(jl) = max(0.0_jprb,zwecutop(jl))
           
-        !  translation into K [m2/s] at this level: K = entrainment velocity * mixing-length (dz)
-        ZKH = ZWECUTOP(JL)                                !top-entrainment by overshooting surface-driven thermals
-        ZKH = ZKH + ZENTRRAD * ZDRADFLX(JL) / ZDTV(JL )   !add cloud top cooling driven entrainment
-        ZKH = ZKH * ZMGEOM(JL) * ZRG
+        !  translation into k [m2/s] at this level: k = entrainment velocity * mixing-length (dz)
+        zkh = zwecutop(jl)                                !top-entrainment by overshooting surface-driven thermals
+        zkh = zkh + zentrrad * zdradflx(jl) / zdtv(jl )   !add cloud top cooling driven entrainment
+        zkh = zkh * zmgeom(jl) * zrg
         
-        ZKH     = MAX(0.0_JPRB,ZKH)
-        ZCFHNEW = ZCFNC1 * ZKH
+        zkh     = max(0.0_jprb,zkh)
+        zcfhnew = zcfnc1 * zkh
             
-        PCFH(JL,JK) = ZCFHNEW
-        PCFM(JL,JK) = ZCFHNEW * 0.75_JPRB
+        pcfh(jl,jk) = zcfhnew
+        pcfm(jl,jk) = zcfhnew * 0.75_jprb
             
-        !  reset any updraft M
-        PMFLX(JL,JK,2) = 0._JPRB
-        PMFLX(JL,JK,3) = 0._JPRB
+        !  reset any updraft m
+        pmflx(jl,jk,2) = 0._jprb
+        pmflx(jl,jk,3) = 0._jprb
 
-      ENDIF
+      endif
 
 
 
       !---------------------------------------------------------------------
       !
-      !   3.4   INTERFACE K AT MIXED LAYER TOP 
+      !   3.4   interface k at mixed layer top 
       !         ------------------------------
       ! 
-      !    This is cloud top for dry & stratocu PBL, and cloud base in 
-      !    shallow cu PBL (PZINV).
+      !    this is cloud top for dry & stratocu pbl, and cloud base in 
+      !    shallow cu pbl (pzinv).
       !
       !    w_e is the mixed layer top-entrainment rate, defined as
       !
-      !          w_e = w'thv'_h / dthv_h = -0.2 w'thv'_s / dthv_h = A/Ri w_*.
+      !          w_e = w'thv'_h / dthv_h = -0.2 w'thv'_s / dthv_h = a/ri w_*.
       !
-      !    This w_e is here translated into K at this level.
+      !    this w_e is here translated into k at this level.
       !
 
-      !IF ( PGEOH(JL,JK)*ZRG <= PZINV(JL)  .AND.  PZINV(JL) < PGEOH(JL,JK-1)*ZRG ) THEN
-      IF ( JK == KHPBL(JL) ) THEN 
+      !if ( pgeoh(jl,jk)*zrg <= pzinv(jl)  .and.  pzinv(jl) < pgeoh(jl,jk-1)*zrg ) then
+      if ( jk == khpbl(jl) ) then 
         
         !wthv_h = -0.2 wthv_s
-        ZWTVENTR = -ZENTRSFC * ZKHVFL(JL) * 0.1_JPRB
-        IF (KPBLTYPE(JL) == 2) THEN
-          ZWTVENTR = -ZENTRSFC * ZKHVFL(JL)
-        ENDIF  
+        zwtventr = -zentrsfc * zkhvfl(jl) * 0.1_jprb
+        if (kpbltype(jl) == 2) then
+          zwtventr = -zentrsfc * zkhvfl(jl)
+        endif  
 
-        !--- Special stratocumulus treatment: radiation impacts on entrainment
+        !--- special stratocumulus treatment: radiation impacts on entrainment
         !---
-        !--- ENTRAINMENT VELOCITY * T,v JUMP DUE TO LW-RADIATIVE COOLING & SFC FLUX
-        !---    (Lock & MacVean, 1999, equ. 11)
-        IF ( KPBLTYPE(JL) == 2 ) THEN                     
-          ZWTVENTR = ZWTVENTR + ZENTRRAD * ZDRADFLX(JL) !radiation flux jump
-        ENDIF
+        !--- entrainment velocity * t,v jump due to lw-radiative cooling & sfc flux
+        !---    (lock & macvean, 1999, equ. 11)
+        if ( kpbltype(jl) == 2 ) then                     
+          zwtventr = zwtventr + zentrrad * zdradflx(jl) !radiation flux jump
+        endif
 
         
-        ZWTVENTR = MAX(0.0_JPRB,ZWTVENTR)
+        zwtventr = max(0.0_jprb,zwtventr)
 
-        !ZDTV(JL) = 1.0_JPRB
-        !ZDTV(JL) = 10.*ZDTV(JL)
-        !ZDTV(JL) = 2._JPRB * PDTHV(JL)
+        !zdtv(jl) = 1.0_jprb
+        !zdtv(jl) = 10.*zdtv(jl)
+        !zdtv(jl) = 2._jprb * pdthv(jl)
 
-        ZKH     = ZWTVENTR * ZMGEOM(JL) / ( RG * ZDTV(JL) )
+        zkh     = zwtventr * zmgeom(jl) / ( rg * zdtv(jl) )
 
-        ZKH     = MAX(0.0_JPRB,ZKH)
-        ZCFHNEW = ZCFNC1 * ZKH
+        zkh     = max(0.0_jprb,zkh)
+        zcfhnew = zcfnc1 * zkh
 
-        !RN PCFH(JL,JK)  = MAX(PCFH(JL,JK),ZCFHNEW)           !protection against K=0
-        !RN PCFM(JL,JK)  = MAX(PCFM(JL,JK),ZCFHNEW * 0.75_JPRB)
-        PCFH(JL,JK)  = ZCFHNEW           
-        PCFM(JL,JK)  = ZCFHNEW * 0.75_JPRB
+        !rn pcfh(jl,jk)  = max(pcfh(jl,jk),zcfhnew)           !protection against k=0
+        !rn pcfm(jl,jk)  = max(pcfm(jl,jk),zcfhnew * 0.75_jprb)
+        pcfh(jl,jk)  = zcfhnew           
+        pcfm(jl,jk)  = zcfhnew * 0.75_jprb
 
-!        IF (LLDIAG) THEN
-!          PEXTR2(JL,4) = - ZDRADFLX(JL)         ! radiative flux jump         [K m/s]
-!          PEXTR2(JL,5) = ZWTVENTR               ! entrainment flux = we * dTv [K m/s]
-!          PEXTR2(JL,7) = ZKH / ZMGEOM(JL)*RG    ! we                          [m/s]
-!          PEXTR2(JL,6) = ZDTV(JL)               ! dTv                         [K]
-!          PEXTR2(JL,7) = ZDTV(JL) * RG / ZMGEOM(JL)
-!        ENDIF
+!        if (lldiag) then
+!          pextr2(jl,4) = - zdradflx(jl)         ! radiative flux jump         [k m/s]
+!          pextr2(jl,5) = zwtventr               ! entrainment flux = we * dtv [k m/s]
+!          pextr2(jl,7) = zkh / zmgeom(jl)*rg    ! we                          [m/s]
+!          pextr2(jl,6) = zdtv(jl)               ! dtv                         [k]
+!          pextr2(jl,7) = zdtv(jl) * rg / zmgeom(jl)
+!        endif
           
-      ENDIF
+      endif
 
 
 
-!          DIFFUSION COEFFICIENT FOR HEAT FOR POSTPROCESSING ONLY IN (M2/S)
+!          diffusion coefficient for heat for postprocessing only in (m2/s)
 
-      PKH(JL,JK) = PCFH(JL,JK) / ZCFNC1
+      pkh(jl,jk) = pcfh(jl,jk) / zcfnc1
 
 
-      !RN output
-      IF (LLDIAG) THEN
-!        PEXTR2(JL,19) = ZWECUTOP(JL)           !top entrainment rate
-!        PEXTR2(JL,20) = ZENTRTOP * PRICUI(JL)  !entrainment efficiency
-        PEXTRA(JL,JK,3) = PCFH(JL,JK)   / ZCFNC1   !K [m2/s]
-      ENDIF  
+      !rn output
+      if (lldiag) then
+!        pextr2(jl,19) = zwecutop(jl)           !top entrainment rate
+!        pextr2(jl,20) = zentrtop * pricui(jl)  !entrainment efficiency
+        pextra(jl,jk,3) = pcfh(jl,jk)   / zcfnc1   !k [m2/s]
+      endif  
       
-    ENDDO
+    enddo
 
 !***
-  ENDDO !JK
+  enddo !jk
 !***
 
-
-! IF (LHOOK) CALL DR_HOOK('VDFEXCU',1,ZHOOK_HANDLE)
-END SUBROUTINE VDFEXCU
+! if (lhook) call dr_hook('vdfexcu',1,zhook_handle)
+end subroutine vdfexcu
