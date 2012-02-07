@@ -105,7 +105,7 @@ subroutine vdfparcel (kidia   , kfdia   , klon    , klev    , kdraft  , &
 !     ------------------------------------------------------------------
 
 !#include "tsmbkind.h"
-use garbage, only : foealfa, cuadjtq
+use garbage, only : foealfa, cuadjtq, satadj
 use parkind1  ,only : jpim     , jprb
 
 ! use yomhook   ,only : lhook,   dr_hook
@@ -306,10 +306,10 @@ zlcrit = 0.001_jprb     !cy32r3
 
         ptuh(jl,jk,kd)   = ( pslguh(jl,jk,kd) - pgeoh(jl,jk) + rlvtt*pqcuh(jl,jk,kd) ) &
                     & / rcpd      ! assume liquid phase!
-        zph(jl)       = paphm1(jl,jk)
-        zqtemp(jl,jk) = pquh(jl,jk,kd)
-        zttemp(jl,jk) = ptuh(jl,jk,kd)
-	
+!         zph(jl)       = paphm1(jl,jk)
+!         zqtemp(jl,jk) = pquh(jl,jk,kd)
+!         zttemp(jl,jk) = ptuh(jl,jk,kd)
+! 	
       endif
       
       lldoit(jl)      = .not. lddone(jl,kd)
@@ -317,30 +317,35 @@ zlcrit = 0.001_jprb     !cy32r3
       if ( kd==2 ) then    ! condensation not done for dry subcloud thermal
         lldoit(jl)    = .false.
       endif
+      if (lldoit(jl)) then
+! print *, jl, jk, kd , paphm1(jl,jk)     
+        call satadj(ptuh(jl,jk,kd), paphm1(jl,jk), pqtuh(jl,jk,kd), pqcuh(jl,jk,kd))
+        pquh(jl,jk,kd) = pqtuh(jl,jk,kd) - pqcuh(jl,jk,kd)
+      end if
       
     enddo
 
-
-    call cuadjtq &
-     & ( kidia,    kfdia,    klon,     0,       klev,&
-     &   jk,&
-     &   zph,      zttemp,   zqtemp,   lldoit,  4)  
-
-
-    do jl=kidia,kfdia
-      if ( lldoit(jl) ) then
-        if ( zqtemp(jl,jk) < pqtuh(jl,jk,kd) ) then !allow evaporation up to qt
-          pquh(jl,jk,kd) = zqtemp(jl,jk)
-          pqcuh(jl,jk,kd)= pqtuh(jl,jk,kd) - pquh(jl,jk,kd)
-          ptuh(jl,jk,kd) = zttemp(jl,jk)
-        else                          !case where qv(initial)<qt but qv(final)>qt
-          pquh(jl,jk,kd) = pqtuh(jl,jk,kd)  !(unusual!)
-          pqcuh(jl,jk,kd)= 0.0_jprb
-          ptuh(jl,jk,kd) = ( pslguh(jl,jk,kd) - pgeoh(jl,jk) + rlvtt*pqcuh(jl,jk,kd) ) &
-                    & / rcpd
-        endif
-      endif
-    enddo
+! 
+!     call cuadjtq &
+!      & ( kidia,    kfdia,    klon,     0,       klev,&
+!      &   jk,&
+!      &   zph,      zttemp,   zqtemp,   lldoit,  4)  
+! 
+! 
+!     do jl=kidia,kfdia
+!       if ( lldoit(jl) ) then
+!         if ( zqtemp(jl,jk) < pqtuh(jl,jk,kd) ) then !allow evaporation up to qt
+!           pquh(jl,jk,kd) = zqtemp(jl,jk)
+!           pqcuh(jl,jk,kd)= pqtuh(jl,jk,kd) - pquh(jl,jk,kd)
+!           ptuh(jl,jk,kd) = zttemp(jl,jk)
+!         else                          !case where qv(initial)<qt but qv(final)>qt
+!           pquh(jl,jk,kd) = pqtuh(jl,jk,kd)  !(unusual!)
+!           pqcuh(jl,jk,kd)= 0.0_jprb
+!           ptuh(jl,jk,kd) = ( pslguh(jl,jk,kd) - pgeoh(jl,jk) + rlvtt*pqcuh(jl,jk,kd) ) &
+!                     & / rcpd
+!         endif
+!       endif
+!     enddo
 
 
     do jl=kidia,kfdia

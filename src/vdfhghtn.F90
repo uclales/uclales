@@ -805,13 +805,14 @@ endif
       !-- inversion theta_v jump --
       !jk = kplzb(jl,1)    !use level of zero buoyancy (lzb) of test-updraft
       jk = kptop(jl,1)    !use top level of test-updraft
+      zdthvcutop = 0
       if (jk>2) then
         zdthvcutop = max( zthven(jl,jk-1)-zthven(jl,jk), zthven(jl,jk)-zthven(jl,jk+1) )
-      endif  
       
-      !-- cumulus ri number - used again in vdfexcu --
-      if ( zdthvcutop > 0._jprb ) then 
-        pricui(jl) = zbuoycu * zrg * zthven(jl,klev) / zdthvcutop   
+        !-- cumulus ri number - used again in vdfexcu --
+        if ( zdthvcutop > 0._jprb ) then 
+          pricui(jl) = zbuoycu * zrg * zthven(jl,klev) / zdthvcutop   
+        endif  
       endif  
       
       !-- rn testing: no top entrainment for stcu (yikes) --

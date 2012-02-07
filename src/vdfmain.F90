@@ -29,7 +29,7 @@ end function interpolate
 subroutine vdfouter(sst)
 use parkind1, only : jprb, jpim
 use grid,  only : nzp, nxp, nyp, liquid, a_up, a_vp, a_theta, a_pexnr, pi0, pi1, a_rp, dt, press,zm, zt, wt_sfc, wq_sfc, dn0
-use defs, only : g,alvl, cp
+use defs, only : g,alvl, cp, cpr,p00
 use srfc, only : zrough
 use util, only : get_avg3, get_avg
 use stat, only : sflg, updtst !, stat_edmf
@@ -75,7 +75,9 @@ real(kind=jprb)   :: pextr2(1,kfldx2), pextra(1,nzp-1,kfldx)
      where(liquid>0) a_scr1 = 1
      call get_avg3(nzp,nxp,nyp, a_scr1,a1)
      pam1(1,:) = 0.!flip(a1(2:nzp-1))
-     call get_avg3(nzp,nxp,nyp, press,a1)
+             a1=p00*((pi0+pi1)/cp)**cpr
+
+!      call get_avg3(nzp,nxp,nyp, a,a1)
      papm1(1,:) = flip(a1(2:nzp-1))
      a1h = 0.
      a1h = interpolate(a1)
@@ -208,17 +210,17 @@ subroutine vdfmain    ( cdconf, &
  & pchar  , pucurr , pvcurr , ptskrad, pcflx  , &
  & psoteu , psotev , psobeta, pvervel, &
  & pz0m   , pz0h   , &
- & pvdis  , pvdisg , pahflev, pahflsb, pfwsb  , pbir   , pvar   , &
- & pu10m  , pv10m  , pt2m   , pd2m   , pq2m   , pzinv  , pblh   , khpbln , kvartop, &
- & pssrflti,pevapsnw,pgust  , pzidlwv, pwuavg , ldnodecp,kpbltype, pldiff, &
+ & pvdis  , pvdisg ,pbir   , pvar   , &
+ & pzinv    , khpbln , kvartop, &
+ & pssrflti,pevapsnw, pwuavg , ldnodecp,kpbltype, pldiff, &
  & pfplvl , pfplvn , pfhpvl , pfhpvn , &
  & pextr2 , kfldx2 , pextra , klevx  , kfldx  , &
  & pte    , pqe    , ple    , pie    , pae    , pvom   , pvol   , &
  & ptenc  , ptske1 , &
  & pustrti, pvstrti, pahfsti, pevapti, ptskti , &
  & pdifts , pdiftq , pdiftl , pdifti , pstrtu , pstrtv , ptofdu , ptofdv, &
- & pstrsou, pstrsov,   pkh  , &
- & pdhtls , pdhtss , pdhtts , pdhtis)
+ & pstrsou, pstrsov,   pkh   &
+ & )
 
 !***
 
@@ -569,18 +571,9 @@ real(kind=jprb)   ,intent(inout) ,optional:: pz0m(klon)
 real(kind=jprb)   ,intent(inout) ,optional:: pz0h(klon) 
 real(kind=jprb)   ,intent(out)   ,optional:: pvdis(klon) 
 real(kind=jprb)   ,intent(out)   ,optional:: pvdisg(klon) 
-real(kind=jprb)   ,intent(out)   ,optional:: pahflev(klon) 
-real(kind=jprb)   ,intent(out)   ,optional:: pahflsb(klon) 
-real(kind=jprb)   ,intent(out)   ,optional:: pfwsb(klon) 
 real(kind=jprb)   ,intent(out)   ,optional:: pbir(klon)
 real(kind=jprb)   ,intent(out)   ,optional:: pvar(klon,klev)
-real(kind=jprb)   ,intent(out)   ,optional:: pu10m(klon) 
-real(kind=jprb)   ,intent(out)   ,optional:: pv10m(klon) 
-real(kind=jprb)   ,intent(out)   ,optional:: pt2m(klon) 
-real(kind=jprb)   ,intent(out)   ,optional:: pd2m(klon) 
-real(kind=jprb)   ,intent(out)   ,optional:: pq2m(klon) 
 real(kind=jprb)   ,intent(out)   ,optional:: pzinv(klon)
-real(kind=jprb)   ,intent(out)   ,optional:: pblh(klon) 
 integer(kind=jpim),intent(out)   ,optional:: khpbln(klon)
 real(kind=jprb)   ,intent(out)   ,optional:: pssrflti(klon,ktiles) 
 real(kind=jprb)   ,intent(out)   ,optional:: pevapsnw(klon) 
@@ -588,8 +581,6 @@ real(kind=jprb)   ,intent(out)   ,optional:: pfplvl(klon,0:klev)
 real(kind=jprb)   ,intent(out)   ,optional:: pfplvn(klon,0:klev)
 real(kind=jprb)   ,intent(out)   ,optional:: pfhpvl(klon,0:klev)
 real(kind=jprb)   ,intent(out)   ,optional:: pfhpvn(klon,0:klev)
-real(kind=jprb)   ,intent(out)   ,optional:: pgust(klon) 
-real(kind=jprb)   ,intent(out)   ,optional:: pzidlwv(klon) 
 real(kind=jprb)   ,intent(out)   ,optional:: pwuavg(klon)
 logical           ,intent(in)    ,optional:: ldnodecp(klon)
 integer(kind=jpim),intent(out)   ,optional:: kpbltype(klon)
@@ -620,10 +611,6 @@ real(kind=jprb)   ,intent(inout) ,optional:: ptofdv(klon)
 real(kind=jprb)   ,intent(out)   ,optional:: pstrsou(klon,0:klev) 
 real(kind=jprb)   ,intent(out)   ,optional:: pstrsov(klon,0:klev) 
 real(kind=jprb)   ,intent(out)   ,optional:: pkh(klon,klev) 
-real(kind=jprb)   ,intent(out)   ,optional:: pdhtls(klon,ktiles,kdhvtls+kdhftls) 
-real(kind=jprb)   ,intent(out)   ,optional:: pdhtss(klon,klevsn,kdhvtss+kdhftss) 
-real(kind=jprb)   ,intent(out)   ,optional:: pdhtts(klon,klevs,kdhvtts+kdhftts) 
-real(kind=jprb)   ,intent(out)   ,optional:: pdhtis(klon,klevi,kdhvtis+kdhftis) 
 real(kind=jprb)   ,intent(in)    ,optional:: pvervel(klon,klev) 
 !          diagnostic output
 integer(kind=jpim),intent(in)     :: kfldx2, klevx, kfldx
@@ -972,7 +959,7 @@ endif
 
 
 !*         4.6  organized updrafts
-
+! print *, papm1
 call vdfhghtn (kidia   , kfdia   , klon    , klev    , idraft   , ztmst , kstep, &
              & pum1    , pvm1    , ptm1    , pqm1    , plm1    , pim1    , pam1     , &
              & paphm1  , papm1   , pgeom1  , pgeoh   , pvervel , pqe     , pte      , &
@@ -1601,8 +1588,8 @@ endif
       !--- t-check ---
 !       if ( ztupd(jl,jk).gt.400._jprb.or.ztupd(jl,jk).lt.100._jprb) then
       if (jk>46) then
-        write(0,'(a,3i5)')    'vdfmain t alarm:',kcnt,jl,jk
-        write(0,'(a,3i5)')    ' pbl type      : ', kpbltype(jl),kvartop(jl),khpbln(jl)
+        write(0,'(a,3i5)')    'vdfmain t alarm:',jl,jk
+        write(0,'(a,4i5)')    ' pbl type      : ', kpbltype(jl),kvartop(jl),khpbln(jl), iplcl(jl,3)
         write(0,'(a,2f10.6)')    '        sfluxes: ', zkhfl(jl),zkqfl(jl)
         write(0,'(a,2f12.6)')    '    cld heights: ', zcldbase(jl),zcldtop(jl)
         write(0,'(a,5f10.6)')    '             t: ',&
@@ -1635,9 +1622,9 @@ endif
            & zdummy2, zslguh(jl,jk,2)/rcpd, zqtuh(jl,jk,2)*1000._jprb, &
            & zdummy3, zslguh(jl,jk,3)/rcpd, zqtuh(jl,jk,3)*1000._jprb
 
-        do jkk= klev-5,klev
-          write(0,'(a,i5,4f10.6)')    '      m-struct: ',jkk, zmflx(jl,jkk,2), zwuh(jl,jkk,2), zmflx(jl,jkk,3), zwuh(jl,jkk,3)
-        enddo
+!         do jkk= klev-5,klev
+!           write(0,'(a,i5,4f10.6)')    '      m-struct: ',jkk, zmflx(jl,jkk,2), zwuh(jl,jkk,2), zmflx(jl,jkk,3), zwuh(jl,jkk,3)
+!         enddo
 	
       endif
       

@@ -247,6 +247,29 @@ zqmax=0.5_jprb
 
 end subroutine cuadjtq
 
+subroutine satadj(pt, psp, pqt, ql)
+  use thrm, only : rslf
+  real, intent(in)  :: psp, pqt
+  real, intent(inout) :: pt
+  real, intent(out)   :: ql
+  real :: qs, T, Told
+  integer :: n
+    T = pt
+    Told = 0
+    n = 0
+    do while (abs(T - Told)/Told > 1e-5)
+      n = n + 1
+      Told = T
+      qs = rslf(psp, T)
+      ql=max(0._jprb,pqt-qs)
+      T = 0.5*(pt +ralvdcp*ql+Told)
+! print *, n, t  , told ,  abs(T - Told)/Told , ql
+    end do
+! print *, pt, T, pqt, psp, ql    
+    pt = T
+!     stop
+end subroutine satadj
+
 end module garbage
 
 module yoevdfs
