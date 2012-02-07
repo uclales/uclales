@@ -28,7 +28,7 @@ end function interpolate
   
 subroutine vdfouter(sst)
 use parkind1, only : jprb, jpim
-use grid,  only : nzp, nxp, nyp, liquid, a_up, a_vp, a_theta, a_pexnr, pi0, pi1, a_rp, dt, press,zm, zt, wt_sfc, wq_sfc, dn0
+use grid,  only : nzp, nxp, nyp, liquid, a_up, a_vp, a_theta, a_pexnr, pi0, pi1, a_rp, dt, press,zm, zt, wt_sfc, wq_sfc, dn0, th00, a_tp
 use defs, only : g,alvl, cp, cpr,p00
 use srfc, only : zrough
 use util, only : get_avg3, get_avg
@@ -62,8 +62,8 @@ real(kind=jprb)   :: pextr2(1,kfldx2), pextra(1,nzp-1,kfldx)
      pum1(1,:) = flip(a1(2:nzp-1))
      call get_avg3(nzp,nxp,nyp, a_vp,a1)
      pvm1(1,:) = flip(a1(2:nzp-1))
-     call fll_tkrs(nzp,nxp,nyp,a_theta,a_pexnr,pi0,pi1,a_scr1)
-
+     call fll_tkrs(nzp,nxp,nyp,a_tp+th00,a_pexnr,pi0,pi1,a_scr1)
+     
      call get_avg3(nzp,nxp,nyp, a_scr1,a1)
      ptm1(1,:) = flip(a1(2:nzp-1))
      call get_avg3(nzp,nxp,nyp, a_rp,a1)
@@ -1589,7 +1589,7 @@ endif
 !       if ( ztupd(jl,jk).gt.400._jprb.or.ztupd(jl,jk).lt.100._jprb) then
       if (jk>46) then
         write(0,'(a,3i5)')    'vdfmain t alarm:',jl,jk
-        write(0,'(a,4i5)')    ' pbl type      : ', kpbltype(jl),kvartop(jl),khpbln(jl), iplcl(jl,3)
+        write(0,'(a,6i5)')    ' pbl type      : ', kpbltype(jl),kvartop(jl),khpbln(jl), iplcl(jl,:)
         write(0,'(a,2f10.6)')    '        sfluxes: ', zkhfl(jl),zkqfl(jl)
         write(0,'(a,2f12.6)')    '    cld heights: ', zcldbase(jl),zcldtop(jl)
         write(0,'(a,5f10.6)')    '             t: ',&
