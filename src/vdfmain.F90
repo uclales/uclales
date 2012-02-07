@@ -1130,12 +1130,12 @@ call vdfincr (kidia  , kfdia  , klon   , klev   , itop   , ztmst  , &
             & zudif  , zvdif  , pucurr , pvcurr ,zslgdif, zqtdif , &
             & pvom   , pvol   , zslge  , zqte   , zslgewodis, &
             & pvdis  , pvdisg , pstrtu , pstrtv , pstrsou, pstrsov , ptofdu , ptofdv)  
-
-!          5.4  solve for tracers
-if (lvdftrac .and. ktrac > 0) then 
-  call vdfdifc(kidia,kfdia,klon,klev,itop,ktrac,&
-             & ztmst,pcm1,ptenc,paphm1,zcfh,pcflx)
-endif
+! 
+! !          5.4  solve for tracers
+! if (lvdftrac .and. ktrac > 0) then 
+!   call vdfdifc(kidia,kfdia,klon,klev,itop,ktrac,&
+!              & ztmst,pcm1,ptenc,paphm1,zcfh,pcflx)
+! endif
 
 
 
