@@ -191,9 +191,9 @@ real(kind=jprb)   :: pextr2(1,kfldx2), pextra(1,nzp-1,kfldx)
   )
   if (sflg) then
     a1 = 0.
-    a1(2:nzp) = flip(pextra(1,:,67)) !Cloud Fraction
+    a1(2:nzp) = flip(pextra(1,:,39)) !Cloud Fraction
     call updtst(nzp,'edm',1,a1,1) 
-    a1(2:nzp) = flip(pextra(1,:,68)) !Liquid water
+    a1(2:nzp) = flip(pextra(1,:,48)) !Liquid water
     call updtst(nzp,'edm',2,a1,1) 
   end if
 end subroutine vdfouter
