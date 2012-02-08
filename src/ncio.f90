@@ -1243,7 +1243,7 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('edmf_cf')    
        if (itype==0) ncinfo = 'EDMF Cloud Fraction'
-       if (itype==1) ncinfo = 'g/kg'
+       if (itype==1) ncinfo = '%'
        if (itype==2) ncinfo = 'tttt'
     case('edmf_ql')    
        if (itype==0) ncinfo = 'EDMF Liquid water content'

@@ -69,183 +69,183 @@ module garbage
   use yoethf, only : r2es, r3ies, r3les, r4ies, r4les, rtt, ralsdcp, ralvdcp, r5alscp, r5alvcp, rtice, rtwat, rtwat_rtice_r
   implicit none
 contains
-  real(kind=jprb) function foedelta (ptare)
-  real(kind=jprb) :: ptare
-      foedelta = max (0.0_jprb,sign(1.0_jprb,ptare-rtt))
- end function foedelta
+!   real(kind=jprb) function foedelta (ptare)
+!   real(kind=jprb) :: ptare
+!       foedelta = max (0.0_jprb,sign(1.0_jprb,ptare-rtt))
+!  end function foedelta
   real(kind=jprb) function foealfa (ptare)
   real(kind=jprb) :: ptare
 foealfa = min(1.0_jprb,((max(rtice,min(rtwat,ptare))-rtice)&
  &*rtwat_rtice_r)**2) 
  end function foealfa
-  real(kind=jprb) function foedem (ptare)
-  real(kind=jprb) :: ptare
-      foedem = foealfa(ptare)*r5alvcp*(1.0_jprb/(ptare-r4les)**2)+&
-             &(1.0_jprb-foealfa(ptare))*r5alscp*(1.0_jprb/(ptare-r4ies)**2)
- end function foedem
-  real(kind=jprb) function foeldcpm (ptare)
-  real(kind=jprb) :: ptare
-foeldcpm = foealfa(ptare)*ralvdcp+&
-            &(1.0_jprb-foealfa(ptare))*ralsdcp
- end function foeldcpm
- 
- real(kind=jprb) function foeewm (ptare)
-  real(kind=jprb) :: ptare
-    foeewm = r2es *&
-     &(foealfa(ptare)*exp(r3les*(ptare-rtt)/(ptare-r4les))+&
-  &(1.0_jprb-foealfa(ptare))*exp(r3ies*(ptare-rtt)/(ptare-r4ies)))
- end function foeewm
-
- subroutine cuadjtq &
- & (kidia,    kfdia,    klon,     ktdia,    klev,&
- & kk,&
- & psp,      pt,       pq,       ldflag,   kcall)  
-
-!          m.tiedtke         e.c.m.w.f.     12/89
-
-!          modifications
-!          -------------
-!          d.salmond         cray(uk))      12/8/91
-!          j.j. morcrette    ecmwf          92-09-18   update to cy44
-!          j.f. mahfouf      ecmwf          96-06-11   smoothing option
-!          d.salmond & m.hamrud ecmwf       99-06-04   optimisation
-!          j.hague                          03-01-13   mass vector functions
-!          j.hague                          03-07-07   more mass v.f.
-!        m.hamrud              01-oct-2003 cy28 cleaning
-!        j.hague & d.salmond   22-nov-2005 optimisations 
-
-!          purpose.
-!          --------
-!          to produce t,q and l values for cloud ascent
-
-!          interface
-!          ---------
-!          this routine is called from subroutines:
-!              *cond*     (t and q at condensation level)
-!              *cubase*   (t and q at condensation level)
-!              *cuasc*    (t and q at cloud levels)
-!              *cuini*    (environmental t and qs values at half levels)
-!              *custrat*  (t and q at condensation level)
-!          input are unadjusted t and q values,
-!          it returns adjusted values of t and q
-
-!     parameter     description                                   units
-!     ---------     -----------                                   -----
-!     input parameters (integer):
-
-!    *kidia*        start point
-!    *kfdia*        end point
-!    *klon*         number of grid points per packet
-!    *ktdia*        start of the vertical loop
-!    *klev*         number of levels
-!    *kk*           level
-!    *kcall*        defines calculation as
-!                      kcall=0  env. t and qs in*cuini*
-!                      kcall=1  condensation in updrafts  (e.g. cubase, cuasc)
-!                      kcall=2  evaporation in downdrafts (e.g. cudlfs,cuddraf)
-
-!     input parameters (logical):
-
-!    *ldland*       land-sea mask (.true. for land points)
-
-!     input parameters (real):
-
-!    *psp*          pressure                                        pa
-
-!     updated parameters (real):
-
-!    *pt*           temperature                                     k
-!    *pq*           specific humidity                             kg/kg
-
-!          externals   
-!          ---------
-!          3 lookup tables ( tlucua, tlucub, tlucuc )
-!          for condensation calculations.
-!          the tables are initialised in *suphec*.
-
-!----------------------------------------------------------------------
-
-use parkind1  ,only : jpim     ,jprb
-! ! use yomhook   ,only : lhook,   dr_hook
+!   real(kind=jprb) function foedem (ptare)
+!   real(kind=jprb) :: ptare
+!       foedem = foealfa(ptare)*r5alvcp*(1.0_jprb/(ptare-r4les)**2)+&
+!              &(1.0_jprb-foealfa(ptare))*r5alscp*(1.0_jprb/(ptare-r4ies)**2)
+!  end function foedem
+!   real(kind=jprb) function foeldcpm (ptare)
+!   real(kind=jprb) :: ptare
+! foeldcpm = foealfa(ptare)*ralvdcp+&
+!             &(1.0_jprb-foealfa(ptare))*ralsdcp
+!  end function foeldcpm
+!  
+!  real(kind=jprb) function foeewm (ptare)
+!   real(kind=jprb) :: ptare
+!     foeewm = r2es *&
+!      &(foealfa(ptare)*exp(r3les*(ptare-rtt)/(ptare-r4les))+&
+!   &(1.0_jprb-foealfa(ptare))*exp(r3ies*(ptare-rtt)/(ptare-r4ies)))
+!  end function foeewm
 ! 
-! use yos_cst   , only : retv     ,rlvtt    ,rlstt    ,rtt
-! use yoethf   , only : r2es     ,r3les    ,r3ies    ,r4les    ,&
-!  & r4ies    ,r5les    ,r5ies    ,r5alvcp  ,r5alscp  ,&
-!  & ralvdcp  ,ralsdcp  ,rtwat    ,rtice    ,rticecu  ,&
-!  & rtwat_rtice_r      ,rtwat_rticecu_r  
-! use yoephli  , only : lphylin  ,rlptrc   ,rlpal1   ,rlpal2
-use yomjfh   , only : n_vmass
-use yos_cst, only : retv
-
-implicit none
-
-integer(kind=jpim),intent(in)    :: klon 
-integer(kind=jpim),intent(in)    :: klev 
-integer(kind=jpim),intent(in)    :: kidia 
-integer(kind=jpim),intent(in)    :: kfdia 
-integer(kind=jpim)               :: ktdia ! argument not used
-integer(kind=jpim),intent(in)    :: kk 
-real(kind=jprb)   ,intent(in)    :: psp(klon) 
-real(kind=jprb)   ,intent(inout) :: pt(klon,klev) 
-real(kind=jprb)   ,intent(inout) :: pq(klon,klev) 
-logical           ,intent(in)    :: ldflag(klon) 
-integer(kind=jpim),intent(in)    :: kcall 
-integer(kind=jpim) :: jl, jlen
-
-real(kind=jprb) :: ztmp0(kfdia-kidia+1+n_vmass)
-real(kind=jprb) :: ztmp1(kfdia-kidia+1+n_vmass)
-real(kind=jprb) :: ztmp2(kfdia-kidia+1+n_vmass)
-real(kind=jprb) :: ztmp3(kfdia-kidia+1+n_vmass)
-real(kind=jprb) :: ztmp4(kfdia-kidia+1+n_vmass)
-real(kind=jprb) :: ztmp5(kfdia-kidia+1+n_vmass)
-real(kind=jprb) :: ztmp6(kfdia-kidia+1+n_vmass)
-
-real(kind=jprb) :: z1s, z2s, zcond,zcond1, zcor, zfoeewi, zfoeewl,&
- & zoealfa, zqmax, zqsat, ztarg, zqp
-
-!dir$ vfunction exphf
-! #include "fcttre.h"
-
-!     statement functions
-!real_b :: foealfaj,foedemj,foeldcpmj,foeewmj
-
-real(kind=jprb) :: minj, maxj, x, y
-! real(kind=jprb) :: zhook_handle
-
-minj(x,y) = y - 0.5_jprb*(abs(x-y)-(x-y))
-maxj(x,y) = y + 0.5_jprb*(abs(x-y)+(x-y))
-
-!----------------------------------------------------------------------
-
-!     1.           define constants
-!                  ----------------
-
-zqmax=0.5_jprb
-
-
-!dir$    ivdep
-!ocl novrec
-    do jl=kidia,kfdia
-      if(ldflag(jl)) then
-        zqp    =1.0_jprb/psp(jl)
-        zqsat=foeewm(pt(jl,kk))*zqp    
-        zqsat=min(0.5_jprb,zqsat)
-        zcor=1.0_jprb/(1.0_jprb-retv  *zqsat)
-        zqsat=zqsat*zcor
-        zcond=(pq(jl,kk)-zqsat)/(1.0_jprb+zqsat*zcor*foedem(pt(jl,kk)))
-        pt(jl,kk)=pt(jl,kk)+foeldcpm(pt(jl,kk))*zcond
-        pq(jl,kk)=pq(jl,kk)-zcond
-        zqsat=foeewm(pt(jl,kk))*zqp    
-        zqsat=min(0.5_jprb,zqsat)
-        zcor=1.0_jprb/(1.0_jprb-retv  *zqsat)
-        zqsat=zqsat*zcor
-        zcond1=(pq(jl,kk)-zqsat)/(1.0_jprb+zqsat*zcor*foedem(pt(jl,kk)))
-        pt(jl,kk)=pt(jl,kk)+foeldcpm(pt(jl,kk))*zcond1
-        pq(jl,kk)=pq(jl,kk)-zcond1
-      endif
-    enddo
-
-end subroutine cuadjtq
+!  subroutine cuadjtq &
+!  & (kidia,    kfdia,    klon,     ktdia,    klev,&
+!  & kk,&
+!  & psp,      pt,       pq,       ldflag,   kcall)  
+! 
+! !          m.tiedtke         e.c.m.w.f.     12/89
+! 
+! !          modifications
+! !          -------------
+! !          d.salmond         cray(uk))      12/8/91
+! !          j.j. morcrette    ecmwf          92-09-18   update to cy44
+! !          j.f. mahfouf      ecmwf          96-06-11   smoothing option
+! !          d.salmond & m.hamrud ecmwf       99-06-04   optimisation
+! !          j.hague                          03-01-13   mass vector functions
+! !          j.hague                          03-07-07   more mass v.f.
+! !        m.hamrud              01-oct-2003 cy28 cleaning
+! !        j.hague & d.salmond   22-nov-2005 optimisations 
+! 
+! !          purpose.
+! !          --------
+! !          to produce t,q and l values for cloud ascent
+! 
+! !          interface
+! !          ---------
+! !          this routine is called from subroutines:
+! !              *cond*     (t and q at condensation level)
+! !              *cubase*   (t and q at condensation level)
+! !              *cuasc*    (t and q at cloud levels)
+! !              *cuini*    (environmental t and qs values at half levels)
+! !              *custrat*  (t and q at condensation level)
+! !          input are unadjusted t and q values,
+! !          it returns adjusted values of t and q
+! 
+! !     parameter     description                                   units
+! !     ---------     -----------                                   -----
+! !     input parameters (integer):
+! 
+! !    *kidia*        start point
+! !    *kfdia*        end point
+! !    *klon*         number of grid points per packet
+! !    *ktdia*        start of the vertical loop
+! !    *klev*         number of levels
+! !    *kk*           level
+! !    *kcall*        defines calculation as
+! !                      kcall=0  env. t and qs in*cuini*
+! !                      kcall=1  condensation in updrafts  (e.g. cubase, cuasc)
+! !                      kcall=2  evaporation in downdrafts (e.g. cudlfs,cuddraf)
+! 
+! !     input parameters (logical):
+! 
+! !    *ldland*       land-sea mask (.true. for land points)
+! 
+! !     input parameters (real):
+! 
+! !    *psp*          pressure                                        pa
+! 
+! !     updated parameters (real):
+! 
+! !    *pt*           temperature                                     k
+! !    *pq*           specific humidity                             kg/kg
+! 
+! !          externals   
+! !          ---------
+! !          3 lookup tables ( tlucua, tlucub, tlucuc )
+! !          for condensation calculations.
+! !          the tables are initialised in *suphec*.
+! 
+! !----------------------------------------------------------------------
+! 
+! use parkind1  ,only : jpim     ,jprb
+! ! ! use yomhook   ,only : lhook,   dr_hook
+! ! 
+! ! use yos_cst   , only : retv     ,rlvtt    ,rlstt    ,rtt
+! ! use yoethf   , only : r2es     ,r3les    ,r3ies    ,r4les    ,&
+! !  & r4ies    ,r5les    ,r5ies    ,r5alvcp  ,r5alscp  ,&
+! !  & ralvdcp  ,ralsdcp  ,rtwat    ,rtice    ,rticecu  ,&
+! !  & rtwat_rtice_r      ,rtwat_rticecu_r  
+! ! use yoephli  , only : lphylin  ,rlptrc   ,rlpal1   ,rlpal2
+! use yomjfh   , only : n_vmass
+! use yos_cst, only : retv
+! 
+! implicit none
+! 
+! integer(kind=jpim),intent(in)    :: klon 
+! integer(kind=jpim),intent(in)    :: klev 
+! integer(kind=jpim),intent(in)    :: kidia 
+! integer(kind=jpim),intent(in)    :: kfdia 
+! integer(kind=jpim)               :: ktdia ! argument not used
+! integer(kind=jpim),intent(in)    :: kk 
+! real(kind=jprb)   ,intent(in)    :: psp(klon) 
+! real(kind=jprb)   ,intent(inout) :: pt(klon,klev) 
+! real(kind=jprb)   ,intent(inout) :: pq(klon,klev) 
+! logical           ,intent(in)    :: ldflag(klon) 
+! integer(kind=jpim),intent(in)    :: kcall 
+! integer(kind=jpim) :: jl, jlen
+! 
+! real(kind=jprb) :: ztmp0(kfdia-kidia+1+n_vmass)
+! real(kind=jprb) :: ztmp1(kfdia-kidia+1+n_vmass)
+! real(kind=jprb) :: ztmp2(kfdia-kidia+1+n_vmass)
+! real(kind=jprb) :: ztmp3(kfdia-kidia+1+n_vmass)
+! real(kind=jprb) :: ztmp4(kfdia-kidia+1+n_vmass)
+! real(kind=jprb) :: ztmp5(kfdia-kidia+1+n_vmass)
+! real(kind=jprb) :: ztmp6(kfdia-kidia+1+n_vmass)
+! 
+! real(kind=jprb) :: z1s, z2s, zcond,zcond1, zcor, zfoeewi, zfoeewl,&
+!  & zoealfa, zqmax, zqsat, ztarg, zqp
+! 
+! !dir$ vfunction exphf
+! ! #include "fcttre.h"
+! 
+! !     statement functions
+! !real_b :: foealfaj,foedemj,foeldcpmj,foeewmj
+! 
+! real(kind=jprb) :: minj, maxj, x, y
+! ! real(kind=jprb) :: zhook_handle
+! 
+! minj(x,y) = y - 0.5_jprb*(abs(x-y)-(x-y))
+! maxj(x,y) = y + 0.5_jprb*(abs(x-y)+(x-y))
+! 
+! !----------------------------------------------------------------------
+! 
+! !     1.           define constants
+! !                  ----------------
+! 
+! zqmax=0.5_jprb
+! 
+! 
+! !dir$    ivdep
+! !ocl novrec
+!     do jl=kidia,kfdia
+!       if(ldflag(jl)) then
+!         zqp    =1.0_jprb/psp(jl)
+!         zqsat=foeewm(pt(jl,kk))*zqp    
+!         zqsat=min(0.5_jprb,zqsat)
+!         zcor=1.0_jprb/(1.0_jprb-retv  *zqsat)
+!         zqsat=zqsat*zcor
+!         zcond=(pq(jl,kk)-zqsat)/(1.0_jprb+zqsat*zcor*foedem(pt(jl,kk)))
+!         pt(jl,kk)=pt(jl,kk)+foeldcpm(pt(jl,kk))*zcond
+!         pq(jl,kk)=pq(jl,kk)-zcond
+!         zqsat=foeewm(pt(jl,kk))*zqp    
+!         zqsat=min(0.5_jprb,zqsat)
+!         zcor=1.0_jprb/(1.0_jprb-retv  *zqsat)
+!         zqsat=zqsat*zcor
+!         zcond1=(pq(jl,kk)-zqsat)/(1.0_jprb+zqsat*zcor*foedem(pt(jl,kk)))
+!         pt(jl,kk)=pt(jl,kk)+foeldcpm(pt(jl,kk))*zcond1
+!         pq(jl,kk)=pq(jl,kk)-zcond1
+!       endif
+!     enddo
+! 
+! end subroutine cuadjtq
 
 subroutine satadj(pt, psp, pqt, ql)
   use thrm, only : rslf
@@ -273,7 +273,7 @@ end subroutine satadj
 end module garbage
 
 module yoevdfs
-
+! 
 use parkind1  ,only : jpim     ,jprb
 
 implicit none
@@ -287,19 +287,19 @@ logical :: firsttime = .true.
 integer(kind=jpim), parameter :: jpritbl=101
 real(kind=jprb) :: ritbl(jpritbl)
 real(kind=jprb) :: aritbl(jpritbl)
-real(kind=jprb) :: rchba
-real(kind=jprb) :: rchbb
-real(kind=jprb) :: rchbc
-real(kind=jprb) :: rchbd
-real(kind=jprb) :: rchb23a
-real(kind=jprb) :: rchbbcd
-real(kind=jprb) :: rchbcd
+! real(kind=jprb) :: rchba
+! real(kind=jprb) :: rchbb
+! real(kind=jprb) :: rchbc
+! real(kind=jprb) :: rchbd
+! real(kind=jprb) :: rchb23a
+! real(kind=jprb) :: rchbbcd
+! real(kind=jprb) :: rchbcd
 real(kind=jprb) :: rcheta
 real(kind=jprb) :: rchetb
-real(kind=jprb) :: rchetc
-real(kind=jprb) :: rchbhdl
+! real(kind=jprb) :: rchetc
+! real(kind=jprb) :: rchbhdl
 real(kind=jprb) :: rcdhalf
-real(kind=jprb) :: rcdhpi2
+! real(kind=jprb) :: rcdhpi2
 real(kind=jprb) :: rimax
 real(kind=jprb) :: dritbl
 real(kind=jprb) :: dri26
@@ -398,41 +398,41 @@ contains
   real(kind=jprb) :: zhook_handle
 
 
-
-  !*     1. initialize constants in common block
-  !         ---------- --------- -- ------ -----
-
-  !     1.1 constants related to eta(ri)-table
-
+! 
+!   !*     1. initialize constants in common block
+!   !         ---------- --------- -- ------ -----
+! 
+!   !     1.1 constants related to eta(ri)-table
+! 
   rimax   = 10._jprb
   dritbl  = rimax/(jpritbl-1)
   dri26   = dritbl**2/6._jprb
   ritbl(1)= 0._jprb
-
-  !     1.2 constants for the ellison turner functions (stable)
-
+! 
+!   !     1.2 constants for the ellison turner functions (stable)
+! 
   rcheta=5._jprb
   rchetb=4._jprb
-  rchetc=8._jprb
-  rchbhdl = 5._jprb
-
-  !     1.21 constants for holtslag and debruin functions (stable psi)
-
-  rchba   = 1._jprb
-  rchbb   = 2.0_jprb/3._jprb
-  rchbc   = 5._jprb
-  rchbd   = 0.35_jprb
-  rchb23a = (2.0_jprb/3._jprb)*rchba
-  rchbbcd = rchbb*rchbc/rchbd
-  rchbcd  = rchbc/rchbd
-
-  !     1.3 constants for dyer and hicks expressions (unstable)
-
+!   rchetc=8._jprb
+!   rchbhdl = 5._jprb
+! 
+!   !     1.21 constants for holtslag and debruin functions (stable psi)
+! 
+!   rchba   = 1._jprb
+!   rchbb   = 2.0_jprb/3._jprb
+!   rchbc   = 5._jprb
+!   rchbd   = 0.35_jprb
+!   rchb23a = (2.0_jprb/3._jprb)*rchba
+!   rchbbcd = rchbb*rchbc/rchbd
+!   rchbcd  = rchbc/rchbd
+! 
+!   !     1.3 constants for dyer and hicks expressions (unstable)
+! 
   rcdhalf = 16._jprb
-  rcdhpi2 = 2.0_jprb*atan(1.0_jprb)
-
-  !*    3. loop over table index
-  !        ---- ---- ----- -----
+!   rcdhpi2 = 2.0_jprb*atan(1.0_jprb)
+! 
+!   *    3. loop over table index
+!          ---- ---- ----- -----
 
   do jjp=2, jpritbl
     zrib=(jjp-1)*dritbl

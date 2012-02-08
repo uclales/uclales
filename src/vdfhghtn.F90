@@ -108,7 +108,8 @@ subroutine vdfhghtn (kidia   , kfdia   , klon    , klev   , kdraft  , ptmst  , k
 
 !     ------------------------------------------------------------------
 
-use garbage, only : foeewm
+! use garbage, only : foeewm
+use thrm, only : rslf
 use parkind1  ,only : jpim     ,jprb
 
 ! use yomhook   ,only : lhook,   dr_hook
@@ -1109,11 +1110,12 @@ endif
         endif  
         
         !-- saturation deficit of mean state t --
-        zqsatm = foeewm(ptm1(jl,jk))/papm1(jl,jk)
-        zqsatm = min(0.5_jprb,zqsatm)
-        zqsatm = zqsatm/(1.0_jprb-retv*zqsatm)
+!         zqsatm = foeewm(ptm1(jl,jk))/papm1(jl,jk)
+!         zqsatm = min(0.5_jprb,zqsatm)
+!         zqsatm = zqsatm/(1.0_jprb-retv*zqsatm)
+        zqsatm = rslf(papm1(jl,jk),ptm1(jl,jk))
         zsatdef = max( 0._jprb, zqsatm-pqm1(jl,jk) )
-
+        
         zpflxtot = zupflxl(jl,jk,jd) + zupflxn(jl,jk,jd)
         if (zpflxtot>0._jprb) then
          

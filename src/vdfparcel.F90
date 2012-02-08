@@ -105,7 +105,7 @@ subroutine vdfparcel (kidia   , kfdia   , klon    , klev    , kdraft  , &
 !     ------------------------------------------------------------------
 
 !#include "tsmbkind.h"
-use garbage, only : foealfa, cuadjtq, satadj
+use garbage, only : foealfa, satadj
 use parkind1  ,only : jpim     , jprb
 
 ! use yomhook   ,only : lhook,   dr_hook

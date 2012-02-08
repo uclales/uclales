@@ -84,10 +84,11 @@ use parkind1  ,only : jpim     ,jprb
 use yos_cst   , only : rg       ,rd       ,rcpd     ,retv     ,ratm
 use yoethf   , only : rvtmp2
 use yoevdf   , only : rlam     ,rkap     ,rvdifts  ,repdu2   ,lldiag   
-use yoevdfs  , only : jpritbl  ,ritbl    ,aritbl   ,rchba    ,&
-                    & rchbb    ,rchbd    ,rchb23a  ,rchbbcd  ,rchbcd   ,&
-                    & rcheta   ,rchetb   ,rcdhalf  ,rcdhpi2  ,rimax    ,&
-                    & dritbl   ,dri26  ,phims, phihs, phimu, phihu
+use yoevdfs, only : dritbl, dri26, jpritbl, rimax, phims, phihs, phimu, phihu, ritbl, aritbl
+! use yoevdfs  , only : jpritbl  ,ritbl    ,aritbl   ,rchba    ,&
+!                     & rchbb    ,rchbd    ,rchb23a  ,rchbbcd  ,rchbcd   ,&
+!                     & rcheta   ,rchetb   ,rcdhalf  ,rcdhpi2  ,rimax    ,&
+!                     & dritbl   ,dri26  ,phims, phihs, phimu, phihu
 use yoephli  , only : rlpmixl  ,rlpbeta
 use yomjfh   , only : n_vmass
 use yos_exc, only : repust

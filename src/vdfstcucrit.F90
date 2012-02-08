@@ -1,271 +1,272 @@
-!OPTIONS XOPT(HSFUN)
-SUBROUTINE VDFSTCUCRIT (KIDIA   , KFDIA   , KLON    , KLEV    , KDRAFT  , &
-                   &    PTM1    , PSLGM1  , PQTM1   , PAPM1   , &
-                   &    PSTABTHRESH, PCLDDEPTH, PBIRTHRESH, PDZCLOUD, &
-                   &    KPTOP   , KPBLTYPE , LDNODECP, &
-                   &    PSTABILITY  )  
+!options xopt(hsfun)
+subroutine vdfstcucrit (kidia   , kfdia   , klon    , klev    , kdraft  , &
+                   &    ptm1    , pslgm1  , pqtm1   , papm1   , &
+                   &    pstabthresh, pclddepth, pbirthresh, pdzcloud, &
+                   &    kptop   , kpbltype , ldnodecp, &
+                   &    pstability  )  
 !     ------------------------------------------------------------------
 
-!**   *VDFSTCUCRIT* - CRITERIA FOR STRATOCUMULUS OCCURRENCE
+!**   *vdfstcucrit* - criteria for stratocumulus occurrence
 !
-!     based on original VDFHGHTN.F90 (CY29R1 and earlier) by
-!             A.P. SIEBESMA    30/06/99  
-!             M. Ko"hler       3/12/2004 
+!     based on original vdfhghtn.f90 (cy29r1 and earlier) by
+!             a.p. siebesma    30/06/99  
+!             m. ko"hler       3/12/2004 
 !     put into separate file by   
-!             Roel Neggers     12/04/2005 
+!             roel neggers     12/04/2005 
 
 
-!     PURPOSE
+!     purpose
 !     -------
 
-!     DETERMINE STRATOCUMULUS OCCURRENCE
+!     determine stratocumulus occurrence
 
-!     INTERFACE
+!     interface
 !     ---------
 
-!     *VDFSTCUCRIT* IS CALLED BY *VDFHGHTN*
+!     *vdfstcucrit* is called by *vdfhghtn*
 
-!     PARAMETER     DESCRIPTION                                   UNITS
+!     parameter     description                                   units
 !     ---------     -----------                                   -----
-!     INPUT PARAMETERS (INTEGER):
+!     input parameters (integer):
 
-!     *KIDIA*        START POINT
-!     *KFDIA*        END POINT
-!     *KLEV*         NUMBER OF LEVELS
-!     *KLON*         NUMBER OF GRID POINTS PER PACKET
-!     *KPTOP*        HIGHEST HALF LEVEL BELOW PBL HEIGHT, AND
-!                    PBL TOP FULL LEVEL (PZPTOP IS WITHIN THAT LAYER)
-!     *KDRAFT*       NUMBER OF EXPLICITLY MODELED DRAFTS - CURRENTLY 3:
+!     *kidia*        start point
+!     *kfdia*        end point
+!     *klev*         number of levels
+!     *klon*         number of grid points per packet
+!     *kptop*        highest half level below pbl height, and
+!                    pbl top full level (pzptop is within that layer)
+!     *kdraft*       number of explicitly modeled drafts - currently 3:
 !                    1: test parcel
 !                    2: rising dry thermals which stop at cloud base or inversion
 !                    3: rising dry thermals which become cloudy
 !                    (4: downdrafts .. to be done)
 
 
-!     INPUT PARAMETERS (REAL):
+!     input parameters (real):
 
-!     *PTM1*         TEMPERATURE AT T-1                               K
-!     *PSLGM1*       LIQUID STATIC ENERGY (SLG) AT T-1                K
-!     *PQTM1*        TOTAL SPECIFIC HUMIDITY AT T-1                   KG/KG
-!     *PAPM1*        PRESSURE AT FULL LEVEL AT T-1                    PA
-!     *PSTABTHRESH*  STABILITY CRITERION (Klein & Hartmann criteria)  K                      
-!     *PCLDDEPTH*    THRESHOLD CLOUD THICKNESS FOR STCU/CU TRANSITION M
-!     *PBIRTHTHRASH* THRESHOLD BIR (TKE DECOUPLING CRITERIA)          1
-!     *PDZCLOUD*     CLOUD THICKNESS                                  M
-
-
-!     INPUT PARAMETERS (LOGICAL):
-
-!     *LDNODECP*     TRUE:  NEVER DECOUPLE
-!                    FALSE: MAYBE DECOUPLE
+!     *ptm1*         temperature at t-1                               k
+!     *pslgm1*       liquid static energy (slg) at t-1                k
+!     *pqtm1*        total specific humidity at t-1                   kg/kg
+!     *papm1*        pressure at full level at t-1                    pa
+!     *pstabthresh*  stability criterion (klein & hartmann criteria)  k                      
+!     *pclddepth*    threshold cloud thickness for stcu/cu transition m
+!     *pbirththrash* threshold bir (tke decoupling criteria)          1
+!     *pdzcloud*     cloud thickness                                  m
 
 
+!     input parameters (logical):
 
-!     OUTPUT PARAMETERS (INTEGER):
+!     *ldnodecp*     true:  never decouple
+!                    false: maybe decouple
 
-!     *KPBLTYPE*    -1: not defined yet
-!                    0: stable PBL
-!                    1: dry convective PBL (no cloud below parcel top)
+
+
+!     output parameters (integer):
+
+!     *kpbltype*    -1: not defined yet
+!                    0: stable pbl
+!                    1: dry convective pbl (no cloud below parcel top)
 !                    2: stratocumulus
 !                    3: shallow cumulus
 !                    4: deep cumulus
 
 
-!     METHOD
+!     method
 !     ------
 
-!     SEE DOCUMENTATION
+!     see documentation
 
 !     ------------------------------------------------------------------
 
 !#include "tsmbkind.h"
-use garbage   ,only : foeewm, foealfa
-USE PARKIND1  ,ONLY : JPIM     , JPRB
+use thrm, only : rslf, esl
+use garbage, only : foealfa
+use parkind1  ,only : jpim     , jprb
 
-! USE YOMHOOK   ,ONLY : LHOOK    , DR_HOOK
+! use yomhook   ,only : lhook    , dr_hook
 
-USE yos_cst   , ONLY : RD       , RG      , RCPD     , RETV     , RLVTT, &
-                     &RLSTT    ,RTT
+use yos_cst   , only : rd       , rg      , rcpd     , retv     , rlvtt, &
+                     &rlstt    ,rtt
 
-USE YOETHF   , ONLY : R2ES     ,R3LES    ,R3IES    ,R4LES    ,R4IES   ,R5LES    ,R5IES, &
-                     &R5ALVCP  ,R5ALSCP  ,RALVDCP  ,RALSDCP  ,RTWAT   ,RTICE    ,RTICECU, &
-                     &RTWAT_RTICE_R      ,RTWAT_RTICECU_R
+use yoethf   , only : r2es     ,r3les    ,r3ies    ,r4les    ,r4ies   ,r5les    ,r5ies, &
+                     &r5alvcp  ,r5alscp  ,ralvdcp  ,ralsdcp  ,rtwat   ,rtice    ,rticecu, &
+                     &rtwat_rtice_r      ,rtwat_rticecu_r
 
-IMPLICIT NONE
-
-
-!*         0.1    GLOBAL VARIABLES
-
-INTEGER(KIND=JPIM),INTENT(IN)    :: KLON 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KLEV 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KIDIA 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KFDIA 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KDRAFT 
-INTEGER(KIND=JPIM),INTENT(IN)    :: KPTOP(KLON,KDRAFT) 
-INTEGER(KIND=JPIM),INTENT(INOUT) :: KPBLTYPE(KLON) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PTM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PSLGM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PQTM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PAPM1(KLON,KLEV) 
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PSTABTHRESH
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PCLDDEPTH
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PBIRTHRESH
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PDZCLOUD(KLON) 
-LOGICAL           ,INTENT(IN)    :: LDNODECP(KLON) 
-REAL(KIND=JPRB)   ,INTENT(OUT)   :: PSTABILITY(KLON)
+implicit none
 
 
-!*         0.2    LOCAL VARIABLES
+!*         0.1    global variables
 
-REAL(KIND=JPRB) ::   ZRG,  ZDCTEI(KLON)
+integer(kind=jpim),intent(in)    :: klon 
+integer(kind=jpim),intent(in)    :: klev 
+integer(kind=jpim),intent(in)    :: kidia 
+integer(kind=jpim),intent(in)    :: kfdia 
+integer(kind=jpim),intent(in)    :: kdraft 
+integer(kind=jpim),intent(in)    :: kptop(klon,kdraft) 
+integer(kind=jpim),intent(inout) :: kpbltype(klon) 
+real(kind=jprb)   ,intent(in)    :: ptm1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pslgm1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pqtm1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: papm1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pstabthresh
+real(kind=jprb)   ,intent(in)    :: pclddepth
+real(kind=jprb)   ,intent(in)    :: pbirthresh
+real(kind=jprb)   ,intent(in)    :: pdzcloud(klon) 
+logical           ,intent(in)    :: ldnodecp(klon) 
+real(kind=jprb)   ,intent(out)   :: pstability(klon)
 
-!          VARIABLES FOR CLOUD BASE ESTIMATION
 
-REAL(KIND=JPRB) ::    ZQS(KLON,0:KLEV)  , ZALFAW  , ZFACW   , ZFACI   , ZFAC        , &
-                    & ZESDP   , ZCOR    , ZDQSDTEMP(KLON)   , ZBETA   , ZDSL(KLEV)  , &
-		    & ZDQT(KLEV)
+!*         0.2    local variables
+
+real(kind=jprb) ::   zrg,  zdctei(klon)
+
+!          variables for cloud base estimation
+
+real(kind=jprb) ::    zqs(klon,0:klev)  , zalfaw  , zfacw   , zfaci   , zfac        , &
+                    & zesdp   , zcor    , zdqsdtemp(klon)   , zbeta   , zdsl(klev)  , &
+        & zdqt(klev)
 		      
-INTEGER(KIND=JPIM) :: IS, JK, JL, JD
+integer(kind=jpim) :: is, jk, jl, jd
 
-INTEGER(KIND=JPIM) :: I700(KLON)
+integer(kind=jpim) :: i700(klon)
 
-! REAL(KIND=JPRB) ::    ZHOOK_HANDLE
+! real(kind=jprb) ::    zhook_handle
 
 
 !#include "cuadjtq.intfb.h"
 
-!DIR$ VFUNCTION EXPHF
+!dir$ vfunction exphf
 ! #include "fcttre.h"
 
 
 
 !     -----------------------------------------------------------------
 
-!*         1.     SET SOME CONSTANTS
+!*         1.     set some constants
 !                 --------------------
 
-! IF (LHOOK) CALL DR_HOOK('VDFSTCUCRIT',0,ZHOOK_HANDLE)
+! if (lhook) call dr_hook('vdfstcucrit',0,zhook_handle)
 
 ! optimization
-ZRG         = 1.0_JPRB/RG
+zrg         = 1.0_jprb/rg
 
 
 
 
 !     -----------------------------------------------------------------
 
-!*         2.     PREPARE VARIABLES APPEARING IN SOME CRITERIA 
+!*         2.     prepare variables appearing in some criteria 
 !                 --------------------------------------------
 
-!*         2.1  stability criteria == theta(700hPa) - theta(sfc)
+!*         2.1  stability criteria == theta(700hpa) - theta(sfc)
 
-!          find index I700 of pressure closest to 700hPa
+!          find index i700 of pressure closest to 700hpa
 
-  DO JL=KIDIA,KFDIA
-    I700(JL) = 0
-  ENDDO
-  DO JK=1,KLEV
-    DO JL=KIDIA,KFDIA
-      IF ( I700(JL) == 0  .AND.  PAPM1(JL,JK) > 70000.0_JPRB ) THEN
-        I700(JL) = JK
-      ENDIF
-    ENDDO
-  ENDDO
-  DO JL=KIDIA,KFDIA
-    IF ( I700(JL) > 1 ) THEN
-      IF ( ABS(PAPM1(JL,I700(JL)-1)-70000.0_JPRB)  <  &
-         & ABS(PAPM1(JL,I700(JL))  -70000.0_JPRB)    ) THEN  
-        I700(JL) = I700(JL)-1
-      ENDIF
+  do jl=kidia,kfdia
+    i700(jl) = 0
+  enddo
+  do jk=1,klev
+    do jl=kidia,kfdia
+      if ( i700(jl) == 0  .and.  papm1(jl,jk) > 70000.0_jprb ) then
+        i700(jl) = jk
+      endif
+    enddo
+  enddo
+  do jl=kidia,kfdia
+    if ( i700(jl) > 1 ) then
+      if ( abs(papm1(jl,i700(jl)-1)-70000.0_jprb)  <  &
+         & abs(papm1(jl,i700(jl))  -70000.0_jprb)    ) then  
+        i700(jl) = i700(jl)-1
+      endif
 
-      PSTABILITY(JL) = PTM1(JL,I700(JL)) * ( 1.0e5_JPRB/PAPM1(JL,I700(JL)) ) ** (RD/RCPD) &
-                   & - PTM1(JL,KLEV)     * ( 1.0e5_JPRB/PAPM1(JL,KLEV) )     ** (RD/RCPD)  
-    ELSE
-      PSTABILITY(JL) = 0.0_JPRB
-    ENDIF
+      pstability(jl) = ptm1(jl,i700(jl)) * ( 1.0e5_jprb/papm1(jl,i700(jl)) ) ** (rd/rcpd) &
+                   & - ptm1(jl,klev)     * ( 1.0e5_jprb/papm1(jl,klev) )     ** (rd/rcpd)  
+    else
+      pstability(jl) = 0.0_jprb
+    endif
 
-  ENDDO
+  enddo
 
 
-!*         2.2  cloud top entrainment instability (CTEI) criteria
+!*         2.2  cloud top entrainment instability (ctei) criteria
 
-  DO JL=KIDIA,KFDIA
+  do jl=kidia,kfdia
 
-   IF ( .FALSE. ) THEN
-    IF ( KPBLTYPE(JL) == 2) THEN
+   if ( .false. ) then
+    if ( kpbltype(jl) == 2) then
 
-      JK            = KPTOP(JL,1)  ! PBL top full level taken as K+1
-                                   ! full level above PBL taken as K-1
+      jk            = kptop(jl,1)  ! pbl top full level taken as k+1
+                                   ! full level above pbl taken as k-1
 
 !          qsat (full level)
-      ZQS(JL,JK+1)  = FOEEWM(PTM1(JL,JK+1))/PAPM1(JL,JK+1)
-      ZQS(JL,JK+1)  = MIN(0.5_JPRB,ZQS(JL,JK+1))
-      ZQS(JL,JK+1)  = ZQS(JL,JK+1)/(1.0_JPRB-RETV*ZQS(JL,JK+1))
+!       zqs(jl,jk+1)  = foeewm(ptm1(jl,jk+1))/papm1(jl,jk+1)
+!       zqs(jl,jk+1)  = min(0.5_jprb,zqs(jl,jk+1))
+!       zqs(jl,jk+1)  = zqs(jl,jk+1)/(1.0_jprb-retv*zqs(jl,jk+1))
+      zqs(jl,jk+1) = rslf(ptm1(jl,jk+1),papm1(jl,jk+1))
+!          calculate dqs/dt correction factor (full level)
+      zalfaw        = foealfa(ptm1(jl,jk+1))
+      zfacw         = r5les/((ptm1(jl,jk+1)-r4les)**2)
+      zfaci         = r5ies/((ptm1(jl,jk+1)-r4ies)**2)
+      zfac          = zalfaw*zfacw+(1.0_jprb-zalfaw)*zfaci
+      zesdp         = esl(ptm1(jl,jk+1))/papm1(jl,jk+1)
+      zcor          = 1.0_jprb/(1.0_jprb-retv*zesdp)
+      zdqsdtemp(jl) = zfac*zcor*zqs(jl,jk+1)
 
-!          calculate dqs/dT correction factor (full level)
-      ZALFAW        = FOEALFA(PTM1(JL,JK+1))
-      ZFACW         = R5LES/((PTM1(JL,JK+1)-R4LES)**2)
-      ZFACI         = R5IES/((PTM1(JL,JK+1)-R4IES)**2)
-      ZFAC          = ZALFAW*ZFACW+(1.0_JPRB-ZALFAW)*ZFACI
-      ZESDP         = FOEEWM(PTM1(JL,JK+1))/PAPM1(JL,JK+1)
-      ZCOR          = 1.0_JPRB/(1.0_JPRB-RETV*ZESDP)
-      ZDQSDTEMP(JL) = ZFAC*ZCOR*ZQS(JL,JK+1)
+!          ctei
+      zbeta = ( 1.0_jprb + (1.0_jprb+retv) * ptm1(jl,jk+1) * zdqsdtemp(jl) ) &
+          & / ( 1.0_jprb + rlvtt/rcpd * zdqsdtemp(jl) )  
+      zdsl(jl)  = pslgm1(jl,jk-1) - pslgm1(jl,jk+1)
+      zdqt(jl)  = pqtm1 (jl,jk-1) - pqtm1 (jl,jk+1)
 
-!          CTEI
-      ZBETA = ( 1.0_JPRB + (1.0_JPRB+RETV) * PTM1(JL,JK+1) * ZDQSDTEMP(JL) ) &
-          & / ( 1.0_JPRB + RLVTT/RCPD * ZDQSDTEMP(JL) )  
-      ZDSL(JL)  = PSLGM1(JL,JK-1) - PSLGM1(JL,JK+1)
-      ZDQT(JL)  = PQTM1 (JL,JK-1) - PQTM1 (JL,JK+1)
+      zdctei(jl) = zbeta * zdsl(jl) &
+               & + ( zbeta - rcpd/rlvtt * ptm1(jl,jk+1) ) * rlvtt * zdqt(jl)  
 
-      ZDCTEI(JL) = ZBETA * ZDSL(JL) &
-               & + ( ZBETA - RCPD/RLVTT * PTM1(JL,JK+1) ) * RLVTT * ZDQT(JL)  
+    else
 
-    ELSE
+      zdctei(jl) = 1.0
 
-      ZDCTEI(JL) = 1.0
-
-    ENDIF
-   ENDIF
+    endif
+   endif
 
 
 
 
 !     -----------------------------------------------------------------
 
-!*         3      STRATOCUMULUS - SHALLOW CUMULUS CRITERIA: 
-!*                * CLOUD THICKNESS = 1000M
-!*                * STABILITY = 15K
-!*                * TKE DECOUPLING, BIR = 0.1
+!*         3      stratocumulus - shallow cumulus criteria: 
+!*                * cloud thickness = 1000m
+!*                * stability = 15k
+!*                * tke decoupling, bir = 0.1
 !                 -----------------------------------------
 
 
-    IF ( .NOT. LDNODECP(JL) .AND.  KPBLTYPE(JL) == 2 ) THEN
+    if ( .not. ldnodecp(jl) .and.  kpbltype(jl) == 2 ) then
 
-!..........stability criteria (Klein & Hartmann 1993)
-      IF ( PSTABILITY(JL) < PSTABTHRESH ) THEN 
+!..........stability criteria (klein & hartmann 1993)
+      if ( pstability(jl) < pstabthresh ) then 
 
 !..........cloud thickness criteria
-!     IF ( PDZCLOUD(JL) > PCLDDEPTH ) THEN
+!     if ( pdzcloud(jl) > pclddepth ) then
 
-!..........CTEI...
-!     IF ( ZDCTEI(JL) < 0 ) THEN
+!..........ctei...
+!     if ( zdctei(jl) < 0 ) then
 
-!..........TKE decoupling (or cloud thickness criteria for safety)
-!     IF ( PBIR(JL) > PBIRTHRESH .OR. PDZCLOUD(JL) > PCLDDEPTH ) THEN
+!..........tke decoupling (or cloud thickness criteria for safety)
+!     if ( pbir(jl) > pbirthresh .or. pdzcloud(jl) > pclddepth ) then
 
 !..........always decouple
-!     IF ( .TRUE. ) THEN
+!     if ( .true. ) then
 
-        KPBLTYPE(JL) = 3   !decouple: PBL type 3 (shallow cumulus)
+        kpbltype(jl) = 3   !decouple: pbl type 3 (shallow cumulus)
 
-      ENDIF
-    ENDIF
-
-
-  ENDDO !JL
+      endif
+    endif
 
 
+  enddo !jl
 
 
-! IF (LHOOK) CALL DR_HOOK('VDFSTCUCRIT',1,ZHOOK_HANDLE)
-END SUBROUTINE VDFSTCUCRIT
+
+
+! if (lhook) call dr_hook('vdfstcucrit',1,zhook_handle)
+end subroutine vdfstcucrit

@@ -193,8 +193,10 @@ real(kind=jprb)   :: pextr2(1,kfldx2), pextra(1,nzp-1,kfldx)
     a1 = 0.
     a1(2:nzp) = flip(pextra(1,:,39)) !Cloud Fraction
     call updtst(nzp,'edm',1,a1,1) 
+print *, 'cf',a1    
     a1(2:nzp) = flip(pextra(1,:,48)) !Liquid water
     call updtst(nzp,'edm',2,a1,1) 
+print *, 'ql',a1    
   end if
 end subroutine vdfouter
 subroutine vdfmain    ( cdconf, &
@@ -487,7 +489,7 @@ subroutine vdfmain    ( cdconf, &
 !     for details about the mathematics of this routine.
 
 !     ------------------------------------------------------------------
-use garbage, only : foealfa, foeewm, foeldcpm
+! use garbage, only : foealfa, foeewm, foeldcpm
 use parkind1  ,only : jpim     ,jprb
 ! use yomhook   ,only : lhook    ,dr_hook
 
@@ -1294,31 +1296,31 @@ call vdfincr (kidia  , kfdia  , klon   , klev   , itop   , ztmst  , &
       
     enddo
   enddo
-
-  !-- calculate saturation specific humidity --
-  do jk=1,klev
-    do jl=kidia,kfdia
-      zqsvar(jl,jk) = foeewm(ztupd(jl,jk))/papm1(jl,jk)
-      zqsvar(jl,jk) = min(0.5_jprb,zqsvar(jl,jk))
-      zqsvar(jl,jk) = zqsvar(jl,jk)/(1.0_jprb-retv*zqsvar(jl,jk))
-
-      !pextra(jl,jk,75) = 1000._jprb * zqsvar(jl,jk)
-
-      zqsvar(jl,jk) = max(zqsvar(jl,jk),zqupd(jl,jk)) !don't allow input supersat.
-      !pextra(jl,jk,76) = 1000._jprb * zqsvar(jl,jk)
-
-!          dqsat/dt correction factor (1+l/cp*dqsat/dt) & alfa
-
-      zalfaw(jl,jk)=foealfa(ztupd(jl,jk))
-      zfacw=r5les/((ztupd(jl,jk)-r4les)**2)
-      zfaci=r5ies/((ztupd(jl,jk)-r4ies)**2)
-      zfac=zalfaw(jl,jk)*zfacw+(1.0_jprb-zalfaw(jl,jk))*zfaci
-      zesdp=foeewm(ztupd(jl,jk))/papm1(jl,jk)
-      zcor=1.0_jprb/(1.0_jprb-retv*zesdp)
-      zdqsdtemp(jl,jk)=zfac*zcor*zqsvar(jl,jk)  !dqsat/dt
-      zcorqs(jl,jk)=max(1.0_jprb,1.0_jprb+foeldcpm(ztupd(jl,jk))*zdqsdtemp(jl,jk))
-    enddo
-  enddo
+! 
+!   !-- calculate saturation specific humidity --
+!   do jk=1,klev
+!     do jl=kidia,kfdia
+!       zqsvar(jl,jk) = foeewm(ztupd(jl,jk))/papm1(jl,jk)
+!       zqsvar(jl,jk) = min(0.5_jprb,zqsvar(jl,jk))
+!       zqsvar(jl,jk) = zqsvar(jl,jk)/(1.0_jprb-retv*zqsvar(jl,jk))
+! 
+!       !pextra(jl,jk,75) = 1000._jprb * zqsvar(jl,jk)
+! 
+!       zqsvar(jl,jk) = max(zqsvar(jl,jk),zqupd(jl,jk)) !don't allow input supersat.
+!       !pextra(jl,jk,76) = 1000._jprb * zqsvar(jl,jk)
+! 
+! !          dqsat/dt correction factor (1+l/cp*dqsat/dt) & alfa
+! 
+!       zalfaw(jl,jk)=foealfa(ztupd(jl,jk))
+!       zfacw=r5les/((ztupd(jl,jk)-r4les)**2)
+!       zfaci=r5ies/((ztupd(jl,jk)-r4ies)**2)
+!       zfac=zalfaw(jl,jk)*zfacw+(1.0_jprb-zalfaw(jl,jk))*zfaci
+!       zesdp=foeewm(ztupd(jl,jk))/papm1(jl,jk)
+!       zcor=1.0_jprb/(1.0_jprb-retv*zesdp)
+!       zdqsdtemp(jl,jk)=zfac*zcor*zqsvar(jl,jk)  !dqsat/dt
+!       zcorqs(jl,jk)=max(1.0_jprb,1.0_jprb+foeldcpm(ztupd(jl,jk))*zdqsdtemp(jl,jk))
+!     enddo
+!   enddo
   
   
   
