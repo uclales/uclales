@@ -63,7 +63,7 @@ contains
     thlnudge=0
     qtnudge=0
     timenudge=0
-
+    height = 0.
 
 
     if (.not. lnudge) return
@@ -103,7 +103,7 @@ contains
         end do
         if (myid == 0) then
           do k=nzp-1,1,-1
-            write (6,'(2f7.1,6e12.4)') &
+            write (6,'(2f10.1,6e12.4)') &
                   zt (k), &
                   height (k), &
                   tnudge (k,t), &
@@ -165,8 +165,9 @@ contains
 
     do j=3,nyp-2
     do i=3,nxp-2
-    do k=2,nzp-1
+    do k=2,nzp-1 
      currtnudge = max(dt,tnudge(k,t)*dtp+tnudge(k,t+1)*dtm)
+     currtnudge = 600.
       if(lunudge  ) a_ut(k,i,j)=a_ut(k,i,j)-&
           (uav(k)-(unudge  (k,t)*dtp+unudge  (k,t+1)*dtm))/currtnudge
       if(lvnudge  ) a_vt(k,i,j)=a_vt(k,i,j)-&
