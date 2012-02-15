@@ -154,22 +154,6 @@ module lsmdata
   !real, allocatable :: tskinbar (:,:)   !<  Filtered surface temperature
   !real, allocatable :: qskinbar (:,:)   !<  Filtered surface specific humidity
 
-  !real, allocatable :: thlflux (:,:)    !<  Kinematic temperature flux [K m/s]
-  !real, allocatable :: qtflux  (:,:)    !<  Kinematic specific humidity flux [kg/kg m/s]
-  !real, allocatable :: svflux  (:,:,:)  !<  Kinematic scalar flux [- m/s]
-
-  ! Surface properties in case of prescribed conditions (previous isurf 2, 3 and 4)
-  !real              :: thls  = -1       !<  Surface liquid water potential temperature [K]
-  !real              :: qts              !<  Surface specific humidity [kg/kg]
-  !real              :: thvs             !<  Surface virtual temperature [K]
-  !real, allocatable :: svs   (:)        !<  Surface scalar concentration [-]
-
-  ! Prescribed surface fluxes
-  !real              :: ustin  = -1      !<  Prescribed friction velocity [m/s]
-  !real              :: wtsurf = -1      !<  Prescribed kinematic temperature flux [K m/s]
-  !real              :: wqsurf = -1      !<  Prescribed kinematic moisture flux [kg/kg m/s]
-  !real              :: wsvsurf(100) = 0 !<  Prescribed surface scalar(n) flux [- m/s]
-
   contains
 
   !
@@ -178,9 +162,34 @@ module lsmdata
   ! Adopted from DALES (vanHeerwaarden)
   !
   subroutine initlsm
-    use grid, only : nxp, nyp, th00, vapor, iradtyp
-    use init, only : rts
+  use grid, only : nxp, nyp, th00, vapor, iradtyp
+  use init, only : rts
+
     integer :: k, ierr
+
+    ! --------------------------------------------------------
+    ! Read LSM-specific NAMELIST (SURFNAMELIST)
+    !
+    namelist/SURFNAMELIST/ & 
+    !< Switches
+    lmostlocal, lmlfilter, lsmoothflux, lneutral, &
+    !< Soil related variables
+    tsoilav, tsoildeepav, phiwav, rootfav, &
+    !< Land surface related variables
+    z0mav, z0hav, rsisurf2, &
+    Cskinav, lambdaskinav, albedoav, Qnetav, cvegav, Wlav, &
+    !< Jarvis-Steward related variables
+    rsminav, rssoilminav, LAIav, gDav
+
+    open(17,file='SURFNAMELIST',status='old',iostat=ierr)
+    read (17,SURFNAMELIST,iostat=ierr)
+    if (ierr > 0) then
+      print *, 'Problem in namoptions SURFNAMELIST'
+      print *, 'iostat error: ', ierr
+      stop 'ERROR: Problem in namoptions SURFNAMELIST'
+    endif
+    write(6 ,SURFNAMELIST)
+    close(17)
 
     ! --------------------------------------------------------
     ! Allocate surface arrays
@@ -260,30 +269,6 @@ module lsmdata
     !end if
 
     ! --------------------------------------------------------
-    ! Read LSM-specific NAMELIST (SURFNAMELIST)
-    !
-    namelist/SURFNAMELIST/ & 
-    !< Switches
-    lmostlocal, lmlfilter, lsmoothflux, lneutral, &
-    !< Soil related variables
-    tsoilav, tsoildeepav, phiwav, rootfav, &
-    !< Land surface related variables
-    z0mav, z0hav, rsisurf2, &
-    Cskinav, lambdaskinav, albedoav, Qnetav, cvegav, Wlav, &
-    !< Jarvis-Steward related variables
-    rsminav, rssoilminav, LAIav, gDav
-
-    open(17,file='SURFNAMELIST',status='old',iostat=ierr)
-    read (17,SURFNAMELIST,iostat=ierr)
-    if (ierr > 0) then
-      print *, 'Problem in namoptions SURFNAMELIST'
-      print *, 'iostat error: ', ierr
-      stop 'ERROR: Problem in namoptions SURFNAMELIST'
-    endif
-    write(6 ,SURFNAMELIST)
-    close(17)
-
-    ! --------------------------------------------------------
     ! Initialize arrays
     ! 
     tskinm	= th00
@@ -293,6 +278,7 @@ module lsmdata
     albedo	= albedoav
     z0m		= z0mav
     z0h		= z0hav
+    ra		= 1.
 
     dzsoil(1) = 0.07		!< First test, pick ECMWF config
     dzsoil(2) = 0.21

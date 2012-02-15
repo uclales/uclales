@@ -187,7 +187,6 @@ contains
        if (init_lsm) then
        print*,"Start Case(5) - initialize LSM"
        call initlsm
-       obl = 1.
        print*,"Land surface initialized..."
        init_lsm = .false.
        end if
@@ -199,11 +198,15 @@ contains
              drdz(i,j) = vapor(2,i,j) - qskin(i,j)    !- rslf(psrf,sst)
           end do
        end do
-       tskinavg = sum(tskin(:,:))/nxp/nyp
+       tskinavg = sum(tskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
 
-       call srfcscls(nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,drdz,a_ustar,a_tstar &
-            ,a_rstar,obl)
-       print*,"Surface scalars done..."
+       call srfcscls(nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,drdz,a_ustar  &
+                     ,a_tstar, a_rstar, obl)
+
+       !if (nstep==3) then
+       print*,tskinavg, minval(a_tstar(3:(nxp-2),3:(nyp-2))) & 
+                       , maxval(obl(3:(nxp-2),3:(nyp-2)))
+       !end if
 
        !Calculate the drag coefficients and aerodynamic resistance
        do j=3,nyp-2
@@ -216,53 +219,56 @@ contains
 			obl(i,j)))
 
              ra(i,j) =  1. / (cs(i,j)* wspd(i,j))
-
           end do
        end do
 
        !Get skin temperature and humidity from land surface model
        call lsm
-       print*,"Land Surface Model done..."
+       !print*,"Land Surface Model done..."
 
        !Calculate the surface fluxes with bulk law (Fairall, 2003)
+       !Fluxes in kinematic form with units [K m/s] and [kg/kg m/s]
        do j=3, nyp-2
           do i=3, nxp-2
 
-             wt_sfc(i,j) = -(a_theta(2,i,j)*(p00/psrf)**rcp		&
-                           - tskin(i,j)*(p00/psrf)**rcp) / ra(i,j) 
-             wq_sfc(i,j) = -(vapor(2,i,j) - qskin(i,j)) / ra(i,j)
+             wt_sfc(i,j) = - (a_theta(2,i,j)*(p00/psrf)**rcp		&
+	                      - tskin(i,j)*(p00/psrf)**rcp) / ra(i,j) 
+             wq_sfc(i,j) = - (vapor(2,i,j) - qskin(i,j)) / ra(i,j)
 
-             uw_sfc(i,j)  = -a_ustar(i,j)*a_ustar(i,j)                  &
-                  *(a_up(2,i,j)+umean)/wspd(i,j)
-             vw_sfc(i,j)  = -a_ustar(i,j)*a_ustar(i,j)                  &
-                  *(a_vp(2,i,j)+vmean)/wspd(i,j)
+             uw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j)                  &
+                              *(a_up(2,i,j)+umean)/wspd(i,j)
+
+             vw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j)                  &
+                              *(a_vp(2,i,j)+vmean)/wspd(i,j)
+
              ww_sfc(i,j)  = 0.
 
-             a_rstar(i,j) = -wq_sfc(i,j)/a_ustar(i,j)
-             a_tstar(i,j) = -wt_sfc(i,j)/a_ustar(i,j)
+             uw_sfc(i,j)  = - 0.04
+             vw_sfc(i,j)  = - 0.005
 
-          if  (wt_sfc(i,j) .lt. 0) then
-             wt_sfc(i,j) = 0.
-          end if
+             a_rstar(i,j) = - wq_sfc(i,j)/a_ustar(i,j)
+             a_tstar(i,j) = - wt_sfc(i,j)/a_ustar(i,j)
 
-          if  (wq_sfc(i,j) .lt. 0) then
-             wq_sfc(i,j) = 0.
-          end if
+          !if  (wt_sfc(i,j) .lt. 0) then
+          !   wt_sfc(i,j) = 0.
+          !end if
+
+          !if  (wq_sfc(i,j) .lt. 0) then
+          !   wq_sfc(i,j) = 0.
+          !end if
 
           end do
        end do
-       print*,"Surface fluxes done..."
+       !print*,"Surface fluxes done..."
 
-       if (nstep==3) then
-         i = 50 
-         j = 3  
+       if (nstep==999) then
          print*,"*******************************"   
          print*,"SH (surface):",minval(wt_sfc(3:(nxp-2),3:(nyp-2))*(0.5*(dn0(1)+dn0(2))*cp))
          print*,"LH (surface):",minval(wq_sfc(3:(nxp-2),3:(nyp-2))*(0.5*(dn0(1)+dn0(2))*alvl))
-         !print*,"**************************************" 
-         !print*,"w'T'",sum(wt_sfc(3:(nxp-2),3)*(0.5*(dn0(1)+dn0(2))*cp))/(nxp-2)
-         !print*,"**************************************"
-         !print*,"w'q'",sum(wq_sfc(3:(nxp-2),3)*(0.5*(dn0(1)+dn0(2))*alvl))/(nxp-2)
+         print*,"**************************************" 
+         print*,"w'T'",sum(wt_sfc(3:(nxp-2),3:(nyp-2))*(0.5*(dn0(1)+dn0(2))*cp))/(nxp-4)/(nyp-4)
+         print*,"**************************************"
+         print*,"w'q'",sum(wq_sfc(3:(nxp-2),3:(nyp-2))*(0.5*(dn0(1)+dn0(2))*alvl))/(nxp-4)/(nyp-4)
          print*,"****************************************************************"
          print*,"****************************************************************"
        end if
@@ -434,7 +440,7 @@ contains
     real, parameter     :: bh   = 16.0   !   "          "         "
     real, parameter     :: am   =  5.0   !   "          "         "
     real, parameter     :: bm   = 16.0   !   "          "         "
-    real, parameter     :: pr   = 1.0   ! prandlt number
+    real, parameter     :: pr   =  0.74  ! prandlt number
     real, parameter     :: eps  = 1.e-10 ! non-zero, small number
 
     integer, intent(in) :: n2,n3         ! span of indicies covering plane
@@ -451,21 +457,19 @@ contains
 
     logical, save :: first_call=.True.
     integer :: i,j,iterate
-    real    :: lnz, klnz, betg, cnst1, cnst2
-    real    :: x, y, psi1, psi2, zeta, lmo, dtv
+    real    :: lnz, klnz, betg
+    real    :: x, y, zeta, lmo, dtv
 
     lnz   = log(z/z0) 
     klnz  = vonk/lnz              
     betg  = th00/g
-    cnst2 = -log(2.)
-    cnst1 = 3.14159/2. + 3.*cnst2
 
     do j=3,n3-2
        do i=3,n2-2
           dtv = dth(i,j) + ep2*th00*drt(i,j)
 
           !
-          ! Stable case
+          ! STABLE CASE
           !
           if (dtv > 0.) then
              x     = (betg*u(i,j)**2)/dtv
@@ -475,48 +479,61 @@ contains
              zeta  = z/lmo
              ustar(i,j) =  vonk*u(i,j)/(lnz + am*zeta)
              tstar(i,j) = (vonk*dtv/(lnz + ah*zeta))/pr
-          obl(i,j) = lmo
           print*,"STABLE ATMOSPHERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-          print*,"MO-Length:",obl(i,j)
+
           !
-          ! Neutral case
+          ! NEUTRAL CASE
           ! 
           elseif (dtv == 0.) then
              ustar =  vonk*u(i,j)/lnz
              tstar =  vonk*dtv/(pr*lnz)
-
              lmo = -1.e10
-             obl(i,j) = lmo
           print*,"NEUTRAL ATMOSPHERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-          print*,"MO-Length:",obl(i,j)
+
           !
-          ! Unstable case, start iterations from values at previous tstep, 
+          ! UNSTABLE CASE
+          !
+          ! start iterations from values at previous tstep, 
           ! unless the sign has changed or if it is the first call, then 
           ! use neutral values.
           !
           else
              if (first_call .or. tstar(i,j)*dtv <= 0.) then
-                ustar(i,j) = u(i,j)*klnz
-                tstar(i,j) = (dtv*klnz/pr)
-		lmo = -1.e10
-
+             ustar =  vonk*u(i,j)/lnz
+             tstar =  vonk*dtv/(pr*lnz)
+             lmo = -1.e10
              end if
 
              do iterate = 1,10
                 lmo   = betg*ustar(i,j)**2/(vonk*tstar(i,j))
+                if (lmo .gt. -1.) then
+                lmo = -1.
+                end if
                 zeta  = z/lmo
                 ustar(i,j) = u(i,j)*vonk/(lnz - psim(zeta))
                 tstar(i,j) = (dtv*vonk/pr)/(lnz - psih(zeta))
              end do
           end if
-   
-          obl(i,j) = lmo
 
+          obl(i,j) = lmo
           rstar(i,j) = tstar(i,j)*drt(i,j)/(dtv + eps)
           tstar(i,j) = tstar(i,j)*dth(i,j)/(dtv + eps)
-
+          
        end do
     end do
+
+       if (.false.) then
+       print*,"********************************"
+       print*,"*********SURFACE SCALARS********"
+       print*,"********************************"
+       print*,"obl (min)",minval(obl(3:n2-2,3:n3-2))
+       print*,"obl (max)",maxval(obl(3:n2-2,3:n3-2))
+       print*,"ustar (min)",minval(ustar(3:n2-2,3:n3-2))
+       print*,"ustar (max)",maxval(ustar(3:n2-2,3:n3-2))
+       print*,"tstar (min)",minval(tstar(3:n2-2,3:n3-2))
+       print*,"tstar (max)",maxval(tstar(3:n2-2,3:n3-2))
+       print*,"********************************"
+       end if
 
     first_call = .False.
 
@@ -563,7 +580,7 @@ contains
 
   !
   ! ----------------------------------------------------------
-  ! Malte: Integrated stability function psi_m
+  ! Malte: Integrated stability function for momentum
   !
   function psim(zeta)
     implicit none
@@ -571,14 +588,13 @@ contains
     real             :: psim
     real, intent(in) :: zeta
     real             :: x
-    real    :: cnst1
-    cnst1 = 3.14159/2. - 3.*log(2.)
 
     if(zeta <= 0) then
-      x    = (1. - 16.0 * zeta) ** (0.25)
-      psim = 2.*log(1.0+x) + log(1.0+x*x) - 2.*atan(x) + cnst1
+      x     = (1. - 15. * zeta) ** (0.25)
+      !psim = 3.14159265/2. - 2. *atan(x) + log((1.+x)** 2. * (1. + x**2.)/ 8.)
+      psim  = 3.14159265/2. - atan(x) + 2.*log((1+x)/2.) + log((1+x*x)/2.)
     else
-      psim  = -5.0*zeta
+      psim  = - 4.7 * zeta
     end if
 
     return
@@ -586,7 +602,7 @@ contains
 
   !
   ! ----------------------------------------------------------------------
-  ! Malte: Integrated stability function psi_h
+  ! Malte: Integrated stability function for heat
   !
   function psih(zeta)
 
@@ -597,10 +613,10 @@ contains
     real             :: x
 
     if(zeta <= 0) then
-      x     = sqrt(1.0 - 16.0*zeta)
-      psih  = 2*log(1.0 + x) - 2*log(2.)
+      x     = (1. - 15. * zeta) ** (0.25)
+      psih  = 2. * log( (1. + x ** 2.) / 2. )
     else
-      psih  = -5.0*zeta
+      psih  = - 4.7 * zeta
     end if
 
     return
@@ -666,8 +682,8 @@ contains
         do k = 1, ksoilmax
           phitot(i,j) = phitot(i,j) + phiw(i,j,k) * dzsoil(k)
         end do
-
         phitot(i,j) = phitot(i,j) / zsoil(ksoilmax)
+
         do k = 1, ksoilmax
           phifrac(i,j,k) = phiw(i,j,k)*dzsoil(k) / zsoil(ksoilmax) / phitot(i,j)
         end do
@@ -885,63 +901,60 @@ contains
 
         phiw(i,j,ksoilmax) = phiwm(i,j,ksoilmax) + rk3coef * (- lambdash(i,j,ksoilmax-1) * (phiw(i,j,ksoilmax) - phiw(i,j,ksoilmax-1)) / dzsoil(ksoilmax-1) + gammash(i,j,ksoilmax-1) - (phifrac(i,j,ksoilmax) * LEveg) / (rowt*alvl) ) / dzsoil(ksoilmax)
 
-        !" Check if energy balance is closed (Cskin must be zero!)
-        !if (abs(Qnet(i,j)-(H(i,j)+LE(i,j)+G0(i,j))+tendskin(i,j)) .gt. 1.) then
-        !print*,"ENERGY BALNACE NOT CLOSED: Qnet-H-LE-G+tendSkin ----------->" &
-        ! ,Qnet(i,j)-(H(i,j)+LE(i,j)+G0(i,j))+tendskin(i,j)
-        !print*,"**************************************************************"
-        !end if 
-
       end do
     end do
       
     call qtsurf
 
-        if (nstep==3) then
+        if (nstep==999) then
         i = 3 
         j = 3  
         print*,"********************************"
         print*,"timestep dt (0,...,dtlong)",dt
         print*,"********************************"
         print*,"Tskin (potential temp skin)",maxval(tskin(3:nxp-2,3:nyp-2))
-        print*,"Tskin*exner (temp skin)",tskin(i,j)*exner
-        print*,"Tskinm (potential temp skin, previous timestep)",tskinm(i,j)
-        print*,"tskinm*exner (temp skin, previous timestep)",tskinm(i,j)*exner
-        print*,"a_theta (potential temp first model layer)",a_theta(1,i,j)
+        print*,"Tskin*exner (temp skin)",maxval(tskin(3:nxp-2,3:nyp-2))*exner
+        print*,"Tskinm (potential temp skin, previous timestep)",maxval(tskinm(3:nxp-2,3:nyp-2))
+        print*,"tskinm*exner (temp skin, previous timestep)",maxval(tskinm(3:nxp-2,3:nyp-2))*exner
+        print*,"a_theta (potential temp first model layer)",maxval(a_theta(1,3:nxp-2,3:nyp-2))
         print*,"a_theta*exner (temp first model layer)",maxval(a_theta(1,3:nxp-2,3:nyp-2)*exner)
         print*,"delta T",minval((a_theta(1,3:nxp-2,3:nyp-2)*exner-tskin(3:nxp-2,3:nyp-2))*exner)
         print*,"********************************"
-        print*,"lambdaskin (lambdaskinav=5.)",lambdaskin(i,j)
-        print*,"lambda (conductivity 1st layer, dry: 0.19)",lambda(i,j,1)
-        print*,"lambda (conductivity 2nd layer, dry: 0.19)",lambda(i,j,2)
-        print*,"lambdah (conductivity at half levels)",lambdah(i,j,1)
-        print*,"lambdas 1st layer",lambdas(i,j,1)
-        print*,"lambdas 2nd layer",lambdas(i,j,2)
-        print*,"lambdash (at 1st half level)",lambdash(i,j,1)
+        print*,"lambdaskin (lambdaskinav=5.)",minval(lambdaskin(3:nxp-2,3:nyp-2))
+        print*,"lambda (conductivity 1st layer, dry: 0.19)",lambda(3:nxp-2,3:nyp-2,1)
+        print*,"lambda (conductivity 2nd layer, dry: 0.19)",lambda(3:nxp-2,3:nyp-2,2)
+        print*,"lambdah (conductivity at half levels)",lambdah(3:nxp-2,3:nyp-2,1)
+        print*,"lambdas 1st layer",lambdas(3:nxp-2,3:nyp-2,1)
+        print*,"lambdas 2nd layer",lambdas(3:nxp-2,3:nyp-2,2)
+        print*,"lambdash (at 1st half level)",lambdash(3:nxp-2,3:nyp-2,1)
         print*,"lambdasat",lambdasat
-        print*,"pCs (2.2e6,....,4.2e6)",pCs(i,j,1)
+        print*,"pCs (2.2e6,....,4.2e6)",pCs(3:nxp-2,3:nyp-2,1)
         print*,"Ke(0,...,1)",Ke
         print*,"********************************"
-        print*,"phiw (water content 1st layer, 0.3)",phiw(i,j,1)
-        print*,"phiw (water content 2nd layer, 0.3)",phiw(i,j,2)
-        print*,"phiw (water content 2nd layer, 0.3)",phiw(i,j,3)
-        print*,"phiw (water content 2nd layer, 0.3)",phiw(i,j,4)
-        print*,"tsoil (soil temperature 1st layer, 290K)",tsoil(i,j,1)
-        print*,"tsoil (soil temperature 2nd layer, 287K)",tsoil(i,j,2)
-        print*,"tsoil (soil temperature 3rd layer, 285K)",tsoil(i,j,3)
-        print*,"tsoil (soil temperature 4th layer, 283K)",tsoil(i,j,4)
-        print*,"tsoil (soil temperature deeeeeeep, 283K)",tsoildeep(i,j)
+        print*,"phiw (water content 1st layer, 0.3)",minval(phiw(3:nxp-2,3:nyp-2,1))
+        print*,"phiw (water content 2nd layer, 0.3)",minval(phiw(3:nxp-2,3:nyp-2,2))
+        print*,"phiw (water content 2nd layer, 0.3)",minval(phiw(3:nxp-2,3:nyp-2,3))
+        print*,"phiw (water content 2nd layer, 0.3)",minval(phiw(3:nxp-2,3:nyp-2,4))
+        print*,"tsoil (soil temperature 1st layer, 290K)",minval(tsoil(3:nxp-2,3:nyp-2,1))
+        print*,"tsoil (soil temperature 2nd layer, 287K)",minval(tsoil(3:nxp-2,3:nyp-2,2))
+        print*,"tsoil (soil temperature 3rd layer, 285K)",minval(tsoil(3:nxp-2,3:nyp-2,3))
+        print*,"tsoil (soil temperature 4th layer, 283K)",minval(tsoil(3:nxp-2,3:nyp-2,4))
+        print*,"tsoil (soil temperature deeeeeeep, 283K)",minval(tsoildeep(3:nxp-2,3:nyp-2))
         print*,"********************************"
-        print*,"dqsatdT",dqsatdT
-        print*,"qsat",qsat
-        print*,"G0",G0(i,j)
+        print*,"Qnet(450 W/m2)",sum(Qnet(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+        print*,"G0 (min)",minval(G0(3:nxp-2,3:nyp-2))
+        print*,"G0 (max)",maxval(G0(3:nxp-2,3:nyp-2))
+        print*,"Tendskin (min)",minval(tendskin(3:nxp-2,3:nyp-2))
+        print*,"Tendskin (max)",maxval(tendskin(3:nxp-2,3:nyp-2))
         print*,"********************************"
-        print*,"Qnet(450 W/m2)",Qnet(i,j)
-        print*,"H + LE + G",(H(i,j)+LE(i,j)+G0(i,j))
-        print*,"Qnet-H-LE-G+tendSkin !=! 0 -->",(Qnet(i,j)-(H(i,j)+LE(i,j)+G0(i,j))+tendskin(i,j))
+        print*,"Qnet-H-LE-G-tendSkin (min) !=! 0 -->",minval(Qnet(3:nxp-2,3:nyp-2)-(H(3:nxp-2,3:nyp-2)+LE(3:nxp-2,3:nyp-2)+G0(3:nxp-2,3:nyp-2))-tendskin(3:nxp-2,3:nyp-2))
+        print*,"Qnet-H-LE-G-tendSkin (max) !=! 0 -->",maxval(Qnet(3:nxp-2,3:nyp-2)-(H(3:nxp-2,3:nyp-2)+LE(3:nxp-2,3:nyp-2)+G0(3:nxp-2,3:nyp-2))-tendskin(3:nxp-2,3:nyp-2))
         print*,"********************************"
-        print*,"SH (lsm):",H(i,j)
-        print*,"LH (lsm):",LE(i,j)
+        print*,"********************************"
+        print*,"SH (min,lsm):",minval(H(3:nxp-2,3:nyp-2))
+        print*,"SH (max,lsm):",maxval(H(3:nxp-2,3:nyp-2))
+        print*,"LH (min,lsm):",minval(LE(3:nxp-2,3:nyp-2))
+        print*,"LH (max,lsm):",maxval(LE(3:nxp-2,3:nyp-2))
         print*,"********************************"
         end if
 
