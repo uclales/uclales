@@ -1200,9 +1200,9 @@ contains
     integer, intent(in) :: n1,n2,n3
     real, intent(in)    :: v1(n1),v2(n1),v3(n1)
 
-    svctr(:,23)=svctr(:,23)+v1(:)/float((n2-2)*(n3-2))
-    svctr(:,25)=svctr(:,25)+v2(:)/float((n2-2)*(n3-2))
-    svctr(:,27)=svctr(:,27)+v3(:)/float((n2-2)*(n3-2))
+    svctr(:,23)=svctr(:,23)+v1(:)/float((n2-4)*(n3-4))
+    svctr(:,25)=svctr(:,25)+v2(:)/float((n2-4)*(n3-4))
+    svctr(:,27)=svctr(:,27)+v3(:)/float((n2-4)*(n3-4))
 
   end subroutine sgs_vel
   !
