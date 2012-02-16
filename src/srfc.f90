@@ -203,11 +203,6 @@ contains
        call srfcscls(nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,drdz,a_ustar  &
                      ,a_tstar, a_rstar, obl)
 
-       !if (nstep==3) then
-       print*,tskinavg, minval(a_tstar(3:(nxp-2),3:(nyp-2))) & 
-                       , maxval(obl(3:(nxp-2),3:(nyp-2)))
-       !end if
-
        !Calculate the drag coefficients and aerodynamic resistance
        do j=3,nyp-2
           do i=3,nxp-2
@@ -224,7 +219,6 @@ contains
 
        !Get skin temperature and humidity from land surface model
        call lsm
-       !print*,"Land Surface Model done..."
 
        !Calculate the surface fluxes with bulk law (Fairall, 2003)
        !Fluxes in kinematic form with units [K m/s] and [kg/kg m/s]
@@ -243,36 +237,23 @@ contains
 
              ww_sfc(i,j)  = 0.
 
-             uw_sfc(i,j)  = - 0.04
-             vw_sfc(i,j)  = - 0.005
+             !uw_sfc(i,j)  = - 0.04
+             !vw_sfc(i,j)  = - 0.005
 
              a_rstar(i,j) = - wq_sfc(i,j)/a_ustar(i,j)
              a_tstar(i,j) = - wt_sfc(i,j)/a_ustar(i,j)
 
-          !if  (wt_sfc(i,j) .lt. 0) then
-          !   wt_sfc(i,j) = 0.
-          !end if
+          if  (wt_sfc(i,j) .lt. 0) then
+             wt_sfc(i,j) = 0.
+          end if
 
-          !if  (wq_sfc(i,j) .lt. 0) then
-          !   wq_sfc(i,j) = 0.
-          !end if
+          if  (wq_sfc(i,j) .lt. 0) then
+             wq_sfc(i,j) = 0.
+          end if
 
           end do
        end do
-       !print*,"Surface fluxes done..."
 
-       if (nstep==999) then
-         print*,"*******************************"   
-         print*,"SH (surface):",minval(wt_sfc(3:(nxp-2),3:(nyp-2))*(0.5*(dn0(1)+dn0(2))*cp))
-         print*,"LH (surface):",minval(wq_sfc(3:(nxp-2),3:(nyp-2))*(0.5*(dn0(1)+dn0(2))*alvl))
-         print*,"**************************************" 
-         print*,"w'T'",sum(wt_sfc(3:(nxp-2),3:(nyp-2))*(0.5*(dn0(1)+dn0(2))*cp))/(nxp-4)/(nyp-4)
-         print*,"**************************************"
-         print*,"w'q'",sum(wq_sfc(3:(nxp-2),3:(nyp-2))*(0.5*(dn0(1)+dn0(2))*alvl))/(nxp-4)/(nyp-4)
-         print*,"****************************************************************"
-         print*,"****************************************************************"
-       end if
-	
   !
   ! ----------------------------------------------------------------------
   ! fix thermodynamic fluxes at surface given values in energetic 
@@ -376,8 +357,8 @@ contains
 
     implicit none
 
-    real, parameter      :: am   =  4.8   !   "          "         "
-    real, parameter      :: bm   = 19.3   !   "          "         "
+    real, parameter      :: am   =  4.7   !   "          "         "
+    real, parameter      :: bm   = 16.0   !   "          "         "
     real, parameter      :: eps  = 1.e-10 ! non-zero, small number
 
     real, intent (in)    :: z             ! height where u locates
@@ -436,9 +417,9 @@ contains
 
     implicit none
 
-    real, parameter     :: ah   =  5.0   ! stability function parameter
+    real, parameter     :: ah   =  4.7   ! stability function parameter
     real, parameter     :: bh   = 16.0   !   "          "         "
-    real, parameter     :: am   =  5.0   !   "          "         "
+    real, parameter     :: am   =  4.7   !   "          "         "
     real, parameter     :: bm   = 16.0   !   "          "         "
     real, parameter     :: pr   =  0.74  ! prandlt number
     real, parameter     :: eps  = 1.e-10 ! non-zero, small number
@@ -499,16 +480,16 @@ contains
           !
           else
              if (first_call .or. tstar(i,j)*dtv <= 0.) then
-             ustar =  vonk*u(i,j)/lnz
-             tstar =  vonk*dtv/(pr*lnz)
+             ustar(i,j) =  vonk*u(i,j)/lnz
+             tstar(i,j) =  vonk*dtv/(pr*lnz)
              lmo = -1.e10
              end if
 
              do iterate = 1,10
                 lmo   = betg*ustar(i,j)**2/(vonk*tstar(i,j))
-                if (lmo .gt. -1.) then
-                lmo = -1.
-                end if
+                !if (lmo .gt. -1.) then
+                !lmo = -1.
+                !end if
                 zeta  = z/lmo
                 ustar(i,j) = u(i,j)*vonk/(lnz - psim(zeta))
                 tstar(i,j) = (dtv*vonk/pr)/(lnz - psih(zeta))
@@ -664,8 +645,7 @@ contains
                     psrf, th00, umean, vmean, dn0, iradtyp, dt, &
 		    a_lflxu, a_lflxd, a_sflxu, a_sflxd, nstep
 
-    integer  :: i, j, k, zaehl=0
-
+    integer  :: i, j, k
     real     :: f1, f2, f3, f4, fsoil !Correction functions for Jarvis-Stewart
     real     :: lflxu_av, lflxd_av, sflxu_av, sflxd_av
     real     :: exner, tsurfm, Tatm, qskinn
@@ -907,8 +887,6 @@ contains
     call qtsurf
 
         if (nstep==999) then
-        i = 3 
-        j = 3  
         print*,"********************************"
         print*,"timestep dt (0,...,dtlong)",dt
         print*,"********************************"
