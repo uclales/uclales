@@ -68,6 +68,7 @@ contains
         if (zt(k)>zcross) exit
       end do
       kcross = k
+      if (zcross<0) kcross = zcross
     end if
     if (lxz) then
       if (ycross < ym(2) .or. ycross >= ym(nyp - 2)) then
@@ -435,9 +436,11 @@ contains
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
        prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux
     use modnetcdf, only : writevar_nc, fillvalue_double
+    use util,      only : get_avg3, get_var3
     real, intent(in) :: rtimee
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
     real, dimension(nzp,nxp,nyp) :: tracer
+    real, dimension(nzp)         :: c1, thvar
     integer :: n, i, j, k, ct, cb
     
     if (.not. lcross) return
@@ -452,7 +455,20 @@ contains
       call writevar_nc(nccrossyzid, tname, rtimee, nccrossrec)
     end if
 
-
+    select case (nint(zcross))
+    case(-1)
+         call get_avg3(nzp,nxp,nyp, a_tp,c1)
+         call get_var3(nzp,nxp,nyp, a_tp, c1, thvar)
+         kcross = max(3,maxloc(thvar,1))       
+    case(-2)
+        call calclevel(liquid, kcross, 'base')
+        if (kcross>=nzp-1) then
+         call get_avg3(nzp,nxp,nyp, a_tp,c1)
+         call get_var3(nzp,nxp,nyp, a_tp, c1, thvar)
+         kcross = max(3,maxloc(thvar,1))
+        end if
+    case default
+    end select
     if (lcouvreux) then
       call scalexcess(a_cvrxp, tracer)
     end if
@@ -565,6 +581,11 @@ contains
         call writecross(crossname(n), tmp)
       case ('tdev_sc')
         call calclevel(liquid, cb, 'base')
+        if (cb>=nzp-1) then
+         call get_avg3(nzp,nxp,nyp, a_tp,c1)
+         call get_var3(nzp,nxp,nyp, a_tp, c1, thvar)
+         cb = maxloc(thvar,1)       
+        end if
         call calcdev(a_tp, 2, cb-1, tmp)
         call writecross(crossname(n), tmp)
       case ('qdev_cl')
@@ -574,6 +595,11 @@ contains
         call writecross(crossname(n), tmp)
       case ('qdev_sc')
         call calclevel(liquid, cb, 'base')
+        if (cb>=nzp-1) then
+         call get_avg3(nzp,nxp,nyp, a_tp,c1)
+         call get_var3(nzp,nxp,nyp, a_tp, c1, thvar)
+         cb = maxloc(thvar,1)       
+        end if
         call calcdev(a_rp, 2, cb-1, tmp)
         call writecross(crossname(n), tmp)
       end select
