@@ -2588,9 +2588,9 @@ contains
     real, dimension(:), intent(inout) :: mass
     real, dimension(:), intent(inout), optional :: num
 
-    if (any(mass < 0.)) then
-      print *, trim(meteor%name), 'below zero', mass
-    end if
+ !   if (any(mass < 0.)) then
+ !     print *, trim(meteor%name), 'below zero', mass
+ !   end if
     where (mass < rthres)
        mass = 0.
     end where

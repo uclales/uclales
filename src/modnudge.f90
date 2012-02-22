@@ -43,7 +43,7 @@ SAVE
   logical :: firsttime = .true.
 contains
   subroutine initnudge(time)
-    use grid, only : nzp,zt,th00
+    use grid, only : nzp,zt,th00,umean,vmean
     use mpi_interface, only : myid
     implicit none
 
@@ -119,6 +119,8 @@ contains
       timenudge = timenudge/86400+time
       tnudge  = tnudgefac*tnudge
       thlnudge = thlnudge - th00
+      unudge = unudge - umean 
+      vnudge = vnudge - vmean
     lunudge = any(abs(unudge)>1e-8)
     lvnudge = any(abs(vnudge)>1e-8)
     lwnudge = any(abs(wnudge)>1e-8)
