@@ -625,7 +625,7 @@ contains
 
         qsatsurf   = R / Rm * es / psrf
         surfwet    = ra(i,j) / (ra(i,j) + rs(i,j))
-        qskin(i,j) = surfwet * qsatsurf + (1. - surfwet) * vapor(1,i,j)
+        qskin(i,j) = surfwet * qsatsurf + (1. - surfwet) * vapor(2,i,j)
       end do
     end do
 
@@ -693,17 +693,17 @@ contains
             lflxd_av = sum(lflxd_avn(:,i,j))/nradtime
             lflxu_av = sum(lflxu_avn(:,i,j))/nradtime
 
-            Qnet(i,j) = -(sflxd_av + sflxu_av + lflxd_av + lflxu_av)
+            Qnet(i,j) = (sflxd_av - sflxu_av + lflxd_av - lflxu_av)
             
-            !If not then:
-            !Qnet(i,j) = -(a_sflxd(1,i,j) + a_sflxu(1,i,j) &
-            !            + a_lflxd(1,i,j) + a_lflxu(1,i,j))
-
         else
           !" Not using full radiation: use average radiation from Namelist
           Qnet(i,j) = Qnetav
         end if
 
+        if ((nstep==3) .and. (i==10) .and. (j==10)) then
+          print*,"Qnet,sd,su,ld,lu",Qnet(i,j),sflxd_av,sflxu_av,lflxd_av,lflxu_av
+        end if
+ 
         !" 2.1 - Calculate the surface resistance with vegetation
 
         !" a) Stomatal opening as a function of incoming short wave radiation
@@ -760,7 +760,7 @@ contains
         Qnet(i,j) = Qnet(i,j) + stefan * (tskinm(i,j)*exner)**4.
  
         !" Allow for dew fall and calculate dew water on leaves
-        if(qsat - vapor(1,i,j) < 0.) then
+        if(qsat - vapor(2,i,j) < 0.) then
           rsveg(i,j)  = 0.
           rssoil(i,j) = 0.
         end if
@@ -821,7 +821,7 @@ contains
         tendskin(i,j) = Cskin(i,j)*(tskin(i,j) - tskinm(i,j)) * exner / rk3coef
 
         !" In case of dew formation, allow all water to enter skin reservoir Wl
-        if(qsat - vapor(1,i,j) < 0.) then
+        if(qsat - vapor(2,i,j) < 0.) then
           Wl(i,j) =  Wlm(i,j) - rk3coef*((LEliq + LEsoil + LEveg)/(rowt * alvl))
         else
           Wl(i,j) =  Wlm(i,j) - rk3coef*(LEliq / (rowt * alvl))
