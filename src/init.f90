@@ -47,7 +47,6 @@ contains
     use thrm, only : thermo
     use mcrp, only : initmcrp
     use modcross, only : initcross, triggercross
-!
 
     implicit none
 
@@ -270,6 +269,8 @@ contains
             xs(ns)  = rts(ns)
             if (ns > 1) then
               rts(ns) = xs(ns)*rslf(ps(ns-1),tks(ns-1))  !cheat a tiny bit - fix it later.
+            else
+              rts(ns)  = xs(ns)*rslf(ps(ns)*100.,ts(ns))
             end if
           else
             rts(ns) = rts(ns)*1.e-3
@@ -293,12 +294,16 @@ contains
              hs(ns) = ps(ns)
              zold1=zold2
              zold2=ps(ns)
-             tavg=(ts(ns)*(1.+ep2*rts(ns))+ts(ns-1)*(1.+ep2*rts(ns-1))*(p00**rcp)             &
-                  /ps(ns-1)**rcp)*.5
-             ps(ns)=(ps(ns-1)**rcp-g*(zold2-zold1)*(p00**rcp)/(cp*tavg))**cpr
+             if ((itsflg==0).or.(itsflg==1)) then
+                tavg=(ts(ns)*(1.+ep2*rts(ns))+tks(ns-1)*(1.+ep2*rts(ns-1))*(p00**rcp)             &
+                     /ps(ns-1)**rcp)*.5
+                ps(ns)=(ps(ns-1)**rcp-g*(zold2-zold1)*(p00**rcp)/(cp*tavg))**cpr
+             else !itsflg=2
+                tavg=(ts(ns)*(1.+ep2*rts(ns))+tks(ns-1)*(1.+ep2*rts(ns-1)))*.5
+                ps(ns)=ps(ns-1)*exp(-g*(zold2-zold1)/(r*tavg))
+             end if
           end if
        end select
-
        !
        ! filling temperature array:
        ! itsflg = 0 :potential temperature in kelvin
@@ -330,35 +335,40 @@ contains
           call appl_abort(0)
        end select
        
-       do iterate1 = 1,1  
+       do iterate1 = 1,1
          if (irsflg == 0) then
            rts(ns) = xs(ns)*rslf(ps(ns),tks(ns))
          end if
          if (ipsflg == 1 .and. ns > 1) then
-              tavg=(ts(ns)*(1.+ep2*rts(ns))+ts(ns-1)*(1.+ep2*rts(ns-1))*(p00**rcp)             &
+            if ((itsflg==0).or.(itsflg==1))then
+               tavg=(ts(ns)*(1.+ep2*rts(ns))+tks(ns-1)*(1.+ep2*rts(ns-1))*(p00**rcp) &
                     /ps(ns-1)**rcp)*.5
-              ps(ns)=(ps(ns-1)**rcp-g*(hs(ns)-hs(ns-1))*(p00**rcp)/(cp*tavg))**cpr
+               ps(ns)=(ps(ns-1)**rcp-g*(hs(ns)-hs(ns-1))*(p00**rcp)/(cp*tavg))**cpr
+            else
+               tavg=(ts(ns)*(1.+ep2*rts(ns))+tks(ns-1)*(1.+ep2*rts(ns-1)))*.5
+               ps(ns)=ps(ns-1)*exp(-g*(zold2-zold1)/(r*tavg))
+            end if
          end if
-          select case (itsflg)
-          case (0)
-              tks(ns)=ts(ns)*(ps(ns)*p00i)**rcp
-          case (1)
-              til=ts(ns)*(ps(ns)*p00i)**rcp
-              xx=til
-              yy=rslf(ps(ns),xx)
-              zz=max(rts(ns)-yy,0.)
-              if (zz > 0.) then
-                do iterate=1,3
-                    x1=alvl/(cp*xx)
-                    xx=xx - (xx - til*(1.+x1*zz))/(1. + x1*til                &
-                        *(zz/xx+(1.+yy*ep)*yy*alvl/(Rm*xx*xx)))
-                    yy=rslf(ps(ns),xx)
-                    zz=max(rts(ns)-yy,0.)
-                enddo
-              endif
-              tks(ns)=xx
-          case default
-          end select
+         select case (itsflg)
+         case (0)
+            tks(ns)=ts(ns)*(ps(ns)*p00i)**rcp
+         case (1)
+            til=ts(ns)*(ps(ns)*p00i)**rcp
+            xx=til
+            yy=rslf(ps(ns),xx)
+            zz=max(rts(ns)-yy,0.)
+            if (zz > 0.) then
+               do iterate=1,3
+                  x1=alvl/(cp*xx)
+                  xx=xx - (xx - til*(1.+x1*zz))/(1. + x1*til                &
+                       *(zz/xx+(1.+yy*ep)*yy*alvl/(Rm*xx*xx)))
+                  yy=rslf(ps(ns),xx)
+                  zz=max(rts(ns)-yy,0.)
+               enddo
+            endif
+            tks(ns)=xx
+         case default
+         end select
          
        end do
        ns = ns+1
@@ -397,6 +407,10 @@ contains
        write(6,fm0)
        write(6,fm1)(ps(k),hs(k),tks(k),thds(k),us(k),vs(k),rts(k),xs(k),xsi(k),k=1,ns)
     endif
+    ! update ts for fldinit
+    do k=1,ns
+       ts(k)=tks(k)*(p00/ps(k))**rcp
+    end do
 
 604 format('    input sounding needs to go higher ! !', /,                &
          '      sounding top (m) = ',f12.2,'  model top (m) = ',f12.2)
