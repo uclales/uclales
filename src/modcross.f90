@@ -434,13 +434,14 @@ contains
   subroutine triggercross(rtimee)
     use grid,      only : nxp, nyp, nzp, tname, zt, zm, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
-       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux
+       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta
     use modnetcdf, only : writevar_nc, fillvalue_double
     use util,      only : get_avg3, get_var3
+    use defs,      only : ep2
     real, intent(in) :: rtimee
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
-    real, dimension(nzp,nxp,nyp) :: tracer
-    real, dimension(nzp)         :: c1, thvar
+    real, dimension(nzp,nxp,nyp) :: tracer, tv
+    real, dimension(nzp)         :: c1, thvar, tvbar
     integer :: n, i, j, k, ct, cb
     
     if (.not. lcross) return
@@ -454,6 +455,21 @@ contains
       nccrossrec = nccrossrec - 1
       call writevar_nc(nccrossyzid, tname, rtimee, nccrossrec)
     end if
+    do j=3,nyp-2
+       do i=3,nxp-2
+          do k=1,nzp
+             tv(k,i,j) = a_theta(k,i,j)*(1.+ep2*a_rp(k,i,j) - liquid(k,i,j))
+          end do
+       end do
+    end do
+    call get_avg3(nzp,nxp,nyp,tv,tvbar)
+    do j=3,nyp-2
+       do i=3,nxp-2
+          do k=1,nzp
+             tv(k,i,j) = tv(k,i,j) - tvbar(k)
+          end do
+       end do
+    end do
 
     select case (nint(zcross))
     case(-1)
@@ -485,6 +501,8 @@ contains
       case('r')
         call writecross(crossname(n), a_rp)
       case('l')
+        call writecross(crossname(n), liquid)
+      case('thv')
         call writecross(crossname(n), liquid)
       case('cvrx')
         call writecross(crossname(n), a_cvrxp)
