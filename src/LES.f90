@@ -85,7 +85,7 @@ contains
          frqcross , strtim, radfrq, cntlat,& 
          case_name,lsvarflg, sst, div, wctime , tau                  !irina
 !cgils         
-    use modnetcdf, only : lsync
+    use modnetcdf, only : lsync, deflate_level
     use modcross, only : lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars
     use forc, only : lstendflg, sfc_albedo     
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
@@ -135,7 +135,8 @@ contains
          SolarConstant, & ! SolarConstant (In case of prescribed TOA radiation
          lrandommicro, microseq,timenuc ,nin_set,cloud_type, &  !thijs: sequence of variables for microphysics
          lwaterbudget, &                 ! axel: flag for liquid water budget diagnostics (only level=3)
-         lcouvreux , tau                     ! The Couvreux 'radioactive' scalar
+         lcouvreux , tau , &                    ! The Couvreux 'radioactive' scalar
+         deflate_level                          !Compression of the crosssections
 
     ps       = 0.
     ts       = th00
