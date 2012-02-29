@@ -82,12 +82,14 @@ rad_rndnmb.o:	defs.o
 rad_solver.o:	defs.o
 rad_corkds.o:	defs.o mpi_interface.o
 rad_cldwtr.o:	defs.o rad_corkds.o
-rad_d4strm.o:	defs.o rad_solver.o rad_rndnmb.orad_corkds.o rad_cldwtr.o
+rad_d4strm.o:	defs.o rad_solver.o rad_rndnmb.o rad_corkds.o rad_cldwtr.o
 rad_driver.o:	defs.o rad_d4strm.o
 forc.o: 	defs.o grid.o rad_gcss.o stat.o
 icemcrp.o: 	defs.o grid.o ice_sb.o
 util.o: 	defs.o grid.o ice_sb.o
 step.o:		icemcrp.o mpi_interface.o
 init.o:		grid.o ncio.o step.o icemcrp.o
-ncio.o:		grid.o mpi_interface.o icemcrp.o
+ncio.o:		grid.o mpi_interface.o icemcrp.o forc.o
 lsvar.o:	forc.o
+stat.o:		forc.o
+srfc.o:		step.o

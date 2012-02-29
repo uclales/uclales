@@ -324,7 +324,7 @@ contains
           rs = rsat(1:n1,i,j)
           rrain = rp(1:n1,i,j)
           nrain = np(1:n1,i,j)
-          convliq = alvl/cp*(pi0+pi1+exner(1:n1,i,j))/cp
+          convliq = alvl/(cp*(pi0+pi1+exner(1:n1,i,j))/cp)
           if (level == 4) then
              rsi = rsati(1:n1,i,j)
              call resetvar(ice,ricep(1:n1,i,j),nicep(1:n1,i,j))
@@ -351,7 +351,7 @@ contains
              end where
              nin_active = nice + nsnow + ngrp
 
-             convice = alvi/cp*(pi0+pi1+exner(1:n1,i,j))/cp
+             convice = alvi/(cp*(pi0+pi1+exner(1:n1,i,j))/cp)
           end if
           if (lrandommicro) call shuffle(microseq)
           do n=1,nprocess
@@ -3261,8 +3261,8 @@ contains
           q_ice_old = qi(kk,jj,ii) + qs(kk,jj,ii) + qg(kk,jj,ii) + qh(kk,jj,ii)
 
           ! ... temperature tendency (for liquid water potential temperature)
-          convice = alvi/cp*(pi0(kk)+pi1(kk)+exner(kk,jj,ii))/cp
-          convliq = (alvl-alvi)/cp*(pi0(kk)+pi1(kk)+exner(kk,jj,ii))/cp
+          convice = alvi/(cp*(pi0(kk)+pi1(kk)+exner(kk,jj,ii))/cp)
+          convliq = (alvl-alvi)/(cp*(pi0(kk)+pi1(kk)+exner(kk,jj,ii))/cp)
           tlt(kk,jj,ii) = tlt(kk,jj,ii) &
                &      - convice * (q_vap_new - q_vap_old) / dt  &
                &      + convliq * (q_liq_new - q_liq_old) / dt

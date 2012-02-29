@@ -856,7 +856,7 @@ contains
        do i=3,n2-2
           scr(i,j) = 0.
           do k=1,n1
-              convice = alvi/cp*(pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp
+              convice = alvi/(cp*(pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp)
             km1=max(1,k-1)
              scr(i,j)=scr(i,j)+rice(k,i,j)*(zm(k)-zm(km1))*dn0(k)
           end do
@@ -869,7 +869,7 @@ contains
        do i=3,n2-2
           scr(i,j) = 0.
           do k=1,n1
-              convice = alvi/cp*(pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp
+              convice = alvi/(cp*(pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp)
              km1=max(1,k-1)
              scr(i,j)=scr(i,j)+rsnow(k,i,j)*(zm(k)-zm(km1))*dn0(k)
           end do
@@ -882,7 +882,7 @@ contains
        do i=3,n2-2
           scr(i,j) = 0.
           do k=1,n1
-               convice = alvi/cp*(pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp
+               convice = alvi/(cp*(pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp)
             km1=max(1,k-1)
              scr(i,j)=scr(i,j)+rgrp(k,i,j)*(zm(k)-zm(km1))*dn0(k)
           end do
@@ -896,7 +896,7 @@ contains
        do i=3,n2-2
           scr(i,j) = 0.
           do k=1,n1
-               convice = alvi/cp*(pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp
+               convice = alvi/(cp*(pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp)
             km1=max(1,k-1)
              scr(i,j)=scr(i,j)+rhail(k,i,j)*(zm(k)-zm(km1))*dn0(k)
           end do
@@ -1200,9 +1200,9 @@ contains
     integer, intent(in) :: n1,n2,n3
     real, intent(in)    :: v1(n1),v2(n1),v3(n1)
 
-    svctr(:,23)=svctr(:,23)+v1(:)/float((n2-2)*(n3-2))
-    svctr(:,25)=svctr(:,25)+v2(:)/float((n2-2)*(n3-2))
-    svctr(:,27)=svctr(:,27)+v3(:)/float((n2-2)*(n3-2))
+    svctr(:,23)=svctr(:,23)+v1(:)/float((n2-4)*(n3-4))
+    svctr(:,25)=svctr(:,25)+v2(:)/float((n2-4)*(n3-4))
+    svctr(:,27)=svctr(:,27)+v3(:)/float((n2-4)*(n3-4))
 
   end subroutine sgs_vel
   !

@@ -22,6 +22,7 @@ module fuliou
   use defs, only   : nv, nv1, mb, pi, totalpower, g, R, ep2
   use cldwtr, only : init_cldwtr, cloud_water
   use solver, only : qft
+  use mpi_interface, only : myid
   use RandomNumbers
   use ckd
 
@@ -41,7 +42,7 @@ contains
 
     if (.not.Initialized) then
        call init_ckd   
-       randoms = new_RandomNumberSequence(1)
+       randoms = new_RandomNumberSequence(1+myid)
        call init_cldwtr
        Initialized = .True.
     end if
@@ -143,7 +144,7 @@ contains
 
     if (.not.Initialized) then
        call init_ckd   
-       randoms = new_RandomNumberSequence(1)
+       randoms = new_RandomNumberSequence(1+myid)
        call init_cldwtr
        Initialized = .True.
     end if

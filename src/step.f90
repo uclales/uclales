@@ -61,7 +61,7 @@ contains
     use grid, only : dt, dtlong, zt, zm, nzp, dn0, u0, v0, level, &
          write_hist
     use ncio, only : write_anal, close_anal
-    use modcross, only : triggercross, exitcross
+    use modcross, only : triggercross, exitcross, lcross
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
 
@@ -161,7 +161,7 @@ contains
 
     call write_hist(1, time)
     iret = close_anal()
-    call exitcross
+    if (lcross) call exitcross
     iret = close_stat()
 
   end subroutine stepper
@@ -215,7 +215,10 @@ contains
        if (lsvarflg) then
           call varlscale(time,case_name,sst,div,u0,v0)
        end if
-       call surface(sst)      
+! linda, b
+!       call surface(sst)
+       call surface(sst,xtime)
+! linda, e
 
        call diffuse
        call fadvect
@@ -342,6 +345,11 @@ contains
        !call sclrset('mixd',nzp,nxp,nyp,a_sp,dzi_t,n)
     end do
 
+    if (level >= 1) then
+       where (a_rp < 0.) 
+          a_rp=0.
+       end where
+    end if
     if (level >= 3) then
        a_rpp(1,:,:) = 0.
        a_npp(1,:,:) = 0.
