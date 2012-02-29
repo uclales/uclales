@@ -7,16 +7,16 @@ module lsmdata
 
   SAVE
 
-  integer           :: nradtime  = 60.
+  integer           :: nradtime  = 200.
 
   ! Flags
   ! ----------------------------------------------------------
-  logical           :: init_lsm    = .true.   !<   Flag for initializing LSM
-  logical           :: lmostlocal  = .false.  !<  Switch to MOST locally to get local Obukhov length
-  logical           :: lsmoothflux = .false.  !<  Create uniform sensible & latent heat over domain
-  logical           :: lneutral    = .false.  !<  Disable stability corrections
-  logical           :: lmlfilter   = .false.  !<  Filter variables at 3 dx to  prevent peak in
-                                              !<  dimensionless wind profile if MOST-local is enabled
+  logical          :: init_lsm   = .true.   !<   Flag for initializing LSM
+  logical          :: local      = .true.   !<  Switch to MOST locally to get local Obukhov length
+  logical          :: smoothflux = .false.  !<  Create uniform sensible & latent heat over domain
+  logical          :: neutral    = .false.  !<  Disable stability corrections
+  logical          :: filter     = .false.  !<  Filter variables at 3 dx to  prevent peak in
+                                            !<  dimensionless wind profile if MOST-local enabled
 
   ! Soil properties
   ! ----------------------------------------------------------
@@ -140,19 +140,22 @@ module lsmdata
   real, allocatable :: rsveg    (:,:)   !<  Vegetation resistance [s/m]
   real, allocatable :: rssoil   (:,:)   !<  Soil evaporation resistance [s/m]
   real, allocatable :: tendskin (:,:)   !<  Tendency of skin [W/m2]
-  !real              :: rsisurf2 = 0.    !<  Vegetation resistance [s/m] if isurf2 is used
+  !real              :: rsisurf2 = 0.   !<  Vegetation resistance [s/m] if isurf2 is used
 
   ! Turbulent exchange variables
+  real, allocatable :: obl     (:,:)    !<  local obuhkov length [m]
   real              :: oblav            !<  Spatially averaged obukhov length [m]
   real, allocatable :: cm      (:,:)    !<  Drag coefficient for momentum [-]
   real, allocatable :: cs      (:,:)    !<  Drag coefficient for scalars [-]
 
-  !real, allocatable :: u0bar    (:,:)   !<  Filtered u-wind component
-  !real, allocatable :: v0bar    (:,:)   !<  Filtered v-wind component
-  !real, allocatable :: a_thetabar  (:,:)   !<  Filtered liquid water pot temp at first level
-  !real, allocatable :: vaporbar   (:,:)   !<  Filtered specific humidity at first full level
-  !real, allocatable :: tskinbar (:,:)   !<  Filtered surface temperature
-  !real, allocatable :: qskinbar (:,:)   !<  Filtered surface specific humidity
+  real              :: u0av             !<  Mean u-wind component
+  real              :: v0av             !<  Mean v-wind component
+  real, allocatable :: u0bar    (:,:,:) !<  Filtered u-wind component
+  real, allocatable :: v0bar    (:,:,:) !<  Filtered v-wind component
+  real, allocatable :: thetabar (:,:)   !<  Filtered liquid water pot temp at first level
+  real, allocatable :: vaporbar (:,:)   !<  Filtered specific humidity at first full level
+  real, allocatable :: tskinbar (:,:)   !<  Filtered surface temperature
+  real, allocatable :: qskinbar (:,:)   !<  Filtered surface specific humidity
 
   contains
 
@@ -162,7 +165,7 @@ module lsmdata
   ! Adopted from DALES (vanHeerwaarden)
   !
   subroutine initlsm
-  use grid, only : nxp, nyp, th00, vapor, iradtyp
+  use grid, only : nzp, nxp, nyp, th00, vapor, iradtyp
   use init, only : rts
 
     integer :: k, ierr
@@ -172,7 +175,7 @@ module lsmdata
     !
     namelist/SURFNAMELIST/ & 
     !< Switches
-    lmostlocal, lmlfilter, lsmoothflux, lneutral, &
+    local, filter, smoothflux, neutral, &
     !< Soil related variables
     tsoilav, tsoildeepav, phiwav, rootfav, &
     !< Land surface related variables
@@ -194,6 +197,7 @@ module lsmdata
     ! --------------------------------------------------------
     ! Allocate surface arrays
     ! 
+    allocate(obl(nxp,nyp))
     allocate(ra(nxp,nyp))
     allocate(rs(nxp,nyp))
     allocate(z0m(nxp,nyp))
@@ -259,14 +263,12 @@ module lsmdata
     allocate(Wlm(nxp,nyp))
 
     ! Allocate filtered variables
-    !if (lmostlocal) then
-    !  allocate(u0bar      (2-ih:i1+ih,2-jh:j1+jh))
-    !  allocate(v0bar      (2-ih:i1+ih,2-jh:j1+jh))
-    !  allocate(a_thetabar (2-ih:i1+ih,2-jh:j1+jh))
-    !  allocate(vaporbar   (2-ih:i1+ih,2-jh:j1+jh))
-    !  allocate(tskinbar(nxp,nyp))
-    !  allocate(qskinbar(nxp,nyp))
-    !end if
+    allocate(u0bar(nzp,nxp,nyp))
+    allocate(v0bar(nzp,nxp,nyp))
+    allocate(thetabar(nxp,nyp))
+    allocate(vaporbar(nxp,nyp))
+    allocate(tskinbar(nxp,nyp))
+    allocate(qskinbar(nxp,nyp))
 
     ! --------------------------------------------------------
     ! Initialize arrays
@@ -279,6 +281,8 @@ module lsmdata
     z0m		= z0mav
     z0h		= z0hav
     ra		= 1.
+    obl 	= -10e10
+    oblav	= -10e10
 
     dzsoil(1) = 0.07		!< First test, pick ECMWF config
     dzsoil(2) = 0.21

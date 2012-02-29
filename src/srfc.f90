@@ -56,7 +56,7 @@ contains
     real (kind=8)	:: bfl(2), bfg(2)
 
     real :: dtdz(nxp,nyp), drdz(nxp,nyp), usfc(nxp,nyp), vsfc(nxp,nyp) &
-            ,wspd(nxp,nyp), bfct(nxp,nyp), ustar(nxp,nyp), obl(nxp,nyp)
+            ,wspd(nxp,nyp), bfct(nxp,nyp), ustar(nxp,nyp)
 
     select case(isfctyp)
 
@@ -178,30 +178,51 @@ contains
           end do
        end do   
 
-
   !
   ! ----------------------------------------------------------------------
   ! Malte: Get surface fluxes using a land surface model
   !
    case(5)
+
+       !Initialize Land Surface 
        if (init_lsm) then
-       print*,"Start Case(5) - initialize LSM"
-       call initlsm
-       print*,"Land surface initialized..."
-       init_lsm = .false.
+          print*,"Start Case(5) - initialize LSM"
+          call initlsm
+          print*,"Land surface initialized..."
+          init_lsm = .false.
        end if
 
-       call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,a_up,a_vp,umean,vmean)
+       if (local) then
+       u0bar(:,:,:)  = a_up(:,:,:)
+       v0bar(:,:,:)  = a_vp(:,:,:)
+       thetabar(:,:) = a_theta(2,:,:)
+       vaporbar(:,:) = vapor(2,:,:)
+       tskinbar(:,:) = tskin(:,:)
+       qskinbar(:,:) = qskin(:,:)
+       else
+       u0av          = sum(a_up(2,3:nxp-2,3:nxp-2))/(nxp-4)/(nyp-4) + umean
+       v0av          = sum(a_vp(2,3:nxp-2,3:nxp-2))/(nxp-4)/(nyp-4) + vmean
+       thetabar(:,:) = sum(a_theta(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+       vaporbar(:,:) = sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+       tskinbar(:,:) = sum(tskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+       qskinbar(:,:) = sum(qskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+       end if
+
+       !Calculate surface wind for flux calculation
+       call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,u0bar,v0bar,umean,vmean)
+
+       ! a) Calculate Monin Obuhkov Length iteratively
+       !call getobl
+
+       ! b) Calculate Monin Obuhkov Length from surface scalars
        do j=3,nyp-2
           do i=3,nxp-2
-             dtdz(i,j) = a_theta(2,i,j) - tskin(i,j)  !- sst*(p00/psrf)**rcp
-             drdz(i,j) = vapor(2,i,j) - qskin(i,j)    !- rslf(psrf,sst)
+             dtdz(i,j) = thetabar(i,j) - tskinbar(i,j)
+             drdz(i,j) = vaporbar(i,j) - qskinbar(i,j)
           end do
        end do
        tskinavg = sum(tskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
-
-       call srfcscls(nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,drdz,a_ustar  &
-                     ,a_tstar, a_rstar, obl)
+       call srfcscls(nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,drdz,a_ustar,a_tstar,a_rstar,obl)
 
        !Calculate the drag coefficients and aerodynamic resistance
        do j=3,nyp-2
@@ -212,7 +233,6 @@ contains
 			obl(i,j)) + psim(z0m(i,j) / obl(i,j))) / (log(zt(2) / &
 			z0h(i,j)) - psih(zt(2) / obl(i,j)) + psih(z0h(i,j) / &
 			obl(i,j)))
-
              ra(i,j) =  1. / (cs(i,j)* wspd(i,j))
           end do
        end do
@@ -225,16 +245,13 @@ contains
        do j=3, nyp-2
           do i=3, nxp-2
 
-             wt_sfc(i,j) = - (a_theta(2,i,j)*(p00/psrf)**rcp		&
-	                      - tskin(i,j)*(p00/psrf)**rcp) / ra(i,j) 
-             wq_sfc(i,j) = - (vapor(2,i,j) - qskin(i,j)) / ra(i,j)
+             wt_sfc(i,j) = - (thetabar(i,j) - tskinbar(i,j)) / ra(i,j) 
+             wq_sfc(i,j) = - (vaporbar(i,j) - qskinbar(i,j)) / ra(i,j)
 
              uw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j)                  &
                               *(a_up(2,i,j)+umean)/wspd(i,j)
-
              vw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j)                  &
                               *(a_vp(2,i,j)+vmean)/wspd(i,j)
-
              ww_sfc(i,j)  = 0.
 
              !uw_sfc(i,j)  = - 0.04
@@ -414,6 +431,7 @@ contains
   subroutine srfcscls(n2,n3,z,z0,th00,u,dth,drt,ustar,tstar,rstar,obl)
 
     use defs, only : vonk, g, ep2
+    use grid ,only: nstep
 
     implicit none
 
@@ -460,7 +478,7 @@ contains
              zeta  = z/lmo
              ustar(i,j) =  vonk*u(i,j)/(lnz + am*zeta)
              tstar(i,j) = (vonk*dtv/(lnz + ah*zeta))/pr
-          print*,"STABLE ATMOSPHERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+          !print*,"STABLE ATMOSPHERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 
           !
           ! NEUTRAL CASE
@@ -469,7 +487,7 @@ contains
              ustar =  vonk*u(i,j)/lnz
              tstar =  vonk*dtv/(pr*lnz)
              lmo = -1.e10
-          print*,"NEUTRAL ATMOSPHERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+          !print*,"NEUTRAL ATMOSPHERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 
           !
           ! UNSTABLE CASE
@@ -485,11 +503,11 @@ contains
              lmo = -1.e10
              end if
 
-             do iterate = 1,10
+             do iterate = 1,3
                 lmo   = betg*ustar(i,j)**2/(vonk*tstar(i,j))
-                !if (lmo .gt. -1.) then
-                !lmo = -1.
-                !end if
+                if (lmo .gt. -1) then
+                lmo = -1.
+                end if
                 zeta  = z/lmo
                 ustar(i,j) = u(i,j)*vonk/(lnz - psim(zeta))
                 tstar(i,j) = (dtv*vonk/pr)/(lnz - psih(zeta))
@@ -503,7 +521,7 @@ contains
        end do
     end do
 
-       if (.false.) then
+       if (nstep == 3) then
        print*,"********************************"
        print*,"*********SURFACE SCALARS********"
        print*,"********************************"
@@ -513,6 +531,8 @@ contains
        print*,"ustar (max)",maxval(ustar(3:n2-2,3:n3-2))
        print*,"tstar (min)",minval(tstar(3:n2-2,3:n3-2))
        print*,"tstar (max)",maxval(tstar(3:n2-2,3:n3-2))
+       print*,"********************************"
+       print*,"********************************"
        print*,"********************************"
        end if
 
@@ -558,6 +578,121 @@ contains
     return
   end subroutine sfcflxs
 
+  !
+  ! ----------------------------------------------------------------------
+  ! subroutine: getobl - Calculates the Obuhkov length iteratively.
+  !
+  subroutine getobl
+    use defs, only: g,ep2
+    use grid, only: nzp,nxp,nyp,a_up,a_vp,a_theta,umean,vmean,vapor,zt,u0,v0
+    implicit none
+
+    integer        :: i,j,iter
+    real           :: upcu, vpcv
+    real           :: thv,thvs, thvsl
+    real           :: L, Lstart, Lend, Lold
+    real           :: Rib, fx, fxdif, wspd2
+    real           :: thetavbar, tvskinbar
+    !real          :: tskinav,thvskinbar,qskinav,thl0av,qt0av,u0av2,v0av2
+     
+    if (local) then
+
+      do j=3,nyp-2
+        do i=3,nxp-2
+          thetavbar   = thetabar(i,j) * (1. + ep2 * vaporbar(i,j))
+          tvskinbar   = tskinbar(i,j) * (1. + ep2 * qskinbar(i,j))
+
+          upcu    = 0.5 * (u0bar(2,i,j) + u0bar(2,i+1,j)) + umean
+          vpcv    = 0.5 * (v0bar(2,i,j) + v0bar(2,i,j+1)) + vmean
+          wspd2   = max(abs(ubmin), upcu**2. + vpcv**2.)
+
+          Rib     = g / thetavbar * zt(2) * (thetavbar - tvskinbar) / wspd2
+
+          iter = 0
+          L = obl(i,j)
+
+          if (Rib * L < 0. .or. abs(L) == 1e5) then
+             if(Rib > 0) L = 0.01
+             if(Rib < 0) L = -0.01
+          end if
+
+          do while (.true.)
+             iter    = iter + 1
+             Lold    = L
+             fx      = Rib - zt(2) / L * (log(zt(2) / z0h(i,j)) - psih(zt(2)  &
+                       / L) + psih(z0h(i,j) / L)) / (log(zt(2) / z0m(i,j)) -  &
+                       psim(zt(2) / L) + psim(z0m(i,j) / L)) ** 2.
+
+             Lstart  = L - 0.001*L
+             Lend    = L + 0.001*L
+
+             fxdif   = ( (- zt(2) / Lstart * (log(zt(2) / z0h(i,j)) - psih(zt(2) / Lstart) + psih(z0h(i,j) / Lstart)) / (log(zt(2) / z0m(i,j)) - psim(zt(2) / Lstart) + psim(z0m(i,j) / Lstart)) ** 2.) - (-zt(2) / Lend * (log(zt(2) / z0h(i,j)) - psih(zt(2) / Lend) + psih(z0h(i,j) / Lend)) / (log(zt(2) / z0m(i,j)) - psim(zt(2) / Lend) + psim(z0m(i,j) / Lend)) ** 2.) ) / (Lstart - Lend)
+
+             L       = L - fx / fxdif
+
+             if(Rib * L < 0. .or. abs(L) == 1e5) then
+               if(Rib > 0) L = 0.01
+               if(Rib < 0) L = -0.01
+             end if
+
+             if(abs(L - Lold) < 0.0001) exit
+             if(iter > 1000) stop 'Obukhov length calculation does not converge!'
+           end do
+
+           obl(i,j) = L
+
+        end do
+      end do
+    end if
+
+    ! CvH also do a global evaluation if local = .true.
+    ! to get an appropriate local mean ??????????????????????????
+    if (.not. local) then
+       thetavbar   = thetabar(3,3) * (1. + ep2 * vaporbar(3,3))
+       tvskinbar   = tskinbar(3,3) * (1. + ep2 * qskinbar(3,3))
+
+       wspd2   = max(abs(ubmin), u0av**2. + v0av**2.)
+       print*,wspd2,thetavbar,tvskinbar
+
+       Rib     = g / thetavbar * zt(2) * (thetavbar - tvskinbar) / wspd2
+
+       iter = 0
+       L = oblav
+
+       if(Rib * L < 0. .or. abs(L) == 1e5) then
+         if(Rib > 0) L = 0.01
+         if(Rib < 0) L = -0.01
+       end if
+
+       do while (.true.)
+         iter    = iter + 1
+         Lold    = L
+         fx      = Rib - zt(2) / L * (log(zt(2) / z0hav) - psih(zt(2) / L) + psih(z0hav / L)) / (log(zt(2) / z0mav) - psim(zt(2) / L) + psim(z0mav / L)) ** 2.
+         Lstart  = L - 0.001*L
+         Lend    = L + 0.001*L
+         fxdif   = ( (- zt(2) / Lstart * (log(zt(2) / z0hav) - psih(zt(2) / Lstart) + psih(z0hav / Lstart)) / (log(zt(2) / z0mav) - psim(zt(2) / Lstart) + psim(z0mav / Lstart)) ** 2.) - (-zt(2) / Lend * (log(zt(2) / z0hav) - psih(zt(2) / Lend) + psih(z0hav / Lend)) / (log(zt(2) / z0mav) - psim(zt(2) / Lend) + psim(z0mav / Lend)) ** 2.) ) / (Lstart - Lend)
+         L       = L - fx / fxdif
+         if(Rib * L < 0. .or. abs(L) == 1e5) then
+            if(Rib > 0) L = 0.01
+            if(Rib < 0) L = -0.01
+         end if
+         if(abs(L - Lold) < 0.0001) exit
+         if(iter > 1000) stop 'Obukhov length calculation does not converge!'
+       end do
+
+       obl(:,:) = L
+    end if
+
+    oblav = L
+
+    print*,"**********************************************"
+    print*,"wspd2:",wspd2
+    print*,"Rib:",Rib
+    print*,"obl",minval(obl(3:nxp-2,3:nxp-2))
+    print*,"**********************************************"
+
+    return
+  end subroutine getobl
 
   !
   ! ----------------------------------------------------------
@@ -640,19 +775,24 @@ contains
   !
   subroutine lsm
 
-    use defs, only: p00, stefan, rcp, cp, R, alvl, rowt
+    use defs, only: p00, stefan, rcp, cp, R, alvl, rowt, g
     use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, liquid, zt, &
                     psrf, th00, umean, vmean, dn0, iradtyp, dt, &
-		    a_lflxu, a_lflxd, a_sflxu, a_sflxd, nstep
+		    a_lflxu, a_lflxd, a_sflxu, a_sflxd, nstep, press
 
     integer  :: i, j, k
     real     :: f1, f2, f3, f4, fsoil !Correction functions for Jarvis-Stewart
     real     :: lflxu_av, lflxd_av, sflxu_av, sflxd_av
-    real     :: exner, tsurfm, Tatm, qskinn
+    real     :: tsurfm, Tatm, qskinn, exnerair, exner, pair, thetaavg
     real     :: e, esat, qsat, desatdT, dqsatdT, Acoef, Bcoef
     real     :: fH, fLE, fLEveg, fLEsoil, fLEliq, LEveg, LEsoil, LEliq
-    real     :: Wlmx
-    real     :: rk3coef=0
+    real     :: Wlmx, rk3coef=0
+
+
+    thetaavg  = sum(a_theta(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    pair      = psrf*exp(-1.*g*(zt(2)-zt(1))/2/R/thetaavg)
+    exner     = (psrf/p00)**rcp
+    exnerair  = (pair/p00)**rcp   
 
     !"1.0 - Compute water content per layer
     do j = 3,nyp-2
@@ -700,16 +840,16 @@ contains
           Qnet(i,j) = Qnetav
         end if
 
-        if ((nstep==3) .and. (i==10) .and. (j==10)) then
-          print*,"Qnet,sd,su,ld,lu",Qnet(i,j),sflxd_av,sflxu_av,lflxd_av,lflxu_av
-        end if
- 
+       if ((nstep==3) .and. (i==10) .and. (j==10) .and. .true.) then
+          print*,"Qnet,sd,su,ld,lu",Qnet(10,10),Qnet(20,20),sflxd_av,sflxu_av,lflxd_av,lflxu_av
+       end if
+
         !" 2.1 - Calculate the surface resistance with vegetation
 
         !" a) Stomatal opening as a function of incoming short wave radiation
         if (iradtyp == 4) then
-          f1  = 1. / min(1., (0.004 * max(0.,-sflxd_av) + 0.05) / &
-                (0.81 * (0.004 * max(0.,-sflxd_av) + 1.)))
+          f1  = 1. / min(1., (0.004 * max(0.,sflxd_av) + 0.05) / &
+                (0.81 * (0.004 * max(0.,sflxd_av) + 1.)))
         else
           f1  = 1.
         end if
@@ -721,29 +861,26 @@ contains
         f2  = min(1.e8, f2)
 
         !" c) Response of stomata to vapor deficit of atmosphere
-        exner  = (psrf/p00)**rcp
-        Tatm    = a_theta(2,i,j)*exner + (alvl / cp) * liquid(2,i,j)
+        Tatm    = a_theta(2,i,j)*exnerair
         esat = 0.611e3 * exp(17.2694 * (Tatm - 273.16) / (Tatm - 35.86))
         e    = vapor(2,i,j) * psrf / 0.622
         f3   = 1. / exp(-gD(i,j) * (esat - e) / 100.)
 
         !" d) Response to temperature
         f4      = 1./ (1. - 0.0016 * (298.0 - Tatm) ** 2.)
-
         rsveg(i,j)  = rsmin(i,j) / LAI(i,j) * f1 * f2 * f3 * f4
 
         !" 2.2 - Calculate soil resistance based on ECMWF method
         fsoil  = (phifc - phiwp) / (phiw(i,j,1) - phiwp)
         fsoil  = max(fsoil, 1.)
         fsoil  = min(1.e8, fsoil)
-
         rssoil(i,j) = rssoilmin(i,j) * fsoil
 
         !" 2.3 - Calculate the heat transport properties of the soil.
         !" Put in init function, as we don't have prognostic soil moisture atm.
 
         !"Save temperature and liquid water from previous timestep 
-        if (nstep == 3) then
+        if (nstep == 1) then
           tskinm(i,j) = tskin(i,j)
           Wlm(i,j)    = Wl(i,j)
         end if
@@ -793,8 +930,8 @@ contains
         if (Cskin(i,j) == 0.) then
            tskin(i,j) = Acoef * Bcoef ** (-1.) / exner
         else
-           tskin(i,j) = (1. + rk3coef / Cskin(i,j) * Bcoef) ** (-1.) / exner &
-                       * ((tskinm(i,j)*exner) + rk3coef / Cskin(i,j) * Acoef) 
+           tskin(i,j) = (1. + rk3coef/Cskin(i,j) * Bcoef) ** (-1.) / exner &
+                       * ((tskinm(i,j)*exner) + rk3coef/Cskin(i,j) * Acoef) 
         end if
 
         Qnet(i,j) = Qnet(i,j) - (stefan* (tskinm(i,j)*exner)**4.  &
@@ -828,7 +965,7 @@ contains
         end if
 
         !" Save temperature and liquid water from previous timestep 
-        if(nstep == 3) then
+        if(nstep == 1) then
           tsoilm(i,j,:) = tsoil(i,j,:)
           phiwm(i,j,:)  = phiw(i,j,:)
         end if
@@ -856,10 +993,10 @@ contains
 
         !" Calculate soil moisture conductivity and difusivity at half levels
         do k = 1, ksoilmax-1
-          lambdash(i,j,k) = 0.5 * (lambdas(i,j,k) * dzsoil(k+1) &
-                            + lambdas(i,j,k+1) * dzsoil(k)) / dzsoilh(k)
-          gammash(i,j,k)  = 0.5 * (gammas(i,j,k)  * dzsoil(k+1) &
-                            + gammas(i,j,k+1)  * dzsoil(k)) / dzsoilh(k)
+          lambdash(i,j,k) = 0.5 * (lambdas(i,j,k) * dzsoil(k) &
+                            + lambdas(i,j,k+1) * dzsoil(k+1)) / dzsoilh(k)
+          gammash(i,j,k)  = 0.5 * (gammas(i,j,k)  * dzsoil(k) &
+                            + gammas(i,j,k+1)  * dzsoil(k+1)) / dzsoilh(k)
         end do
         lambdash(i,j,ksoilmax) = lambdas(i,j,ksoilmax)
 
@@ -886,7 +1023,7 @@ contains
       
     call qtsurf
 
-        if (nstep==999) then
+        if (nstep==3) then
         print*,"********************************"
         print*,"timestep dt (0,...,dtlong)",dt
         print*,"********************************"
@@ -899,14 +1036,14 @@ contains
         print*,"delta T",minval((a_theta(1,3:nxp-2,3:nyp-2)*exner-tskin(3:nxp-2,3:nyp-2))*exner)
         print*,"********************************"
         print*,"lambdaskin (lambdaskinav=5.)",minval(lambdaskin(3:nxp-2,3:nyp-2))
-        print*,"lambda (conductivity 1st layer, dry: 0.19)",lambda(3:nxp-2,3:nyp-2,1)
-        print*,"lambda (conductivity 2nd layer, dry: 0.19)",lambda(3:nxp-2,3:nyp-2,2)
-        print*,"lambdah (conductivity at half levels)",lambdah(3:nxp-2,3:nyp-2,1)
-        print*,"lambdas 1st layer",lambdas(3:nxp-2,3:nyp-2,1)
-        print*,"lambdas 2nd layer",lambdas(3:nxp-2,3:nyp-2,2)
-        print*,"lambdash (at 1st half level)",lambdash(3:nxp-2,3:nyp-2,1)
+        print*,"lambda (conductivity 1st layer, dry: 0.19)",minval(lambda(3:nxp-2,3:nyp-2,1))
+        print*,"lambdah (conductivity at half levels)",minval(lambdah(3:nxp-2,3:nyp-2,1))
+        print*,"lambda (conductivity 2nd layer, dry: 0.19)",minval(lambda(3:nxp-2,3:nyp-2,2))
+        print*,"lambdas 1st layer",minval(lambdas(3:nxp-2,3:nyp-2,1))
+        print*,"lambdash (at 1st half level)",minval(lambdash(3:nxp-2,3:nyp-2,1))
+        print*,"lambdas 2nd layer",minval(lambdas(3:nxp-2,3:nyp-2,2))
         print*,"lambdasat",lambdasat
-        print*,"pCs (2.2e6,....,4.2e6)",pCs(3:nxp-2,3:nyp-2,1)
+        print*,"pCs (2.2e6,....,4.2e6)",minval(pCs(3:nxp-2,3:nyp-2,1))
         print*,"Ke(0,...,1)",Ke
         print*,"********************************"
         print*,"phiw (water content 1st layer, 0.3)",minval(phiw(3:nxp-2,3:nyp-2,1))

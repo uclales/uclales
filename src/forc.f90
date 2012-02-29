@@ -54,15 +54,16 @@ contains
     use grid, only: nxp, nyp, nzp, zm, zt, dzi_t, dzi_m, dn0, iradtyp, liquid  &
          , a_rflx, a_sflx, albedo, a_tt, a_tp, a_rt, a_rp, a_pexnr, a_scr1 &
          , vapor, a_rpp,a_ricep,a_nicep,a_rgrp, CCN, pi0, pi1, level, a_ut, a_up, a_vt, a_vp,a_theta,&
-          a_lflxu, a_lflxd, a_sflxu, a_sflxd,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa
+          a_lflxu, a_lflxd, a_sflxu, a_sflxd,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa,u0,v0
 
     use mpi_interface, only : myid, appl_abort
+    use util, only : get_avg
 
 !irina
     real, optional, intent (in) :: time_in, cntlat, sst,div
+    real, dimension (nzp):: um,vm
 
-   character (len=5), intent (in) :: case_name
-!irina
+    character (len=5), intent (in) :: case_name
     real :: xref1, xref2
     integer :: i, j, k, kp1
 
@@ -145,7 +146,20 @@ contains
        enddo
     end if
 
-    
+    !Malte: Relax the mean wind profile to the initial state (u0,v0)
+    do k=2,nzp-2
+       um(k)=get_avg(nzp,nxp,nyp,k,a_up)
+       vm(k)=get_avg(nzp,nxp,nyp,k,a_vp)
+    end do
+    do j=3,nyp-2
+       do i=3,nxp-2
+          do k=2,nzp-2
+             a_ut(k,i,j) = a_ut(k,i,j)-(um(k)-u0(k))/3600.0
+             a_vt(k,i,j) = a_vt(k,i,j)-(vm(k)-v0(k))/3600.0
+          end do
+       end do
+    end do
+
   end subroutine forcings
   !
   ! -------------------------------------------------------------------
