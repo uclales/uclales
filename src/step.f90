@@ -46,7 +46,7 @@ module step
 
   integer :: istp
 ! linda,b
-  logical ::lanom=.true.
+  logical ::lanom=.false.
 !linda,e
 
 contains
@@ -176,7 +176,7 @@ contains
   ! 
   subroutine t_step
 
-    use mpi_interface, only : myid
+    use mpi_interface, only : myid, appl_abort
     use grid, only : level, dt, nstep, a_tt, a_up, a_vp, a_wp, dxi, dyi, dzi_t, &
          nxp, nyp, nzp, dn0,a_scr1, u0, v0, a_ut, a_vt, a_wt, zt, a_ricep, a_rct, a_rpt, &
          lwaterbudget
@@ -194,12 +194,13 @@ contains
     use lsvar, only : varlscale
     use util, only : velset,get_avg
     use modtimedep, only : timedep
-
+    use centered, only:advection_scalars
     logical, parameter :: debug = .false.
 !     integer :: k
     real :: xtime
 !     character (len=11)    :: fname = 'debugXX.dat'
-  
+  character (len=8) :: adv='second'
+
     xtime = time/86400. + strtim
     call timedep(time,timmax, sst)
     do nstep = 1,3
@@ -224,7 +225,14 @@ contains
 ! linda, e
 
        call diffuse
-       call fadvect
+       if (adv=='monotone') then
+          call fadvect
+       elseif ((adv=='second').or.(adv=='fourth')) then
+          call advection_scalars(adv)
+       else 
+          print *, 'wrong specification for advection scheme'
+          call appl_abort(0)
+       endif
        call ladvect
        if (level >= 1) then
           if (lwaterbudget) then
