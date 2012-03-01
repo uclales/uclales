@@ -41,7 +41,10 @@ contains
   !
   subroutine initialize
 !irina use lsvarflg
-    use step, only : time, outflg,lsvarflg
+    use step, only : time, outflg,lsvarflg, &
+! LINDA, b
+    lanom
+!LINDA, e
     use stat, only : init_stat
     use mpi_interface, only : appl_abort, myid
     use thrm, only : thermo
@@ -54,11 +57,35 @@ contains
 
     implicit none
 
+    real ::   &
+         t_ano(nzp,nxp-4,nyp-4), &
+         q_ano(nzp,nxp-4,nyp-4), &
+         u_ano(nzp,nxp-4,nyp-4), &
+         v_ano(nzp,nxp-4,nyp-4), &
+         w_ano(nzp,nxp-4,nyp-4)   
+    integer :: k, i, j
+
     if (runtype == 'INITIAL') then
        time=0.
        call arrsnd
        call basic_state
        call fldinit
+       if (lanom) then
+
+          call larm_init_anom (nzp,nxp-4,nyp-4,t_ano,q_ano,u_ano,v_ano,w_ano)
+
+          do k=1,nzp
+            do i=3,nxp-2
+              do j=3,nyp-2
+                a_tp(k,i,j) = a_tp(k,i,j) + t_ano(k,i-2,j-2)
+                a_rp(k,i,j) = a_rp(k,i,j) + q_ano(k,i-2,j-2)
+                a_up(k,i,j) = a_up(k,i,j) + u_ano(k,i-2,j-2)
+                a_vp(k,i,j) = a_vp(k,i,j) + v_ano(k,i-2,j-2)
+                a_wp(k,i,j) = a_wp(k,i,j) + w_ano(k,i-2,j-2)
+              end do
+            end do
+          end do
+       end if
        dt  = dtlong
     else if (runtype == 'HISTORY') then
        call hstart
@@ -111,7 +138,7 @@ contains
     use defs, only : alvl, cpr, cp, p00
     use util, only : azero, atob
     use thrm, only : thermo, rslf
-    use step, only : case_name
+    use step, only : case_name, lanom
 
     implicit none
 
@@ -180,7 +207,10 @@ contains
        xran(k) = 0.2*(zrand - zt(k))/zrand
        !xran(k) = 0.05*(zrand - zt(k))/zrand
     end do
-    call random_pert(nzp,nxp,nyp,zt,a_tp,xran,k) 
+! LINDA, b
+    if (.not.lanom) call random_pert(nzp,nxp,nyp,zt,a_tp,xran,k) 
+!    call random_pert(nzp,nxp,nyp,zt,a_tp,xran,k) 
+! LINDA, e
 
     if (associated(a_rp)) then
        k=1
@@ -189,7 +219,10 @@ contains
           xran(k) = 5.0e-5*(zrand - zt(k))/zrand
           !xran(k) = 1.0e-5*(zrand - zt(k))/zrand
        end do
-       call random_pert(nzp,nxp,nyp,zt,a_rp,xran,k) 
+! LINDA, b
+    if (.not.lanom) call random_pert(nzp,nxp,nyp,zt,a_rp,xran,k) 
+!    call random_pert(nzp,nxp,nyp,zt,a_rp,xran,k) 
+! LINDA, e
     end if
     call azero(nxyzp,a_wp)
     !    
@@ -697,5 +730,86 @@ contains
 
  end subroutine larm_surf
 
+!--------------------------------------------------------------------------!
+! routine to start the model with noise resulting from previous simulation !
+!--------------------------------------------------------------------------!
+ subroutine larm_init_anom (n1,n2,n3,t_ano,q_ano,u_ano,v_ano,w_ano)
+
+   use netcdf
+   use mpi_interface, only:myid,pecount, wrxid, wryid
+
+   implicit none
+
+   integer, intent(in) :: n1,n2,n3
+   integer :: nx,ny,nz
+   integer :: k, i, j
+   integer             ::ncid,status
+   real, intent(inout) ::   &
+         t_ano(n1,n2,n3), &
+         q_ano(n1,n2,n3), &
+         u_ano(n1,n2,n3), &
+         v_ano(n1,n2,n3), &
+         w_ano(n1,n2,n3)   
+
+   character (len=88) :: lfname
+   character (len=80) :: fname
+   integer            :: varid, dimid
+
+    fname =  trim(filprf)
+    if (pecount > 1) then
+       write(lfname,'(a,a6,i4.4,i4.4,a3)') trim(fname),'.anom.',wrxid,wryid,'.nc'
+    else
+       write(lfname,'(a,a8)') trim(fname),'.anom.nc'
+    end if
+    print*, 'opening file: ', lfname
+
+!*  Open
+    status=nf90_open(lfname,nf90_nowrite,ncid)
+    if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+    if (myid==0) print*,'opened netcdf file'
+
+    status = nf90_inq_dimid(ncid, "xt", DimID)
+    status=nf90_inquire_dimension(ncid,dimid,len=nx)
+    if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+    status = nf90_inq_dimid(ncid, "yt", DimID)
+     status=nf90_inquire_dimension(ncid,dimid,len=ny)
+    if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+    status = nf90_inq_dimid(ncid, "zt", DimID)
+    status=nf90_inquire_dimension(ncid,dimid,len=nz)
+    if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+    print*,'nx=',nx,'ny=',ny,'nz=',nz
+!* Read
+    status=nf90_inq_varid(ncid,"t",varid)
+    if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+    status=nf90_get_var(ncid,varid,t_ano)
+    if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+    if (myid == 0) print*,'read in t'
+    status=nf90_inq_varid(ncid,"q",varid)
+    if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+    status=nf90_get_var(ncid,varid,q_ano)
+    if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+    if (myid == 0) print*,'read in q'
+    status=nf90_inq_varid(ncid,"u",varid)
+    if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+    status=nf90_get_var(ncid,varid,u_ano)
+    if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+    if (myid == 0) print*,'read in u'
+    status=nf90_inq_varid(ncid,"v",varid)
+    if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+    status=nf90_get_var(ncid,varid,v_ano)
+    if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+    if (myid == 0) print*,'read in v'
+    status=nf90_inq_varid(ncid,"w",varid)
+    if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+    status=nf90_get_var(ncid,varid,w_ano)
+    if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+    if (myid == 0) print*,'read in w'
+!* Close
+    status=nf90_close(ncid)
+    if (status.ne.nf90_noerr) print*,nf90_strerror(status)   
+
+ end subroutine larm_init_anom
+
+! linda, e
 
 end module init

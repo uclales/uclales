@@ -21,7 +21,7 @@ module advf
 
   implicit none
 
-  integer :: lmtr = 0 
+  integer :: lmtr = 3
 
 contains
   !

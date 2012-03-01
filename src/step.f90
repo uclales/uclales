@@ -45,6 +45,9 @@ module step
   character (len=8) :: case_name = 'astex'
 
   integer :: istp
+! linda,b
+  logical ::lanom=.true.
+!linda,e
 
 contains
   ! 
