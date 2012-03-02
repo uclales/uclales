@@ -38,7 +38,7 @@ contains
                      a_scr1, a_scr2, nstep, dt
      
     real, dimension(:,:,:), allocatable    :: rhow
-    double precision, dimension(:,:,:,:), allocatable :: flux
+    real, dimension(:,:,:,:), allocatable :: flux
     integer :: ret
     integer :: n
     integer :: nghost(3)
@@ -99,7 +99,7 @@ contains
     use util, only : atob, get_avg3
      
     real, dimension(:,:,:), allocatable    :: rhow
-    double precision, dimension(:,:,:,:), allocatable :: flux1, flux3
+    real, dimension(:,:,:,:), allocatable :: flux1, flux3
     integer :: ret
     integer :: n
     integer :: nghost(3)
@@ -160,10 +160,10 @@ contains
 
   subroutine scalarFluxDifferencesSecond(nz, nx, ny, nghost, wx1, wy1, wz1, Zrhs, rho, flux)
      integer, intent(in) :: nz, nx, ny, nghost(3)
-     double precision, intent(in) :: wx1, wy1
-     double precision, dimension(nz), intent(in) ::rho, wz1
-     double precision, dimension(3,nz,nx,ny), intent(in) :: flux
-     double precision, dimension(nz,nx,ny), intent(inout) :: Zrhs
+     real, intent(in) :: wx1, wy1
+     real, dimension(nz), intent(in) ::rho, wz1
+     real, dimension(3,nz,nx,ny), intent(in) :: flux
+     real, dimension(nz,nx,ny), intent(inout) :: Zrhs
      
      integer :: i, j, k, ilo, ihi, jlo, jhi, klo, khi
      
@@ -191,13 +191,13 @@ contains
 
   subroutine scalarFluxDifferencesFourth(nz, nx, ny, nghost, dxi, dyi, dzi, Zrhs, rho, flux1, flux3)
     integer, intent(in) :: nz, nx, ny, nghost(3)
-    double precision, intent(in) :: dxi, dyi
-    doubleprecision, dimension(nz), intent(in) :: rho(nz), dzi(nz)
-    double precision, dimension(3,nz,nx,ny), intent(in) :: flux1, flux3
-    double precision, dimension(nz,nx,ny), intent(inout) :: Zrhs
+    real, intent(in) :: dxi, dyi
+    real, dimension(nz), intent(in) :: rho, dzi
+    real, dimension(3,nz,nx,ny), intent(in) :: flux1, flux3
+    real, dimension(nz,nx,ny), intent(inout) :: Zrhs
 
     integer :: i, j, k, ilo, ihi, jlo, jhi, klo, khi
-    double precision :: wx1, wy1, wz1, wx3, wy3, wz3
+    real :: wx1, wy1, wz1, wx3, wy3, wz3
 
     ilo=nghost(1)+1
     jlo=nghost(2)+1
@@ -220,10 +220,11 @@ contains
                 Zrhs(k,i,j)=Zrhs(k,i,j) &
                              -(flux1(1,k,i+1,j)-flux1(1,k,i,j))*wx1      &
                              -(flux1(2,k,i,j+1)-flux1(2,k,i,j))*wy1      &
-                             -(flux1(3,k+1,i,j)-flux1(3,k,i,j))*wz1/rho(k)      &
-                             -(flux3(1,k,i+2,j)-flux3(1,k,i-1,j))*wx3    &
-                             -(flux3(2,k,i,j+2)-flux3(2,k,i,j-1))*wy3    &
-                             -(flux3(3,k+2,i,j)-flux3(3,k-1,i,j))*wz3/rho(k)
+                             -(flux1(3,k+1,i,j)-flux1(3,k,i,j))*wz1/rho(k)&
+!linda, changed i+2 to i and i-1 to i, same for j and k, to stay with 2 ghost cells
+                             -(flux3(1,k,i+1,j)-flux3(1,k,i,j))*wx3    &
+                             -(flux3(2,k,i,j+1)-flux3(2,k,i,j))*wy3    &
+                             -(flux3(3,k+1,i,j)-flux3(3,k,i,j))*wz3/rho(k)
              end do
          end do
      end do
@@ -233,8 +234,8 @@ contains
 
   subroutine scalarFluxSecond(nz, nx, ny, u, v, w, Z, flux)
      integer, intent(in) :: nz, nx, ny
-     double precision, dimension(nz,nx,ny), intent(in) :: u, v, w, Z
-     double precision, dimension(3,nz,nx,ny), intent(out) :: flux
+     real, dimension(nz,nx,ny), intent(in) :: u, v, w, Z
+     real, dimension(3,nz,nx,ny), intent(out) :: flux
      
      integer :: i, j, k, ilo, ihi, jlo, jhi, klo, khi
 
@@ -260,8 +261,8 @@ contains
 
   subroutine scalarFluxFourth(nz, nx, ny, u, v, w, Z, flux1, flux3)
     integer, intent(in) :: nz, nx, ny
-    double precision, dimension(nz,nx,ny), intent(in) :: u, v, w, Z
-    double precision, dimension(3,nz,nx,ny), intent(out) :: flux1, flux3
+    real, dimension(nz,nx,ny), intent(in) :: u, v, w, Z
+    real, dimension(3,nz,nx,ny), intent(out) :: flux1, flux3
 
     integer :: i, j, k, ilo, ihi, jlo, jhi, klo, khi
 
@@ -276,13 +277,13 @@ contains
     do j=jlo,jhi
         do i=ilo,ihi
             do k=klo,khi
-               flux1(1,k,i,j)=(Z(k,i-1,j)+Z(k,i,j))*u(k,i-1,j)*0.5d0
-               flux1(2,k,i,j)=(Z(k,i,j-1)+Z(k,i,j))*v(k,i,j-1)*0.5d0
-               flux1(3,k,i,j)=(Z(k-1,i,j)+Z(k,i,j))*w(k-1,i,j)*0.5d0
+               flux1(1,k,i,j)=(Z(k,i-1,j)+Z(k,i,j))*u(k,i-1,j)*0.5
+               flux1(2,k,i,j)=(Z(k,i,j-1)+Z(k,i,j))*v(k,i,j-1)*0.5
+               flux1(3,k,i,j)=(Z(k-1,i,j)+Z(k,i,j))*w(k-1,i,j)*0.5
 
-               flux3(1,k,i,j)=(Z(k,i-2,j)+Z(k,i+1,j))*u(k,i-1,j)*0.5d0
-               flux3(2,k,i,j)=(Z(k,i,j-2)+Z(k,i,j+1))*v(k,i,j-1)*0.5d0
-               flux3(3,k,i,j)=(Z(k-2,i,j)+Z(k+1,i,j))*w(k-1,i,j)*0.5d0
+               flux3(1,k,i,j)=(Z(k,i-2,j)+Z(k,i+1,j))*u(k,i-1,j)*0.5
+               flux3(2,k,i,j)=(Z(k,i,j-2)+Z(k,i,j+1))*v(k,i,j-1)*0.5
+               flux3(3,k,i,j)=(Z(k-2,i,j)+Z(k+1,i,j))*w(k-1,i,j)*0.5
             end do
         end do
     end do
@@ -292,9 +293,9 @@ contains
 
   subroutine advection_make_rhow(nz, nx, ny, w, rho, rhow)
     integer, intent(in) :: nz, nx, ny
-    double precision, dimension(nz), intent(in) :: rho
-    double precision, dimension(nz,nx,ny), intent(in) :: w
-    double precision, dimension(nz,nx,ny), intent(out) :: rhow
+    real, dimension(nz), intent(in) :: rho
+    real, dimension(nz,nx,ny), intent(in) :: w
+    real, dimension(nz,nx,ny), intent(out) :: rhow
 
     integer :: i, j, k
 
