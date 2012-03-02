@@ -8,10 +8,10 @@
   implicit none
   private
 
-  public :: open_nc, define_nc, init_anal, close_anal, write_anal
+  public :: open_nc, define_nc, init_anal, close_anal, write_anal, deflate_level
 
   integer, private, save  :: nrec0, nvar0, nbase=15
-  integer, save           :: ncid0,ncid_s, ncid_cross
+  integer, save           :: ncid0,ncid_s, ncid_cross, deflate_level
   integer, save           :: crossx, crossy, crossz
   character (len=7), dimension(30) :: crossnames
   character (len=7),  private :: v_snm='sxx    ' 
@@ -48,7 +48,7 @@ contains
     ncall = 0
     if (.not.exans) then
        call date_and_time(date)
-       iret = nf90_create(lfname,NF90_SHARE,ncid)
+       iret = nf90_create(lfname,NF90_HDF5,ncid)
 
        iret = nf90_put_att(ncid,NF90_GLOBAL,'title',ename)
        iret = nf90_put_att(ncid,NF90_GLOBAL,'history','Created on '//date)
@@ -134,7 +134,7 @@ contains
              iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,ymID    ,VarID)
           case ('tttt')
              if (present(n2) .and. present(n3)) then
-                iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tttt,VarID)
+                iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tttt,VarID, deflate_level = deflate_level)
              else
                 iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tt,VarID)
              end if

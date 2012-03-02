@@ -20,23 +20,26 @@ module modcross
 implicit none
 
   logical            :: lcross = .false., ldocross, lxy = .false., lxz = .false., lyz = .false.
-  real               :: dtcross = 60, xcross = 0., ycross = 0., zcross = 0.
-  integer            :: icross,jcross,kcross
+  real               :: dtcross = 60, xcross = 0., ycross = 0., zcross(10) = 0.
+  integer            :: icross,jcross,kcross(10) = 0, nkcross
   real               :: threstracer = 2
   real               :: thres_rw    = 1.e-8
   integer :: ncross = 0
   character(len=7), allocatable, dimension(:) :: crossname
-  integer, parameter :: nvar_all = 42
+  character(len=7), dimension(10) :: hname
+  character(len=7), dimension(80) :: hlname
+  integer, parameter :: nvar_all = 47
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
-         'l      ','rp     ','np     ','ricep  ','nicep  ', & !6-10
+         'l      ','rp     ','tv     ','ricep  ','nicep  ', & !6-10
          'rsnowp ','rgrpp  ','nsnowp ','ngrpp  ','rhailp ', & !11-15
          'nhailp ','lwp    ','rwp    ','iwp    ','swp    ', & !16-20
          'gwp    ','hwp    ','prc_acc','cnd_acc','cev_acc', & !21-25
-         'rev_acc','cldbase','cldtop ','clddept','rwpbase', & !26-30
-         'rwptop ','rwpdept','tracer ','trcpath','trcbase', & !31-35
-         'trctop ','trcdept','tdev_cl','tdev_sc','qdev_cl', & !36-40
-         'qdev_sc','cvrx   '/)                                !41-42
+         'rev_acc','cldbase','cldtop ','rwpbase','rwptop ', & !26-30
+         'tracer ','trcpath','trcbase','trctop ','wdev_cl', & !31-35
+         'wdev_sc','w_cld  ','tdev_cl','tdev_sc','t_cld  ', & !36-40
+         'qdev_cl','qdev_sc','q_cld  ','tv_cl  ','tv_sc  ', & !41-45
+         'tv_cld ','core   '/)                                !46-47
   integer :: nccrossxzid,nccrossyzid,nccrossxyid, nccrossrec, nvar
   
   interface writecross
@@ -64,11 +67,31 @@ contains
     write(cmpicoordx,'(i4.4)') wrxid
     write(cmpicoordy,'(i4.4)') wryid
     if (lxy) then
-      do k=2,nzp-1
-        if (zt(k)>zcross) exit
-      end do
-      kcross = k
-      if (zcross<0) kcross = zcross
+      nkcross = 10
+      docross: do n = 1, 10
+        select case (nint(zcross(n)))
+        case(0)
+          nkcross = n - 1
+          exit docross
+        case(-1)
+          hname(n)  = 'zi'
+          hlname(n) = 'at maximum buoyancy variance'
+        case(-2)
+          hname(n)  = 'cb'
+          hlname(n) = 'at cloud base'
+        case default
+          write(hname(n),'(i4.4)') nint(zcross(n))
+          hlname(n) = ' at '//trim(hname(n))//' m'
+          if (nint(zcross(n)) == 0) then
+          elseif (zcross(n) < 0) then
+          else
+            do k=2,nzp-1
+              if (zt(k)>zcross(n)) exit
+            end do
+            kcross(n) = k
+          end if
+        end select
+      end do docross
     end if
     if (lxz) then
       if (ycross < ym(2) .or. ycross >= ym(nyp - 2)) then
@@ -142,6 +165,10 @@ contains
         iscross = .true.
       case('t')
         longname =  'Liquid water potential temperature'
+        unit = 'K'
+        iscross = .true.
+      case('tv')
+        longname =  'Virtual potential temperature'
         unit = 'K'
         iscross = .true.
       case('r')
@@ -245,6 +272,21 @@ contains
         if (level < 2) return
         longname = 'Cloud base height'
         unit = 'm'          
+      case ('w_cld')
+        if (level < 2) return
+        longname = 'Av. In cloud vertical velocity'
+        unit = 'm/s'          
+      case ('wdev_cl')
+        longname = 'Av. Cloud layer vertical velocity'
+        unit = 'm/s'          
+      case ('wdev_sc')
+        if (level < 2) return
+        longname = 'SubCloud layer vertical velocity'
+        unit = 'm/s'          
+      case ('t_cld')
+        if (level < 2) return
+        longname = 'Av. In cloud temperature deviation'
+        unit = 'K'          
       case ('tdev_cl')
         if (level < 2) return
         longname = 'Av. Cloud layer temperature deviation'
@@ -253,6 +295,22 @@ contains
         if (level < 2) return
         longname = 'SubCloud layer temperature deviation'
         unit = 'K'          
+      case ('tv_cld')
+        if (level < 2) return
+        longname = 'Av. In cloud virt. pot. temperature deviation'
+        unit = 'K'          
+      case ('tvdev_cl')
+        if (level < 2) return
+        longname = 'Av. Cloud layer virt. temperature deviation'
+        unit = 'K'          
+      case ('tvdev_sc')
+        if (level < 2) return
+        longname = 'SubCloud layer virt. temperature deviation'
+        unit = 'K'          
+      case ('q_cld')
+        if (level < 2) return
+        longname = 'Av. In cloud humidity deviation'
+        unit = 'kg/kg'          
       case ('qdev_cl')
         if (level < 2) return
         longname = 'Av. Cloud layer humidity deviation'
@@ -265,10 +323,6 @@ contains
         if (level < 2) return
         longname = 'Cloud top height'
         unit = 'm'          
-      case ('clddept')
-        if (level < 2) return
-        longname = 'Cloud depth'
-        unit = 'm'          
       case ('rwpbase')
         if (level < 2) return
         longname = 'Rain base height'
@@ -276,10 +330,6 @@ contains
       case ('rwptop')
         if (level < 2) return
         longname = 'Rain top height'
-        unit = 'm'          
-      case ('rwpdept')
-        if (level < 2) return
-        longname = 'Rain depth'
         unit = 'm'          
       case ('trcpath')
         if (.not.lcouvreux) return
@@ -293,10 +343,9 @@ contains
         if (.not.lcouvreux) return
         longname = 'Tracer top height'
         unit = 'm'          
-      case ('trcdept')
-        if (.not.lcouvreux) return
-        longname = 'Tracer depth'
-        unit = 'm'          
+      case ('core')
+        longname = 'Max. in cloud buoyancy'
+        unit = 'K'
       case default
         return
       end select
@@ -396,8 +445,10 @@ contains
             dimname(2)            = yhname
             dimlongname(2)        = yhlongname
           end if
-          call addvar_nc(nccrossxyid, trim(name), 'xy crosssection of '//trim(longname), &
-          unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
+          do n = 1, nkcross
+            call addvar_nc(nccrossxyid, trim(name)//trim(hname(n)), 'xy crosssection of '//trim(longname)//trim(hlname(n)), &
+            unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
+          end do
           crossname(ncross) = name
         end if      
       else
@@ -434,14 +485,15 @@ contains
   subroutine triggercross(rtimee)
     use grid,      only : nxp, nyp, nzp, tname, zt, zm, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
-       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux
+       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta
     use modnetcdf, only : writevar_nc, fillvalue_double
     use util,      only : get_avg3, get_var3
+    use defs,      only : ep2
     real, intent(in) :: rtimee
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
-    real, dimension(nzp,nxp,nyp) :: tracer
-    real, dimension(nzp)         :: c1, thvar
-    integer :: n, i, j, k, ct, cb
+    real, dimension(nzp,nxp,nyp) :: tracer, tv
+    real, dimension(nzp)         :: c1, thvar, tvbar
+    integer :: n, i, j, k, ct, cb, zi
     
     if (.not. lcross) return
     
@@ -454,24 +506,43 @@ contains
       nccrossrec = nccrossrec - 1
       call writevar_nc(nccrossyzid, tname, rtimee, nccrossrec)
     end if
+    do j=3,nyp-2
+       do i=3,nxp-2
+          do k=1,nzp
+             tv(k,i,j) = a_theta(k,i,j)*(1.+ep2*a_rp(k,i,j) - liquid(k,i,j))
+          end do
+       end do
+    end do
+    call get_avg3(nzp,nxp,nyp,tv,tvbar)
+    do j=3,nyp-2
+       do i=3,nxp-2
+          do k=1,nzp
+             tv(k,i,j) = tv(k,i,j) - tvbar(k)
+          end do
+       end do
+    end do
+    call calclevel(liquid, cb, 'base')
+    call calclevel(liquid, ct, 'top')
+    call get_avg3(nzp,nxp,nyp, tv,c1)
+    call get_var3(nzp,nxp,nyp, tv, c1, thvar)
+    zi = maxloc(thvar,1)       
+    if (cb >= nzp-1) then
+      cb = zi
+    end if
 
-    select case (nint(zcross))
-    case(-1)
-         call get_avg3(nzp,nxp,nyp, a_tp,c1)
-         call get_var3(nzp,nxp,nyp, a_tp, c1, thvar)
-         kcross = max(3,maxloc(thvar,1))       
-    case(-2)
-        call calclevel(liquid, kcross, 'base')
-        if (kcross>=nzp-1) then
-         call get_avg3(nzp,nxp,nyp, a_tp,c1)
-         call get_var3(nzp,nxp,nyp, a_tp, c1, thvar)
-         kcross = max(3,maxloc(thvar,1))
-        end if
-    case default
-    end select
+    do n = 1, nkcross
+      select case (nint(zcross(n)))
+      case(-1)
+        kcross(n) = zi
+      case(-2)
+        kcross(n) = cb
+      case default
+      end select
+    end do
     if (lcouvreux) then
       call scalexcess(a_cvrxp, tracer)
     end if
+    
     do n = 1, ncross
       select case(trim(crossname(n)))
       case('u')
@@ -486,8 +557,8 @@ contains
         call writecross(crossname(n), a_rp)
       case('l')
         call writecross(crossname(n), liquid)
-      case('cvrx')
-        call writecross(crossname(n), a_cvrxp)
+      case('thv')
+        call writecross(crossname(n), tv)
       case('rp')
         call writecross(crossname(n), a_rpp)
       case('np')
@@ -574,33 +645,44 @@ contains
       case ('trcdept')
         call calcdepth(tracer, tmp)
         call writecross(crossname(n), tmp)
+      case ('w_cld')
+        call calcdevmask(a_wp, liquid, tmp)
+        call writecross(crossname(n), tmp)
+      case ('wdev_cl')
+        call calcdev(a_wp, cb, ct, tmp)
+        call writecross(crossname(n), tmp)
+      case ('wdev_sc')
+        call calcdev(a_wp, 2, cb-1, tmp)
+        call writecross(crossname(n), tmp)
+      case ('t_cld')
+        call calcdevmask(a_tp, liquid, tmp)
+        call writecross(crossname(n), tmp)
       case ('tdev_cl')
-        call calclevel(liquid, ct, 'top')
-        call calclevel(liquid, cb, 'base')
         call calcdev(a_tp, cb, ct, tmp)
         call writecross(crossname(n), tmp)
       case ('tdev_sc')
-        call calclevel(liquid, cb, 'base')
-        if (cb>=nzp-1) then
-         call get_avg3(nzp,nxp,nyp, a_tp,c1)
-         call get_var3(nzp,nxp,nyp, a_tp, c1, thvar)
-         cb = maxloc(thvar,1)       
-        end if
         call calcdev(a_tp, 2, cb-1, tmp)
         call writecross(crossname(n), tmp)
+      case ('tv_cld')
+        call calcdevmask(tv, liquid, tmp)
+        call writecross(crossname(n), tmp)
+      case ('tv_cl')
+        call calcdev(tv, cb, ct, tmp)
+        call writecross(crossname(n), tmp)
+      case ('tv_sc')
+        call calcdev(a_tp, 2, cb-1, tmp)
+        call writecross(crossname(n), tmp)
+      case ('q_cld')
+        call calcdevmask(a_rp, liquid, tmp)
+        call writecross(crossname(n), tmp)
       case ('qdev_cl')
-        call calclevel(liquid, ct, 'top')
-        call calclevel(liquid, cb, 'base')
         call calcdev(a_rp, cb, ct, tmp)
         call writecross(crossname(n), tmp)
       case ('qdev_sc')
-        call calclevel(liquid, cb, 'base')
-        if (cb>=nzp-1) then
-         call get_avg3(nzp,nxp,nyp, a_tp,c1)
-         call get_var3(nzp,nxp,nyp, a_tp, c1, thvar)
-         cb = maxloc(thvar,1)       
-        end if
         call calcdev(a_rp, 2, cb-1, tmp)
+        call writecross(crossname(n), tmp)
+      case ('core')
+        call calcmax(tv, liquid, tmp)
         call writecross(crossname(n), tmp)
       end select
     end do
@@ -613,7 +695,7 @@ contains
     character(*), intent(in)                :: crossname
     real, dimension(1:nzp, 1:nxp, 1:nyp), intent(in) :: am
     real, dimension(:,:), allocatable  :: cross
-
+    integer :: n
   ! XZ crosssection
 
     if (lxz) then
@@ -634,8 +716,10 @@ contains
   ! XY crosssection
     if (lxy) then
       allocate(cross(3:nxp-2, 3:nyp-2))
-      cross = am(kcross, 3:nxp-2, 3:nyp-2)
-      call writevar_nc(nccrossxyid, trim(crossname), cross, nccrossrec)
+      do n=1,nkcross
+        cross = am(kcross(n), 3:nxp-2, 3:nyp-2)
+        call writevar_nc(nccrossxyid, trim(crossname)//trim(hname(n)), cross, nccrossrec)
+      end do
       deallocate(cross)
     end if
 
@@ -685,6 +769,25 @@ contains
       end do
     end do
   end subroutine calcintpath
+
+  subroutine calcmax(varin, mask, varout)
+    use modnetcdf, only : fillvalue_double
+    use grid, only : nzp, nxp, nyp
+    real, intent(in), dimension(:,:,:) :: varin, mask
+    real, intent(out), dimension(3:,3:)  :: varout
+    integer :: i, j, k
+    
+    varout = fillvalue_double
+    do j=3,nyp-2
+      do i=3,nxp-2
+        do k=2,nzp-1
+          if (mask(k,i,j) > 0.) then
+            varout(i,j) = max(varout(i,j),varin(k,i,j))
+          end if
+        enddo
+      end do
+    end do
+  end subroutine calcmax
 
   subroutine calcbase(varin, varout, threshold)
     use grid, only : nzp, nxp, nyp, zt
@@ -843,6 +946,32 @@ contains
         end do
       end do
   end subroutine calcdev
+  
+  subroutine calcdevmask(varin, mask, varout)
+    use grid, only : nzp, nxp, nyp, zm, zt, a_wp, dzi_t
+    use util, only : get_avg3
+    use modnetcdf, only : fillvalue_double
+    real, intent(in), dimension(:,:,:) :: varin, mask
+    real, intent(out), dimension(3:,3:)  :: varout
+    real, dimension(nzp) :: mean, div, divmin
+    integer :: i, j, k, nr
+    varout = 0.
+    divmin = 0.
+    call get_avg3(nzp, nyp, nxp,varin,mean)
+      do j=3,nyp-2
+        do i=3,nxp-2
+          nr = count(mask(:,:,k)>0)
+          if (nr == 0) then
+            varout(i,j) = fillvalue_double
+          else
+            do k=2,nzp-1
+              varout(i,j) = varout(i,j) + varin(k,i,j) - mean(k) 
+            end do
+            varout(i,j) = varout(i,j)/real(nr)
+          end if
+        end do
+      end do
+  end subroutine calcdevmask
 !The output is the number of std. deviations over 1 that the local value of the local value 
 !is larger than the slab average. Only for points with an upward positive velocity.
   subroutine scalexcess(varin, varout)
