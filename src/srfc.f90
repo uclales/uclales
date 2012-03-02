@@ -521,7 +521,7 @@ contains
        end do
     end do
 
-       if (nstep == 3) then
+       if (nstep == 1 .and. .false.) then
        print*,"********************************"
        print*,"*********SURFACE SCALARS********"
        print*,"********************************"
@@ -685,11 +685,11 @@ contains
 
     oblav = L
 
-    print*,"**********************************************"
-    print*,"wspd2:",wspd2
-    print*,"Rib:",Rib
-    print*,"obl",minval(obl(3:nxp-2,3:nxp-2))
-    print*,"**********************************************"
+    !print*,"**********************************************"
+    !print*,"wspd2:",wspd2
+    !print*,"Rib:",Rib
+    !print*,"obl",minval(obl(3:nxp-2,3:nxp-2))
+    !print*,"**********************************************"
 
     return
   end subroutine getobl
@@ -816,7 +816,7 @@ contains
 
         !" 1.1 - Calculate net radiation (average in time (nradtime))
         if(iradtyp == 4) then
-            if(nstep == 3) then
+            if(nstep == 1) then
               sflxd_avn(2:nradtime,i,j) = sflxd_avn(1:nradtime-1,i,j)
               sflxu_avn(2:nradtime,i,j) = sflxu_avn(1:nradtime-1,i,j)
               lflxd_avn(2:nradtime,i,j) = lflxd_avn(1:nradtime-1,i,j)
@@ -828,10 +828,15 @@ contains
               lflxu_avn(1,i,j) = a_lflxu(1,i,j)
             end if
 
-            sflxd_av = sum(sflxd_avn(:,i,j))/nradtime
-            sflxu_av = sum(sflxu_avn(:,i,j))/nradtime
-            lflxd_av = sum(lflxd_avn(:,i,j))/nradtime
-            lflxu_av = sum(lflxu_avn(:,i,j))/nradtime
+            !sflxd_av = sum(sflxd_avn(:,i,j))/nradtime
+            !sflxu_av = sum(sflxu_avn(:,i,j))/nradtime
+            !lflxd_av = sum(lflxd_avn(:,i,j))/nradtime
+            !lflxu_av = sum(lflxu_avn(:,i,j))/nradtime
+
+            sflxd_av = sum(sflxd_avn(:,:,:))/nradtime/(nxp-4)/(nyp-4)
+            sflxu_av = sum(sflxu_avn(:,:,:))/nradtime/(nxp-4)/(nyp-4)
+            lflxd_av = sum(lflxd_avn(:,:,:))/nradtime/(nxp-4)/(nyp-4)
+            lflxu_av = sum(lflxu_avn(:,:,:))/nradtime/(nxp-4)/(nyp-4)
 
             Qnet(i,j) = (sflxd_av - sflxu_av + lflxd_av - lflxu_av)
             
@@ -840,9 +845,10 @@ contains
           Qnet(i,j) = Qnetav
         end if
 
-       if ((nstep==3) .and. (i==10) .and. (j==10) .and. .true.) then
-          print*,"Qnet,sd,su,ld,lu",Qnet(10,10),Qnet(20,20),sflxd_av,sflxu_av,lflxd_av,lflxu_av
-       end if
+        if ((nstep==1) .and. (i==10) .and. (j==10) .and. .false.) then
+        print*,"Qnet***************sflxd*******************a_sflxd*******************lflxd*******************lflxu
+          print*,Qnet(10,10),sflxd_av,a_sflxd(2,i,j),lflxd_av,lflxu_av
+        end if
 
         !" 2.1 - Calculate the surface resistance with vegetation
 
@@ -1023,7 +1029,7 @@ contains
       
     call qtsurf
 
-        if (nstep==3) then
+        if (nstep==1 .and. .false.) then
         print*,"********************************"
         print*,"timestep dt (0,...,dtlong)",dt
         print*,"********************************"
