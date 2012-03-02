@@ -86,6 +86,7 @@ contains
          case_name,lsvarflg, sst, div, wctime , tau                  !irina
 !cgils         
     use modnetcdf, only : lsync, deflate_level
+    use ncio, only : deflev => deflate_level
     use modcross, only : lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars
     use forc, only : lstendflg, sfc_albedo     
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
@@ -137,7 +138,7 @@ contains
          lwaterbudget, &                 ! axel: flag for liquid water budget diagnostics (only level=3)
          lcouvreux , tau , &                    ! The Couvreux 'radioactive' scalar
          deflate_level                          !Compression of the crosssections
-
+    deflev = deflate_level
     ps       = 0.
     ts       = th00
     !
