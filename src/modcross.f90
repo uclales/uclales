@@ -135,9 +135,9 @@ contains
     use modnetcdf,     only : addvar_nc
     use mpi_interface, only : appl_abort
     use grid,          only : level, ictr, ihlf, nzp, nxp, nyp, zt, xt, yt, zm, xm, ym, &
-                            zname, zlongname, zunit, zhname, zhlongname, &
-                            xname, xlongname, xunit, xhname, xhlongname, &
-                            yname, ylongname, yunit, yhname, yhlongname, &
+                            zname, zlongname, zunit, &
+                            xname, xlongname, xunit, &
+                            yname, ylongname, yunit, &
                             tname, tlongname, tunit, &
                             lwaterbudget, lcouvreux
 
@@ -379,24 +379,13 @@ contains
           dimunit(2) = xunit
           dimsize(1) = nzp - 2
           dimsize(2) = nxp - 4
-          if(loc(1)==ictr) then
-            dimvalues(1:nzp-2,1)  = zt(2:nzp-1)
-            dimname(1)            = zname
-            dimlongname(1)        = zlongname
-          else
-            dimvalues(1:nzp-2,1)  = zm(2:nzp-1)
-            dimname(1)            = zhname
-            dimlongname(1)        = zhlongname
-          end if
-          if(loc(2)==ictr) then
-            dimvalues(1:nxp-4,2)  = xt(3:nxp-2)
-            dimname(2)            = xname
-            dimlongname(2)        = xlongname
-          else
-            dimvalues(1:nxp-4,2)  = xm(3:nxp-2)
-            dimname(2)            = xhname
-            dimlongname(2)        = xhlongname
-          end if
+          dimvalues(1:nzp-2,1)  = zt(2:nzp-1)
+          dimname(1)            = zname
+          dimlongname(1)        = zlongname
+          
+          dimvalues(1:nxp-4,2)  = xt(3:nxp-2)
+          dimname(2)            = xname
+          dimlongname(2)        = xlongname
           call addvar_nc(nccrossxzid, trim(name), 'xz crosssection of '//trim(longname), &
           unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
           crossname(ncross) = name
@@ -406,24 +395,12 @@ contains
           dimunit(2) = yunit
           dimsize(1) = nzp - 2
           dimsize(2) = nyp - 4
-          if(loc(1)==ictr) then
-            dimvalues(1:nzp-2,1)  = zt(2:nzp-1)
-            dimname(1)            = zname
-            dimlongname(1)        = zlongname
-          else
-            dimvalues(1:nzp-2,1)  = zm(2:nzp-1)
-            dimname(1)            = zhname
-            dimlongname(1)        = zhlongname
-          end if
-          if(loc(2)==ictr) then
-            dimvalues(1:nyp-4,2)  = yt(3:nyp-2)
-            dimname(2)            = yname
-            dimlongname(2)        = ylongname
-          else
-            dimvalues(1:nyp-4,2)  = ym(3:nyp-2)
-            dimname(2)            = yhname
-            dimlongname(2)        = yhlongname
-          end if
+          dimvalues(1:nzp-2,1)  = zt(2:nzp-1)
+          dimname(1)            = zname
+          dimlongname(1)        = zlongname
+          dimvalues(1:nyp-4,2)  = yt(3:nyp-2)
+          dimname(2)            = yname
+          dimlongname(2)        = ylongname
           call addvar_nc(nccrossyzid, trim(name), 'yz crosssection of '//trim(longname), &
           unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
           crossname(ncross) = name
@@ -434,24 +411,12 @@ contains
           dimunit(2) = yunit
           dimsize(1) = nxp - 4
           dimsize(2) = nyp - 4
-          if(loc(1)==ictr) then
-            dimvalues(1:nxp-4,1)  = xt(3:nxp-2)
-            dimname(1)            = xname
-            dimlongname(1)        = xlongname
-          else
-            dimvalues(1:nxp-4,1)  = xm(3:nxp-2)
-            dimname(1)            = xhname
-            dimlongname(1)        = xhlongname
-          end if
-          if(loc(2)==ictr) then
-            dimvalues(1:nyp-4,2)  = yt(3:nyp-2)
-            dimname(2)            = yname
-            dimlongname(2)        = ylongname
-          else
-            dimvalues(1:nyp-4,2)  = ym(3:nyp-2)
-            dimname(2)            = yhname
-            dimlongname(2)        = yhlongname
-          end if
+          dimvalues(1:nxp-4,1)  = xt(3:nxp-2)
+          dimname(1)            = xname
+          dimlongname(1)        = xlongname
+          dimvalues(1:nyp-4,2)  = yt(3:nyp-2)
+          dimname(2)            = yname
+          dimlongname(2)        = ylongname
           do n = 1, nkcross
             call addvar_nc(nccrossxyid, trim(name)//trim(hname(n)), 'xy crosssection of '//trim(longname)//' at '//trim(hlname(n)), &
             unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
@@ -463,24 +428,12 @@ contains
         dimunit(2) = yunit
         dimsize(1) = nxp - 4
         dimsize(2) = nyp - 4
-        if(loc(1)==ictr) then
-          dimvalues(1:nxp-4,1)  = xt(3:nxp-2)
-          dimname(1)            = xname
-          dimlongname(1)        = xlongname
-        else
-          dimvalues(1:nxp-4,1)  = xm(3:nxp-2)
-          dimname(1)            = xhname
-          dimlongname(1)        = xhlongname
-        end if
-        if(loc(2)==ictr) then
-          dimvalues(1:nyp-4,2)  = yt(3:nyp-2)
-          dimname(2)            = yname
-          dimlongname(2)        = ylongname
-        else
-          dimvalues(1:nyp-4,2)  = ym(3:nyp-2)
-          dimname(2)            = yhname
-          dimlongname(2)        = yhlongname
-        end if
+        dimvalues(1:nxp-4,1)  = xt(3:nxp-2)
+        dimname(1)            = xname
+        dimlongname(1)        = xlongname
+        dimvalues(1:nyp-4,2)  = yt(3:nyp-2)
+        dimname(2)            = yname
+        dimlongname(2)        = ylongname
         call addvar_nc(nccrossxyid, trim(name), trim(longname), &
         unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
         crossname(ncross) = name
@@ -490,7 +443,7 @@ contains
   end subroutine addcross
 
   subroutine triggercross(rtimee)
-    use grid,      only : nxp, nyp, nzp, tname, zt, zm, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
+    use grid,      only : nxp, nyp, nzp, tname, zt, zm, dzi_m, dzi_t, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
        prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta
     use modnetcdf, only : writevar_nc, fillvalue_double
@@ -498,7 +451,7 @@ contains
     use defs,      only : ep2
     real, intent(in) :: rtimee
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
-    real, dimension(nzp,nxp,nyp) :: tracer, tv
+    real, dimension(nzp,nxp,nyp) :: tracer, tv, interp
     real, dimension(nzp)         :: c1, thvar, tvbar
     integer :: n, i, j, k, ct, cb, zi
     
@@ -558,10 +511,31 @@ contains
     do n = 1, ncross
       select case(trim(crossname(n)))
       case('u')
-        call writecross(crossname(n), a_up)
+        do j=3,nyp-2
+          do i=3,nxp-2
+              do k=1,nzp
+                interp(k,i,j) = 0.5*(a_up(k,i-1,j) + a_up(k,i,j))
+              end do
+          end do
+        end do
+        call writecross(crossname(n), interp)
       case('v')
-        call writecross(crossname(n), a_vp)
+        do j=3,nyp-2
+          do i=3,nxp-2
+              do k=1,nzp
+                interp(k,i,j) = 0.5*(a_vp(k,i,j-1) + a_vp(k,i,j))
+              end do
+          end do
+        end do
+        call writecross(crossname(n), interp)
       case('w')
+        do j=3,nyp-2
+          do i=3,nxp-2
+              do k=1,nzp
+                interp(k,i,j) = 0.5*dzi_t(k) * (a_wp(k-1,i,j) / dzi_m(k) + a_wp(k,i,j) / dzi_m(k-1))
+              end do
+          end do
+        end do
         call writecross(crossname(n), a_wp)
       case('t')
         call writecross(crossname(n), a_tp)
