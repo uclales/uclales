@@ -26,8 +26,8 @@ implicit none
   real               :: thres_rw    = 1.e-8
   integer :: ncross = 0
   character(len=7), allocatable, dimension(:) :: crossname
-  character(len=7), dimension(10) :: hname
-  character(len=7), dimension(80) :: hlname
+  character(len=7),  dimension(10) :: hname
+  character(len=80), dimension(10) :: hlname
   integer, parameter :: nvar_all = 47
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
@@ -55,8 +55,10 @@ contains
 !-------------------
   subroutine initcross(rtimee, expname)
     use mpi_interface,   only : wrxid, wryid
-    use modnetcdf,       only : open_nc
-    use grid,            only : nzp, nxp, nyp, zt, xt, yt, xm, ym
+    use modnetcdf,       only : open_nc, addvar_nc
+    use grid,            only : nzp, nxp, nyp, zt, xt, yt, xm, ym, &
+                                tname, tlongname, tunit
+
     real, intent(in) :: rtimee
     integer :: n
     character(len=*), intent(in) :: expname
@@ -75,10 +77,10 @@ contains
           exit docross
         case(-1)
           hname(n)  = 'zi'
-          hlname(n) = 'at maximum buoyancy variance'
+          hlname(n) = 'Maximum buoyancy variance'
         case(-2)
           hname(n)  = 'cb'
-          hlname(n) = 'at cloud base'
+          hlname(n) = 'Cloud base'
         case default
           write(hname(n),'(i4.4)') nint(zcross(n))
           hlname(n) = ' at '//trim(hname(n))//' m'
@@ -119,6 +121,11 @@ contains
 
 !     if (.not.(lxy .or. lxz .or. lyz)) lcross = .false.
     if (lcross) call open_nc(trim(expname)//'.out.xy.'//cmpicoordx//'.'//cmpicoordy//'.nc', nccrossxyid, nccrossrec, rtimee)
+    do n=1,nkcross
+     if (zcross(n) < 0) then
+       call addvar_nc(nccrossxyid, trim(hname(n)),trim(hlname(n)), 'm', (/tname/), (/tlongname/), (/tunit/))
+      end if
+    end do
     do n=1,nvar_all
       call addcross(crossvars(n))
     end do
@@ -446,7 +453,7 @@ contains
             dimlongname(2)        = yhlongname
           end if
           do n = 1, nkcross
-            call addvar_nc(nccrossxyid, trim(name)//trim(hname(n)), 'xy crosssection of '//trim(longname)//trim(hlname(n)), &
+            call addvar_nc(nccrossxyid, trim(name)//trim(hname(n)), 'xy crosssection of '//trim(longname)//' at '//trim(hlname(n)), &
             unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
           end do
           crossname(ncross) = name
@@ -521,6 +528,8 @@ contains
           end do
        end do
     end do
+
+    
     call calclevel(liquid, cb, 'base')
     call calclevel(liquid, ct, 'top')
     call get_avg3(nzp,nxp,nyp, tv,c1)
@@ -534,7 +543,10 @@ contains
       select case (nint(zcross(n)))
       case(-1)
         kcross(n) = zi
+        call writevar_nc(nccrossxyid, trim(hname(n)), zt(zi), nccrossrec)
+  
       case(-2)
+        call writevar_nc(nccrossxyid, trim(hname(n)), zt(cb), nccrossrec)
         kcross(n) = cb
       case default
       end select
@@ -557,7 +569,7 @@ contains
         call writecross(crossname(n), a_rp)
       case('l')
         call writecross(crossname(n), liquid)
-      case('thv')
+      case('tv')
         call writecross(crossname(n), tv)
       case('rp')
         call writecross(crossname(n), a_rpp)
