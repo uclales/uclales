@@ -960,7 +960,7 @@ contains
     call get_avg3(nzp, nyp, nxp,varin,mean)
       do j=3,nyp-2
         do i=3,nxp-2
-          nr = count(mask(:,:,k)>0)
+          nr = count(mask(2:nzp-1,i,j)>0)
           if (nr == 0) then
             varout(i,j) = fillvalue_double
           else
