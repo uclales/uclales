@@ -783,6 +783,8 @@ contains
 
     nfl(n1) = 0.
     rfl(n1) = 0.
+    vn = 0.
+    vr = 0.
     do k=n1-1,2,-1
       if (rp(k) > 0.) then
         Xp = rp(k) / np(k)
