@@ -784,29 +784,30 @@ contains
     nfl(n1) = 0.
     rfl(n1) = 0.
     do k=n1-1,2,-1
+      if (rp(k) > 0.) then
+        Xp = rp(k) / np(k)
+        !
+        ! Adjust Dm and mu-Dm and Dp=1/lambda following Milbrandt & Yau
+        !
+        Dm = ( 6. / (rowt*pi) * Xp )**(1./3.)
+        mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))
+        Dp = (Dm**3/((mu+3.)*(mu+2.)*(mu+1.)))**(1./3.)
 
-       Xp = rp(k) / (np(k)+eps0)
-       !
-       ! Adjust Dm and mu-Dm and Dp=1/lambda following Milbrandt & Yau
-       !
-       Dm = ( 6. / (rowt*pi) * Xp )**(1./3.)
-       mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))
-       Dp = (Dm**3/((mu+3.)*(mu+2.)*(mu+1.)))**(1./3.)
+        vn(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
+        vr(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
+        !
+        ! Set fall speeds following Khairoutdinov and Kogan
 
-       vn(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
-       vr(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
-       !
-       ! Set fall speeds following Khairoutdinov and Kogan
-
-       !              if (khairoutdinov) then
-       !                 vn(k) = max(0.,an * Dp + bn)
-       !                 vr(k) = max(0.,aq * Dp + bq)
-       !              end if
-       !irina-olivier
-       if (khairoutdinov) then
-          vn(k) = max(0.,an * Dp + bn)
-          vr(k) = max(0.,aq * Dp + bq)
-       end if
+        !              if (khairoutdinov) then
+        !                 vn(k) = max(0.,an * Dp + bn)
+        !                 vr(k) = max(0.,aq * Dp + bq)
+        !              end if
+        !irina-olivier
+        if (khairoutdinov) then
+            vn(k) = max(0.,an * Dp + bn)
+            vr(k) = max(0.,aq * Dp + bq)
+        end if
+      end if
     end do
 
     do k=2,n1-1
@@ -911,17 +912,19 @@ contains
     !
     rfl(n1) = 0.
     do k=n1-1,2,-1
-       Xc = rc(k) / (cldw%nr+eps0)
-       Dc = ( Xc / prw )**(1./3.)
-       vc = min(c*(Dc*0.5)**2 * exp(4.5*(log(sgg))**2),1./(dzi_t(k)*dt))
-       !               vc = min(c*(Dc*0.5)**2 * exp(5*(log(1.3))**2),1./(dzi_t(k)*dt))
-       rfl(k) = - rc(k) * vc
-       !
-       kp1=k+1
-       flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)
-       rc(k) = rc(k)-flxdiv*dt
-       tl(k) = tl(k)+flxdiv*convliq(k)*dt
-       rrate(k)    = -rfl(k)
+      if (rc(k) > 0.) then
+        Xc = rc(k) / cldw%nr
+        Dc = ( Xc / prw )**(1./3.)
+        vc = min(c*(Dc*0.5)**2 * exp(4.5*(log(sgg))**2),1./(dzi_t(k)*dt))
+        !               vc = min(c*(Dc*0.5)**2 * exp(5*(log(1.3))**2),1./(dzi_t(k)*dt))
+        rfl(k) = - rc(k) * vc
+        !
+      end if
+      kp1=k+1
+      flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)
+      rc(k) = rc(k)-flxdiv*dt
+      tl(k) = tl(k)+flxdiv*convliq(k)*dt
+      rrate(k)    = -rfl(k)
     end do
 
   end subroutine sedim_cd
