@@ -740,10 +740,11 @@ contains
              rc(k) = rc(k) - ac
              tl(k) = tl(k) + convliq(k)*ac
 
+
+             sc = k_rr * np(k) * rp(k) * sqrt(rho_0*dn0(k))
+             sc = min(sc, np(k))
+             np(k) = np(k) - sc
           end if
-          sc = k_rr * np(k) * rp(k) * sqrt(rho_0*dn0(k)) * sc
-          sc = min(sc, np(k))
-          np(k) = np(k) - sc
        end if
     end do
 
@@ -786,8 +787,10 @@ contains
     vn = 0.
     vr = 0.
     do k=n1-1,2,-1
-      if (rp(k) > 0.) then
+      if (rp(k) > rthres) then
         Xp = rp(k) / np(k)
+        xp = MIN(MAX(xp,rain%x_min),rain%x_max)
+     
         !
         ! Adjust Dm and mu-Dm and Dp=1/lambda following Milbrandt & Yau
         !
@@ -809,7 +812,10 @@ contains
             vn(k) = max(0.,an * Dp + bn)
             vr(k) = max(0.,aq * Dp + bq)
         end if
+        vn(k) = min(max(vn(k),0.1),20.)
+        vr(k) = min(max(vr(k),0.1),20.)
       end if
+      
     end do
 
     do k=2,n1-1
@@ -848,8 +854,8 @@ contains
             &                                     2.*(maxi-rp(k)))
     enddo
 
-    rfl(n1-1) = 0.
-    nfl(n1-1) = 0.
+    rfl = 0.
+    nfl = 0.
     do k=n1-2,2,-1
 
        kk = k
@@ -862,6 +868,7 @@ contains
           kk  = kk + 1
           cc  = min(1.,cn(kk) - zz*dzi_t(kk))
        enddo
+       tot = min(tot,dn0(k)/dzi_t(k) * np(k) - nfl(k+1) * dt - rthres)  
        nfl(k) = -tot /dt
 
        kk = k
@@ -874,6 +881,7 @@ contains
           kk  = kk + 1
           cc  = min(1.,cr(kk) - zz*dzi_t(kk))
        enddo
+       tot = min(tot,dn0(k)/dzi_t(k) * rp(k) - rfl(k+1) * dt - rthres)
        rfl(k) = -tot /dt
 
        kp1=k+1
@@ -912,7 +920,7 @@ contains
     !
     ! calculate the precipitation flux and its effect on r_t and theta_l
     !
-    rfl(n1) = 0.
+    rfl = 0.
     do k=n1-1,2,-1
       if (rc(k) > 0.) then
         Xc = rc(k) / cldw%nr
@@ -2035,8 +2043,9 @@ contains
     end if
 
     do k=n1-1,2,-1
-
-       Xp = rp(k) / (np(k)+eps0)
+      if (rp(k) > rthres) then
+       Xp = rp(k) / np(k)
+       xp = MIN(MAX(xp,meteor%x_min),meteor%x_max)
        lam = ( c_lam(metnr) * xp )**(meteor%b_vel)
        vr(k) = alfq(metnr) * lam
        vr(k) = max(vr(k),vmin)
@@ -2047,6 +2056,10 @@ contains
        vn(k) = max(vn(k),vmin)
        vn(k) = min(vn(k),vlimit)
        !      vn(k) = -vn(k)
+      else
+        vr(k) = 0.
+        vn(k) = 0.
+      end if
     end do
     do k=2,n1-1
        kp1 = min(k+1,n1-1)
@@ -2103,6 +2116,7 @@ contains
           kk  = kk + 1
           cc  = min(1.,cn(kk) - zz*dzi_t(kk))
        enddo
+       tot = min(tot,dn0(k)/dzi_t(k) * np(k) - nfl(k+1) * dtsedi - rthres)  
        nfl(k) = -tot /dtsedi
 
        kk = k
@@ -2116,6 +2130,7 @@ contains
           kk  = kk + 1
           cc  = min(1.,cr(kk) - zz*dzi_t(kk))
        enddo
+       tot = min(tot,dn0(k)/dzi_t(k) * rp(k) - rfl(k+1) * dtsedi - rthres)
        rfl(k) = -tot /dtsedi
 
        kp1=k+1
@@ -2594,7 +2609,7 @@ contains
     real, dimension(:), intent(inout), optional :: num
 
     if (any(mass < 0.)) then
-      print *, trim(meteor%name), 'below zero', mass
+      print *, trim(meteor%name), 'below zero'!, mass
     end if
     where (mass < rthres)
        mass = 0.
