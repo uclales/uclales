@@ -20,6 +20,7 @@
 module cldwtr
 
   use defs, only : nv, mb
+  implicit none
   integer, save :: nsizes
   logical, save :: Initialized = .False.
 
@@ -47,18 +48,18 @@ contains
          stop 'TERMINATING: incompatible cldwtr.dat file'
 
     allocate (re(nsizes),fl(nsizes),bz(nsizes,mb),wz(nsizes,mb),gz(nsizes,mb))
-    if (myid==0) write(frmt,'(A1,I2.2,A8)') '(',mb,'E15.7)    '
+    write(frmt,'(A1,I2.2,A8)') '(',mb,'E15.7)    '
     read (71,frmt) (cntrs(i), i=1,mb)
     do i=1,mb
        if (spacing(1.) < abs(cntrs(i)- center(band(i))) ) &
             stop 'TERMINATING: cloud properties not matched to band structure'
     end do
 
-    if (myid==0) write(frmt,'(A1,I2.2,A9)') '(',nsizes,'E15.7)   '
+    write(frmt,'(A1,I2.2,A9)') '(',nsizes,'E15.7)   '
     read (71,frmt) (re(i), i=1,nsizes)
     read (71,frmt) (fl(i), i=1,nsizes)
 
-    if (myid==0)     write(frmt,'(A1,I4.4,A7)') '(',nsizes*mb,'E15.7) '
+    write(frmt,'(A1,I4.4,A7)') '(',nsizes*mb,'E15.7) '
     read (71,frmt) ((bz(i,ib), i=1,nsizes), ib=1,mb)
     read (71,frmt) ((wz(i,ib), i=1,nsizes), ib=1,mb)
     read (71,frmt) ((gz(i,ib), i=1,nsizes), ib=1,mb)
