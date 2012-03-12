@@ -47,6 +47,7 @@ contains
     use thrm, only: rslf
     use stat, only: sfc_stat, sflg
     use mpi_interface, only : nypg, nxpg, double_array_par_sum
+    use mpi_interface, only: myid
 
     implicit none
  
@@ -192,6 +193,7 @@ contains
           init_lsm = .false.
        end if
 
+       !Local or filtered variables for flux calculation
        if (local) then
        u0bar(:,:,:)  = a_up(:,:,:)
        v0bar(:,:,:)  = a_vp(:,:,:)
@@ -237,8 +239,17 @@ contains
           end do
        end do
 
-       !Get skin temperature and humidity from land surface model
+       !Get skin temperature and humidity from land surface model(van Heerwarden)
        call lsm
+
+       !Update tskin and qskin (local or filtered) for flux calculation
+       if (local) then
+         tskinbar(:,:) = tskin(:,:)
+         qskinbar(:,:) = qskin(:,:)
+         else
+         tskinbar(:,:) = sum(tskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+         qskinbar(:,:) = sum(qskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+       end if
 
        !Calculate the surface fluxes with bulk law (Fairall, 2003)
        !Fluxes in kinematic form with units [K m/s] and [kg/kg m/s]
@@ -266,6 +277,15 @@ contains
 
           if  (wq_sfc(i,j) .lt. 0) then
              wq_sfc(i,j) = 0.
+          end if
+
+          if (nstep==1 .and. i==5 .and. j==5 .and. .false.) then
+          print*,"*****************************************************************"
+          print*,"LHF(5,5):",wq_sfc(5,5)*alvl*(dn0(1)+dn0(2))*0.5
+          print*,"*****************************************************************"
+          print*,"LHF(mean),LHF(max),LHF(min):",sum(wq_sfc(3:nxp-2,3:nyp-2))*alvl*(dn0(1)+dn0(2))*0.5/(nxp-4)/(nyp-4),  &
+                 maxval(wq_sfc(3:nxp-2,3:nyp-2)*alvl*(dn0(1)+dn0(2))*0.5), minval(wq_sfc(3:nxp-2,3:nyp-2)*alvl*(dn0(1)+dn0(2))*0.5)
+          print*,"*****************************************************************"
           end if
 
           end do
@@ -580,7 +600,7 @@ contains
 
   !
   ! ----------------------------------------------------------------------
-  ! subroutine: getobl - Calculates the Obuhkov length iteratively.
+  ! subroutine: getobl - Calculates the Obuhkov length iteratively. (van Heerwarden)
   !
   subroutine getobl
     use defs, only: g,ep2
@@ -770,7 +790,7 @@ contains
   !
   ! ----------------------------------------------------------
   ! Malte: LSM to calculate temperature and moisture at the surface
-  ! DALES (vanHeerwaarden)
+  ! DALES (van Heerwaarden)
   ! "PLEASE NOTE: LSM variables are defined and initialized in lsmdata.f90
   !
   subroutine lsm
@@ -779,6 +799,7 @@ contains
     use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, liquid, zt, &
                     psrf, th00, umean, vmean, dn0, iradtyp, dt, &
 		    a_lflxu, a_lflxd, a_sflxu, a_sflxd, nstep, press
+    use mpi_interface, only: myid
 
     integer  :: i, j, k
     real     :: f1, f2, f3, f4, fsoil !Correction functions for Jarvis-Stewart
@@ -814,48 +835,51 @@ contains
     do j = 3, nyp-2
       do i = 3, nxp-2
 
-        !" 1.1 - Calculate net radiation (average in time (nradtime))
+        !" 1.1 - Calculate net radiation (average over nradtime)
         if(iradtyp == 4) then
             if(nstep == 1) then
+
               sflxd_avn(2:nradtime,i,j) = sflxd_avn(1:nradtime-1,i,j)
               sflxu_avn(2:nradtime,i,j) = sflxu_avn(1:nradtime-1,i,j)
               lflxd_avn(2:nradtime,i,j) = lflxd_avn(1:nradtime-1,i,j)
               lflxu_avn(2:nradtime,i,j) = lflxu_avn(1:nradtime-1,i,j)
 
-              sflxd_avn(1,i,j) = a_sflxd(1,i,j)
-              sflxu_avn(1,i,j) = a_sflxu(1,i,j)
-              lflxd_avn(1,i,j) = a_lflxd(1,i,j)
-              lflxu_avn(1,i,j) = a_lflxu(1,i,j)
+              sflxd_avn(1,i,j) = a_sflxd(2,i,j)
+              sflxu_avn(1,i,j) = a_sflxu(2,i,j)
+              lflxd_avn(1,i,j) = a_lflxd(2,i,j)
+              lflxu_avn(1,i,j) = a_lflxu(2,i,j)
+
+              !Surface radiation averaged over nradtime but depends on location
+              sflxd_av = sum(sflxd_avn(:,i,j))/nradtime
+              sflxu_av = sum(sflxu_avn(:,i,j))/nradtime
+              lflxd_av = sum(lflxd_avn(:,i,j))/nradtime
+              lflxu_av = sum(lflxu_avn(:,i,j))/nradtime
+
+              !Surface radiation averaged over nradtime and over domain
+              !sflxd_av = sum(sflxd_avn(:,3:nxp-2,3:nyp-2))/nradtime/(nxp-4)/(nyp-4)
+              !sflxu_av = sum(sflxu_avn(:,3:nxp-2,3:nyp-2))/nradtime/(nxp-4)/(nyp-4)
+              !lflxd_av = sum(lflxd_avn(:,3:nxp-2,3:nyp-2))/nradtime/(nxp-4)/(nyp-4)
+              !lflxu_av = sum(lflxu_avn(:,3:nxp-2,3:nyp-2))/nradtime/(nxp-4)/(nyp-4)
+
+              !Surface radiation averaged over domain per timestep
+              !sflxd_av = sum(a_sflxd(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+              !sflxu_av = sum(a_sflxu(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+              !lflxd_av = sum(a_lflxd(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+              !lflxu_av = sum(a_lflxu(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+
+              Qnet(i,j) = (sflxd_av - sflxu_av + lflxd_av - lflxu_av)
+
             end if
-
-            !sflxd_av = sum(sflxd_avn(:,i,j))/nradtime
-            !sflxu_av = sum(sflxu_avn(:,i,j))/nradtime
-            !lflxd_av = sum(lflxd_avn(:,i,j))/nradtime
-            !lflxu_av = sum(lflxu_avn(:,i,j))/nradtime
-
-            sflxd_av = sum(sflxd_avn(:,:,:))/nradtime/(nxp-4)/(nyp-4)
-            sflxu_av = sum(sflxu_avn(:,:,:))/nradtime/(nxp-4)/(nyp-4)
-            lflxd_av = sum(lflxd_avn(:,:,:))/nradtime/(nxp-4)/(nyp-4)
-            lflxu_av = sum(lflxu_avn(:,:,:))/nradtime/(nxp-4)/(nyp-4)
-
-            Qnet(i,j) = (sflxd_av - sflxu_av + lflxd_av - lflxu_av)
-            
         else
           !" Not using full radiation: use average radiation from Namelist
           Qnet(i,j) = Qnetav
-        end if
-
-        if ((nstep==1) .and. (i==10) .and. (j==10) .and. .false.) then
-        print*,"Qnet***************sflxd*******************a_sflxd*******************lflxd*******************lflxu
-          print*,Qnet(10,10),sflxd_av,a_sflxd(2,i,j),lflxd_av,lflxu_av
         end if
 
         !" 2.1 - Calculate the surface resistance with vegetation
 
         !" a) Stomatal opening as a function of incoming short wave radiation
         if (iradtyp == 4) then
-          f1  = 1. / min(1., (0.004 * max(0.,sflxd_av) + 0.05) / &
-                (0.81 * (0.004 * max(0.,sflxd_av) + 1.)))
+          f1  = 1. ! / min(1., (0.004 * max(0.,sflxd_av) + 0.05) / (0.81 * (0.004 * max(0.,sflxd_av) + 1.)) )
         else
           f1  = 1.
         end if
@@ -875,7 +899,8 @@ contains
         !" d) Response to temperature
         f4      = 1./ (1. - 0.0016 * (298.0 - Tatm) ** 2.)
         rsveg(i,j)  = rsmin(i,j) / LAI(i,j) * f1 * f2 * f3 * f4
-
+        if (myid==2 .and. nstep==1 .and. i==5 .and. j==5) print*,"f1,f2,f3,f4,rsveg:",f1,f2,f3,f4,rsveg(i,j)
+         
         !" 2.2 - Calculate soil resistance based on ECMWF method
         fsoil  = (phifc - phiwp) / (phiw(i,j,1) - phiwp)
         fsoil  = max(fsoil, 1.)
@@ -899,13 +924,14 @@ contains
                   (tsurfm-273.16) / (tsurfm-35.86)**2.)
         dqsatdT = 0.622 * desatdT / psrf
 
-        !" First, remove LWup from Qnet calculation
+        !" Remove LWup from Qnet calculation (if running without radiation)
         Qnet(i,j) = Qnet(i,j) + stefan * (tskinm(i,j)*exner)**4.
- 
+
         !" Allow for dew fall and calculate dew water on leaves
         if(qsat - vapor(2,i,j) < 0.) then
           rsveg(i,j)  = 0.
           rssoil(i,j) = 0.
+          print*,"Dew fall!!!!!!!!!!!!!!!!!!!!"
         end if
 
         Wlmx      = LAI(i,j) * Wmax
@@ -923,7 +949,7 @@ contains
         fLE     = fLEveg + fLEsoil + fLEliq
 
         !" Weighted timestep in runge-kutta scheme
-        rk3coef = dt / (4- dble(nstep))
+        rk3coef = dt / (4 - dble(nstep))
 
         !" Compute skin temperature from linarized surface energy balance
         Acoef   = Qnet(i,j) - stefan * (tskinm(i,j)*exner) **4. &
@@ -947,11 +973,28 @@ contains
         G0(i,j)   = lambdaskin(i,j) * ( tskin(i,j) * exner - tsoil(i,j,1) )
 
         qskinn    = (dqsatdT * (tskin(i,j)*exner - tskinm(i,j)*exner) + qsat)
-        LE(i,j)   = - fLE     * ( vapor(2,i,j) - qskinn)
 
+        LE(i,j)   = - fLE     * ( vapor(2,i,j) - qskinn)
         LEveg     = - fLEveg  * ( vapor(2,i,j) - qskinn)
         LEsoil    = - fLEsoil * ( vapor(2,i,j) - qskinn)
         LEliq     = - fLEliq  * ( vapor(2,i,j) - qskinn)
+
+        if ((nstep==1) .and. (i==5) .and. (j==5) .and. (myid==2) .and. .false.) then
+        print*,"********************************************************************************************"
+        print*,"********************************************************************************************"
+        print*,"Qnet(mean)*************Qnet(min)*************(Qnet(max))**************"
+        print*,sum(Qnet(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4),minval(Qnet(3:nxp-2,3:nyp-2)),maxval(Qnet(3:nxp-2,3:nyp-2))
+        print*,"****sflxd_av***********sflxu_av*************lflxd_av****************lflxu********"
+        print*,sflxd_av,sflxu_av,lflxd_av,lflxu_av
+        print*,"********************************************************************************************"
+        print*,"********************************************************************************************"
+        print*,"nradtime:",nradtime
+        print*,"sflxd(:,i,j)",sflxd_avn(1:nradtime,i,j)
+        print*,"********************************************************************************************"
+        print*,"LEveg,LEsoil,LEliq",LEveg,LEsoil,LEliq
+        print*,"LHF(5,5):",LE(i,j)
+        print*,"********************************************************************************************"
+        end if
 
         if(LE(i,j) == 0.) then
           rs(i,j) = 1.e8           ! "WHY???

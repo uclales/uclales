@@ -7,7 +7,7 @@ module lsmdata
 
   SAVE
 
-  integer           :: nradtime  = 200.
+  integer           :: nradtime  = 50
 
   ! Flags
   ! ----------------------------------------------------------
@@ -166,9 +166,9 @@ module lsmdata
   !
   subroutine initlsm
   use grid, only : nzp, nxp, nyp, th00, vapor, iradtyp
-  use init, only : rts
+  !use forc, only : sfc_albedo
 
-    integer :: k, ierr
+    integer :: k,ierr
 
     ! --------------------------------------------------------
     ! Read LSM-specific NAMELIST (SURFNAMELIST)
@@ -209,10 +209,10 @@ module lsmdata
     allocate(albedo(nxp,nyp))
 
     if(iradtyp == 4) then
-      allocate(sflxd_avn(nxp,nyp,nradtime))
-      allocate(sflxu_avn(nxp,nyp,nradtime))
-      allocate(lflxd_avn(nxp,nyp,nradtime))
-      allocate(lflxu_avn(nxp,nyp,nradtime))
+      allocate(sflxd_avn(nradtime,nxp,nyp))
+      allocate(sflxu_avn(nradtime,nxp,nyp))
+      allocate(lflxd_avn(nradtime,nxp,nyp))
+      allocate(lflxu_avn(nradtime,nxp,nyp))
       
       sflxd_avn (:,:,:) = 0
       sflxu_avn (:,:,:) = 0
@@ -275,14 +275,14 @@ module lsmdata
     ! 
     tskinm	= th00
     tskin	= th00
-    qskin	= rts(1)
-    qskinn	= rts(1)
+    qskin       = sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
     albedo	= albedoav
     z0m		= z0mav
     z0h		= z0hav
     ra		= 1.
     obl 	= -10e10
     oblav	= -10e10
+    qskin	= sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
 
     dzsoil(1) = 0.07		!< First test, pick ECMWF config
     dzsoil(2) = 0.21
@@ -350,6 +350,7 @@ module lsmdata
     cveg       = cvegav
     cliq       = 0.
     Wl         = Wlav
+    !sfc_albedo = albedoav
 
   end subroutine initlsm
 
