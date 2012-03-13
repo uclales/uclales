@@ -547,7 +547,7 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('q')
        if (itype==0) ncinfo = 'Total water mixing ratio'
-!irina
+       !irina
        if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
     case('l')
@@ -630,7 +630,7 @@ contains
        if (itype==0) ncinfo = 'Vertical integral of total TKE'
        if (itype==1) ncinfo = 'kg/s'
        if (itype==2) ncinfo = 'time'
-!irina
+       !irina
     case('tkeint')
        if (itype==0) ncinfo = 'Vertical integral of total TKE non-weighted'
        if (itype==1) ncinfo = 'm3/s2'
@@ -683,7 +683,6 @@ contains
        if (itype==0) ncinfo = 'Cloud-base height'
        if (itype==1) ncinfo = 'm'
        if (itype==2) ncinfo = 'time'
-!irina
     case('zcmn')
        if (itype==0) ncinfo = 'Mean Cloud-top height'
        if (itype==1) ncinfo = 'm'
@@ -706,15 +705,15 @@ contains
        if (itype==2) ncinfo = 'time'
     case('rwp_bar')
        if (itype==0) ncinfo = 'Rain-water path'
-     !  if (itype==1) ncinfo = 'kg/m^2'
+       !if (itype==1) ncinfo = 'kg/m^2'
        !irina
        if (itype==1) ncinfo = 'g/m^2'
        if (itype==2) ncinfo = 'time'
     case('prcp')
        if (itype==0) ncinfo = 'Surface precipitation rate'
-    !irina
+       !irina
        if (itype==1) ncinfo = 'kg/kg m/s'
-      ! if (itype==1) ncinfo = 'W/m^2'
+       !if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
     case('pfrac')
        if (itype==0) ncinfo = 'Precipitation fraction'
@@ -941,7 +940,7 @@ contains
        if (itype==0) ncinfo = 'Shortwave radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    !irina
+       !irina
     case('sflxu')
        if (itype==0) ncinfo = 'Shortwave radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
@@ -1238,7 +1237,54 @@ contains
        if (itype==0) ncinfo = 'Third moment of s (extended liquid water specific humidity)'
        if (itype==1) ncinfo = ''
        if (itype==2) ncinfo = 'tttt'
-
+    case('Qnet')    
+       if (itype==0) ncinfo = 'Qnet'
+       if (itype==1) ncinfo = 'w/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('G0')    
+       if (itype==0) ncinfo = 'Ground heat flux'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('tndskin')    
+       if (itype==0) ncinfo = 'Skin heat tendency'
+       if (itype==1) ncinfo = 'w/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('ra')    
+       if (itype==0) ncinfo = 'Aerodynamic resistance'
+       if (itype==1) ncinfo = 's/m'
+       if (itype==2) ncinfo = 'time'
+    case('rs')    
+       if (itype==0) ncinfo = 'Surface resistance'
+       if (itype==1) ncinfo = 's/m'
+       if (itype==2) ncinfo = 'time'
+    case('rsveg')    
+       if (itype==0) ncinfo = 'Vegetation resistance'
+       if (itype==1) ncinfo = 's/m'
+       if (itype==2) ncinfo = 'time'
+    case('rssoil')    
+       if (itype==0) ncinfo = 'Soil resistance'
+       if (itype==1) ncinfo = 's/m'
+       if (itype==2) ncinfo = 'time'
+    case('tskinav')    
+       if (itype==0) ncinfo = 'Skin potential temperature'
+       if (itype==1) ncinfo = 'K'
+       if (itype==2) ncinfo = 'time'
+    case('qskinav')    
+       if (itype==0) ncinfo = 'Skin specific humidity'
+       if (itype==1) ncinfo = 'kg/kg'
+       if (itype==2) ncinfo = 'time'
+    case('obl')    
+       if (itype==0) ncinfo = 'Monin Obukhov Length'
+       if (itype==1) ncinfo = 'm'
+       if (itype==2) ncinfo = 'time'
+    case('cliq')    
+       if (itype==0) ncinfo = 'Fraction of vegetated surface covered with liquid water'
+       if (itype==1) ncinfo = '-'
+       if (itype==2) ncinfo = 'time'
+    case('Wl')    
+       if (itype==0) ncinfo = 'Liquid water reservoir'
+       if (itype==1) ncinfo = '-'
+       if (itype==2) ncinfo = 'time'
     case default
        if (myid==0) print *, 'ABORTING: variable not found in ncinfo, ',trim(short_name)
        call appl_abort(0)

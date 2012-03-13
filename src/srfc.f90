@@ -197,17 +197,17 @@ contains
        if (local) then
        u0bar(:,:,:)  = a_up(:,:,:)
        v0bar(:,:,:)  = a_vp(:,:,:)
-       thetabar(:,:) = a_theta(2,:,:)
-       vaporbar(:,:) = vapor(2,:,:)
-       tskinbar(:,:) = tskin(:,:)
-       qskinbar(:,:) = qskin(:,:)
+       thetaav(:,:) = a_theta(2,:,:)
+       vaporav(:,:) = vapor(2,:,:)
+       tskinav(:,:) = tskin(:,:)
+       qskinav(:,:) = qskin(:,:)
        else
        u0av          = sum(a_up(2,3:nxp-2,3:nxp-2))/(nxp-4)/(nyp-4) + umean
        v0av          = sum(a_vp(2,3:nxp-2,3:nxp-2))/(nxp-4)/(nyp-4) + vmean
-       thetabar(:,:) = sum(a_theta(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-       vaporbar(:,:) = sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-       tskinbar(:,:) = sum(tskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-       qskinbar(:,:) = sum(qskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+       thetaav(:,:) = sum(a_theta(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+       vaporav(:,:) = sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+       tskinav(:,:) = sum(tskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+       qskinav(:,:) = sum(qskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
        end if
 
        !Calculate surface wind for flux calculation
@@ -219,8 +219,8 @@ contains
        ! b) Calculate Monin Obuhkov Length from surface scalars
        do j=3,nyp-2
           do i=3,nxp-2
-             dtdz(i,j) = thetabar(i,j) - tskinbar(i,j)
-             drdz(i,j) = vaporbar(i,j) - qskinbar(i,j)
+             dtdz(i,j) = thetaav(i,j) - tskinav(i,j)
+             drdz(i,j) = vaporav(i,j) - qskinav(i,j)
           end do
        end do
        tskinavg = sum(tskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
@@ -244,11 +244,11 @@ contains
 
        !Update tskin and qskin (local or filtered) for flux calculation
        if (local) then
-         tskinbar(:,:) = tskin(:,:)
-         qskinbar(:,:) = qskin(:,:)
+         tskinav(:,:) = tskin(:,:)
+         qskinav(:,:) = qskin(:,:)
          else
-         tskinbar(:,:) = sum(tskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-         qskinbar(:,:) = sum(qskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+         tskinav(:,:) = sum(tskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+         qskinav(:,:) = sum(qskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
        end if
 
        !Calculate the surface fluxes with bulk law (Fairall, 2003)
@@ -256,8 +256,8 @@ contains
        do j=3, nyp-2
           do i=3, nxp-2
 
-             wt_sfc(i,j) = - (thetabar(i,j) - tskinbar(i,j)) / ra(i,j) 
-             wq_sfc(i,j) = - (vaporbar(i,j) - qskinbar(i,j)) / ra(i,j)
+             wt_sfc(i,j) = - (thetaav(i,j) - tskinav(i,j)) / ra(i,j) 
+             wq_sfc(i,j) = - (vaporav(i,j) - qskinav(i,j)) / ra(i,j)
 
              uw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j)                  &
                               *(a_up(2,i,j)+umean)/wspd(i,j)
@@ -619,8 +619,8 @@ contains
 
       do j=3,nyp-2
         do i=3,nxp-2
-          thetavbar   = thetabar(i,j) * (1. + ep2 * vaporbar(i,j))
-          tvskinbar   = tskinbar(i,j) * (1. + ep2 * qskinbar(i,j))
+          thetavbar   = thetaav(i,j) * (1. + ep2 * vaporav(i,j))
+          tvskinbar   = tskinav(i,j) * (1. + ep2 * qskinav(i,j))
 
           upcu    = 0.5 * (u0bar(2,i,j) + u0bar(2,i+1,j)) + umean
           vpcv    = 0.5 * (v0bar(2,i,j) + v0bar(2,i,j+1)) + vmean
@@ -668,8 +668,8 @@ contains
     ! CvH also do a global evaluation if local = .true.
     ! to get an appropriate local mean ??????????????????????????
     if (.not. local) then
-       thetavbar   = thetabar(3,3) * (1. + ep2 * vaporbar(3,3))
-       tvskinbar   = tskinbar(3,3) * (1. + ep2 * qskinbar(3,3))
+       thetavbar   = thetaav(3,3) * (1. + ep2 * vaporav(3,3))
+       tvskinbar   = tskinav(3,3) * (1. + ep2 * qskinav(3,3))
 
        wspd2   = max(abs(ubmin), u0av**2. + v0av**2.)
        print*,wspd2,thetavbar,tvskinbar
@@ -1004,7 +1004,7 @@ contains
         end if
 
         H(i,j)    = - fH  * ( a_theta(2,i,j)*exner - tskin(i,j)*exner )
-        tendskin(i,j) = Cskin(i,j)*(tskin(i,j) - tskinm(i,j)) * exner / rk3coef
+        tndskin(i,j) = Cskin(i,j)*(tskin(i,j) - tskinm(i,j)) * exner / rk3coef
 
         !" In case of dew formation, allow all water to enter skin reservoir Wl
         if(qsat - vapor(2,i,j) < 0.) then
@@ -1108,11 +1108,11 @@ contains
         print*,"Qnet(450 W/m2)",sum(Qnet(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
         print*,"G0 (min)",minval(G0(3:nxp-2,3:nyp-2))
         print*,"G0 (max)",maxval(G0(3:nxp-2,3:nyp-2))
-        print*,"Tendskin (min)",minval(tendskin(3:nxp-2,3:nyp-2))
-        print*,"Tendskin (max)",maxval(tendskin(3:nxp-2,3:nyp-2))
+        print*,"Tndskin (min)",minval(tndskin(3:nxp-2,3:nyp-2))
+        print*,"Tndskin (max)",maxval(tndskin(3:nxp-2,3:nyp-2))
         print*,"********************************"
-        print*,"Qnet-H-LE-G-tendSkin (min) !=! 0 -->",minval(Qnet(3:nxp-2,3:nyp-2)-(H(3:nxp-2,3:nyp-2)+LE(3:nxp-2,3:nyp-2)+G0(3:nxp-2,3:nyp-2))-tendskin(3:nxp-2,3:nyp-2))
-        print*,"Qnet-H-LE-G-tendSkin (max) !=! 0 -->",maxval(Qnet(3:nxp-2,3:nyp-2)-(H(3:nxp-2,3:nyp-2)+LE(3:nxp-2,3:nyp-2)+G0(3:nxp-2,3:nyp-2))-tendskin(3:nxp-2,3:nyp-2))
+        print*,"Qnet-H-LE-G-tendSkin (min) !=! 0 -->",minval(Qnet(3:nxp-2,3:nyp-2)-(H(3:nxp-2,3:nyp-2)+LE(3:nxp-2,3:nyp-2)+G0(3:nxp-2,3:nyp-2))-tndskin(3:nxp-2,3:nyp-2))
+        print*,"Qnet-H-LE-G-tendSkin (max) !=! 0 -->",maxval(Qnet(3:nxp-2,3:nyp-2)-(H(3:nxp-2,3:nyp-2)+LE(3:nxp-2,3:nyp-2)+G0(3:nxp-2,3:nyp-2))-tndskin(3:nxp-2,3:nyp-2))
         print*,"********************************"
         print*,"********************************"
         print*,"SH (min,lsm):",minval(H(3:nxp-2,3:nyp-2))

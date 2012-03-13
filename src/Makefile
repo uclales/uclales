@@ -27,11 +27,11 @@ $(LES_ARC)(modnudge.o)   \
 $(LES_ARC)(modtimedep.o)   \
 $(LES_ARC)(ice_sb.o)   \
 $(LES_ARC)(icemcrp.o)   \
+$(LES_ARC)(lsmdata.o)   \
 $(LES_ARC)(ncio.o)   \
 $(LES_ARC)(stat.o)   \
 $(LES_ARC)(sgsm.o)   \
 $(LES_ARC)(prss.o)   \
-$(LES_ARC)(lsmdata.o)   \
 $(LES_ARC)(srfc.o)   \
 $(LES_ARC)(advf.o)   \
 $(LES_ARC)(advl.o)   \

@@ -22,6 +22,7 @@ module stat
   use mpi_interface, only : myid
   use ncio, only : open_nc, define_nc
   use grid, only : level
+  !use srfc, only : isfctyp
   use util, only : get_avg, get_cor, get_avg3, get_cor3, get_var3, get_csum
 !irina
 !  use step, only: case_name
@@ -30,7 +31,7 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 45, nvar2 = 113 ! number of time series and profiles
+  integer, parameter :: nvar1 = 57, nvar2 = 113 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2, nv1=nvar1, nv2=nvar2
   real, save         :: fsttm, lsttm, nsmp = 0
 
@@ -48,7 +49,9 @@ module stat
        'CCN    ','nrain  ','nrcnt  ','zcmn   ','zbmn   ','tkeint ', & !25
        'lflxut ','lflxdt ','sflxut ','sflxdt ','thl_int','wvp_bar', & !31
        'wvp_var','iwp_bar','iwp_var','swp_bar','swp_var','gwp_bar', & !37
-       'gwp_var','hwp_bar','hwp_var'/),                             & !43
+       'gwp_var','hwp_bar','hwp_var','Qnet   ','G0     ','tndskin', & !43 
+       'ra     ','rs     ','rsveg  ','rssoil ','tskinav','qskinav', & !49
+       'obl    ','cliq   ','Wl     '/),                             & !55-57
        s2(nvar2)=(/                                                 &
        'time   ','zt     ','zm     ','dn0    ','u0     ','v0     ', & ! 1
        'fsttm  ','lsttm  ','nsmp   ','u      ','v      ','t      ', & ! 7
@@ -58,7 +61,7 @@ module stat
        'lmbde  ','sfs_tke','sfs_boy','sfs_shr','boy_prd','shr_prd', & !31
        'trans  ','diss   ','dff_u  ','dff_v  ','dff_w  ','adv_u  ', & !37
        'adv_v  ','adv_w  ','prs_u  ','prs_v  ','prs_w  ','prd_uw ', & !43
-       'storage','q      ','q_2    ','q_3    ','tot_qw ','sfs_qw ', & !49
+       'storage','q      ','q_2    ','q_3     ','tot_qw','sfs_qw ', & !49
        'rflx   ','rflx2  ','sflx   ','sflx2  ','l      ','l_2    ', & !55
        'l_3    ','tot_lw ','sed_lw ','cs1    ','cnt_cs1','w_cs1  ', & !61
        'tl_cs1 ','tv_cs1 ','rt_cs1 ','rl_cs1 ','wt_cs1 ','wv_cs1 ', & !67
@@ -66,7 +69,7 @@ module stat
        'rt_cs2 ','rl_cs2 ','wt_cs2 ','wv_cs2 ','wr_cs2 ','Nc     ', & !79  
        'Nr     ','rr     ','prc_r  ','evap   ','frc_prc','prc_prc', & !85
        'frc_ran','hst_srf','lflxu  ','lflxd  ','sflxu  ','sflxd  ', & !91
-       'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel', & !97
+       'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel ',& !97
        'rsup   ','prc_c  ','prc_i  ','prc_s  ','prc_g  ','prc_h  ', & !103
        'hail   ','qt_th  ','s_1    ','s_2    ','s_3    '/)            !109-113
 
@@ -161,6 +164,8 @@ contains
          , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa &
          , a_ricep, a_rsnowp, a_rgrp, a_rhailp, a_nicep, a_nsnowp, a_ngrp, a_nhailp &
          , vapor
+    use lsmdata, only: Qnet,G0,tndskin,ra,rs,rsveg,rssoil,tskinav,qskinav,  &
+                       obl, cliq, Wl, Cskinav
 
     real, intent (in) :: time
 
@@ -212,6 +217,9 @@ contains
     call set_ts(nzp, nxp, nyp, a_wp, a_theta, dn0, zt,zm,dzi_t,dzi_m,th00,time)
     if (level >=1) call ts_lvl1(nzp, nxp, nyp, dn0, zt, dzi_m, a_rp)
     if (level >=2) call ts_lvl2(nzp, nxp, nyp, a_rp, a_scr2, zt)
+
+    if (.true.) call accum_lsm(nxp,nyp,Qnet,G0,tndskin,ra,rs,rsveg, &
+                                   rssoil,tskinav,qskinav,obl,cliq,Wl,Cskinav)
 
     if (debug) WRITE (0,*) 'statistics: set_ts ok,  myid=',myid
 
@@ -1512,6 +1520,44 @@ contains
     end select
 
   end function get_zi
+
+  !
+  !---------------------------------------------------------------------
+  ! SUBROUTINE ACCUM_LSM: Accumulates timeseries statistics  
+  ! for land surface variables (if isfctyp=5) 
+  !
+  subroutine accum_lsm(nxp, nyp, Qnet, G0, tndskin, ra, rs, rveg, &
+                       rsoil, tskinav,qskinav, obl, cliq, Wl, Cskinav)
+
+    integer, intent (in)  :: nxp,nyp
+    real, intent (in)     :: Qnet(nxp,nyp)
+    real, intent (in)     :: G0(nxp,nyp)
+    real, intent (in)     :: tndskin(nxp,nyp)
+    real, intent (in)     :: ra(nxp,nyp)
+    real, intent (in)     :: rs(nxp,nyp)
+    real, intent (in)     :: rveg(nxp,nyp)
+    real, intent (in)     :: rsoil(nxp,nyp)
+    real, intent (in)     :: tskinav(nxp,nyp)
+    real, intent (in)     :: qskinav(nxp,nyp)
+    real, intent (in)     :: obl(nxp,nyp)
+    real, intent (in)     :: cliq(nxp,nyp)
+    real, intent (in)     :: Wl(nxp,nyp)
+    real, intent (in)     :: Cskinav
+
+    ssclr(46) = sum(Qnet(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(47) = sum(G0(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(48) = sum(tndskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)*Cskinav
+    ssclr(49) = sum(ra(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(50) = sum(rs(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(51) = sum(rveg(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(52) = sum(rsoil(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(53) = sum(tskinav(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(54) = sum(qskinav(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(55) = sum(obl(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(56) = sum(cliq(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(57) = sum(Wl(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
+
+  end subroutine accum_lsm
 
 end module stat
 

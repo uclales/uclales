@@ -139,7 +139,7 @@ module lsmdata
   real, allocatable :: rs       (:,:)   !<  Composite resistance [s/m]
   real, allocatable :: rsveg    (:,:)   !<  Vegetation resistance [s/m]
   real, allocatable :: rssoil   (:,:)   !<  Soil evaporation resistance [s/m]
-  real, allocatable :: tendskin (:,:)   !<  Tendency of skin [W/m2]
+  real, allocatable :: tndskin (:,:)   !<  Tendency of skin [W/m2]
   !real              :: rsisurf2 = 0.   !<  Vegetation resistance [s/m] if isurf2 is used
 
   ! Turbulent exchange variables
@@ -152,10 +152,10 @@ module lsmdata
   real              :: v0av             !<  Mean v-wind component
   real, allocatable :: u0bar    (:,:,:) !<  Filtered u-wind component
   real, allocatable :: v0bar    (:,:,:) !<  Filtered v-wind component
-  real, allocatable :: thetabar (:,:)   !<  Filtered liquid water pot temp at first level
-  real, allocatable :: vaporbar (:,:)   !<  Filtered specific humidity at first full level
-  real, allocatable :: tskinbar (:,:)   !<  Filtered surface temperature
-  real, allocatable :: qskinbar (:,:)   !<  Filtered surface specific humidity
+  real, allocatable :: thetaav (:,:)   !<  Filtered liquid water pot temp at first level
+  real, allocatable :: vaporav (:,:)   !<  Filtered specific humidity at first full level
+  real, allocatable :: tskinav (:,:)   !<  Filtered surface temperature
+  real, allocatable :: qskinav (:,:)   !<  Filtered surface specific humidity
 
   contains
 
@@ -253,7 +253,7 @@ module lsmdata
     allocate(rssoilmin(nxp,nyp))
     allocate(cveg(nxp,nyp))
     allocate(cliq(nxp,nyp))
-    allocate(tendskin(nxp,nyp))
+    allocate(tndskin(nxp,nyp))
     allocate(tskinm(nxp,nyp))
     allocate(Cskin(nxp,nyp))
     allocate(lambdaskin(nxp,nyp))
@@ -265,10 +265,10 @@ module lsmdata
     ! Allocate filtered variables
     allocate(u0bar(nzp,nxp,nyp))
     allocate(v0bar(nzp,nxp,nyp))
-    allocate(thetabar(nxp,nyp))
-    allocate(vaporbar(nxp,nyp))
-    allocate(tskinbar(nxp,nyp))
-    allocate(qskinbar(nxp,nyp))
+    allocate(thetaav(nxp,nyp))
+    allocate(vaporav(nxp,nyp))
+    allocate(tskinav(nxp,nyp))
+    allocate(qskinav(nxp,nyp))
 
     ! --------------------------------------------------------
     ! Initialize arrays
