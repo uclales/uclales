@@ -81,6 +81,9 @@ contains
         case(-2)
           hname(n)  = 'cb'
           hlname(n) = 'Cloud base'
+        case(-3)
+          hname(n)  = 'lcl'
+          hlname(n) = 'at lifting condensation level'
         case default
           write(hname(n),'(i4.4)') nint(zcross(n))
           hlname(n) = ' at '//trim(hname(n))//' m'
@@ -447,8 +450,8 @@ contains
     real, intent(in) :: rtimee
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
     real, dimension(nzp,nxp,nyp) :: tracer, tv, interp
-    real, dimension(nzp)         :: c1, thvar, tvbar
-    integer :: n, i, j, k, ct, cb, zi
+    real, dimension(nzp)         :: c1, thvar, tvbar, tvenv, tvcld
+    integer :: n, i, j, k, ct, cb, zi, lcl
     
     if (.not. lcross) return
     
@@ -468,6 +471,20 @@ contains
           end do
        end do
     end do
+
+!-------- calc lcl -------------------
+    call calcavg(tv, liquid, tvenv)
+    call calcavgcld(tv, liquid, tvcld)
+
+    lcl=0
+    do k=1,nzp
+       if (tvcld(k)>tvenv(k)) then
+           lcl=k
+           exit
+       end if 
+    end do
+!-------------------------------------
+
     call get_avg3(nzp,nxp,nyp,tv,tvbar)
     do j=3,nyp-2
        do i=3,nxp-2
@@ -486,6 +503,9 @@ contains
     if (cb >= nzp-1) then
       cb = zi
     end if
+    if (lcl >= nzp-1) then
+      lcl = 0
+    end if
 
     do n = 1, nkcross
       select case (nint(zcross(n)))
@@ -494,6 +514,8 @@ contains
   
       case(-2)
         kcross(n) = cb
+      case(-3)
+        kcross(n) = lcl
       case default
       end select
     end do
@@ -754,7 +776,7 @@ contains
     use grid, only : nzp, nxp, nyp
     real, intent(in), dimension(:,:,:) :: varin, mask
     real, intent(out), dimension(3:,3:)  :: varout
-    integer :: i, j, k
+    integer :: i, j, k, n
     
     varout = fillvalue_double
     do j=3,nyp-2
@@ -767,6 +789,90 @@ contains
       end do
     end do
   end subroutine calcmax
+
+  subroutine calcavg(varin, mask, varout)
+    use modnetcdf, only : fillvalue_double
+    use grid, only : nzp, nxp, nyp
+    use mpi_interface, only : double_array_par_sum
+    real, intent(in), dimension(:,:,:) :: varin, mask
+    real, intent(out), dimension(:)  :: varout
+    real, dimension(SIZE(varout))  :: varoutsum, lvaroutsum, gvaroutsum
+    integer :: i, j, k, n
+    real, dimension(SIZE(varout)) :: ncl, lncl, gncl
+
+    varout = fillvalue_double
+    do k=1,nzp
+      ncl(k)=0.
+      varoutsum(k)=0.
+        do j=3,nyp-2
+        do i=3,nxp-2
+          if (mask(k,i,j) == 0.) then
+            varoutsum(k) = varoutsum(k)+varin(k,i,j)
+            ncl(k) = ncl(k)+1
+          else
+            varoutsum(k) = varoutsum(k) 
+            ncl(k)= ncl(k)
+          end if
+        end do
+        end do
+      end do
+
+    n=size(varout)
+    lvaroutsum=varoutsum
+    call double_array_par_sum(lvaroutsum,gvaroutsum,n)
+    lncl=ncl
+    call double_array_par_sum(lncl,gncl,n)
+
+    do k=1,nzp
+       if (gncl(k) == 0. ) then
+         varout(k) = 0.
+       else
+         varout(k) = gvaroutsum(k)/gncl(k)
+       end if
+    end do
+  end subroutine calcavg
+
+  subroutine calcavgcld(varin, mask, varout)
+    use modnetcdf, only : fillvalue_double
+    use grid, only : nzp, nxp, nyp
+    use mpi_interface, only : double_array_par_sum
+    real, intent(in), dimension(:,:,:) :: varin, mask
+    real, intent(out), dimension(:)  :: varout
+    real, dimension(SIZE(varout))  :: varoutsum, lvaroutsum, gvaroutsum
+    integer :: i, j, k, n
+    real, dimension(SIZE(varout)) :: ncl, lncl, gncl
+
+    do k=1,nzp
+      ncl(k)=0.
+      varoutsum(k)=0.
+        do j=3,nyp-2
+        do i=3,nxp-2
+          if (mask(k,i,j) > 0. ) then
+            varoutsum(k) = varoutsum(k)+varin(k,i,j)
+            ncl(k)=ncl(k)+1
+          else
+            varoutsum(k) = varoutsum(k)
+            ncl(k)= ncl(k)
+          end if
+        end do
+        end do
+      end do
+
+    n=size(varout)
+    lvaroutsum=varoutsum
+    call double_array_par_sum(lvaroutsum,gvaroutsum,n)
+    lncl=ncl
+    call double_array_par_sum(lncl,gncl,n)
+
+    do k=1,nzp
+       if (gncl(k) == 0. ) then
+         varout(k) = 0
+       else
+         varout(k) = gvaroutsum(k)/gncl(k)
+       end if
+    end do
+  end subroutine calcavgcld
+
 
   subroutine calcbase(varin, varout, threshold)
     use grid, only : nzp, nxp, nyp, zt
