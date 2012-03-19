@@ -85,8 +85,9 @@ contains
           call triggercross(time)
        else
           call init_anal(time+dt)
-          call initcross(time+dt, filprf)
-          call triggercross(time+dt)
+          call initcross(time, filprf)
+          call thermo(level)
+          call triggercross(time)
           call write_hist(0, time)
        end if
     end if
