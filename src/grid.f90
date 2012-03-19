@@ -77,9 +77,6 @@ module grid
        cnd_acc, &  ! accumulated condensation  [kg/m2] (diagnostic for 2D output)
        cev_acc, &  ! accumulated evaporation of cloud water [kg/m2] (diagnostic for 2D output)
        rev_acc     ! accumulated evaporation of rainwater   [kg/m2] (diagnostic for 2D output)
-! linda, b
-  real, dimension (:), allocatable :: sstls,shls,lhls
-! linda, e
   !
   ! 3D Arrays 
   !irina
@@ -324,16 +321,6 @@ contains
     wq_sfc(:,:) = 0.
 
     memsize = memsize +  nxyzp*nscl*2 + 3*nxyp + nxyp*10
-
-!linda,b
-    allocate (shls(24))
-    allocate (lhls(24))
-
-    memsize = memsize + 2.*24.
-
-    shls(:)=0.
-    lhls(:)=0.
-!linda,e
 
     if(myid == 0) then
        print "(//' ',49('-')/,' ',/3x,i3.3,' prognostic scalars')", nscl
