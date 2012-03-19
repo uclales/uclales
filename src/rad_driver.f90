@@ -142,7 +142,7 @@ module radiation
 
             if (present(albedo)) then
               if (u0 > 0.) then
-                albedo(i,j) = fus(1)/fds(1)
+                albedo(i,j) = fus(1)/(fds(1)+epsilon(fds(1)))!LINDA
               else
                 albedo(i,j) = -999.
               end if

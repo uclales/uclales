@@ -24,7 +24,7 @@ module step
   integer :: istpfl = 1
   real    :: timmax = 18000.
   real    :: timrsm = 86400.
-  real    :: wctime = 1e10
+  real    :: wctime = 1.e10
   logical :: corflg = .false.
   logical :: rylflg = .true.
 
@@ -159,13 +159,15 @@ contains
               istp, time, t2-t1, t2*(timmax/time-1)
        endif
        call broadcast(t2, 0)
-        
     enddo
 
     call write_hist(1, time)
     iret = close_anal()
     if (lcross) call exitcross
     iret = close_stat()
+
+    if (t2 .ge. wctime .and. myid == 0) write(*,*) '  Wall clock limit wctime reached, stopped simulation for restart'
+    if (time.ge.timmax .and. myid == 0) write(*,*) '  Max simulation time timmax reached. Finished simulation successfully'
 
   end subroutine stepper
   ! 
@@ -192,14 +194,15 @@ contains
     use advl, only : ladvect
     use forc, only : forcings
     use lsvar, only : varlscale
-    use util, only : velset,get_avg
+    use util, only : velset
     use modtimedep, only : timedep
     use centered, only:advection_scalars
+
     logical, parameter :: debug = .false.
 !     integer :: k
     real :: xtime
 !     character (len=11)    :: fname = 'debugXX.dat'
-  character (len=8) :: adv='second'
+  character (len=8) :: adv='monotone'
 
     xtime = time/86400. + strtim
     call timedep(time,timmax, sst)
@@ -221,9 +224,8 @@ contains
        end if
 ! linda, b
 !       call surface(sst)
-       call surface(sst,xtime)
+         call surface(sst,xtime)
 ! linda, e
-
        call diffuse
        if (adv=='monotone') then
           call fadvect

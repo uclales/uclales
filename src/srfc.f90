@@ -53,6 +53,7 @@ contains
 ! linda, b
           shls,lhls
     use step, only : strtim
+    use modtimedep, only : ltimedepsurf
 ! linda, e
     use thrm, only: rslf
     use stat, only: sfc_stat, sflg
@@ -217,7 +218,7 @@ contains
           end if
           wt_sfc(1,1)=(shls(tcnt2)+(shls(tcnt)-shls(tcnt2))*tfrac)/(0.5*(dn0(1)+dn0(2))*cp)
           wq_sfc(1,1)=(lhls(tcnt2)+(lhls(tcnt)-lhls(tcnt2))*tfrac)/(0.5*(dn0(1)+dn0(2))*alvl)
-       else
+       elseif (.not.ltimedepsurf) then
           wt_sfc(1,1)  = ffact* dthcon/(0.5*(dn0(1)+dn0(2))*cp)
           wq_sfc(1,1)  = ffact* drtcon/(0.5*(dn0(1)+dn0(2))*alvl)
        endif

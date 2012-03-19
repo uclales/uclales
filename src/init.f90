@@ -22,7 +22,7 @@ module init
   use grid
   use ncio
 
-  integer, parameter    :: nns = 50
+  integer, parameter    :: nns = 100
   integer               :: ns
   integer               :: iseed = 0
   integer               :: ipsflg = 1
@@ -713,16 +713,14 @@ contains
    implicit none
 
    integer, parameter ::nt=24
-   real               ::sh_in(nt),lh_in(nt)
 
 !*  Open
 
        open (1,file='srfc_in',status='old',form='formatted')
-       do ns=1,nns
-          read (1,*,end=100) shls(ns),lhls(ns)
+       do ns=1,nt
+          read (1,*) shls(ns),lhls(ns)
        end do
        close (1)
-100 continue
 
    if (myid==0) print*,'shls=',shls
    if (myid==0) print*,'lhls=',lhls

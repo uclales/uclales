@@ -37,7 +37,7 @@ implicit none
 save
 ! switches for timedependent surface fluxes and large scale forcings
   logical       :: ltimedep     = .false. !< Overall switch, input in namoptions
-  logical       :: ltimedepz    = .true.  !< Switch for large scale forcings
+  logical       :: ltimedepz    = .false.  !< Switch for large scale forcings
   logical       :: ltimedepsurf = .true.  !< Switch for surface fluxes
   logical       :: firsttime    = .true.
   integer, parameter    :: kflux = 200
@@ -63,6 +63,7 @@ contains
 !     use modsurfdata,only :ps,qts,wqsurf,wtsurf,thls
 !     use modtimedepsv, only : inittimedepsv
     use grid, only : nzp, zt
+    use mpi_interface, only : myid
     real, intent(in) :: time,time_end
     character (80):: chmess
     character (1) :: chmess1
@@ -96,12 +97,12 @@ contains
 
 
     open(ifinput,file='ls_flux_in')
-    read(ifinput,'(a80)') chmess
-    write(6,*) chmess
-    read(ifinput,'(a80)') chmess
-    write(6,*) chmess
-    read(ifinput,'(a80)') chmess
-    write(6,*) chmess
+!    read(ifinput,'(a80)') chmess
+!    write(6,*) chmess
+!    read(ifinput,'(a80)') chmess
+!    write(6,*) chmess
+!    read(ifinput,'(a80)') chmess
+!    write(6,*) chmess
 
     timeflux = 0
     timels   = 0
@@ -113,24 +114,30 @@ contains
     ierr = 0
     do while (timeflux(t) < (time_end))
       t=t+1
-      read(ifinput,*, iostat = ierr) timeflux(t), wtsurft(t), wqsurft(t),thlst(t),qtst(t),pst(t)
-      write(*,'(i8,6e12.4)') t,timeflux(t), wtsurft(t), wqsurft(t),thlst(t),qtst(t),pst(t)
+      read(ifinput,*, iostat = ierr) timeflux(t), wtsurft(t), wqsurft(t),thlst(t),pst(t)
       if (ierr < 0) then
           stop 'STOP: No time dependend data for end of run (surface fluxes)'
       end if
     end do
+    t    = 0
+    ierr = 0
+    do while (timeflux(t) < (time_end))
+      t=t+1
+    if (myid==0) write(*,'(i8,6e12.4)') t,timeflux(t), wtsurft(t), wqsurft(t),thlst(t),pst(t)
+    end do
+
     if(timeflux(1)>(time_end)) then
         write(6,*) 'Time dependent surface variables do not change before end of'
         write(6,*) 'simulation. --> only large scale forcings'
         ltimedepsurf=.false.
     endif
 ! flush to the end of fluxlist
-    do while (ierr ==0)
-      read (ifinput,*,iostat=ierr) dummyr
-    end do
-    backspace (ifinput)
+!    do while (ierr ==0)
+!      read (ifinput,*,iostat=ierr) dummyr
+!    end do
+!    backspace (ifinput)
 !     ---load large scale forcings----
-
+    if (ltimedepz) then
     t = 0
 
     do while (timels(t) < time_end)
@@ -168,8 +175,8 @@ contains
       ltimedepz=.false.
     end if
 
+    endif
     close(ifinput)
-
 
   end subroutine inittimedep
 
@@ -233,11 +240,13 @@ contains
   end subroutine timedepz
 
   subroutine timedepsurf(time, sst)
-    use grid, only : psrf, wt_sfc, wq_sfc
-    
+    use grid, only : psrf, wt_sfc, wq_sfc, dn0
+    use defs, only: cp, alvl
+    use mpi_interface, only : myid
 !     use modglobal,   only : rtimee, lmoist
 !     use modsurfdata, only : wtsurf,wqsurf,thls,qts,ps
 !     use modsurface,  only : qtsurf
+
 
     implicit none
     real, intent(in) :: time
@@ -258,11 +267,11 @@ contains
     end if
 
     fac = ( time -timeflux(t) ) / ( timeflux(t+1)-timeflux(t))
-    wq_sfc   = wqsurft(t) + fac * ( wqsurft(t+1) - wqsurft(t)  )
-    wt_sfc   = wtsurft(t) + fac * ( wtsurft(t+1) - wtsurft(t)  )
+    wq_sfc(1,1)= (wqsurft(t) + fac * ( wqsurft(t+1) - wqsurft(t)  ))/(0.5*(dn0(1)+dn0(2))*alvl)
+    wt_sfc(1,1)   = (wtsurft(t) + fac * ( wtsurft(t+1) - wtsurft(t)  ))/(0.5*(dn0(1)+dn0(2))*cp)
     sst      = thlst(t)   + fac * ( thlst(t+1)   - thlst(t)    )
     psrf     = pst(t)     + fac * ( pst(t+1)   - pst(t)    )
-
+!if (myid==0) print*,time,timeflux(t),t,fac,wq_sfc(1,1),wt_sfc(1,1),sst,psrf
 !     return
   end subroutine timedepsurf
 
