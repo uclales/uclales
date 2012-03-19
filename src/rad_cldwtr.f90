@@ -95,12 +95,12 @@ contains
        cwmks = pcw(k)*1.e-3
        if ( cwmks .ge. 1.e-8) then
           j = 0
-          do while (j<nsizes .and. pre(k) > re(j+1))
+          do while (j<(nsizes-1) .and. pre(k) > re(j+1))
              j = j + 1
           end do
           if (j >= 1 .and. j < nsizes) then
              j1 = j+1
-             wght = (pre(k)-re(j))/(re(j1)-re(j))
+             wght = (pre(k)-re(j))/(re(j1)-re(j)+epsilon(re))
              tw(k) = dz(k) * cwmks * ( bz(j,ib) / fl(j) +   &
                   ( bz(j1,ib) / fl(j1) - bz(j,ib) / fl(j) ) /    &
                   ( 1.0 / re(j1) - 1.0 / re(j) ) * ( 1.0 / pre(k) &

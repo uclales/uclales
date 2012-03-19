@@ -26,6 +26,9 @@ module srfc
   real    :: ubmin  =  0.20
   real    :: dthcon = 100.0
   real    :: drtcon = 0.0
+! linda, b
+  logical :: larms=.true.
+! linda, e
 
 contains 
   !
@@ -38,12 +41,20 @@ contains
   !     isfclyr=2: fixed lower boundary of water at certain sst
   !     isfclyr=3: bulk aerodynamic law with coefficeints (drtcon, dthcon)
   !irina
-  subroutine surface(sst)
+! linda, b
+!  subroutine surface(sst)
+  subroutine surface(sst,time_in)
+! linda, e
 
     use defs, only: vonk, p00, rcp, g, cp, alvl, ep2
     use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, zt, psrf,   &
          th00, umean, vmean, dn0, level, a_ustar, a_tstar, a_rstar,        &
-         uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc
+         uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,                           &
+! linda, b
+          shls,lhls
+    use step, only : strtim
+    use modtimedep, only : ltimedepsurf
+! linda, e
     use thrm, only: rslf
     use stat, only: sfc_stat, sflg
     use mpi_interface, only : nypg, nxpg, double_array_par_sum
@@ -51,7 +62,10 @@ contains
     implicit none
  
  !irina
-    real, optional, intent (inout) :: sst
+! linda, b
+!    real, optional, intent (inout) :: sst
+    real, optional, intent (inout) :: sst,time_in
+! linda, e
  !   
     real :: dtdz(nxp,nyp), drdz(nxp,nyp), usfc(nxp,nyp), vsfc(nxp,nyp)       &
          ,wspd(nxp,nyp), bfct(nxp,nyp)
@@ -59,6 +73,10 @@ contains
     integer :: i, j, iterate
     real    :: zs, bflx0,bflx, ffact, sst1, bflx1, Vbulk, Vzt, usum
     real (kind=8) :: bfl(2), bfg(2)
+! linda,b
+    real ::times,tfrac,tlag
+    integer::tcnt,tcnt2
+!linda,e
 
 
     select case(isfctyp)
@@ -186,8 +204,28 @@ contains
        !
     case default
        ffact = 1.
-       wt_sfc(1,1)  = ffact* dthcon/(0.5*(dn0(1)+dn0(2))*cp)
-       wq_sfc(1,1)  = ffact* drtcon/(0.5*(dn0(1)+dn0(2))*alvl)
+
+! linda, b
+       if (larms) then ! linda
+          tlag=3600.0
+          times=(time_in-strtim)*24.0*3600.0
+          tfrac=(times/tlag)-int(times/tlag)
+          tcnt=int(times/tlag)+2
+          tcnt2=tcnt-1
+          if (tcnt.gt.24) then
+             tcnt=tcnt-24
+             if (tcnt.ne.1) tcnt2=tcnt-1
+          end if
+          wt_sfc(1,1)=(shls(tcnt2)+(shls(tcnt)-shls(tcnt2))*tfrac)/(0.5*(dn0(1)+dn0(2))*cp)
+          wq_sfc(1,1)=(lhls(tcnt2)+(lhls(tcnt)-lhls(tcnt2))*tfrac)/(0.5*(dn0(1)+dn0(2))*alvl)
+       elseif (.not.ltimedepsurf) then
+          wt_sfc(1,1)  = ffact* dthcon/(0.5*(dn0(1)+dn0(2))*cp)
+          wq_sfc(1,1)  = ffact* drtcon/(0.5*(dn0(1)+dn0(2))*alvl)
+       endif
+! linda, e
+
+!       wt_sfc(1,1)  = ffact* dthcon/(0.5*(dn0(1)+dn0(2))*cp)
+!       wq_sfc(1,1)  = ffact* drtcon/(0.5*(dn0(1)+dn0(2))*alvl)
 
        if (zrough <= 0.) then
           usum = 0.

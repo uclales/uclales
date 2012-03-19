@@ -89,5 +89,7 @@ icemcrp.o: 	defs.o grid.o ice_sb.o
 util.o: 	defs.o grid.o ice_sb.o
 step.o:		icemcrp.o mpi_interface.o
 init.o:		grid.o ncio.o step.o icemcrp.o
-ncio.o:		grid.o mpi_interface.o icemcrp.o
+ncio.o:		grid.o mpi_interface.o icemcrp.o forc.o
 lsvar.o:	forc.o
+stat.o:		forc.o
+srfc.o:		step.o

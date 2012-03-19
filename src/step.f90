@@ -24,7 +24,7 @@ module step
   integer :: istpfl = 1
   real    :: timmax = 18000.
   real    :: timrsm = 86400.
-  real    :: wctime = 1e10
+  real    :: wctime = 1.e10
   logical :: corflg = .false.
   logical :: rylflg = .true.
 
@@ -46,6 +46,9 @@ module step
   character (len=8) :: case_name = 'astex'
 
   integer :: istp
+! linda,b
+  logical ::lanom=.false.
+!linda,e
 
 contains
   ! 
@@ -66,7 +69,7 @@ contains
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
 
-    real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
+    real, parameter    :: peak_cfl = 0.4, peak_peclet = 0.5
 
     real    :: t1,t2,tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax
     integer :: iret
@@ -157,13 +160,15 @@ contains
               istp, time, t2-t1, t2*(timmax/time-1)
        endif
        call broadcast(t2, 0)
-        
     enddo
 
     call write_hist(1, time)
     iret = close_anal()
     if (lcross) call exitcross
     iret = close_stat()
+
+    if (t2 .ge. wctime .and. myid == 0) write(*,*) '  Wall clock limit wctime reached, stopped simulation for restart'
+    if (time.ge.timmax .and. myid == 0) write(*,*) '  Max simulation time timmax reached. Finished simulation successfully'
 
   end subroutine stepper
   ! 
@@ -174,7 +179,7 @@ contains
   ! 
   subroutine t_step
 
-    use mpi_interface, only : myid
+    use mpi_interface, only : myid, appl_abort
     use grid, only : level, dt, nstep, a_tt, a_up, a_vp, a_wp, dxi, dyi, dzi_t, &
          nxp, nyp, nzp, dn0,a_scr1, u0, v0, a_ut, a_vt, a_wt, zt, a_ricep, a_rct, a_rpt, &
          lwaterbudget
@@ -190,14 +195,16 @@ contains
     use advl, only : ladvect
     use forc, only : forcings
     use lsvar, only : varlscale
-    use util, only : velset,get_avg
+    use util, only : velset
     use modtimedep, only : timedep
+    use centered, only:advection_scalars
 
     logical, parameter :: debug = .false.
 !     integer :: k
     real :: xtime
 !     character (len=11)    :: fname = 'debugXX.dat'
-  
+  character (len=8) :: adv='monotone'
+
     xtime = time/86400. + strtim
     call timedep(time,timmax, sst)
     do nstep = 1,3
@@ -216,10 +223,19 @@ contains
        if (lsvarflg) then
           call varlscale(time,case_name,sst,div,u0,v0)
        end if
-       call surface(sst)      
-
+! linda, b
+!       call surface(sst)
+         call surface(sst,xtime)
+! linda, e
        call diffuse
-       call fadvect
+       if (adv=='monotone') then
+          call fadvect
+       elseif ((adv=='second').or.(adv=='fourth')) then
+          call advection_scalars(adv)
+       else 
+          print *, 'wrong specification for advection scheme'
+          call appl_abort(0)
+       endif
        call ladvect
        if (level >= 1) then
           if (lwaterbudget) then
@@ -347,6 +363,11 @@ contains
        !call sclrset('mixd',nzp,nxp,nyp,a_sp,dzi_t,n)
     end do
 
+    if (level >= 1) then
+       where (a_rp < 0.) 
+          a_rp=0.
+       end where
+    end if
     if (level >= 3) then
        a_rpp(1,:,:) = 0.
        a_npp(1,:,:) = 0.

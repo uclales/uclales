@@ -8639,7 +8639,7 @@ CONTAINS
     DOUBLE PRECISION            :: q_s,n_s,x_s,d_s,D_sd
     DOUBLE PRECISION            :: x_coll_c,x_r
     DOUBLE PRECISION            :: D_rd
-    DOUBLE PRECISION            :: rime_n,rime_q, rime_qr, rime_qs, rime_qi
+    DOUBLE PRECISION, SAVE            :: rime_n,rime_q, rime_qr, rime_qs, rime_qi
     DOUBLE PRECISION            :: conv_n,conv_q
     DOUBLE PRECISION            :: mult_n,mult_q,mult_1,mult_2
     DOUBLE PRECISION            :: const2,const3,const4,const5
