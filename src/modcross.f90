@@ -1050,7 +1050,9 @@ contains
             varout(i,j) = fillvalue_double
           else
             do k=2,nzp-1
-              varout(i,j) = varout(i,j) + varin(k,i,j) - mean(k) 
+              if (mask(k,i,j) > 0) then
+                varout(i,j) = varout(i,j) + varin(k,i,j) - mean(k) 
+              end if
             end do
             varout(i,j) = varout(i,j)/real(nr)
           end if
