@@ -224,7 +224,7 @@ contains
        end if
 ! linda, b
 !       call surface(sst)
-         call surface(sst,xtime)
+         call surface(sst,xtime,strtim)
 ! linda, e
        call diffuse
        if (adv=='monotone') then

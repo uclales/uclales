@@ -43,7 +43,7 @@ contains
   !irina
 ! linda, b
 !  subroutine surface(sst)
-  subroutine surface(sst,time_in)
+  subroutine surface(sst,time_in,strtim)
 ! linda, e
 
     use defs, only: vonk, p00, rcp, g, cp, alvl, ep2
@@ -52,7 +52,6 @@ contains
          uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,                           &
 ! linda, b
           shls,lhls
-    use step, only : strtim
     use modtimedep, only : ltimedepsurf
 ! linda, e
     use thrm, only: rslf
@@ -62,9 +61,9 @@ contains
     implicit none
  
  !irina
+    real, optional, intent (inout) :: sst
 ! linda, b
-!    real, optional, intent (inout) :: sst
-    real, optional, intent (inout) :: sst,time_in
+    real, optional, intent (in) :: time_in,strtim
 ! linda, e
  !   
     real :: dtdz(nxp,nyp), drdz(nxp,nyp), usfc(nxp,nyp), vsfc(nxp,nyp)       &

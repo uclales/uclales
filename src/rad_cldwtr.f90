@@ -21,6 +21,7 @@ module cldwtr
 
   use defs, only : nv, mb
   use mpi_interface, only : myid
+  implicit none
   integer, save :: nsizes
   logical, save :: Initialized = .False.
 
