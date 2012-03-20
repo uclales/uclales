@@ -124,6 +124,11 @@ contains
 
 !     if (.not.(lxy .or. lxz .or. lyz)) lcross = .false.
     if (lcross) call open_nc(trim(expname)//'.out.xy.'//cmpicoordx//'.'//cmpicoordy//'.nc', nccrossxyid, nccrossrec, rtimee)
+    do n=1,nkcross
+     if (zcross(n) < 0) then
+       call addvar_nc(nccrossxyid, trim(hname(n)),trim(hlname(n)), 'm', (/tname/), (/tlongname/), (/tunit/))
+      end if
+    end do
     do n=1,nvar_all
       call addcross(crossvars(n))
     end do
@@ -511,8 +516,10 @@ contains
       select case (nint(zcross(n)))
       case(-1)
         kcross(n) = zi
+        call writevar_nc(nccrossxyid, trim(hname(n)), zt(zi), nccrossrec)
   
       case(-2)
+        call writevar_nc(nccrossxyid, trim(hname(n)), zt(cb), nccrossrec)
         kcross(n) = cb
       case(-3)
         kcross(n) = lcl
