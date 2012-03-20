@@ -61,7 +61,7 @@ module stat
        'lmbde  ','sfs_tke','sfs_boy','sfs_shr','boy_prd','shr_prd', & !31
        'trans  ','diss   ','dff_u  ','dff_v  ','dff_w  ','adv_u  ', & !37
        'adv_v  ','adv_w  ','prs_u  ','prs_v  ','prs_w  ','prd_uw ', & !43
-       'storage','q      ','q_2    ','q_3     ','tot_qw','sfs_qw ', & !49
+       'storage','q      ','q_2    ','q_3    ','tot_qw ','sfs_qw ', & !49
        'rflx   ','rflx2  ','sflx   ','sflx2  ','l      ','l_2    ', & !55
        'l_3    ','tot_lw ','sed_lw ','cs1    ','cnt_cs1','w_cs1  ', & !61
        'tl_cs1 ','tv_cs1 ','rt_cs1 ','rl_cs1 ','wt_cs1 ','wv_cs1 ', & !67
@@ -69,7 +69,7 @@ module stat
        'rt_cs2 ','rl_cs2 ','wt_cs2 ','wv_cs2 ','wr_cs2 ','Nc     ', & !79  
        'Nr     ','rr     ','prc_r  ','evap   ','frc_prc','prc_prc', & !85
        'frc_ran','hst_srf','lflxu  ','lflxd  ','sflxu  ','sflxd  ', & !91
-       'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel ',& !97
+       'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel', & !97
        'rsup   ','prc_c  ','prc_i  ','prc_s  ','prc_g  ','prc_h  ', & !103
        'hail   ','qt_th  ','s_1    ','s_2    ','s_3    '/)            !109-113
 
@@ -1526,7 +1526,7 @@ contains
   ! SUBROUTINE ACCUM_LSM: Accumulates timeseries statistics  
   ! for land surface variables (if isfctyp=5) 
   !
-  subroutine accum_lsm(nxp, nyp, Qnet, G0, tndskin, ra, rs, rveg, &
+  subroutine accum_lsm(nxp, nyp, Qnet, G0, tndskin, ra, rs, rsveg, &
                        rsoil, tskinav,qskinav, obl, cliq, Wl, Cskinav)
 
     integer, intent (in)  :: nxp,nyp
@@ -1535,7 +1535,7 @@ contains
     real, intent (in)     :: tndskin(nxp,nyp)
     real, intent (in)     :: ra(nxp,nyp)
     real, intent (in)     :: rs(nxp,nyp)
-    real, intent (in)     :: rveg(nxp,nyp)
+    real, intent (in)     :: rsveg(nxp,nyp)
     real, intent (in)     :: rsoil(nxp,nyp)
     real, intent (in)     :: tskinav(nxp,nyp)
     real, intent (in)     :: qskinav(nxp,nyp)
@@ -1547,15 +1547,15 @@ contains
     ssclr(46) = sum(Qnet(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
     ssclr(47) = sum(G0(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
     ssclr(48) = sum(tndskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)*Cskinav
-    ssclr(49) = sum(ra(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
-    ssclr(50) = sum(rs(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
-    ssclr(51) = sum(rveg(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
-    ssclr(52) = sum(rsoil(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
-    ssclr(53) = sum(tskinav(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
-    ssclr(54) = sum(qskinav(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
-    ssclr(55) = sum(obl(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
-    ssclr(56) = sum(cliq(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
-    ssclr(57) = sum(Wl(2:(nxp-2),2:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(49) = sum(ra(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(50) = sum(rs(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(51) = sum(rsveg(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(52) = sum(rsoil(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(53) = sum(tskinav(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(54) = sum(qskinav(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(55) = sum(obl(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(56) = sum(cliq(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(57) = sum(Wl(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
 
   end subroutine accum_lsm
 

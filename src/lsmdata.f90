@@ -7,7 +7,7 @@ module lsmdata
 
   SAVE
 
-  integer           :: nradtime  = 50
+  integer           :: nradtime  = 200
 
   ! Flags
   ! ----------------------------------------------------------

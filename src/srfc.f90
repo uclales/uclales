@@ -849,6 +849,8 @@ contains
               lflxd_avn(1,i,j) = a_lflxd(2,i,j)
               lflxu_avn(1,i,j) = a_lflxu(2,i,j)
 
+            end if
+
               !Surface radiation averaged over nradtime but depends on location
               sflxd_av = sum(sflxd_avn(:,i,j))/nradtime
               sflxu_av = sum(sflxu_avn(:,i,j))/nradtime
@@ -869,7 +871,7 @@ contains
 
               Qnet(i,j) = (sflxd_av - sflxu_av + lflxd_av - lflxu_av)
 
-            end if
+
         else
           !" Not using full radiation: use average radiation from Namelist
           Qnet(i,j) = Qnetav
@@ -879,7 +881,8 @@ contains
 
         !" a) Stomatal opening as a function of incoming short wave radiation
         if (iradtyp == 4) then
-          f1  = 1. ! / min(1., (0.004 * max(0.,sflxd_av) + 0.05) / (0.81 * (0.004 * max(0.,sflxd_av) + 1.)) )
+          f1  = 1. /min(1., (0.004 * max(0.,sflxd_av) + 0.05) &
+                   / (0.81 * (0.004 * max(0.,sflxd_av) + 1.)) )
         else
           f1  = 1.
         end if
@@ -899,8 +902,7 @@ contains
         !" d) Response to temperature
         f4      = 1./ (1. - 0.0016 * (298.0 - Tatm) ** 2.)
         rsveg(i,j)  = rsmin(i,j) / LAI(i,j) * f1 * f2 * f3 * f4
-        if (myid==2 .and. nstep==1 .and. i==5 .and. j==5) print*,"f1,f2,f3,f4,rsveg:",f1,f2,f3,f4,rsveg(i,j)
-         
+
         !" 2.2 - Calculate soil resistance based on ECMWF method
         fsoil  = (phifc - phiwp) / (phiw(i,j,1) - phiwp)
         fsoil  = max(fsoil, 1.)
