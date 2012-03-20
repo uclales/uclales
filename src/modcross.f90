@@ -522,6 +522,7 @@ contains
         call writevar_nc(nccrossxyid, trim(hname(n)), zt(cb), nccrossrec)
         kcross(n) = cb
       case(-3)
+        call writevar_nc(nccrossxyid, trim(hname(n)), zt(lcl), nccrossrec)
         kcross(n) = lcl
       case default
       end select
