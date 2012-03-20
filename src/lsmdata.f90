@@ -284,11 +284,16 @@ module lsmdata
     oblav	= -10e10
     qskin	= sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
 
-    dzsoil(1) = 0.07		!< First test, pick ECMWF config
-    dzsoil(2) = 0.21
-    dzsoil(3) = 0.72
-    dzsoil(4) = 1.89
+    dzsoil(1) = 0.07    ! z = 0.07 m  COSMO config from Linda
+    dzsoil(2) = 0.27    ! z = 0.34 m
+    dzsoil(3) = 1.13    ! z = 1.47 m
+    dzsoil(4) = 1.39    ! z = 2.86 m 
 
+    !dzsoil(1) = 0.07   ! ECMWF config from Chiel
+    !dzsoil(2) = 0.21
+    !dzsoil(3) = 0.72
+    !dzsoil(4) = 1.89
+ 
     ! Calculate vertical layer properties
     zsoil(1)  = dzsoil(1)
     do k = 2, ksoilmax
