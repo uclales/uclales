@@ -79,7 +79,7 @@ contains
     use defs, only : SolarConstant
     use sgsm, only : csx, prndtl
     !irina
-    use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon
+    use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon,lhomflx
     !use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon, sst
     use step, only : timmax, timrsm, istpfl, corflg, outflg, frqanl, frqhis,          &
          frqcross , strtim, radfrq, cntlat,& 
@@ -137,7 +137,7 @@ contains
          lrandommicro, microseq,timenuc ,nin_set,cloud_type, &  !thijs: sequence of variables for microphysics
          lwaterbudget, &                 ! axel: flag for liquid water budget diagnostics (only level=3)
          lcouvreux , tau , &                    ! The Couvreux 'radioactive' scalar
-         deflate_level                          !Compression of the crosssections
+         deflate_level , lhomflx                         !Compression of the crosssections
     deflev = deflate_level
     ps       = 0.
     ts       = th00
