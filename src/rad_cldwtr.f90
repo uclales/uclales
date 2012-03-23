@@ -24,13 +24,16 @@ module cldwtr
   implicit none
   integer, save :: nsizes
   logical, save :: Initialized = .False.
+  logical, save :: iceInitialized = .False.
+  integer, save :: mbs,mbir
 
   real, allocatable    :: re(:), fl(:), bz(:,:), wz(:,:), gz(:,:)
+  real, allocatable    :: ap(:,:), bp(:,:), cps(:,:,:), dps(:,:), cpir(:,:)
 
 contains
   !
   !---------------------------------------------------------------------------
-  ! Surbourine cloud_init initialize data arrays for the cloud model, 
+  ! Subroutine cloud_init initialize data arrays for the cloud model, 
   ! checking for consistency between band structure of cloud model and CKD
   !
   subroutine init_cldwtr
@@ -76,6 +79,49 @@ contains
     Initialized = .True.
 
   end subroutine init_cldwtr
+
+  !
+  !---------------------------------------------------------------------------
+  ! Surbourine cloud_init initialize data arrays for the cloud model, 
+  ! checking for consistency between band structure of cloud model and CKD
+  !
+  subroutine init_cldice
+
+    use ckd, only : band, center
+    integer, parameter  :: nrec = 21600
+
+
+    integer             :: ib, i, nbands
+
+    mbs=6
+    mbir=12
+
+    allocate (ap(3,mb),bp(4,mb),cps(4,4,mbs),dps(4,mbs),cpir(4,mbir))
+    open ( unit = 71, file = 'datafiles/cldice.dat', status = 'old', recl=nrec)
+    do i=1,mb
+       read (71,'(3E10.3)') ap(1,i), ap(2,i), ap(3,i)
+    enddo
+    do i=1,mb
+       read (71,'(4E12.5)') bp(1,i), bp(2,i), bp(3,i), bp(4,i)
+    enddo
+    do i=1,mbs
+       read (71,'(4E12.5)') cps(1,1,i), cps(2,1,i), cps(3,1,i), cps(4,1,i)
+       read (71,'(4E12.5)') cps(1,2,i), cps(2,2,i), cps(3,3,i), cps(4,4,i)
+       read (71,'(4E12.5)') cps(1,2,i), cps(2,2,i), cps(3,3,i), cps(4,4,i)
+       read (71,'(4E12.5)') cps(1,2,i), cps(2,2,i), cps(3,3,i), cps(4,4,i)
+    enddo
+    do i=1,mbs
+       read (71,'(4E12.5)') dps(1,i), dps(2,i), dps(3,i), dps(4,i)
+    enddo
+    do i=1,mbir
+       read (71,'(F7.5,3E13.3)') dps(1,i), dps(2,i), dps(3,i), dps(4,i)
+    enddo
+
+    close (71)
+
+    iceInitialized = .True.
+
+  end subroutine init_cldice
 
   ! -----------------------------------------------------------------------
   ! Subroutine cloud_water:  calculates the optical depth (tw), single 
@@ -133,6 +179,79 @@ contains
 
     return
   end subroutine cloud_water
+
+  ! -----------------------------------------------------------------------
+  ! Subroutine cloud_ice:  calculates the optical depth (ti), single 
+  ! scattering albedo (wi), and phase function (wwi(4)) given the cloud 
+  ! ice [g/m^3] and effective radius [microns] by interpolating based on
+  ! known optical properties at predefined sizes  
+  !
+  subroutine cloud_ice ( ib, pde, pci, dz, ti, wi, wwi )
+
+    implicit none
+
+    integer, intent (in) :: ib
+    real, dimension (nv), intent (in) :: pde, pci, dz
+    real, intent (out) :: ti(nv), wi(nv), wwi(nv,4)
+
+    integer :: k, j, j0, j1
+    real    :: gg, wght, cwmks
+    real    :: fw1, fw2, fw3, wf1, wf2, wf3, wf4, x1, x2, x3, x4, ibr, fd
+    if (.not.iceInitialized) stop 'TERMINATING: Ice not Initialized'
+
+    do k = 1, nv
+       cwmks = pci(k)*1.e-3
+       if ( cwmks .ge. 1.e-8) then
+          j = 0
+          do while (j<(nsizes-1) .and. pde(k) > re(j+1))
+             j = j + 1
+          end do
+             j1 = j+1
+	     fw1 = pde(j)
+	     fw2 = fw1 * pde(j)
+	     fw3 = fw2 * pde(j)
+             ti(j) = dz(k) * cwmks * ( ap(1,ib) + &
+      	     ap(2,ib) / fw1 + ap(3,ib) / fw2 )
+             wi(j) = 1.0 - ( bp(1,ib) + bp(2,ib) * fw1 + &
+      	     bp(3,ib) * fw2 + bp(4,ib) * fw3 )
+	     if ( ib .le. mbs ) then
+	       fd = dps(1,ib) + dps(2,ib) * fw1 + &
+               dps(3,ib) * fw2 + dps(4,ib) * fw3
+               wf1 = cps(1,1,ib) + cps(2,1,ib) * fw1 + &
+               cps(3,1,ib) * fw2 + cps(4,1,ib) * fw3
+               wwi(j,1) = ( 1.0 - fd ) * wf1 + 3.0 * fd
+	       wf2 = cps(1,2,ib) + cps(2,2,ib) * fw1 + &
+               cps(3,2,ib) * fw2 + cps(4,2,ib) * fw3
+               wwi(j,2) = ( 1.0 - fd ) * wf2 + 5.0 * fd
+       	       wf3 = cps(1,3,ib) + cps(2,3,ib) * fw1 + &
+               cps(3,3,ib) * fw2 + cps(4,3,ib) * fw3
+               wwi(j,3) = ( 1.0 - fd ) * wf3 + 7.0 * fd
+               wf4 = cps(1,4,ib) + cps(2,4,ib) * fw1 + &
+               cps(3,4,ib) * fw2 + cps(4,4,ib) * fw3
+               wwi(j,4) = ( 1.0 - fd ) * wf4 + 9.0 * fd
+             else
+               ibr = ib - mbs
+               gg = cpir(1,ibr) + cpir(2,ibr) * fw1 + &
+               cpir(3,ibr) * fw2 + cpir(4,ibr) * fw3
+	       x1 = gg
+               x2 = x1 * gg
+               x3 = x2 * gg
+               x4 = x3 * gg
+               wwi(j,1) = 3.0 * x1
+	       wwi(j,2) = 5.0 * x2
+               wwi(j,3) = 7.0 * x3
+               wwi(j,4) = 9.0 * x4
+	     endif
+       else
+          wwi(k,:) = 0.0
+          ti(k) = 0.0
+          wi(k) = 0.0
+          gg    = 0.
+       end if
+    end do
+
+    return
+  end subroutine cloud_ice
 
   ! ---------------------------------------------------------------------------
   ! linear interpolation between two points, returns indicies of the 

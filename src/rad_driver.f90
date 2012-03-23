@@ -91,7 +91,9 @@ module radiation
                pt(kk) = th(k,i,j)*exner(k)
                !old
              !  pt(kk) = tk(k,i,j)
-               ph(kk) = rv(k,i,j)
+!               if ((rv(k,i,j).lt.0.).or.(rv(k,i,j).gt.0.05)) print*,'bad rv',rv(k,i,j),i,j,k,kk
+               ph(kk) = max(0.,rv(k,i,j))
+!               if ((ph(kk).lt.0.).or.(ph(kk).gt.0.02)) print*,'bad ph',ph(kk),rv(k,i,j),i,j,k,kk
                plwc(kk) = 1000.*dn0(k)*max(0.,rc(k,i,j))
                pre(kk)  = 1.e6*(plwc(kk)/(1000.*prw*CCN*dn0(k)))**(1./3.)
                if (plwc(kk).le.0.) pre(kk) = 0.
@@ -102,7 +104,9 @@ module radiation
                end if
                if (present(ice)) then
                  piwc(kk) = 1000.*dn0(k)*ice(k,i,j)
+                 plwc(kk) = plwc(kk)+0.5*piwc(kk)
                  pde(kk)  = 1.e6*(piwc(kk)/(1000.*prw*nice(k,i,j)*dn0(k)))**(1./3.)
+                 pre(kk)  = 1.e6*(plwc(kk)/(1000.*prw*(nice(k,i,j)+CCN)*dn0(k)))**(1./3.)
                else
                   piwc(kk) = 0.
                end if
@@ -124,7 +128,7 @@ module radiation
             !print *, "u0",u0
 
             call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
-                 fds, fus, fdir, fuir, plwc=plwc, pre=pre, useMcICA=.True.)
+                 fds, fus, fdir, fuir, plwc=plwc, pre=pre, useMcICA=.false.)
 
             do k=1,n1
                kk = nv1 - (k-1)
