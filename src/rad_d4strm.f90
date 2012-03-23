@@ -190,6 +190,7 @@ contains
         call cloud_water(ib + size(solar_bands), pre, plwc, dz, tw, ww, www)
         call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tw, ww, www)
         call cloud_ice(ib + size(solar_bands), pde, piwc, dz, ti, wi, wwi)
+        call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, ti, wi, wwi)
       end if 
       
       call planck(pt, pts, llimit(ir_bands(ib)), rlimit(ir_bands(ib)), bf)
@@ -331,6 +332,7 @@ contains
            call cloud_water(ib, pre, plwc, dz, tw, ww, www)
            call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tw,ww,www)
            call cloud_ice(ib, pde, piwc, dz, ti, wi, wwi)
+           call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, ti,wi,wwi)
          end if 
   
          gPointLoop: do ig =  ig1, ig2

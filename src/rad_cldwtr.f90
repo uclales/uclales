@@ -194,7 +194,7 @@ contains
     real, dimension (nv), intent (in) :: pde, pci, dz
     real, intent (out) :: ti(nv), wi(nv), wwi(nv,4)
 
-    integer :: k, j, j0, j1
+    integer :: k
     real    :: gg, wght, cwmks
     real    :: fw1, fw2, fw3, wf1, wf2, wf3, wf4, x1, x2, x3, x4, ibr, fd
     if (.not.iceInitialized) stop 'TERMINATING: Ice not Initialized'
@@ -202,33 +202,28 @@ contains
     do k = 1, nv
        cwmks = pci(k)*1.e-3
        if ( cwmks .ge. 1.e-8) then
-          j = 0
-          do while (j<(nsizes-1) .and. pde(k) > re(j+1))
-             j = j + 1
-          end do
-             j1 = j+1
-	     fw1 = pde(j)
-	     fw2 = fw1 * pde(j)
-	     fw3 = fw2 * pde(j)
-             ti(j) = dz(k) * cwmks * ( ap(1,ib) + &
+	     fw1 = pde(k)
+	     fw2 = fw1 * pde(k)
+	     fw3 = fw2 * pde(k)
+             ti(k) = dz(k) * cwmks * ( ap(1,ib) + &
       	     ap(2,ib) / fw1 + ap(3,ib) / fw2 )
-             wi(j) = 1.0 - ( bp(1,ib) + bp(2,ib) * fw1 + &
+             wi(k) = 1.0 - ( bp(1,ib) + bp(2,ib) * fw1 + &
       	     bp(3,ib) * fw2 + bp(4,ib) * fw3 )
 	     if ( ib .le. mbs ) then
 	       fd = dps(1,ib) + dps(2,ib) * fw1 + &
                dps(3,ib) * fw2 + dps(4,ib) * fw3
                wf1 = cps(1,1,ib) + cps(2,1,ib) * fw1 + &
                cps(3,1,ib) * fw2 + cps(4,1,ib) * fw3
-               wwi(j,1) = ( 1.0 - fd ) * wf1 + 3.0 * fd
+               wwi(k,1) = ( 1.0 - fd ) * wf1 + 3.0 * fd
 	       wf2 = cps(1,2,ib) + cps(2,2,ib) * fw1 + &
                cps(3,2,ib) * fw2 + cps(4,2,ib) * fw3
-               wwi(j,2) = ( 1.0 - fd ) * wf2 + 5.0 * fd
+               wwi(k,2) = ( 1.0 - fd ) * wf2 + 5.0 * fd
        	       wf3 = cps(1,3,ib) + cps(2,3,ib) * fw1 + &
                cps(3,3,ib) * fw2 + cps(4,3,ib) * fw3
-               wwi(j,3) = ( 1.0 - fd ) * wf3 + 7.0 * fd
+               wwi(k,3) = ( 1.0 - fd ) * wf3 + 7.0 * fd
                wf4 = cps(1,4,ib) + cps(2,4,ib) * fw1 + &
                cps(3,4,ib) * fw2 + cps(4,4,ib) * fw3
-               wwi(j,4) = ( 1.0 - fd ) * wf4 + 9.0 * fd
+               wwi(k,4) = ( 1.0 - fd ) * wf4 + 9.0 * fd
              else
                ibr = ib - mbs
                gg = cpir(1,ibr) + cpir(2,ibr) * fw1 + &
@@ -237,10 +232,10 @@ contains
                x2 = x1 * gg
                x3 = x2 * gg
                x4 = x3 * gg
-               wwi(j,1) = 3.0 * x1
-	       wwi(j,2) = 5.0 * x2
-               wwi(j,3) = 7.0 * x3
-               wwi(j,4) = 9.0 * x4
+               wwi(k,1) = 3.0 * x1
+	       wwi(k,2) = 5.0 * x2
+               wwi(k,3) = 7.0 * x3
+               wwi(k,4) = 9.0 * x4
 	     endif
        else
           wwi(k,:) = 0.0
