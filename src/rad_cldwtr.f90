@@ -91,7 +91,7 @@ contains
     integer, parameter  :: nrec = 21600
 
 
-    integer             :: ib, i, nbands
+    integer             :: ib, i, j, nbands
 
     mbs=6
     mbir=12
@@ -105,16 +105,15 @@ contains
        read (71,'(4E12.5)') bp(1,i), bp(2,i), bp(3,i), bp(4,i)
     enddo
     do i=1,mbs
-       read (71,'(4E12.5)') cps(1,1,i), cps(2,1,i), cps(3,1,i), cps(4,1,i)
-       read (71,'(4E12.5)') cps(1,2,i), cps(2,2,i), cps(3,3,i), cps(4,4,i)
-       read (71,'(4E12.5)') cps(1,2,i), cps(2,2,i), cps(3,3,i), cps(4,4,i)
-       read (71,'(4E12.5)') cps(1,2,i), cps(2,2,i), cps(3,3,i), cps(4,4,i)
+       do j=1,4
+          read (71,'(4E12.5)') cps(1,j,i), cps(2,j,i), cps(3,j,i), cps(4,j,i)
+       enddo
     enddo
     do i=1,mbs
        read (71,'(4E12.5)') dps(1,i), dps(2,i), dps(3,i), dps(4,i)
     enddo
     do i=1,mbir
-       read (71,'(F7.5,3E13.3)') dps(1,i), dps(2,i), dps(3,i), dps(4,i)
+       read (71,'(4E13.4)') cpir(1,i), cpir(2,i), cpir(3,i), cpir(4,i)
     enddo
 
     close (71)

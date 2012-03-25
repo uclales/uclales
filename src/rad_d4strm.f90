@@ -189,6 +189,8 @@ contains
       if (present(plwc)) then
         call cloud_water(ib + size(solar_bands), pre, plwc, dz, tw, ww, www)
         call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tw, ww, www)
+      end if 
+      if (present(piwc)) then
         call cloud_ice(ib + size(solar_bands), pde, piwc, dz, ti, wi, wwi)
         call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, ti, wi, wwi)
       end if 
@@ -331,6 +333,8 @@ contains
          if (present(plwc)) then
            call cloud_water(ib, pre, plwc, dz, tw, ww, www)
            call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tw,ww,www)
+        end if
+        if (present(piwc)) then
            call cloud_ice(ib, pde, piwc, dz, ti, wi, wwi)
            call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, ti,wi,wwi)
          end if 
