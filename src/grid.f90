@@ -254,7 +254,9 @@ contains
       a_rpp =>a_xp(:,:,:,6)
       a_npp =>a_xp(:,:,:,7)
       allocate (prc_acc(nxp,nyp))
+      allocate (rev_acc(nxp,nyp))
       prc_acc(:,:) = 0.   ! accumulated precipitation for 2D output  [kg/m2]
+      rev_acc(:,:) = 0.   ! accumulated evaporation of rainwater     [kg/m2]
     end if
     if (lwaterbudget) then 
       ! for liquid water budget and precipitation efficiency diagnostic
@@ -263,7 +265,6 @@ contains
       allocate (cnd_acc(nxp,nyp),cev_acc(nxp,nyp),rev_acc(nxp,nyp))
       cnd_acc(:,:) = 0.   ! accumulated condensation                 [kg/m2]
       cev_acc(:,:) = 0.   ! accumulated evaporation of cloud water   [kg/m2]
-      rev_acc(:,:) = 0.   ! accumulated evaporation of raindwater    [kg/m2]
     end if
     ! ice microphysics
     if (level >= 4) then
