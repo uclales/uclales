@@ -204,6 +204,7 @@ contains
        if (.not.lwaterbudget) then
           call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
                a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r)
+          prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)) * dt / 3.
        else
           call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
                a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r,rct=a_rct)
@@ -359,11 +360,7 @@ contains
              case(iwtrdff)
                 call resetvar(cldw,rc)
                 call resetvar(rain,rrain,nrain)
-                if (lwaterbudget) then
-                   call wtr_dff_SB(n1,dn0,rrain,nrain,rc,rs,rv,tl,temp,ev=rev_acc(i,j),zm=zm)
-                else
-                   call wtr_dff_SB(n1,dn0,rrain,nrain,rc,rs,rv,tl,temp)
-                end if
+                call wtr_dff_SB(n1,dn0,rrain,nrain,rc,rs,rv,tl,temp,ev=rev_acc(i,j),zm=zm)
              case(iauto)
                 call resetvar(cldw,rc)
                 call resetvar(rain,rrain,nrain)

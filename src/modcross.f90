@@ -263,7 +263,6 @@ contains
         longname = 'Hail water path'
         unit = 'kg/m2'
       case ('prc_acc')
-        if (.not.lwaterbudget) return
         longname = 'acc. precip'
         unit = 'kg/m2'
       case ('cnd_acc')
@@ -275,7 +274,6 @@ contains
         longname = 'acc. evaporation of cloud water'
         unit = 'kg/m2'          
       case ('rev_acc')
-        if (.not.lwaterbudget) return
         longname = 'acc. evaporation of rain water'
         unit = 'kg/m2'          
       case ('cldbase')
