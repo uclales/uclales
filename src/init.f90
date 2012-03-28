@@ -32,6 +32,7 @@ module init
   real, dimension(nns)  :: us,vs,ts,thds,ps,hs,rts,rss,tks,xs,xsi
   real                  :: zrand = 200.
   character  (len=80)   :: hfilin = 'test.'  
+  logical               :: lhomrestart = .false.
 
 contains
   !
@@ -58,6 +59,9 @@ contains
        dt  = dtlong
     else if (runtype == 'HISTORY') then
        call hstart
+       if (lhomrestart) then
+         call homogenize
+       end if
     else
        if (myid == 0) print *,'  ABORTING:  Invalid Runtype'
        call appl_abort(0)
@@ -706,6 +710,54 @@ contains
     return
   end subroutine lstend_init
 
+  subroutine homogenize
+    use util, only : get_avg3,azero, atob
+    use thrm, only : thermo
+    use grid, only : a_ustar, a_tstar, a_rstar
+    implicit none
+
+    integer :: i,j,k,n
+    real    :: exner, pres, tk, rc, xran(nzp), zc, dist, xc
+    real :: ust(3,nxp,nyp), ustmn(3), prof(nzp)
+    ust(1,:,:) = a_ustar
+    ust(2,:,:) = a_tstar
+    ust(3,:,:) = a_rstar
+    call get_avg3(3,nxp,nyp,ust,ustmn)
+    a_ustar = ustmn(1)
+    a_tstar = ustmn(2)
+    a_rstar = ustmn(3)
+    do n = 1,nscl
+      call get_avg3(nzp,nxp,nyp,a_xp(:,:,:,n),prof)
+      do k = 1,nzp
+        a_xp(k,:,:,n) = prof(k)
+      end do
+    end do
+
+    k=1
+    do while( zt(k+1) <= zrand .and. k < nzp)
+       k=k+1
+       xran(k) = 0.2*(zrand - zt(k))/zrand
+       !xran(k) = 0.05*(zrand - zt(k))/zrand
+    end do
+    call random_pert(nzp,nxp,nyp,zt,a_tp,xran,k) 
+
+    if (associated(a_rp)) then
+       k=1
+       do while( zt(k+1) <= zrand .and. k < nzp)
+          k=k+1
+          xran(k) = 5.0e-5*(zrand - zt(k))/zrand
+          !xran(k) = 1.0e-5*(zrand - zt(k))/zrand
+       end do
+       call random_pert(nzp,nxp,nyp,zt,a_rp,xran,k) 
+    end if
+    call azero(nxyzp,a_wp)
+    !    
+    ! initialize thermodynamic fields
+    !
+    call thermo (level)
+    call atob(nxyzp,a_pexnr,press)
+    
+  end subroutine homogenize
 
   !
 
