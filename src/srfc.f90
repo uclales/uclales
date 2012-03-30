@@ -30,13 +30,15 @@ use lsmdata
 contains 
   !
   ! --------------------------------------------------------------------------
-  ! SURFACE: Calcualtes surface fluxes using an algorithm chosen by ISFCLYR
+  ! SURFACE: Calcualtes surface fluxes using an algorithm chosen by ISFCTYP
   ! and fills the appropriate 2D arrays
   !
-  !     default: specified thermo-fluxes (drtcon, dthcon)
-  !     isfclyr=1: specified surface layer gradients (drtcon, dthcon)
-  !     isfclyr=2: fixed lower boundary of water at certain sst
-  !     isfclyr=3: bulk aerodynamic law with coefficeints (drtcon, dthcon)
+  !       default: specified thermo-fluxes (drtcon, dthcon)
+  !     isfctyp=1: specified surface layer gradients (drtcon, dthcon)
+  !     isfctyp=2: fixed lower boundary of water at certain sst
+  !     isfctyp=3: bulk aerodynamic law with coefficeints (drtcon, dthcon)
+  !     isfctyp=4: fix surface temperature to yield a constant surface buoyancy flux
+  !     isfctyp=5: variable surface temperature and humidity using LSM (van Heerwarden)
   !irina
   subroutine surface(sst)
 
@@ -181,7 +183,7 @@ contains
 
   !
   ! ----------------------------------------------------------------------
-  ! Malte: Get surface fluxes using a land surface model
+  ! Malte: Get surface fluxes using a land surface model (van Heerwarden)
   !
    case(5)
 
@@ -195,15 +197,15 @@ contains
 
        !Local or filtered variables for flux calculation
        if (local) then
-       u0bar(:,:,:)  = a_up(:,:,:)
-       v0bar(:,:,:)  = a_vp(:,:,:)
+       u0bar(:,:,:) = a_up(:,:,:)
+       v0bar(:,:,:) = a_vp(:,:,:)
        thetaav(:,:) = a_theta(2,:,:)
        vaporav(:,:) = vapor(2,:,:)
        tskinav(:,:) = tskin(:,:)
        qskinav(:,:) = qskin(:,:)
        else
-       u0av          = sum(a_up(2,3:nxp-2,3:nxp-2))/(nxp-4)/(nyp-4) + umean
-       v0av          = sum(a_vp(2,3:nxp-2,3:nxp-2))/(nxp-4)/(nyp-4) + vmean
+       u0av         = sum(a_up(2,3:nxp-2,3:nxp-2))/(nxp-4)/(nyp-4) + umean
+       v0av         = sum(a_vp(2,3:nxp-2,3:nxp-2))/(nxp-4)/(nyp-4) + vmean
        thetaav(:,:) = sum(a_theta(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
        vaporav(:,:) = sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
        tskinav(:,:) = sum(tskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
@@ -213,10 +215,7 @@ contains
        !Calculate surface wind for flux calculation
        call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,u0bar,v0bar,umean,vmean)
 
-       ! a) Calculate Monin Obuhkov Length iteratively
-       !call getobl
-
-       ! b) Calculate Monin Obuhkov Length from surface scalars
+       ! a) Calculate Monin Obuhkov Length from surface scalars
        do j=3,nyp-2
           do i=3,nxp-2
              dtdz(i,j) = thetaav(i,j) - tskinav(i,j)
@@ -224,7 +223,11 @@ contains
           end do
        end do
        tskinavg = sum(tskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+       sst = tskinavg*(psrf/p00)**(rcp)
        call srfcscls(nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,drdz,a_ustar,a_tstar,a_rstar,obl)
+
+       ! b) Calculate Monin Obuhkov Length iteratively
+       !call getobl
 
        !Calculate the drag coefficients and aerodynamic resistance
        do j=3,nyp-2
@@ -235,14 +238,17 @@ contains
 			obl(i,j)) + psim(z0m(i,j) / obl(i,j))) / (log(zt(2) / &
 			z0h(i,j)) - psih(zt(2) / obl(i,j)) + psih(z0h(i,j) / &
 			obl(i,j)))
-             ra(i,j) =  1. / (cs(i,j)* wspd(i,j))
+             ra(i,j) = 1. / (cs(i,j)* wspd(i,j))
           end do
        end do
+
+       !switch between homogeneous and heterogeneous ra
+       !ra(:,:) = sum(ra(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
 
        !Get skin temperature and humidity from land surface model(van Heerwarden)
        call lsm
 
-       !Update tskin and qskin (local or filtered) for flux calculation
+      !Update tskin and qskin (local or filtered) for flux calculation
        if (local) then
          tskinav(:,:) = tskin(:,:)
          qskinav(:,:) = qskin(:,:)
@@ -271,25 +277,38 @@ contains
              a_rstar(i,j) = - wq_sfc(i,j)/a_ustar(i,j)
              a_tstar(i,j) = - wt_sfc(i,j)/a_ustar(i,j)
 
-          if  (wt_sfc(i,j) .lt. 0) then
-             wt_sfc(i,j) = 0.
-          end if
+          !if  (wt_sfc(i,j) .lt. 0) then
+          !   wt_sfc(i,j) = 0.
+          !end if
 
-          if  (wq_sfc(i,j) .lt. 0) then
-             wq_sfc(i,j) = 0.
-          end if
-
-          if (nstep==1 .and. i==5 .and. j==5 .and. .false.) then
-          print*,"*****************************************************************"
-          print*,"LHF(5,5):",wq_sfc(5,5)*alvl*(dn0(1)+dn0(2))*0.5
-          print*,"*****************************************************************"
-          print*,"LHF(mean),LHF(max),LHF(min):",sum(wq_sfc(3:nxp-2,3:nyp-2))*alvl*(dn0(1)+dn0(2))*0.5/(nxp-4)/(nyp-4),  &
-                 maxval(wq_sfc(3:nxp-2,3:nyp-2)*alvl*(dn0(1)+dn0(2))*0.5), minval(wq_sfc(3:nxp-2,3:nyp-2)*alvl*(dn0(1)+dn0(2))*0.5)
-          print*,"*****************************************************************"
-          end if
+          !if  (wq_sfc(i,j) .lt. 0) then
+          !   wq_sfc(i,j) = 0.
+          !end if
 
           end do
        end do
+
+       if (nstep==1 .and. i==nxp-2 .and. j==nyp-2 .and. .false.) then
+         print*,"*****************************************************************"
+         print*,"LHF(mean),LHF(max),LHF(min):",sum(wq_sfc(3:nxp-2,3:nyp-2))*alvl*(dn0(1)+dn0(2))*0.5/(nxp-4)/(nyp-4),  &
+                 maxval(wq_sfc(3:nxp-2,3:nyp-2)*alvl*(dn0(1)+dn0(2))*0.5), minval(wq_sfc(3:nxp-2,3:nyp-2)*alvl*(dn0(1)+dn0(2))*0.5)
+         print*,"*****************************************************************"
+       end if
+
+       if (nstep == 1 .and. myid == 3 .and. .false.) then
+         print*,"********************************"
+         print*,"*********SURFACE SCALARS********"
+         print*,"********************************"
+         print*,"obl (min)",minval(obl(3:nxp-2,3:nyp-2))
+         print*,"obl (max)",maxval(obl(3:nxp-2,3:nyp-2))
+         print*,"ustar (min)",minval(a_ustar(3:nxp-2,3:nyp-2))
+         print*,"ustar (max)",maxval(a_ustar(3:nxp-2,3:nyp-2))
+         print*,"tstar (min)",minval(a_tstar(3:nxp-2,3:nyp-2))
+         print*,"tstar (max)",maxval(a_tstar(3:nxp-2,3:nyp-2))
+         print*,"********************************"
+         print*,"********************************"
+         print*,"********************************"
+       end if
 
   !
   ! ----------------------------------------------------------------------
@@ -488,29 +507,28 @@ contains
           dtv = dth(i,j) + ep2*th00*drt(i,j)
 
           !
-          ! STABLE CASE
+          ! OLD STABLE CASE
           !
-          if (dtv > 0.) then
-             x     = (betg*u(i,j)**2)/dtv
-             y     = (am - 0.5*x)/lnz
-             x     = (x*ah - am**2)/(lnz**2)
-             lmo   = -y + sqrt(x+y**2)
-             zeta  = z/lmo
-             ustar(i,j) =  vonk*u(i,j)/(lnz + am*zeta)
-             tstar(i,j) = (vonk*dtv/(lnz + ah*zeta))/pr
-          !print*,"STABLE ATMOSPHERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+          !if (dtv > 0.) then
+          !   x     = (betg*u(i,j)**2)/dtv
+          !   y     = (am - 0.5*x)/lnz
+          !   x     = (x*ah - am**2)/(lnz**2)
+          !   lmo   = -y + sqrt(x+y**2)
+          !   zeta  = z/lmo
+          !   ustar(i,j) =  vonk*u(i,j)/(lnz + am*zeta)
+          !   tstar(i,j) = (vonk*dtv/(lnz + ah*zeta))/pr
+          !print*,"STABLE ATMOSPHERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 
           !
           ! NEUTRAL CASE
           ! 
-          elseif (dtv == 0.) then
+          if (dtv == 0.) then
              ustar =  vonk*u(i,j)/lnz
              tstar =  vonk*dtv/(pr*lnz)
              lmo = -1.e10
-          !print*,"NEUTRAL ATMOSPHERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 
           !
-          ! UNSTABLE CASE
+          ! STABLE AND UNSTABLE CASE
           !
           ! start iterations from values at previous tstep, 
           ! unless the sign has changed or if it is the first call, then 
@@ -523,11 +541,16 @@ contains
              lmo = -1.e10
              end if
 
-             do iterate = 1,3
+             do iterate = 1,10
                 lmo   = betg*ustar(i,j)**2/(vonk*tstar(i,j))
-                if (lmo .gt. -1) then
-                lmo = -1.
+
+                if ((dtv < 0) .and. (lmo > -0.001) ) then
+                   lmo = -0.001999
                 end if
+                if ((dtv > 0) .and. (lmo < +0.001) ) then
+                   lmo = +0.001777
+                end if
+
                 zeta  = z/lmo
                 ustar(i,j) = u(i,j)*vonk/(lnz - psim(zeta))
                 tstar(i,j) = (dtv*vonk/pr)/(lnz - psih(zeta))
@@ -540,21 +563,6 @@ contains
           
        end do
     end do
-
-       if (nstep == 1 .and. .false.) then
-       print*,"********************************"
-       print*,"*********SURFACE SCALARS********"
-       print*,"********************************"
-       print*,"obl (min)",minval(obl(3:n2-2,3:n3-2))
-       print*,"obl (max)",maxval(obl(3:n2-2,3:n3-2))
-       print*,"ustar (min)",minval(ustar(3:n2-2,3:n3-2))
-       print*,"ustar (max)",maxval(ustar(3:n2-2,3:n3-2))
-       print*,"tstar (min)",minval(tstar(3:n2-2,3:n3-2))
-       print*,"tstar (max)",maxval(tstar(3:n2-2,3:n3-2))
-       print*,"********************************"
-       print*,"********************************"
-       print*,"********************************"
-       end if
 
     first_call = .False.
 
@@ -705,12 +713,6 @@ contains
 
     oblav = L
 
-    !print*,"**********************************************"
-    !print*,"wspd2:",wspd2
-    !print*,"Rib:",Rib
-    !print*,"obl",minval(obl(3:nxp-2,3:nxp-2))
-    !print*,"**********************************************"
-
     return
   end subroutine getobl
 
@@ -839,6 +841,10 @@ contains
         if(iradtyp == 4) then
             if(nstep == 1) then
 
+              !if (i==3 .and. j==3) Qnetm(:,:) = Qnetn(:,:)
+              !if (i==3 .and. j==3) rsvegm(:,:) = rsveg(:,:)  
+              !if (i==3 .and. j==3) rssoilm(:,:) = rssoil(:,:)
+
               sflxd_avn(2:nradtime,i,j) = sflxd_avn(1:nradtime-1,i,j)
               sflxu_avn(2:nradtime,i,j) = sflxu_avn(1:nradtime-1,i,j)
               lflxd_avn(2:nradtime,i,j) = lflxd_avn(1:nradtime-1,i,j)
@@ -869,8 +875,11 @@ contains
               !lflxd_av = sum(a_lflxd(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
               !lflxu_av = sum(a_lflxu(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
 
-              Qnet(i,j) = (sflxd_av - sflxu_av + lflxd_av - lflxu_av)
+              Qnetn(i,j) = (sflxd_av - sflxu_av + lflxd_av - lflxu_av)
 
+              !Switch between homogeneous and heterogeneous net radiation
+              !Qnet(:,:) = sum(Qnetm(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+              Qnet(i,j) = Qnetn(i,j)
 
         else
           !" Not using full radiation: use average radiation from Namelist
@@ -908,6 +917,10 @@ contains
         fsoil  = max(fsoil, 1.)
         fsoil  = min(1.e8, fsoil)
         rssoil(i,j) = rssoilmin(i,j) * fsoil
+
+        !"Switch between homogeneous and heterogeneous surface resistance
+        !rsveg(:,:) = sum(rsvegm(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+        !rssoil(:,:) = sum(rssoilm(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
 
         !" 2.3 - Calculate the heat transport properties of the soil.
         !" Put in init function, as we don't have prognostic soil moisture atm.
@@ -980,23 +993,6 @@ contains
         LEveg     = - fLEveg  * ( vapor(2,i,j) - qskinn)
         LEsoil    = - fLEsoil * ( vapor(2,i,j) - qskinn)
         LEliq     = - fLEliq  * ( vapor(2,i,j) - qskinn)
-
-        if ((nstep==1) .and. (i==5) .and. (j==5) .and. (myid==2) .and. .false.) then
-        print*,"********************************************************************************************"
-        print*,"********************************************************************************************"
-        print*,"Qnet(mean)*************Qnet(min)*************(Qnet(max))**************"
-        print*,sum(Qnet(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4),minval(Qnet(3:nxp-2,3:nyp-2)),maxval(Qnet(3:nxp-2,3:nyp-2))
-        print*,"****sflxd_av***********sflxu_av*************lflxd_av****************lflxu********"
-        print*,sflxd_av,sflxu_av,lflxd_av,lflxu_av
-        print*,"********************************************************************************************"
-        print*,"********************************************************************************************"
-        print*,"nradtime:",nradtime
-        print*,"sflxd(:,i,j)",sflxd_avn(1:nradtime,i,j)
-        print*,"********************************************************************************************"
-        print*,"LEveg,LEsoil,LEliq",LEveg,LEsoil,LEliq
-        print*,"LHF(5,5):",LE(i,j)
-        print*,"********************************************************************************************"
-        end if
 
         if(LE(i,j) == 0.) then
           rs(i,j) = 1.e8           ! "WHY???

@@ -122,6 +122,8 @@ module lsmdata
   ! Surface energy balance
   real, allocatable :: Qnet     (:,:)   !<  Net radiation [W/m2]
   real              :: Qnetav   = 300.
+  real, allocatable :: Qnetm    (:,:)   !<  Net radiation previous timestep [W/m2]
+  real, allocatable :: Qnetn    (:,:)   !<  Net radiation dummy [W/m2]
 
   real, allocatable :: rsmin    (:,:)   !<  Minimum vegetation resistance [s/m]
   real              :: rsminav = 110.
@@ -138,8 +140,10 @@ module lsmdata
   real, allocatable :: ra       (:,:)   !<  Aerodynamic resistance [s/m]
   real, allocatable :: rs       (:,:)   !<  Composite resistance [s/m]
   real, allocatable :: rsveg    (:,:)   !<  Vegetation resistance [s/m]
+  real, allocatable :: rsvegm   (:,:)   !<  Vegetation resistance previous timestep [s/m]
   real, allocatable :: rssoil   (:,:)   !<  Soil evaporation resistance [s/m]
-  real, allocatable :: tndskin (:,:)   !<  Tendency of skin [W/m2]
+  real, allocatable :: rssoilm  (:,:)   !<  Soil evaporation resistance previous timestep [s/m]
+  real, allocatable :: tndskin  (:,:)   !<  Tendency of skin [W/m2]
   !real              :: rsisurf2 = 0.   !<  Vegetation resistance [s/m] if isurf2 is used
 
   ! Turbulent exchange variables
@@ -214,10 +218,10 @@ module lsmdata
       allocate(lflxd_avn(nradtime,nxp,nyp))
       allocate(lflxu_avn(nradtime,nxp,nyp))
       
-      sflxd_avn (:,:,:) = 0
-      sflxu_avn (:,:,:) = 0
-      lflxd_avn (:,:,:) = 0
-      lflxu_avn (:,:,:) = 0
+      sflxd_avn (:,:,:) = 0.
+      sflxu_avn (:,:,:) = 0.
+      lflxd_avn (:,:,:) = 0.
+      lflxu_avn (:,:,:) = 0.
     end if
 
     ! Allocate LSM arrays
@@ -243,13 +247,17 @@ module lsmdata
     allocate(phitot(nxp,nyp))
 
     allocate(Qnet(nxp,nyp))
+    allocate(Qnetm(nxp,nyp))
+    allocate(Qnetn(nxp,nyp))
     allocate(LE(nxp,nyp))
     allocate(H(nxp,nyp))
     allocate(G0(nxp,nyp))
 
     allocate(rsveg(nxp,nyp))
+    allocate(rsvegm(nxp,nyp))
     allocate(rsmin(nxp,nyp))
     allocate(rssoil(nxp,nyp))
+    allocate(rssoilm(nxp,nyp))
     allocate(rssoilmin(nxp,nyp))
     allocate(cveg(nxp,nyp))
     allocate(cliq(nxp,nyp))
@@ -346,6 +354,8 @@ module lsmdata
     lambdasat = lambdasm ** (1. - phi) * lambdaw ** (phi)
 
     Qnet       = Qnetav
+    Qnetm      = Qnetav
+    Qnetn      = Qnetav
     Cskin      = Cskinav
     lambdaskin = lambdaskinav
     rsmin      = rsminav

@@ -1546,7 +1546,7 @@ contains
 
     ssclr(46) = sum(Qnet(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
     ssclr(47) = sum(G0(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
-    ssclr(48) = sum(tndskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)*Cskinav
+    ssclr(48) = sum(tndskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
     ssclr(49) = sum(ra(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
     ssclr(50) = sum(rs(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
     ssclr(51) = sum(rsveg(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
