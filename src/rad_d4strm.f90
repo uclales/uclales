@@ -20,7 +20,7 @@
 module fuliou
 
   use defs, only   : nv, nv1, mb, pi, totalpower, g, R, ep2
-  use cldwtr, only : init_cldwtr, cloud_water, init_cldice, cloud_ice
+  use cldwtr, only : init_cldwtr, cloud_water, init_cldice, cloud_ice, init_cldgrp, cloud_grp
   use solver, only : qft
   use mpi_interface, only : myid
   use RandomNumbers
@@ -45,6 +45,7 @@ contains
        randoms = new_RandomNumberSequence(1+myid)
        call init_cldwtr
        call init_cldice
+       call init_cldgrp
        Initialized = .True.
     end if
     
@@ -135,9 +136,11 @@ contains
 
     real, dimension (nv)   :: tw,ww,tg,dz,tauNoGas, wNoGas, Tau, w
     real, dimension (nv)   :: ti,wi
+    real, dimension (nv)   :: tgr,wgr
     real, dimension (nv1)  :: fu1, fd1, bf
     real, dimension (nv,4) :: www, pfNoGas, pf
     real, dimension (nv,4) :: wwi
+    real, dimension (nv,4) :: wwgr
   
     integer :: ib, ig, k, ig1, ig2, ibandloop, iblimit
     real :: fuq2, xir_norm
@@ -150,6 +153,7 @@ contains
        randoms = new_RandomNumberSequence(1+myid)
        call init_cldwtr
        call init_cldice
+       call init_cldgrp
        Initialized = .True.
     end if
 
@@ -189,10 +193,14 @@ contains
       if (present(plwc)) then
         call cloud_water(ib + size(solar_bands), pre, plwc, dz, tw, ww, www)
         call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tw, ww, www)
-      end if 
+      end if
       if (present(piwc)) then
-        call cloud_ice(ib + size(solar_bands), pde, piwc, dz, ti, wi, wwi)
+        call cloud_ice(ib + size(solar_bands), pde, piwc, dz, ti, wi, wwi,'ir')
         call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, ti, wi, wwi)
+      end if
+      if (present(pgwc)) then
+        call cloud_grp(ib + size(solar_bands), pgwc, dz, tgr, wgr, wwgr)
+        call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tgr, wgr, wwgr)
       end if 
       
       call planck(pt, pts, llimit(ir_bands(ib)), rlimit(ir_bands(ib)), bf)
@@ -267,9 +275,11 @@ contains
 
     real, dimension (nv)   :: tw,ww,tg,tgm,dz, tauNoGas, wNoGas, tau, w
     real, dimension (nv)   :: ti,wi
+    real, dimension (nv)   :: tgr,wgr
     real, dimension (nv1)  :: fu1, fd1, bf
     real, dimension (nv,4) :: www, pfNoGas, pf
     real, dimension (nv,4) :: wwi
+    real, dimension (nv,4) :: wwgr
 
     real, dimension(:), allocatable, save :: bandWeights
 
@@ -335,8 +345,12 @@ contains
            call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tw,ww,www)
         end if
         if (present(piwc)) then
-           call cloud_ice(ib, pde, piwc, dz, ti, wi, wwi)
+           call cloud_ice(ib, pde, piwc, dz, ti, wi, wwi,'vis')
            call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, ti,wi,wwi)
+         end if 
+        if (present(pgwc)) then
+           call cloud_grp(ib,pgwc, dz, tgr, wgr, wwgr)
+           call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tgr, wgr,wwgr)
          end if 
   
          gPointLoop: do ig =  ig1, ig2
@@ -563,6 +577,7 @@ contains
           bf(k) = bf(k) + (fq1/(exp(fq2/tk) - 1.0))*(v1-v2)
           else
              print*,'tk wrong',tk,v1,v2,rlimit,llimit
+             stop
           endif
        end do
           if ((pt(1).gt.0.0)) then
@@ -570,6 +585,7 @@ contains
        bf(nv1) = bf(nv1) + (fq1/(exp(fq2/tskin) - 1.0))*(v1-v2)
           else
              print*,'pt wrong',pt(1),v1,v2,rlimit,llimit
+             stop
           endif
        v1 = v2
     end do

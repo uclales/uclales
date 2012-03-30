@@ -25,10 +25,13 @@ module cldwtr
   integer, save :: nsizes
   logical, save :: Initialized = .False.
   logical, save :: iceInitialized = .False.
+  logical, save :: grpInitialized = .False.
   integer, save :: mbs,mbir
 
   real, allocatable    :: re(:), fl(:), bz(:,:), wz(:,:), gz(:,:)
   real, allocatable    :: ap(:,:), bp(:,:), cps(:,:,:), dps(:,:), cpir(:,:)
+  real, allocatable    :: bg(:), wgf(:), gg(:)
+  real :: gwc
 
 contains
   !
@@ -62,8 +65,8 @@ contains
 
 !    if (myid==0) write(frmt,'(A1,I2.2,A9)') '(',nsizes,'E15.7)   '
     write(frmt,'(A1,I2.2,A9)') '(',nsizes,'E15.7)   '
-!    if (myid==0) print*,'frmt=',frmt   
     read (71,frmt) (re(i), i=1,nsizes)
+    if (myid==0) print*,'re=',re
     read (71,frmt) (fl(i), i=1,nsizes)
 
 !    if (myid==0)     write(frmt,'(A1,I4.4,A7)') '(',nsizes*mb,'E15.7) '
@@ -82,16 +85,16 @@ contains
 
   !
   !---------------------------------------------------------------------------
-  ! Surbourine cloud_init initialize data arrays for the cloud model, 
+  ! Subroutine cloud_init initialize data arrays for the cloud model, 
   ! checking for consistency between band structure of cloud model and CKD
   !
   subroutine init_cldice
 
-    use ckd, only : band, center
+    use ckd, only : center
     integer, parameter  :: nrec = 21600
 
 
-    integer             :: ib, i, j, nbands
+    integer             :: i, j
 
     mbs=6
     mbir=12
@@ -122,6 +125,33 @@ contains
 
   end subroutine init_cldice
 
+  !
+  !---------------------------------------------------------------------------
+  ! Subroutine cloud_init initialize data arrays for the cloud model, 
+  ! checking for consistency between band structure of cloud model and CKD
+  !
+  subroutine init_cldgrp
+
+    integer, parameter  :: nrec = 21600
+    integer             :: i
+    character (len=12)  :: frmt
+    
+    gwc  = 1.5e10
+
+    allocate (bg(mb),wgf(mb),gg(mb))
+    open ( unit = 71, file = 'datafiles/cldgrp.dat', status = 'old', recl=nrec)
+    write(frmt,'(A1,I2.2,A8)') '(',mb,'E10.3)    '
+    read (71,frmt) (bg(i), i=1,mb)
+    write(frmt,'(A1,I2.2,A8)') '(',mb,'F7.4)    '
+    read (71,frmt) (wgf(i), i=1,mb)
+    read (71,frmt) (gg(i), i=1,mb)
+
+    close (71)
+
+    grpInitialized = .True.
+
+  end subroutine init_cldgrp
+
   ! -----------------------------------------------------------------------
   ! Subroutine cloud_water:  calculates the optical depth (tw), single 
   ! scattering albedo (ww), and phase function (www(4)) given the cloud 
@@ -150,18 +180,18 @@ contains
           end do
           if (j >= 1 .and. j < nsizes) then
              j1 = j+1
-             wght = (pre(k)-re(j))/(re(j1)-re(j)+epsilon(re))
+             wght = (pre(k)-re(j))/(re(j1)-re(j))
              tw(k) = dz(k) * cwmks * ( bz(j,ib) / fl(j) +   &
                   ( bz(j1,ib) / fl(j1) - bz(j,ib) / fl(j) ) /    &
-                  ( 1.0 / re(j1) - 1.0 / re(j) ) * ( 1.0 / pre(k) &
+                  ( 1.0 / re(j1) - 1.0 / re(j) ) * ( 1.0 / (pre(k)+epsilon(pre)) &
                   - 1.0 / re(j) ) )
              ww(k) = wz(j,ib) + (wz(j1,ib) - wz(j,ib) ) * wght
              gg    = gz(j,ib) + (gz(j1,ib) - gz(j,ib) ) * wght
           else
              j0 = max(j,1)
              tw(k) = dz(k) * cwmks * (bz(j0,ib)/fl(j0))
-             ww(k) = wz(j0,ib) 
-             gg    = gz(j0,ib)          
+             ww(k) = wz(j0,ib)
+             gg    = gz(j0,ib)
           end if
           www(k,1) = 3.0 * gg
           do j=2,4
@@ -174,6 +204,8 @@ contains
           ww(k) = 0.0
           gg    = 0.
        end if
+       if (ww(k).lt.0.) print*,'bad ww, ',ww(k),ib,k,cwmks
+       if (tw(k).lt.0.) print*,'bad tw, ',tw(k),ib,k,cwmks
     end do
 
     return
@@ -185,7 +217,7 @@ contains
   ! ice [g/m^3] and effective radius [microns] by interpolating based on
   ! known optical properties at predefined sizes  
   !
-  subroutine cloud_ice ( ib, pde, pci, dz, ti, wi, wwi )
+  subroutine cloud_ice ( ib, pde, pci, dz, ti, wi, wwi,ch )
 
     implicit none
 
@@ -196,11 +228,12 @@ contains
     integer :: k
     real    :: gg, wght, cwmks
     real    :: fw1, fw2, fw3, wf1, wf2, wf3, wf4, x1, x2, x3, x4, ibr, fd
+    character(len=3):: ch
     if (.not.iceInitialized) stop 'TERMINATING: Ice not Initialized'
 
     do k = 1, nv
        cwmks = pci(k)*1.e-3
-       if ( cwmks .ge. 1.e-8) then
+       if ( (cwmks .ge. 1.e-8).and.(pde(k).gt.0.)) then
 	     fw1 = pde(k)
 	     fw2 = fw1 * pde(k)
 	     fw3 = fw2 * pde(k)
@@ -208,7 +241,9 @@ contains
       	     ap(2,ib) / fw1 + ap(3,ib) / fw2 )
              wi(k) = 1.0 - ( bp(1,ib) + bp(2,ib) * fw1 + &
       	     bp(3,ib) * fw2 + bp(4,ib) * fw3 )
-	     if ( ib .le. mbs ) then
+             if (wi(k).lt.0.) print*,'bad wi, ',wi(k),ib,k,bp(1,ib),bp(2,ib),bp(3,ib),bp(4,ib),fw1,fw2,fw3,ch
+             if (ti(k).lt.0.) print*,'bad ti, ',ti(k),ib,k,cwmks,dz(k),ap(1,ib),ap(2,ib),ap(3,ib),fw1,fw2,ch
+	     if ( ib .le. mbs ) then ! shortwave
 	       fd = dps(1,ib) + dps(2,ib) * fw1 + &
                dps(3,ib) * fw2 + dps(4,ib) * fw3
                wf1 = cps(1,1,ib) + cps(2,1,ib) * fw1 + &
@@ -223,7 +258,7 @@ contains
                wf4 = cps(1,4,ib) + cps(2,4,ib) * fw1 + &
                cps(3,4,ib) * fw2 + cps(4,4,ib) * fw3
                wwi(k,4) = ( 1.0 - fd ) * wf4 + 9.0 * fd
-             else
+             else ! longwave
                ibr = ib - mbs
                gg = cpir(1,ibr) + cpir(2,ibr) * fw1 + &
                cpir(3,ibr) * fw2 + cpir(4,ibr) * fw3
@@ -246,6 +281,61 @@ contains
 
     return
   end subroutine cloud_ice
+
+
+  ! -----------------------------------------------------------------------
+  ! Subroutine cloud_grp:  calculates the optical depth (ti), single 
+  ! scattering albedo (wi), and phase function (wwi(4)) given the cloud 
+  ! ice [g/m^3] and effective radius [microns] by interpolating based on
+  ! known optical properties at predefined sizes  
+  !
+  ! tgr, wgr, and wwgr are the optical depth, single scattering albedo,
+  ! and expansion coefficients of the phase function ( 1, 2, 3, and 4 )
+  ! due to the Mie scattering of graupel for a given layer. 
+  !                        Jan. 19, 1993
+  ! -----------------------------------------------------------------------
+
+  subroutine cloud_grp ( ib, pcg, dz, tgr, wgr, wwgr )
+
+    implicit none
+
+    integer, intent (in) :: ib
+    real, dimension (nv), intent (in) :: pcg, dz
+    real, intent (out) :: tgr(nv), wgr(nv), wwgr(nv,4)
+
+    integer :: i
+    real    :: cwmks
+    real    :: y1, y2, y3, y4, x1, x2, x3, x4, ibr, fd
+    if (.not.grpInitialized) stop 'TERMINATING: Ice not Initialized'
+
+    x1 = gg(ib)
+    x2 = x1 * gg(ib)
+    x3 = x2 * gg(ib)
+    x4 = x3 * gg(ib)
+    y1 = 3.0 * x1
+    y2 = 5.0 * x2
+    y3 = 7.0 * x3
+    y4 = 9.0 * x4
+    do i = 1, nv
+       cwmks = pcg(i)*1.e-3
+       if ( cwmks .lt. 1.0e-8 ) then
+          tgr(i) = 0.0
+          wgr(i) = 0.0
+          wwgr(i,1) = 0.0
+          wwgr(i,2) = 0.0
+          wwgr(i,3) = 0.0
+          wwgr(i,4) = 0.0
+       else
+          tgr(i) = dz(i) * cwmks * bg(ib) / gwc
+          wgr(i) = wgf(ib)
+          wwgr(i,1) = y1
+          wwgr(i,2) = y2
+          wwgr(i,3) = y3
+          wwgr(i,4) = y4
+       endif       
+    end do
+
+  end subroutine cloud_grp
 
   ! ---------------------------------------------------------------------------
   ! linear interpolation between two points, returns indicies of the 

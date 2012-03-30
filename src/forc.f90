@@ -48,7 +48,7 @@ contains
   ! -------------------------------------------------------------------
   ! subroutine forcings:  calls the appropriate large-scale forcings
   !irina
-  subroutine forcings(time_in, cntlat, sst,div, case_name)
+  subroutine forcings(time_in, cntlat, sst,div, case_name,istp)
 
 !irina
     use grid, only: nxp, nyp, nzp, zm, zt, dzi_t, dzi_m, dn0, iradtyp, liquid  &
@@ -65,12 +65,13 @@ contains
 !irina
     real :: xref1, xref2
     integer :: i, j, k, kp1
-
+    integer :: istp
 
 !irina
     select case(iradtyp)
     case (1)
-        call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt)
+!        call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt)
+        call case_forcing(nzp,nxp,nyp,'cosmo',zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt)
     case (2)
        select case(level)
        case(1) 
@@ -101,7 +102,7 @@ contains
                   dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt,&
                   a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
                   rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
-                  lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa,ice=a_ricep,nice=a_nicep)
+                  lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa,ice=a_ricep,nice=a_nicep,grp=a_rgrp,istp=istp)
             !old      
             ! call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
             !      dn0, pi0, pi1, dzi_t, a_pexnr, a_scr1, vapor, liquid, a_tt,&
@@ -320,6 +321,16 @@ contains
                 !
                 rtt(k,i,j) = rtt(k,i,j) - ( rt(kp1,i,j) - rt(k,i,j) )*sf(k)
                 if (zt(k) < zibar) rtt(k,i,j) = rtt(k,i,j)  - 1.5e-8
+             enddo
+          enddo
+       enddo
+    case('cosmo')
+       do j=3,n3-2
+          do i=3,n2-2
+             do k=2,n1-2
+                ! radiative cooling
+                !
+                tt(k,i,j) = tt(k,i,j)  - 2.5/86400.
              enddo
           enddo
        enddo
