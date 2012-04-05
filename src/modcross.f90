@@ -448,7 +448,7 @@ contains
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
        prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta
     use modnetcdf, only : writevar_nc, fillvalue_double
-    use util,      only : get_avg3, get_var3
+    use util,      only : get_avg3, get_var3, calclevel
     use defs,      only : ep2
     real, intent(in) :: rtimee
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
@@ -958,61 +958,7 @@ contains
       end do
     end do
   end subroutine calcdepth
-   
-  subroutine calclevel(varin,varout,location, threshold)
-    use grid, only : nzp, nxp, nyp, zt
-    use mpi_interface, only : double_scalar_par_max, double_scalar_par_min
-    real, intent(in), dimension(:,:,:) :: varin
-    real, intent(in), optional :: threshold
-    integer, intent(out) :: varout
-    integer :: klocal
-    real :: rlocal, rglobal
-    character(*), intent(in) :: location
-    integer :: i, j, k, km1
-    real :: thres
-    
 
-     if (present(threshold)) then
-      thres = threshold
-    else
-      thres = 0.0
-    end if
-   
-    select case(location)
-    case ('top')
-      klocal = 0
-      do j = 3, nyp - 2
-        do i = 3, nxp - 2
-          top:do k = nzp - 1, 2, -1
-            if (varin(k,i,j) > thres) then
-              klocal = max(klocal, k)
-              exit top
-            end if
-          end do top
-        end do
-      end do
-      rlocal = klocal
-      call double_scalar_par_max(rlocal,rglobal) 
-      varout = rglobal
-    case ('base')
-      klocal = nzp 
-      do j = 3, nyp - 2
-        do i = 3, nxp - 2
-          base:do k = 2, nzp - 1
-            if (varin(k,i,j) > thres) then
-              klocal = min(klocal, k)
-              exit base
-            end if
-          end do base
-        end do
-      end do
-      rlocal = klocal
-      call double_scalar_par_min(rlocal,rglobal) 
-      varout = rglobal
-
-    end select
-  end subroutine calclevel
-  
   subroutine calcdev(varin, base, top, varout)
     use grid, only : nzp, nxp, nyp, zm, zt, a_wp, dzi_t
     use util, only : get_avg3

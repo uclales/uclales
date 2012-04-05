@@ -463,4 +463,59 @@ contains
 
   end subroutine get_fft_twodim
   !
+     
+  subroutine calclevel(varin,varout,location, threshold)
+    use grid, only : nzp, nxp, nyp, zt
+    use mpi_interface, only : double_scalar_par_max, double_scalar_par_min
+    real, intent(in), dimension(:,:,:) :: varin
+    real, intent(in), optional :: threshold
+    integer, intent(out) :: varout
+    integer :: klocal
+    real :: rlocal, rglobal
+    character(*), intent(in) :: location
+    integer :: i, j, k, km1
+    real :: thres
+    
+
+     if (present(threshold)) then
+      thres = threshold
+    else
+      thres = 0.0
+    end if
+   
+    select case(location)
+    case ('top')
+      klocal = 0
+      do j = 3, nyp - 2
+        do i = 3, nxp - 2
+          top:do k = nzp - 1, 2, -1
+            if (varin(k,i,j) > thres) then
+              klocal = max(klocal, k)
+              exit top
+            end if
+          end do top
+        end do
+      end do
+      rlocal = klocal
+      call double_scalar_par_max(rlocal,rglobal) 
+      varout = rglobal
+    case ('base')
+      klocal = nzp 
+      do j = 3, nyp - 2
+        do i = 3, nxp - 2
+          base:do k = 2, nzp - 1
+            if (varin(k,i,j) > thres) then
+              klocal = min(klocal, k)
+              exit base
+            end if
+          end do base
+        end do
+      end do
+      rlocal = klocal
+      call double_scalar_par_min(rlocal,rglobal) 
+      varout = rglobal
+
+    end select
+  end subroutine calclevel
+
 end module util
