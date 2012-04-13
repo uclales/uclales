@@ -47,6 +47,7 @@ contains
     use thrm, only : thermo
     use mcrp, only : initmcrp
     use modcross, only : initcross, triggercross
+    use modparticles, only: init_particles, lpartic
 
     implicit none
 
@@ -73,6 +74,11 @@ contains
        call lsvar_init
        end if
     !    
+
+    if (lpartic) then
+      call init_particles
+    end if
+
     ! write analysis and history files from restart if appropriate
     ! 
     if (outflg) then

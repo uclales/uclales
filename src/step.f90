@@ -65,6 +65,7 @@ contains
     use modcross, only : triggercross, exitcross, lcross
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
+    use modparticles, only : lpartic, exit_particles
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
@@ -161,8 +162,13 @@ contains
     enddo
 
     call write_hist(1, time)
+
     iret = close_anal()
+
     if (lcross) call exitcross
+
+    if (lpartic) call exit_particles
+
     iret = close_stat()
 
   end subroutine stepper
@@ -192,6 +198,7 @@ contains
     use lsvar, only : varlscale
     use util, only : velset,get_avg
     use modtimedep, only : timedep
+    use modparticles, only : particles, lpartic
 
     logical, parameter :: debug = .false.
 !     integer :: k
@@ -237,6 +244,11 @@ contains
        call update (nstep)
        call poisson 
        call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
+
+       if (lpartic) then
+         call particles
+       end if
+
     end do
 
     if (statflg) then 
