@@ -52,10 +52,11 @@ contains
   !--------------------------------------------------------------------------
   ! subroutine particles: Main routine, called every .. step
   !--------------------------------------------------------------------------
-  subroutine particles
+  subroutine particles(time)
     use grid, only : deltax, deltay
     !use step, only : time
     implicit none
+    real, intent(in)               :: time
     type (particle_record), pointer:: particle
 
     if ( np < 1 ) return      ! Just to be sure..
@@ -63,34 +64,25 @@ contains
 
     particle => head
     do while( associated(particle) )
-      !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-      ! How to deal with circular references......?
-      !if (  time - particle%tstart >= 0 ) then
-  
+      if (  time - particle%tstart >= 0 ) then
         particle%partstep = particle%partstep + 1
-
         !interpolation of the velocity field
-        !if (  rtimee - particle%tstart >= 0 ) then
-          !particle%ures = velocity_ures(particle%x,particle%y,particle%z) / dx
-          !particle%vres = velocity_vres(particle%x,particle%y,particle%z) / dy
-          !particle%wres = velocity_wres(particle%x,particle%y,particle%z) / dzf(floor(particle%z))
-
-          particle%ures = 1. / deltax
-
-        !  if (lpartsgs) then
-        !    if (rk3step==1) then
-        !      particle%usgs_prev = particle%usgs
-        !      particle%vsgs_prev = particle%vsgs
-        !      particle%wsgs_prev = particle%wsgs
-        !    end if
-        !    call sgshelpvar(particle)
-        !    particle%usgs = velocity_usgs(particle) / dx
-        !    particle%vsgs = velocity_vsgs(particle) / dy
-        !    particle%wsgs = velocity_wsgs(particle) / dzf(floor(particle%z))
+        !particle%ures = velocity_ures(particle%x,particle%y,particle%z) / dx
+        !particle%vres = velocity_vres(particle%x,particle%y,particle%z) / dy
+        !particle%wres = velocity_wres(particle%x,particle%y,particle%z) / dzf(floor(particle%z))
+        particle%ures = 1. / deltax
+        !if (lpartsgs) then
+        !  if (rk3step==1) then
+        !    particle%usgs_prev = particle%usgs
+        !    particle%vsgs_prev = particle%vsgs
+        !    particle%wsgs_prev = particle%wsgs
         !  end if
+        !  call sgshelpvar(particle)
+        !  particle%usgs = velocity_usgs(particle) / dx
+        !  particle%vsgs = velocity_vsgs(particle) / dy
+        !  particle%wsgs = velocity_wsgs(particle) / dzf(floor(particle%z))
         !end if
-      !end if
-
+      end if
 
     particle => particle%next
     end do
@@ -114,6 +106,7 @@ contains
     !            stop 'PARTICLES ERROR: incorrect integration scheme'
     !    end select
       !end if
+
     particle => particle%next
     end do
 
@@ -121,6 +114,53 @@ contains
     !call partcommunicate
 
   end subroutine particles
+
+  !--------------------------------------------------------------------------
+  ! subroutine velocity_ures: trilinear interpolation of u-component
+  !--------------------------------------------------------------------------
+  function velocity_ures(x,y,z)
+
+    !use modglobal, only : cu,zh,zf,dzh,dzf
+    use grid, only : umean
+    implicit none
+    real, intent(in) ::  x, y, z
+    integer :: xbottom, ybottom, zbottom
+    real :: velocity_ures, deltax, deltay, deltaz
+
+    xbottom = floor(x)
+    ybottom = floor(y - 0.5)
+    zbottom = floor(z - 0.5)
+    deltax = x - xbottom
+    deltay = y - 0.5 - ybottom
+
+    if (zbottom==0)  then
+      deltaz = 2.*z - 2.
+      velocity_ures = (1-deltaz) * (1-deltay) * (1-deltax) * (-cu) + &
+      &               (1-deltaz) * (1-deltay) * (  deltax) * (-cu) + &
+      &               (1-deltaz) * (  deltay) * (1-deltax) * (-cu) + &
+      &               (1-deltaz) * (  deltay) * (  deltax) * (-cu) + &
+      &               (  deltaz) * (1-deltay) * (1-deltax) * u0(xbottom    , ybottom    , 1)  + &
+      &               (  deltaz) * (1-deltay) * (  deltax) * u0(xbottom + 1, ybottom    , 1)  + &
+      &               (  deltaz) * (  deltay) * (1-deltax) * u0(xbottom    , ybottom + 1, 1)  + &
+      &               (  deltaz) * (  deltay) * (  deltax) * u0(xbottom + 1, ybottom + 1, 1)
+    else
+      deltaz = (zh(floor(z)) + dzf(floor(z))*(z-floor(z)) - zf(zbottom))/dzh(zbottom)
+      velocity_ures =  (1-deltaz) * (1-deltay) * (1-deltax) * u0(xbottom    , ybottom    , zbottom    ) + &
+      &                (1-deltaz) * (1-deltay) * (  deltax) * u0(xbottom + 1, ybottom    , zbottom    ) + &
+      &                (1-deltaz) * (  deltay) * (1-deltax) * u0(xbottom    , ybottom + 1, zbottom    ) + &
+      &                (1-deltaz) * (  deltay) * (  deltax) * u0(xbottom + 1, ybottom + 1, zbottom    ) + &
+      &                (  deltaz) * (1-deltay) * (1-deltax) * u0(xbottom    , ybottom    , zbottom + 1) + &
+      &                (  deltaz) * (1-deltay) * (  deltax) * u0(xbottom + 1, ybottom    , zbottom + 1) + &
+      &                (  deltaz) * (  deltay) * (1-deltax) * u0(xbottom    , ybottom + 1, zbottom + 1) + &
+      &                (  deltaz) * (  deltay) * (  deltax) * u0(xbottom + 1, ybottom + 1, zbottom + 1)
+      print*,u0(xbottom,ybottom,zbottom),u0(xbottom,ybottom,zbottom)
+    end if
+
+  end function velocity_ures
+
+
+
+
 
   !--------------------------------------------------------------------------
   ! subroutine rk3
@@ -155,6 +195,17 @@ contains
 
   end subroutine rk3
 
+
+
+
+
+
+
+
+  !--------------------------------------------------------------------------
+  !
+  ! BELOW: ONLY INIT / EXIT PARTICLES
+  !
   !--------------------------------------------------------------------------
   ! subroutine init_particles: initialize particles, reading initial position, 
   ! etc. Called from subroutine initialize (init.f90)
@@ -162,13 +213,14 @@ contains
   subroutine init_particles
     use mpi_interface, only : myid
     use grid, only : zm, dzi_m, deltax, deltay, zt,dzi_t
+    use grid, only : a_up, a_vp, a_wp
 
     integer :: k, n, ierr, kmax
     real :: tstart, xstart, ystart, zstart
     type (particle_record), pointer:: particle
 
     kmax = size(zm)
-    
+  
     np = 0
     startfile = 'partstartpos'
     open(ifinput,file=startfile,status='old',position='rewind',action='read')
@@ -190,9 +242,9 @@ contains
         call add_particle(particle)
 
         particle%unique = n + myid/1000.0
-        particle%x = xstart/deltax !+2
-        particle%y = ystart/deltay !+2
-        do k=kmax,1,-1
+        particle%x = xstart/deltax +2      ! +2 here for ghost cells.
+        particle%y = ystart/deltay +2      ! +2 here for ghost cells.
+        do k=kmax,1,1
           if ( zm(k)<zstart ) exit
         end do
         particle%z = k + (zstart-zm(k))*dzi_m(k)
@@ -319,5 +371,4 @@ contains
     end if
 
   end subroutine delete_particle
-
 end module modparticles

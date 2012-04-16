@@ -24,6 +24,7 @@ set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/config)
 
 #  make sure that the default is a RELEASE
 if (NOT CMAKE_BUILD_TYPE)
+  MESSAGE(STATUS "CMAKE_BUILD_TYPE not specified, defaulting to RELEASE")
   set (CMAKE_BUILD_TYPE RELEASE CACHE STRING
       "Choose the type of build, options are: None Debug Release." FORCE )
 endif ()
