@@ -27,11 +27,13 @@ module modparticles
 
   ! For/from namelist  
   logical            :: lpartic     = .false.
-  ! ..................
+  logical            :: lpartdump   = .true.
+  real               :: frqpartdump = 5
 
   character(30)      :: startfile
   integer            :: ifinput     = 1
   integer            :: np
+  integer            :: tnextdump
 
   ! Particle structure
   TYPE :: particle_record
@@ -53,8 +55,7 @@ contains
   ! subroutine particles: Main routine, called every .. step
   !--------------------------------------------------------------------------
   subroutine particles(time)
-    use grid, only : deltax, deltay
-    !use step, only : time
+    use grid, only : deltax, deltay, nstep, dzi_t, dt
     implicit none
     real, intent(in)               :: time
     type (particle_record), pointer:: particle
@@ -66,11 +67,12 @@ contains
     do while( associated(particle) )
       if (  time - particle%tstart >= 0 ) then
         particle%partstep = particle%partstep + 1
-        !interpolation of the velocity field
-        !particle%ures = velocity_ures(particle%x,particle%y,particle%z) / dx
-        !particle%vres = velocity_vres(particle%x,particle%y,particle%z) / dy
-        !particle%wres = velocity_wres(particle%x,particle%y,particle%z) / dzf(floor(particle%z))
-        particle%ures = 1. / deltax
+        
+        ! Interpolation of the velocity field
+        particle%ures = velocity_ures(particle%x,particle%y,particle%z) / deltax
+        particle%vres = velocity_vres(particle%x,particle%y,particle%z) / deltay
+        particle%wres = velocity_wres(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
+ 
         !if (lpartsgs) then
         !  if (rk3step==1) then
         !    particle%usgs_prev = particle%usgs
@@ -87,25 +89,26 @@ contains
     particle => particle%next
     end do
     
-    !****Statistics******
-    !if (rk3step==3) then
-    !  call statistics
-    !  call writeparticles
-    !end if
-
     !Time integration
     particle => head
     do while( associated(particle) )
-      !if ( time - particle%tstart >= 0 ) then
+      if ( time - particle%tstart >= 0 ) then
     !    select case(intmeth)
     !    case(inomove)
-    !            ! no movement
+    !      !no movement
     !    case(irk3)
            call rk3(particle)
-    !    case default
-    !            stop 'PARTICLES ERROR: incorrect integration scheme'
-    !    end select
-      !end if
+      end if
+
+    if (nstep==3) then
+      if(time + dt >= tnextdump) then
+        call writeparticles
+        tnextdump = tnextdump + frqpartdump
+      end if
+
+      !call statistics
+      !call writeparticles
+    end if
 
     particle => particle%next
     end do
@@ -115,52 +118,181 @@ contains
 
   end subroutine particles
 
+
+  !--------------------------------------------------------------------------
+  ! subroutine writeparticles -> raw dump of particle field
+  !--------------------------------------------------------------------------
+  subroutine writeparticles
+    use grid, only : deltax, deltay, dzi_t, zm
+    implicit none
+    
+    real, allocatable,dimension (:,:) :: partdata
+    integer(KIND=selected_int_kind(11)), allocatable, dimension (:) :: partids
+    type (particle_record), pointer:: particle
+    integer :: ndata = 3         ! Hardcoded for now
+    integer :: n, m
+    integer :: ifoutput = 99
+
+    n = 0
+
+    allocate (partdata(ndata,nplisted))
+    allocate (partids(nplisted))
+
+    particle => head
+    do while( associated(particle) )
+      n = n + 1
+      partids(n) = particle%unique
+
+      if (ndata > 0) then
+         partdata(1,n) = (particle%x-3)*deltax
+      endif
+      if (ndata > 1) then
+         partdata(2,n) = (particle%y-3)*deltay
+      endif
+      if (ndata > 2) then
+         partdata(3,n) = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
+      endif
+      !if (ndata > 3) then
+      !   partdata(4,n) = (particle%ures+particle%usgs)*dx
+      !endif
+      !if (ndata > 4) then
+      !   partdata(5,n) = (particle%vres+particle%vsgs)*dy
+      !endif
+      !if (ndata > 5) then
+      !   partdata(6,n) = (particle%wres+particle%wsgs)*dzf(floor(particle%z))
+      !endif
+      !if (ndata > 6) then
+      !   partdata(7,n) = thlpart
+      !endif
+      !if (ndata > 7) then
+      !   partdata(8,n) = thvpart
+      !endif
+      !if (ndata > 8) then
+      !   partdata(9,n) = qtpart * 1000.
+      !endif
+      !if (ndata > 9) then
+      !   partdata(10,n)= qlpart * 1000.
+      !endif
+      particle => particle%next
+    end do
+
+    !open(ifoutput,file='particles.'//cmyid//'.'//cexpnr,form='unformatted',position = 'append',action='write')
+    !write(ifoutput) rtimee,nplisted
+    !write(ifoutput) (partids(n),(partdata(m,n),m=1,ndata),n=1,nplisted)
+    !close(ifoutput)
+    
+    ! Hack BvS: simply write particles to text file
+    open(ifoutput,file='particles',position='append',action='write')
+    write(ifoutput,'(A2,I10,I10)') '# ',tnextdump,nplisted
+    write(ifoutput,'(I10,3F12.5)') (partids(n),(partdata(m,n),m=1,ndata),n=1,nplisted)
+    close(ifoutput) 
+    
+    deallocate (partdata)
+    deallocate (partids)
+
+  end subroutine writeparticles
+
+
+
   !--------------------------------------------------------------------------
   ! subroutine velocity_ures: trilinear interpolation of u-component
   !--------------------------------------------------------------------------
   function velocity_ures(x,y,z)
-
-    !use modglobal, only : cu,zh,zf,dzh,dzf
-    use grid, only : umean
+    use grid, only : a_up, dzi_m, dzi_t, zt, zm
     implicit none
-    real, intent(in) ::  x, y, z
-    integer :: xbottom, ybottom, zbottom
-    real :: velocity_ures, deltax, deltay, deltaz
+    real, intent(in) :: x, y, z
+    integer          :: xbottom, ybottom, zbottom
+    real             :: velocity_ures, deltax, deltay, deltaz, sign
 
-    xbottom = floor(x)
+    xbottom = floor(x) - 1
     ybottom = floor(y - 0.5)
-    zbottom = floor(z - 0.5)
-    deltax = x - xbottom
+    zbottom = floor(z + 0.5)
+    deltax = x - 1   - xbottom
     deltay = y - 0.5 - ybottom
 
-    if (zbottom==0)  then
-      deltaz = 2.*z - 2.
-      velocity_ures = (1-deltaz) * (1-deltay) * (1-deltax) * (-cu) + &
-      &               (1-deltaz) * (1-deltay) * (  deltax) * (-cu) + &
-      &               (1-deltaz) * (  deltay) * (1-deltax) * (-cu) + &
-      &               (1-deltaz) * (  deltay) * (  deltax) * (-cu) + &
-      &               (  deltaz) * (1-deltay) * (1-deltax) * u0(xbottom    , ybottom    , 1)  + &
-      &               (  deltaz) * (1-deltay) * (  deltax) * u0(xbottom + 1, ybottom    , 1)  + &
-      &               (  deltaz) * (  deltay) * (1-deltax) * u0(xbottom    , ybottom + 1, 1)  + &
-      &               (  deltaz) * (  deltay) * (  deltax) * u0(xbottom + 1, ybottom + 1, 1)
+    ! u(1,:,:) == u(2,:,:) with zt(1) = - zt(2). By multiplying u(1,:,:) with -1, 
+    ! the velocity interpolates to 0 at the surface.  
+    if (zbottom==1)  then
+      sign = -1
     else
-      deltaz = (zh(floor(z)) + dzf(floor(z))*(z-floor(z)) - zf(zbottom))/dzh(zbottom)
-      velocity_ures =  (1-deltaz) * (1-deltay) * (1-deltax) * u0(xbottom    , ybottom    , zbottom    ) + &
-      &                (1-deltaz) * (1-deltay) * (  deltax) * u0(xbottom + 1, ybottom    , zbottom    ) + &
-      &                (1-deltaz) * (  deltay) * (1-deltax) * u0(xbottom    , ybottom + 1, zbottom    ) + &
-      &                (1-deltaz) * (  deltay) * (  deltax) * u0(xbottom + 1, ybottom + 1, zbottom    ) + &
-      &                (  deltaz) * (1-deltay) * (1-deltax) * u0(xbottom    , ybottom    , zbottom + 1) + &
-      &                (  deltaz) * (1-deltay) * (  deltax) * u0(xbottom + 1, ybottom    , zbottom + 1) + &
-      &                (  deltaz) * (  deltay) * (1-deltax) * u0(xbottom    , ybottom + 1, zbottom + 1) + &
-      &                (  deltaz) * (  deltay) * (  deltax) * u0(xbottom + 1, ybottom + 1, zbottom + 1)
-      print*,u0(xbottom,ybottom,zbottom),u0(xbottom,ybottom,zbottom)
-    end if
+      sign = 1
+    end if      
+
+    deltaz = ((zm(floor(z)) + (z - floor(z)) / dzi_t(floor(z))) - zt(floor(z))) * dzi_m(floor(z))
+    velocity_ures =  (1-deltaz) * (1-deltay) * (1-deltax) * sign * a_up(zbottom    , xbottom    , ybottom    ) + &    !
+    &                (1-deltaz) * (1-deltay) * (  deltax) * sign * a_up(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
+    &                (1-deltaz) * (  deltay) * (1-deltax) * sign * a_up(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
+    &                (1-deltaz) * (  deltay) * (  deltax) * sign * a_up(zbottom    , xbottom + 1, ybottom + 1) + &    ! x+1,y+1
+    &                (  deltaz) * (1-deltay) * (1-deltax) *        a_up(zbottom + 1, xbottom    , ybottom    ) + &    ! z+1
+    &                (  deltaz) * (1-deltay) * (  deltax) *        a_up(zbottom + 1, xbottom + 1, ybottom    ) + &    ! x+1, z+1
+    &                (  deltaz) * (  deltay) * (1-deltax) *        a_up(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
+    &                (  deltaz) * (  deltay) * (  deltax) *        a_up(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
 
   end function velocity_ures
 
+  !--------------------------------------------------------------------------
+  ! subroutine velocity_vres: trilinear interpolation of v-component
+  !--------------------------------------------------------------------------
+  function velocity_vres(x,y,z)
+    use grid, only : a_vp, dzi_m, dzi_t, zt, zm
+    implicit none
+    real, intent(in) :: x, y, z
+    integer          :: xbottom, ybottom, zbottom
+    real             :: velocity_vres, deltax, deltay, deltaz, sign
 
+    xbottom = floor(x - 0.5)
+    ybottom = floor(y) - 1
+    zbottom = floor(z + 0.5)
+    deltax = x - 0.5 - xbottom
+    deltay = y - 1   - ybottom
 
+    ! v(1,:,:) == v(2,:,:) with zt(1) = - zt(2). By multiplying v(1,:,:) with -1, 
+    ! the velocity interpolates to 0 at the surface.  
+    if (zbottom==1)  then
+      sign = -1
+    else
+      sign = 1
+    end if      
 
+    deltaz = ((zm(floor(z)) + (z - floor(z)) / dzi_t(floor(z))) - zt(floor(z))) * dzi_m(floor(z))
+    velocity_vres =  (1-deltaz) * (1-deltay) * (1-deltax) * sign * a_vp(zbottom    , xbottom    , ybottom    ) + &    !
+    &                (1-deltaz) * (1-deltay) * (  deltax) * sign * a_vp(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
+    &                (1-deltaz) * (  deltay) * (1-deltax) * sign * a_vp(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
+    &                (1-deltaz) * (  deltay) * (  deltax) * sign * a_vp(zbottom    , xbottom + 1, ybottom + 1) + &    ! x+1,y+1
+    &                (  deltaz) * (1-deltay) * (1-deltax) *        a_vp(zbottom + 1, xbottom    , ybottom    ) + &    ! z+1
+    &                (  deltaz) * (1-deltay) * (  deltax) *        a_vp(zbottom + 1, xbottom + 1, ybottom    ) + &    ! x+1, z+1
+    &                (  deltaz) * (  deltay) * (1-deltax) *        a_vp(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
+    &                (  deltaz) * (  deltay) * (  deltax) *        a_vp(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
+
+  end function velocity_vres
+
+  !--------------------------------------------------------------------------
+  ! subroutine velocity_wres: trilinear interpolation of w-component
+  !--------------------------------------------------------------------------
+  function velocity_wres(x,y,z)
+    use grid, only : a_wp, dzi_m, dzi_t, zt, zm
+    implicit none
+    real, intent(in) :: x, y, z
+    integer          :: xbottom, ybottom, zbottom
+    real             :: velocity_wres, deltax, deltay, deltaz, sign
+
+    xbottom = floor(x - 0.5)
+    ybottom = floor(y - 0.5)
+    zbottom = floor(z)
+    deltax = x - 0.5 - xbottom
+    deltay = y - 0.5 - ybottom
+    deltaz = z - zbottom
+
+    velocity_wres =  (1-deltaz) * (1-deltay) * (1-deltax) *  a_wp(zbottom    , xbottom    , ybottom    ) + &    !
+    &                (1-deltaz) * (1-deltay) * (  deltax) *  a_wp(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
+    &                (1-deltaz) * (  deltay) * (1-deltax) *  a_wp(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
+    &                (1-deltaz) * (  deltay) * (  deltax) *  a_wp(zbottom    , xbottom + 1, ybottom + 1) + &    ! x+1,y+1
+    &                (  deltaz) * (1-deltay) * (1-deltax) *  a_wp(zbottom + 1, xbottom    , ybottom    ) + &    ! z+1
+    &                (  deltaz) * (1-deltay) * (  deltax) *  a_wp(zbottom + 1, xbottom + 1, ybottom    ) + &    ! x+1, z+1
+    &                (  deltaz) * (  deltay) * (1-deltax) *  a_wp(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
+    &                (  deltaz) * (  deltay) * (  deltax) *  a_wp(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
+    
+  end function velocity_wres
 
   !--------------------------------------------------------------------------
   ! subroutine rk3
@@ -212,7 +344,7 @@ contains
   !--------------------------------------------------------------------------
   subroutine init_particles
     use mpi_interface, only : myid
-    use grid, only : zm, dzi_m, deltax, deltay, zt,dzi_t
+    use grid, only : zm, deltax, deltay, zt,dzi_t
     use grid, only : a_up, a_vp, a_wp
 
     integer :: k, n, ierr, kmax
@@ -242,12 +374,15 @@ contains
         call add_particle(particle)
 
         particle%unique = n + myid/1000.0
-        particle%x = xstart/deltax +2      ! +2 here for ghost cells.
-        particle%y = ystart/deltay +2      ! +2 here for ghost cells.
+        particle%x = xstart/deltax + 3      ! +3 here for ghost cells.
+        particle%y = ystart/deltay + 3      ! +3 here for ghost cells.
         do k=kmax,1,1
           if ( zm(k)<zstart ) exit
         end do
-        particle%z = k + (zstart-zm(k))*dzi_m(k)
+        particle%z = k + (zstart-zm(k))*dzi_t(k)
+
+        print*,'-----> INIT POS: ',particle%x,particle%y,particle%z
+
         particle%xstart = xstart
         particle%ystart = ystart
         particle%zstart = zstart
@@ -269,8 +404,10 @@ contains
     !  !end if
     end do
 
+    ! Set first dump times
+    tnextdump = frqpartdump
+
     close(ifinput)
-    !write(6,*) 'timee :',rtimee,': proc ',myid,': #particles: ',nplisted
 
   end subroutine init_particles
 
