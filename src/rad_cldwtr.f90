@@ -20,7 +20,6 @@
 module cldwtr
 
   use defs, only : nv, mb
-  use mpi_interface, only : myid
   implicit none
   integer, save :: nsizes
   logical, save :: Initialized = .False.
@@ -55,7 +54,6 @@ contains
          stop 'TERMINATING: incompatible cldwtr.dat file'
 
     allocate (re(nsizes),fl(nsizes),bz(nsizes,mb),wz(nsizes,mb),gz(nsizes,mb))
-!    if (myid==0) write(frmt,'(A1,I2.2,A8)') '(',mb,'E15.7)    '
     write(frmt,'(A1,I2.2,A8)') '(',mb,'E15.7)    '
     read (71,frmt) (cntrs(i), i=1,mb)
     do i=1,mb
@@ -63,13 +61,10 @@ contains
             stop 'TERMINATING: cloud properties not matched to band structure'
     end do
 
-!    if (myid==0) write(frmt,'(A1,I2.2,A9)') '(',nsizes,'E15.7)   '
     write(frmt,'(A1,I2.2,A9)') '(',nsizes,'E15.7)   '
     read (71,frmt) (re(i), i=1,nsizes)
-    if (myid==0) print*,'re=',re
     read (71,frmt) (fl(i), i=1,nsizes)
 
-!    if (myid==0)     write(frmt,'(A1,I4.4,A7)') '(',nsizes*mb,'E15.7) '
     write(frmt,'(A1,I4.4,A7)') '(',nsizes*mb,'E15.7) '
     read (71,frmt) ((bz(i,ib), i=1,nsizes), ib=1,mb)
     read (71,frmt) ((wz(i,ib), i=1,nsizes), ib=1,mb)
@@ -175,7 +170,7 @@ contains
        cwmks = pcw(k)*1.e-3
        if ( cwmks .ge. 1.e-8) then
           j = 0
-          do while (j<(nsizes-1) .and. pre(k) > re(j+1))
+          do while (j<nsizes .and. pre(k) > re(j+1))
              j = j + 1
           end do
           if (j >= 1 .and. j < nsizes) then

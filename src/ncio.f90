@@ -8,10 +8,10 @@
   implicit none
   private
 
-  public :: open_nc, define_nc, init_anal, close_anal, write_anal
+  public :: open_nc, define_nc, init_anal, close_anal, write_anal, deflate_level
 
   integer, private, save  :: nrec0, nvar0, nbase=15
-  integer, save           :: ncid0,ncid_s, ncid_cross
+  integer, save           :: ncid0,ncid_s, ncid_cross, deflate_level
   integer, save           :: crossx, crossy, crossz
   character (len=7), dimension(30) :: crossnames
   character (len=7),  private :: v_snm='sxx    ' 
@@ -133,11 +133,11 @@ contains
           case ('ym')
              iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,ymID    ,VarID)
           case ('tttt')
-             if (present(n2) .and. present(n3)) then
-                iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tttt,VarID)
-             else
+             !if (present(n2) .and. present(n3)) then
+             !   iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tttt,VarID, deflate_level = deflate_level)
+             !else
                 iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tt,VarID)
-             end if
+             !end if
              if (sx(n).eq."l") then
                 iret=nf90_put_att(ncID,VarID,'nu',cldw%nu)
                 iret=nf90_put_att(ncID,VarID,'mu',cldw%mu)
@@ -422,7 +422,7 @@ contains
     if (level >= 2)  then
 !        nn = nn+1
        iret = nf90_inq_varid(ncid0, sanal(17), VarID)
-       iret = nf90_put_var(ncid0, VarID, liquid(:,i1:i2,j1:j2), start=ibeg, &
+       iret = nf90_put_var(ncid0, VarID,liquid(:,i1:i2,j1:j2), start=ibeg, &
             count=icnt)
     end if
     nn = nbase+2
@@ -547,7 +547,10 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('q')
        if (itype==0) ncinfo = 'Total water mixing ratio'
-!irina
+       if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('reff')
+       if (itype==0) ncinfo = 'Liquid water mixing ratio'
        if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
     case('l')
@@ -557,6 +560,10 @@ contains
     case('r')
        if (itype==0) ncinfo = 'Rain-water mixing ratio'
        if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('RH')
+       if (itype==0) ncinfo = 'Relative Humidity'
+       if (itype==1) ncinfo = '-'
        if (itype==2) ncinfo = 'tttt'
     case('inuc')
        if (itype==0) ncinfo = 'Number of ice nuclei'

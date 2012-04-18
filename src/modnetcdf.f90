@@ -14,12 +14,14 @@
 ! along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !
 !  Copyright 2010-2011 Chiel van Heerwaarden and Thijs Heus
-!> Background routines to write NetCDF output
+!> Background routines to read and write NetCDF output
 !! All calls to the netcdf library should be directed through here.
 !! The module opens (with open_nc), closes (with close_nc),
 !! reads (with readvar_nc) and writes (with writevar_nc) anything between 0D (e.g. timeseries)
 !! and 4D (e.g. z,x,y,t) fields to file.
 !! Inspired on the UCLA-LES routine by Bjorn Stevens.
+!! \todo Parallel NETCDF
+!! \todo Documentation
 module modnetcdf
   use defs, only : single, short, double, int32
   implicit none
@@ -27,9 +29,11 @@ module modnetcdf
   real(kind=single), parameter    :: fillvalue_single = -32678. !< Fill value
   real(kind=double), parameter    :: fillvalue_double = -32678. !< Fill value
   integer(kind=short), parameter  :: fillvalue_short  = -32678  !< Fill value
-  integer, parameter :: icomp_dbl = 1 !< Write back doubles instead of floats
-  integer, parameter :: icomp_int = 2 !< Write back integers instead of floats
+  integer, parameter :: icomp_float = 0 !< Write back floats (default)
+  integer, parameter :: icomp_dbl   = 1 !< Write back doubles instead of floats
+  integer, parameter :: icomp_int   = 2 !< Write back integers instead of floats
   logical            :: lsync = .false. !< Synchronization switch
+  integer            :: deflate_level = 0 !< Compression level
 
 !> Interface to write into a netcdf file
   interface writevar_nc
@@ -64,20 +68,23 @@ module modnetcdf
     module procedure getatt_int_nc
     module procedure getatt_short_nc
     module procedure getatt_str_nc
+    module procedure getatt_str_fname_nc
   end interface getatt_nc
 
 contains
-
+  
 !> Subroutine Open_NC: Opens a NetCDF File for writing
 !! If the file already exists, the record number is being set to the current
 !! time in the simulation
-  subroutine open_nc(fname, ncid,nrec, rtimee)
-    use netcdf, only : nf90_create, nf90_open, nf90_inquire, nf90_inquire_dimension, &
-                       nf90_inq_varid, nf90_get_var, nf90_put_var, nf90_sync, nf90_share, nf90_write, nf90_noerr, nf90_inquire_variable, nf90_short
+  subroutine open_nc(fname, ncid,nrec, rtimee, ldelete)
     use grid,   only : tname
+    use netcdf, only : nf90_create, nf90_open, nf90_inquire, nf90_inquire_dimension, &
+                       nf90_inq_varid, nf90_get_var, nf90_put_var, nf90_sync, nf90_share, &
+                       nf90_write, nf90_noerr, nf90_inquire_variable, nf90_short
     integer, intent (out)          :: ncid   !< NetCDF file number
-    integer, intent (out)          :: nrec   !< The record number that corresponds to the current simulation time
+    integer, intent (out),optional :: nrec   !< The record number that corresponds to the current simulation time
     real, intent(in), optional     :: rtimee !< Simulation time
+    logical, intent(in), optional  :: ldelete !< Whether to delete an old file when present
     character (len=*), intent (in) :: fname  !< File name
     integer :: ndims, nvars, n, nn, xtype, dimsize(7)
     integer, allocatable, dimension(:) :: start, dimids
@@ -89,6 +96,13 @@ contains
 
     if (present(rtimee)) then ! Check whether file exists
       inquire(file=trim(fname),exist=exists)
+      if (exists .and. present(ldelete)) then
+        if (ldelete) then
+          exists = .false.
+          open(1, file=trim(fname), status='old')
+          close(1,status='delete')
+        end if
+      end if
     else
       exists = .false.
     end if
@@ -155,7 +169,7 @@ contains
         end if
       end if
     end if
-    nrec = ncall 
+    if (present(nrec)) nrec = ncall
     iret = nf90_sync(ncid)
   end subroutine open_nc
 
@@ -204,9 +218,11 @@ contains
 
 !> Close a NetCDF file
   subroutine close_nc(ncid)
-    use netcdf, only : nf90_close, nf90_noerr
+    use netcdf, only : nf90_close, nf90_inquire, nf90_noerr
     integer, intent(in) :: ncid !< NetCDF file number
-    integer iret
+    integer :: iret
+    iret = nf90_inquire(ncid)
+    if (iret /= nf90_noerr) return
     iret = nf90_close(ncid)
     if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
   end subroutine close_nc
@@ -214,7 +230,7 @@ contains
 !> Add a variable to a NetCDF file. The procedure checks whether the variable(name) is already present,
 !! and if not, adds it to the file. The same holds for the dimension(names) of the variable.
   subroutine addvar_nc(ncID, name, lname, unit, dimname, dimlongname, dimunit, dimsize, dimvalues, icompress, datamin, datamax)
-    use netcdf, only : nf90_def_var, nf90_inq_varid, nf90_float, nf90_short, nf90_double, nf90_noerr
+    use netcdf, only : nf90_def_var, nf90_inq_varid, nf90_float, nf90_short, nf90_double, nf90_noerr!, nf90_def_var_deflate
     integer, intent (in)                              :: ncID        !< NetCDF file number
     character (*), intent (in)                        :: name        !< Netcdf name of the variable
     character (*), intent (in)                        :: lname       !< Longname of the variable
@@ -242,7 +258,7 @@ contains
     if (present(icompress)) then
       icomp= icompress
     else
-      icomp = 0
+      icomp = icomp_float
     end if
     allocate (ncdim(nrdim))
     do n=1,nrdim ! For every dimension, check whether it exists in the file. If not, inqdim_nc will write it.
@@ -252,7 +268,7 @@ contains
         ncdim(n) = inqdimid_nc(ncid ,dimname(n) ,dimlongname(n) ,dimunit(n), (/0./))
       end if
     end do
-    iret=nf90_inq_varid(ncid,name,varid)
+    iret=nf90_inq_varid(ncid,trim(validate(name)),varid)
     if (iret /= nf90_noerr) then ! If the inquiry fails, the variable needs to be created
       select case (icomp)
       case (icomp_int)
@@ -262,11 +278,14 @@ contains
       case default
         datatype = NF90_FLOAT
       end select
-      iret=nf90_def_var(ncID, name, datatype, ncdim,VarID)
+      iret=nf90_def_var(ncID, trim(validate(name)), datatype, ncdim,VarID)!, deflate_level = deflate_level)
       if (iret/=0) then
         write (*,*) 'Variable ',trim(name), ncdim
         call nchandle_error(ncid, iret)
       end if
+      !if (nrdim > 2 .and. deflate_level > 0) then
+      !  iret=nf90_def_var_deflate(ncid, varid, 0, 1, deflate_level = deflate_level)
+      !end if
       iret = putatt_nc(ncID, 'longname', lname, trim(name))
       if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
       iret = putatt_nc(ncID, 'units', unit, trim(name))
@@ -320,14 +339,14 @@ contains
       ltime = .false.
     end if
     iret = 0
-    iret = nf90_inq_dimid(ncid, dimname, inqdimid_nc)
+    iret = nf90_inq_dimid(ncid, trim(validate(dimname)), inqdimid_nc)
     if (iret == 0) then !If the dimension already exists....
       if (.not. ltime) then
         iret = nf90_inquire_dimension(ncID, inqdimid_nc, len = dimsize)
         allocate(dimvar(dimsize))
         if (dimsize == size(dimvalues)) then ! Check whether the number of points along this dimension is correct
           ldef = ensuredata_nc(ncid)
-          iret =  nf90_inq_varid(ncid, trim(dimname), varid)
+          iret =  nf90_inq_varid(ncid, trim(validate(dimname)), varid)
           iret  = nf90_get_var(ncid,varid,dimvar)
           ldef = ensuredefine_nc(ncid)
           if (any((abs((dimvar - dimvalues)/(dimvar+epsilon(1.)))) > 1e-4)) then ! Check whether dimension in file matches with the desired values
@@ -350,15 +369,15 @@ contains
       end if
     else !If the dimension does not exist yet, we need to create it.
       if (ltime) then
-        iret = nf90_def_dim(ncID, dimname, NF90_UNLIMITED, inqdimid_nc)
+        iret = nf90_def_dim(ncID, trim(validate(dimname)), NF90_UNLIMITED, inqdimid_nc)
       else
-        iret = nf90_def_dim(ncID, trim(dimname), size(dimvalues), inqdimid_nc)
+        iret = nf90_def_dim(ncID, trim(validate(dimname)), size(dimvalues), inqdimid_nc)
       endif
       if (iret/=0) then
         print *,'For dimension ',trim(dimname)
         call nchandle_error(ncid, iret)
       end if
-      iret = nf90_def_var(ncID,dimname, nf90_double, inqdimid_nc,VarID)
+      iret = nf90_def_var(ncID,trim(validate(dimname)), nf90_double, inqdimid_nc,VarID)
       if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
       iret = putatt_nc(ncID, 'longname', dimlongname, dimname)
       if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
@@ -380,7 +399,8 @@ contains
 
 !> Write down a number of variables that depend on (possibly) time and 1 other dimension.
   subroutine writevar0D_nc(ncid,ncname,var,nrec)
-    use netcdf, only : nf90_inquire, nf90_inquire_dimension, nf90_inquire_variable, nf90_inq_varid, nf90_put_var, nf90_noerr
+    use netcdf, only : nf90_inquire, nf90_inquire_dimension, nf90_inq_varid, &
+                       nf90_put_var, nf90_noerr, nf90_erange
     integer, intent(in)              :: ncid   !< Netcdf file number
     character(len=*),intent(in)      :: ncname !< The variable names
     real,intent(in)                  :: var    !< The variables to be written to file
@@ -390,7 +410,7 @@ contains
     real    :: scale_factor, add_offset
     integer(kind=single)  :: var_i
     character(len=20) :: udimname
-    iret = nf90_inq_varid(ncid, ncname, VarID)
+    iret = nf90_inq_varid(ncid, trim(validate(ncname)), VarID)
     if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
     if (present(nrec)) then
       iret = nf90_inquire(ncid,unlimitedDimId=udimid)
@@ -411,14 +431,13 @@ contains
     else
       iret = nf90_put_var(ncid, VarID, var,loc)
     end if      
-    if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
-
+    if (iret /= nf90_noerr .and. iret /= nf90_erange) call nchandle_error(ncid, iret)
     iret = sync_nc(ncid)
   end subroutine writevar0D_nc
 
 !> Write down a number of variables that depend on (possibly) time and 1 other dimension.
   subroutine writevar1D_nc(ncid,ncname,var,nrec)
-    use netcdf, only : nf90_inquire_dimension, nf90_inquire_variable, nf90_inq_varid, nf90_put_var, nf90_noerr
+    use netcdf, only : nf90_inquire_dimension, nf90_inquire_variable, nf90_inq_varid, nf90_put_var, nf90_noerr, nf90_erange
     integer, intent(in)           :: ncid   !< Netcdf file number
     character(len=*),intent(in)   :: ncname !< The variable names
     real,dimension(:),intent(in)  :: var    !< The variables to be written to file
@@ -430,13 +449,12 @@ contains
     real    :: scale_factor, add_offset
     integer(kind=single), allocatable, dimension(:) :: var_i
     dimsize(2) = 1 !The time dimension has size 1
-    iret = nf90_inq_varid(ncid, ncname, VarID)
+    iret = nf90_inq_varid(ncid, trim(validate(ncname)), VarID)
     if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
     iret = nf90_inquire_variable(ncid,varid,dimids=dimids)
     if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
     iret = nf90_inquire_dimension(ncid,dimids(1),len=dimsize(1))
     if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
-    iret = getatt_nc(ncid, 'scale_factor', scale_factor, ncname)
     if (present(nrec)) then
       allocate(loc(2))
       loc = (/1, nrec/)
@@ -444,6 +462,7 @@ contains
       allocate(loc(1))
       loc = (/1/)
     end if
+    iret = getatt_nc(ncid, 'scale_factor', scale_factor, ncname)
     if (iret == 0) then !We're doing compression
       iret = getatt_nc(ncid, 'add_offset', add_offset, ncname)
       if (iret /=0) add_offset = 0.
@@ -453,15 +472,14 @@ contains
     else
       iret = nf90_put_var(ncid, VarID, var(1:dimsize(1)),loc,dimsize)
     end if      
-    if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
-
+    if (iret /= nf90_noerr .and. iret /= nf90_erange) call nchandle_error(ncid, iret)
     iret = sync_nc(ncid)
     if (allocated(var_i)) deallocate(var_i)
   end subroutine writevar1D_nc
 
 !> Write down a number of variables that depend on (possibly) time and 2 other dimension.
   subroutine writevar2D_nc(ncid,ncname,var,nrec)
-    use netcdf, only : nf90_inquire_dimension, nf90_inquire_variable, nf90_inq_varid, nf90_put_var, nf90_noerr
+    use netcdf, only : nf90_inquire_dimension, nf90_inquire_variable, nf90_inq_varid, nf90_put_var, nf90_noerr, nf90_erange
     integer, intent(in)             :: ncid   !< Netcdf file number
     character(len=*),intent(in)     :: ncname !< The variable names
     real,dimension(:,:),intent(in)  :: var    !< The variables to be written to file
@@ -473,7 +491,7 @@ contains
     real    :: scale_factor, add_offset
     integer(kind=single), allocatable, dimension(:,:) :: var_i
     dimsize(3) = 1 !The time dimension has size 1
-    iret = nf90_inq_varid(ncid, ncname, VarID)
+    iret = nf90_inq_varid(ncid, trim(validate(ncname)), VarID)
     if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
     iret = nf90_inquire_variable(ncid,varid,dimids=dimids)
     if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
@@ -481,7 +499,6 @@ contains
     if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
     iret = nf90_inquire_dimension(ncid,dimids(2),len=dimsize(2))
     if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
-    iret = getatt_nc(ncid, 'scale_factor', scale_factor, ncname)
     if (present(nrec)) then
       allocate(loc(3))
       loc = (/1, 1, nrec/)
@@ -489,6 +506,7 @@ contains
       allocate(loc(2))
       loc = (/1, 1/)
     end if
+    iret = getatt_nc(ncid, 'scale_factor', scale_factor, ncname)
     if (iret == 0) then !We're doing compression
       iret = getatt_nc(ncid, 'add_offset', add_offset, ncname)
       if (iret /=0) add_offset = 0.
@@ -499,15 +517,14 @@ contains
     else
       iret = nf90_put_var(ncid, VarID, var(1:dimsize(1),1:dimsize(2)),loc,dimsize)
     end if      
-    if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
-
+    if (iret /= nf90_noerr .and. iret /= nf90_erange) call nchandle_error(ncid, iret)
     iret = sync_nc(ncid)
     
   end subroutine writevar2D_nc
 
 !> Write down a number of variables that depend on (possibly) time and 3 other dimension.
   subroutine writevar3D_nc(ncid,ncname,var,nrec)
-    use netcdf, only : nf90_inquire_dimension, nf90_inquire_variable, nf90_inq_varid, nf90_put_var, nf90_noerr
+    use netcdf, only : nf90_inquire_dimension, nf90_inquire_variable, nf90_inq_varid, nf90_put_var, nf90_noerr, nf90_erange
     integer, intent(in)              :: ncid   !< Netcdf file number
     character(len=*),intent(in)      :: ncname !< The variable names
     real,dimension(:,:,:),intent(in) :: var    !< The variables to be written to file
@@ -519,7 +536,7 @@ contains
     real    :: scale_factor, add_offset
     integer(kind=single), allocatable, dimension(:,:,:) :: var_i
     dimsize(4) = 1 !The time dimension has size 1
-    iret = nf90_inq_varid(ncid, ncname, VarID)
+    iret = nf90_inq_varid(ncid, trim(validate(ncname)), VarID)
     if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
     iret = nf90_inquire_variable(ncid,varid,dimids=dimids)
     if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
@@ -529,7 +546,6 @@ contains
     if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
     iret = nf90_inquire_dimension(ncid,dimids(3),len=dimsize(3))
     if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
-    iret = getatt_nc(ncid, 'scale_factor', scale_factor, ncname)
     if (present(nrec)) then
       allocate(loc(4))
       loc = (/1, 1, 1, nrec/)
@@ -537,6 +553,7 @@ contains
       allocate(loc(3))
       loc = (/1, 1, 1/)
     end if
+    iret = getatt_nc(ncid, 'scale_factor', scale_factor, ncname)
     if (iret == 0) then !We're doing compression
       iret = getatt_nc(ncid, 'add_offset', add_offset, ncname)
       if (iret /=0) add_offset = 0.
@@ -547,7 +564,7 @@ contains
     else
       iret = nf90_put_var(ncid, VarID, var(1:dimsize(1),1:dimsize(2),1:dimsize(3)),loc,dimsize)
     end if      
-    if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
+    if (iret /= nf90_noerr .and. iret /= nf90_erange) call nchandle_error(ncid, iret)
 
     iret = sync_nc(ncid)
     
@@ -579,7 +596,7 @@ contains
       return
     end if
 !Check whether variable is available
-    iret  = nf90_inq_varid(ncid, ncname, VarID)
+    iret  = nf90_inq_varid(ncid, trim(validate(ncname)), VarID)
     if (iret /= nf90_noerr) then
       readvar0D_nc = iret
       iret         = nf90_close(ncid)
@@ -645,18 +662,18 @@ contains
     end if
     dimname = dimname_in
 !Open file
-    inquire(file=trim(fname),exist=exists)
+    inquire(file=trim(validate(fname)),exist=exists)
     if (.not. exists) then
       readvar1D_nc = -1
       return
     end if
-    iret  = nf90_open (trim(fname), NF90_NOWRITE, ncid)
+    iret  = nf90_open (trim(validate(fname)), NF90_NOWRITE, ncid)
     if (iret /= nf90_noerr) then
       readvar1D_nc = -1
       return
     end if
 !Check whether variable is available
-    iret  = nf90_inq_varid(ncid, ncname, VarID)
+    iret  = nf90_inq_varid(ncid, trim(validate(ncname)), VarID)
     if (iret /= nf90_noerr) then
       readvar1D_nc = iret
       iret         = nf90_close(ncid)
@@ -691,7 +708,7 @@ contains
     allocate(dimvars(maxval(dimsize),ndim_exp))
     dimvars = 0.
     do n=1,ndims
-      iret  = nf90_inq_varid(ncid, dimname(n), dimid)
+      iret  = nf90_inq_varid(ncid, validate(dimname(n)), dimid)
       if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
       iret  = nf90_get_var(ncid,dimid, dimvars(1:dimsize(n), n))
       if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
@@ -778,7 +795,7 @@ contains
       return
     end if
 !Check whether variable is available
-    iret  = nf90_inq_varid(ncid, ncname, VarID)
+    iret  = nf90_inq_varid(ncid, trim(validate(ncname)), VarID)
     if (iret /= nf90_noerr) then
       readvar2D_nc = iret
       iret         = nf90_close(ncid)
@@ -813,7 +830,7 @@ contains
     allocate(dimvars(maxval(dimsize),ndim_exp))
     dimvars = 0.
     do n=1,ndims
-      iret  = nf90_inq_varid(ncid, dimname(n), dimid)
+      iret  = nf90_inq_varid(ncid, validate(dimname(n)), dimid)
       if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
       iret  = nf90_get_var(ncid,dimid, dimvars(1:dimsize(n), n))
       if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
@@ -908,7 +925,7 @@ contains
       return
     end if
 !Check whether variable is available
-    iret  = nf90_inq_varid(ncid, ncname, VarID)
+    iret  = nf90_inq_varid(ncid, trim(validate(ncname)), VarID)
     if (iret /= nf90_noerr) then
       readvar3D_nc = iret
       iret         = nf90_close(ncid)
@@ -943,7 +960,7 @@ contains
     allocate(dimvars(maxval(dimsize),ndim_exp))
     dimvars = 0.
     do n=1,ndims
-      iret  = nf90_inq_varid(ncid, dimname(n), dimid)
+      iret  = nf90_inq_varid(ncid, validate(dimname(n)), dimid)
       if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
       iret  = nf90_get_var(ncid,dimid, dimvars(1:dimsize(n), n))
       if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
@@ -1044,7 +1061,7 @@ contains
       return
     end if
 !Check whether variable is available
-    iret  = nf90_inq_varid(ncid, ncname, VarID)
+    iret  = nf90_inq_varid(ncid, trim(validate(ncname)), VarID)
     if (iret /= nf90_noerr) then
       readvar4D_nc = iret
       iret         = nf90_close(ncid)
@@ -1076,7 +1093,7 @@ contains
     allocate(dimvars(maxval(dimsize),ndim_exp))
     dimvars = 0.
     do n=1,ndims
-      iret  = nf90_inq_varid(ncid, dimname(n), dimid)
+      iret  = nf90_inq_varid(ncid, validate(dimname(n)), dimid)
       iret  = nf90_get_var(ncid,dimid, dimvars(1:dimsize(n), n))
       if (nslice(n) > 0) then
         locmax = dimsize(n)
@@ -1121,11 +1138,11 @@ contains
     
     ldef = ensuredefine_nc(ncid)
     if (present(varname)) then
-      iret  = nf90_inq_varid(ncid,trim(varname),varid)
+      iret  = nf90_inq_varid(ncid,validate(varname),varid)
     else
       varid = nf90_global
     end if
-    putatt_str_nc = nf90_put_att(ncid, varid, trim(attrname), trim(attrval))
+    putatt_str_nc = nf90_put_att(ncid, varid, validate(attrname), trim(attrval))
     if (ldef .eqv. .false.) then
       ldef = ensuredata_nc(ncid)
     end if
@@ -1142,11 +1159,11 @@ contains
     
     ldef = ensuredefine_nc(ncid)
     if (present(varname)) then
-      iret  = nf90_inq_varid(ncid,trim(varname),varid)
+      iret  = nf90_inq_varid(ncid,validate(varname),varid)
     else
       varid = nf90_global
     end if
-    putatt_single_nc = nf90_put_att(ncid, varid, trim(attrname), attrval)
+    putatt_single_nc = nf90_put_att(ncid, varid, validate(attrname), attrval)
     if (ldef .eqv. .false.) then
       ldef = ensuredata_nc(ncid)
     end if
@@ -1163,11 +1180,11 @@ contains
     
     ldef = ensuredefine_nc(ncid)
     if (present(varname)) then
-      iret  = nf90_inq_varid(ncid,trim(varname),varid)
+      iret  = nf90_inq_varid(ncid,validate(varname),varid)
     else
       varid = nf90_global
     end if
-    putatt_double_nc = nf90_put_att(ncid, varid, trim(attrname), attrval)
+    putatt_double_nc = nf90_put_att(ncid, varid, validate(attrname), attrval)
     if (ldef .eqv. .false.) then
       ldef = ensuredata_nc(ncid)
     end if
@@ -1184,11 +1201,11 @@ contains
     
     ldef = ensuredefine_nc(ncid)
     if (present(varname)) then
-      iret  = nf90_inq_varid(ncid,trim(varname),varid)
+      iret  = nf90_inq_varid(ncid,validate(varname),varid)
     else
       varid = nf90_global
     end if
-    putatt_int_nc = nf90_put_att(ncid, varid, trim(attrname), attrval)
+    putatt_int_nc = nf90_put_att(ncid, varid, validate(attrname), attrval)
     if (ldef .eqv. .false.) then
       ldef = ensuredata_nc(ncid)
     end if
@@ -1205,11 +1222,11 @@ contains
     
     ldef = ensuredefine_nc(ncid)
     if (present(varname)) then
-      iret  = nf90_inq_varid(ncid,trim(varname),varid)
+      iret  = nf90_inq_varid(ncid,validate(varname),varid)
     else
       varid = nf90_global
     end if
-    putatt_short_nc = nf90_put_att(ncid, varid, trim(attrname), attrval)
+    putatt_short_nc = nf90_put_att(ncid, varid, validate(attrname), attrval)
     if (ldef .eqv. .false.) then
       ldef = ensuredata_nc(ncid)
     end if
@@ -1224,11 +1241,11 @@ contains
     integer :: iret, varid
     
     if (present(varname)) then
-      iret  = nf90_inq_varid(ncid,trim(varname),varid)
+      iret  = nf90_inq_varid(ncid,validate(varname),varid)
     else
       varid = nf90_global
     end if
-    getatt_str_nc = nf90_get_att(ncid, varid, trim(attrname), attrval)
+    getatt_str_nc = nf90_get_att(ncid, varid, validate(attrname), attrval)
   end function getatt_str_nc
   
   integer function getatt_single_nc(ncid, attrname, attrval, varname)
@@ -1240,11 +1257,11 @@ contains
     integer :: iret, varid
     
     if (present(varname)) then
-      iret  = nf90_inq_varid(ncid,trim(varname),varid)
+      iret  = nf90_inq_varid(ncid,validate(varname),varid)
     else
       varid = nf90_global
     end if
-    getatt_single_nc= nf90_get_att(ncid, varid, trim(attrname), attrval)
+    getatt_single_nc= nf90_get_att(ncid, varid, validate(attrname), attrval)
   end function getatt_single_nc
   
   integer function getatt_double_nc(ncid, attrname, attrval, varname)
@@ -1256,11 +1273,11 @@ contains
     integer :: iret, varid
     
     if (present(varname)) then
-      iret  = nf90_inq_varid(ncid,trim(varname),varid)
+      iret  = nf90_inq_varid(ncid,validate(varname),varid)
     else
       varid = nf90_global
     end if
-    getatt_double_nc= nf90_get_att(ncid, varid, trim(attrname), attrval)
+    getatt_double_nc= nf90_get_att(ncid, varid, validate(attrname), attrval)
   end function getatt_double_nc
   
   integer function getatt_int_nc(ncid, attrname, attrval, varname)
@@ -1272,11 +1289,11 @@ contains
     integer :: iret, varid
     
     if (present(varname)) then
-      iret  = nf90_inq_varid(ncid,trim(varname),varid)
+      iret  = nf90_inq_varid(ncid,validate(varname),varid)
     else
       varid = nf90_global
     end if
-    getatt_int_nc= nf90_get_att(ncid, varid, trim(attrname), attrval)
+    getatt_int_nc= nf90_get_att(ncid, varid, validate(attrname), attrval)
   end function getatt_int_nc
   
   integer function getatt_short_nc(ncid, attrname, attrval, varname)
@@ -1288,12 +1305,45 @@ contains
     integer :: iret, varid
     
     if (present(varname)) then
-      iret  = nf90_inq_varid(ncid,trim(varname),varid)
+      iret  = nf90_inq_varid(ncid,validate(varname),varid)
     else
       varid = nf90_global
     end if
-    getatt_short_nc= nf90_get_att(ncid, varid, trim(attrname), attrval)
+    getatt_short_nc= nf90_get_att(ncid, varid, validate(attrname), attrval)
   end function getatt_short_nc
+  
+  integer function getatt_str_fname_nc(fname, attrname, attrval, varname)
+    use netcdf, only : nf90_open, nf90_get_att, nf90_inq_varid, nf90_global, nf90_nowrite
+    character(len=*), intent(in)           :: fname
+    character(len=*), intent(in)           :: attrname
+    character(len=*), intent(out)          :: attrval
+    character(len=*), intent(in), optional :: varname
+    integer :: iret, varid, ncid
+    
+    iret = nf90_open(trim(fname), NF90_NOWRITE, ncid)
+    if (present(varname)) then
+      iret  = nf90_inq_varid(ncid,validate(varname),varid)
+    else
+      varid = nf90_global
+    end if
+    getatt_str_fname_nc = nf90_get_att(ncid, varid, validate(attrname), attrval)
+  end function getatt_str_fname_nc
+  
+  function validate(input) !\todo Make this allocatable as soon as all common compilers allow it
+    character(len=*), intent(in) :: input
+    character(len=len_trim(input)):: validate
+    character(len=2) :: cforbidden
+    integer          :: n, nn
+    cforbidden = '()'
+    nn = 0
+    do n=1,len_trim(input)
+      validate(n:n) = ' '
+      if (scan(input(n:n),cforbidden) == 0) then
+        nn = nn + 1
+        validate(nn:nn) = input(n:n)
+      end if
+    end do
+  end function validate
 
 !> Synchronize the netcdf file on disk with the buffer.
   integer function sync_nc(ncid)
@@ -1315,7 +1365,7 @@ contains
       iret = getatt_nc(ncid, 'title', fname)
       if (iret /= nf90_noerr) fname = ''
       print *, 'NetCDF error in file ' // trim(fname)
-      print *, trim(nf90_strerror(status))
+      print *, status, trim(nf90_strerror(status))
       call appl_finalize (-1)
     end if
   end subroutine nchandle_error

@@ -37,7 +37,7 @@ module radiation
   contains
 
     subroutine d4stream(n1, n2, n3, alat, time, sknt, sfc_albedo, CCN, dn0, &
-         pi0, pi1, dzi_m, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,sflxd, albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa, rr,ice,nice,grp,istp)
+         pi0, pi1, dzi_m, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,sflxd,reff, albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa, rr,ice,nice,grp,istp)
 
 
       integer, intent (in) :: n1, n2, n3
@@ -45,7 +45,7 @@ module radiation
       real, dimension (n1), intent (in)                 :: dn0, pi0, pi1, dzi_m
       real, dimension (n1,n2,n3), intent (in)           :: pip, th, rv, rc
       real, optional, dimension (n1,n2,n3), intent (in) :: rr,ice,nice,grp
-      real, dimension (n1,n2,n3), intent (inout)        :: tt, rflx, sflx, lflxu, lflxd, sflxu, sflxd 
+      real, dimension (n1,n2,n3), intent (inout)        :: tt, rflx, sflx, lflxu, lflxd, sflxu, sflxd,reff 
       real, dimension (n2,n3), intent (out),optional    :: albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa
       integer, optional, intent (in) :: istp
 
@@ -106,13 +106,17 @@ module radiation
                if (present(ice)) then
                  piwc(kk) = 1000.*dn0(k)*ice(k,i,j)
                  if (nice(k,i,j).gt.0.0) then
-                    pde(kk)  = 1.e6*(piwc(kk)/(1000.*pri*nice(k,i,j)*dn0(k)))**(1./3.)
+                    pde(kk)  = 1.e6*(piwc(kk)/(1000.*pri*nice(k,i,j)))**(1./3.)
+                    reff(k,i,j)=pde(kk)
                     pde(kk)=min(max(pde(kk),20.),180.)
                  else
                     pde(kk)  = 0.0
+                    reff(k,i,j)=0.0
                  endif
                else
                   piwc(kk) = 0.
+                  pde(kk) = 0.0
+                  reff(k,i,j) = 0.0
                end if
                if (present(grp)) then
                  pgwc(kk) = 1000.*dn0(k)*grp(k,i,j)

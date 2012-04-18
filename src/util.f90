@@ -265,21 +265,30 @@ contains
   !
   subroutine get_var3(n1,n2,n3,a,b,avg)
 
-    integer n1,n2,n3,k,i,j
-    real a(n1,n2,n3),b(n1),avg(n1),x
 
-    do k=1,n1
-       avg(k) = 0.
-    end do
-    x = 1./real((n3-4)*(n2-4))
+    use mpi_interface, only : nypg,nxpg,double_array_par_sum
 
+    integer,intent(in) :: n1,n2,n3
+    real,intent(in) :: a(n1,n2,n3)
+    real,intent(in) :: b(n1)
+    real,intent(out) :: avg(n1)
+
+    integer      :: k,i,j
+    real(kind=8) :: lavg(n1),gavg(n1),x
+
+    x = 1./(real(nypg-4)*real(nxpg-4))
+    gavg(:) = 0.
     do j=3,n3-2
        do i=3,n2-2
           do k=1,n1
-             avg(k)=avg(k)+((a(k,i,j)-b(k))**2 )*x
+             gavg(k)=gavg(k)+(a(k,i,j)-b(k))**2
           end do
-       enddo
-    enddo
+       end do
+    end do
+    lavg = gavg
+    call double_array_par_sum(lavg,gavg,n1)
+    avg(:) = real(gavg(:) * x)
+
 
   end subroutine get_var3
   ! 
@@ -454,4 +463,59 @@ contains
 
   end subroutine get_fft_twodim
   !
+     
+  subroutine calclevel(varin,varout,location, threshold)
+    use grid, only : nzp, nxp, nyp, zt
+    use mpi_interface, only : double_scalar_par_max, double_scalar_par_min
+    real, intent(in), dimension(:,:,:) :: varin
+    real, intent(in), optional :: threshold
+    integer, intent(out) :: varout
+    integer :: klocal
+    real :: rlocal, rglobal
+    character(*), intent(in) :: location
+    integer :: i, j, k, km1
+    real :: thres
+    
+
+     if (present(threshold)) then
+      thres = threshold
+    else
+      thres = 0.0
+    end if
+   
+    select case(location)
+    case ('top')
+      klocal = 0
+      do j = 3, nyp - 2
+        do i = 3, nxp - 2
+          top:do k = nzp - 1, 2, -1
+            if (varin(k,i,j) > thres) then
+              klocal = max(klocal, k)
+              exit top
+            end if
+          end do top
+        end do
+      end do
+      rlocal = klocal
+      call double_scalar_par_max(rlocal,rglobal) 
+      varout = rglobal
+    case ('base')
+      klocal = nzp 
+      do j = 3, nyp - 2
+        do i = 3, nxp - 2
+          base:do k = 2, nzp - 1
+            if (varin(k,i,j) > thres) then
+              klocal = min(klocal, k)
+              exit base
+            end if
+          end do base
+        end do
+      end do
+      rlocal = klocal
+      call double_scalar_par_min(rlocal,rglobal) 
+      varout = rglobal
+
+    end select
+  end subroutine calclevel
+
 end module util

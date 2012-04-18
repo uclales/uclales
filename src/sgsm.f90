@@ -31,7 +31,7 @@ module sgsm
   real, parameter     :: tkemin=1.e-20
   real :: csx = 0.23
   real :: prndtl = 0.3333333333
-
+  real :: clouddiff = -1.
   real, allocatable, dimension (:,:) :: sxy1, sxy2, sxy3, sxz1, sxz2, sxz3    &
        , sxz4, sxz5, sxz6  ,szx1, szx2, szx3, szx4, szx5
   real, allocatable, dimension (:,:,:) :: szxy 
@@ -67,7 +67,7 @@ contains
          ,a_rp, a_tp, a_sp, a_st, vapor, a_pexnr, a_theta,a_km               &
          , a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7, nscl, nxp, nyp    &
          , nzp, nxyp, nxyzp, zm, dxi, dyi, dzi_t, dzi_m, dt, th00, dn0           &
-         , pi0, pi1, level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,liquid
+         , pi0, pi1, level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,liquid, a_cvrxp, trac_sfc
 
     use util, only         : atob, azero, get_avg3
     use mpi_interface, only: cyclics, cyclicc
@@ -136,6 +136,7 @@ contains
        call azero(nxyp,sxy2)
        if ( associated(a_tp,a_sp) ) call atob(nxyp,wt_sfc,sxy1)
        if ( associated(a_rp,a_sp) ) call atob(nxyp,wq_sfc,sxy1)
+       if ( associated(a_cvrxp,a_sp) ) call atob(nxyp,trac_sfc,sxy1)
 
        if (sflg) call azero(nxyzp,a_scr1)
 
@@ -244,8 +245,9 @@ contains
       
     use defs, only          : pi, vonk
     use stat, only          : tke_sgs
-    use util, only          : get_avg3, get_cor3
+    use util, only          : get_avg3, get_cor3, calclevel
     use mpi_interface, only : cyclics, cyclicc
+    use grid, only          : liquid
 
     implicit none
 
@@ -254,7 +256,7 @@ contains
     real, intent(in)    :: dxi,dyi,zm(n1),dn0(n1)
     real, intent(inout) :: ri(n1,n2,n3),kh(n1,n2,n3)
     real, intent(out)   :: km(n1,n2,n3),szxy(n1,n2,n3)
-
+    integer             :: cb, ct
     real    :: delta,pr
 
     pr    = abs(prndtl)
@@ -329,6 +331,21 @@ contains
           enddo
        enddo
     enddo
+    if (clouddiff> 0) then ! Additional diffusion outside of the clouds - but in the cloud layer
+      call calclevel(liquid, cb, 'base')
+      call calclevel(liquid, ct, 'top')    
+      do j=3,n3-2
+        do i=3,n2-2
+            do k=cb,ct
+              if (liquid(k,i,j) <1e-10) then
+                kh(k,i,j) = clouddiff * kh(k,i,j) 
+              end if
+            enddo
+        enddo
+      enddo
+        
+    
+    end if
     call cyclics(n1,n2,n3,kh,req)
     call cyclicc(n1,n2,n3,kh,req)
 

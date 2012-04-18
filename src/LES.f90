@@ -77,22 +77,23 @@ contains
 
     use util, only : fftinix,fftiniy
     use defs, only : SolarConstant
-    use sgsm, only : csx, prndtl
+    use sgsm, only : csx, prndtl, clouddiff
     !irina
-    use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon
+    use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon,lhomflx
     !use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon, sst
     use step, only : timmax, timrsm, istpfl, corflg, outflg, frqanl, frqhis,          &
          frqcross , strtim, radfrq, cntlat,& 
-         case_name,lsvarflg, sst, div, wctime                   !irina
+         case_name,lsvarflg, sst, div, wctime , tau                  !irina
 !cgils         
-    use modnetcdf, only : lsync
+    use modnetcdf, only : lsync, deflate_level
+    use ncio, only : deflev => deflate_level
     use modcross, only : lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars
     use forc, only : lstendflg, sfc_albedo     
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
-         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype, CCN, lwaterbudget
+         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype, CCN, lwaterbudget, lcouvreux
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,irsflg, iseed, hfilin,   &
-         zrand
+         zrand,lhomrestart
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
     use modnudge, only : lnudge,tnudgefac
@@ -134,8 +135,12 @@ contains
          lnudge, tnudgefac, ltimedep, &             !thijs: Nudging
          SolarConstant, & ! SolarConstant (In case of prescribed TOA radiation
          lrandommicro, microseq,timenuc ,nin_set,cloud_type, &  !thijs: sequence of variables for microphysics
-         lwaterbudget                 ! axel: flag for liquid water budget diagnostics (only level=3)
-
+         lwaterbudget, &                 ! axel: flag for liquid water budget diagnostics (only level=3)
+         lcouvreux , tau , &                    ! The Couvreux 'radioactive' scalar
+         deflate_level , lhomflx,lhomrestart, &                         !Compression of the crosssections
+         clouddiff
+         
+    deflev = deflate_level
     ps       = 0.
     ts       = th00
     !

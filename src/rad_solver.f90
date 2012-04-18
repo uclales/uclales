@@ -630,7 +630,7 @@ contains
        tkm1 = 0.0
        do k = 1, nv
           f0a(k) = 2.0 * ( 1.0 - w(k) ) * bf(k)
-          u0a(k) = -(t(k)-tkm1) / ( alog( (bf(k+1)+epsilon(1.))/(bf(k)  + epsilon(1.))))
+          u0a(k) = -(t(k)-tkm1) / ( alog( bf(k+1)/bf(k) ) + epsilon(1.))
           tkm1 = t(k)
        end do
     end if
