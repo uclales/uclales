@@ -72,7 +72,7 @@ contains
         particle%ures = velocity_ures(particle%x,particle%y,particle%z) / deltax
         particle%vres = velocity_vres(particle%x,particle%y,particle%z) / deltay
         particle%wres = velocity_wres(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
- 
+
         !if (lpartsgs) then
         !  if (rk3step==1) then
         !    particle%usgs_prev = particle%usgs
@@ -107,7 +107,6 @@ contains
       end if
 
       !call statistics
-      !call writeparticles
     end if
 
     particle => particle%next
@@ -118,79 +117,6 @@ contains
 
   end subroutine particles
 
-
-  !--------------------------------------------------------------------------
-  ! subroutine writeparticles -> raw dump of particle field
-  !--------------------------------------------------------------------------
-  subroutine writeparticles
-    use grid, only : deltax, deltay, dzi_t, zm
-    implicit none
-    
-    real, allocatable,dimension (:,:) :: partdata
-    integer(KIND=selected_int_kind(11)), allocatable, dimension (:) :: partids
-    type (particle_record), pointer:: particle
-    integer :: ndata = 3         ! Hardcoded for now
-    integer :: n, m
-    integer :: ifoutput = 99
-
-    n = 0
-
-    allocate (partdata(ndata,nplisted))
-    allocate (partids(nplisted))
-
-    particle => head
-    do while( associated(particle) )
-      n = n + 1
-      partids(n) = particle%unique
-
-      if (ndata > 0) then
-         partdata(1,n) = (particle%x-3)*deltax
-      endif
-      if (ndata > 1) then
-         partdata(2,n) = (particle%y-3)*deltay
-      endif
-      if (ndata > 2) then
-         partdata(3,n) = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
-      endif
-      !if (ndata > 3) then
-      !   partdata(4,n) = (particle%ures+particle%usgs)*dx
-      !endif
-      !if (ndata > 4) then
-      !   partdata(5,n) = (particle%vres+particle%vsgs)*dy
-      !endif
-      !if (ndata > 5) then
-      !   partdata(6,n) = (particle%wres+particle%wsgs)*dzf(floor(particle%z))
-      !endif
-      !if (ndata > 6) then
-      !   partdata(7,n) = thlpart
-      !endif
-      !if (ndata > 7) then
-      !   partdata(8,n) = thvpart
-      !endif
-      !if (ndata > 8) then
-      !   partdata(9,n) = qtpart * 1000.
-      !endif
-      !if (ndata > 9) then
-      !   partdata(10,n)= qlpart * 1000.
-      !endif
-      particle => particle%next
-    end do
-
-    !open(ifoutput,file='particles.'//cmyid//'.'//cexpnr,form='unformatted',position = 'append',action='write')
-    !write(ifoutput) rtimee,nplisted
-    !write(ifoutput) (partids(n),(partdata(m,n),m=1,ndata),n=1,nplisted)
-    !close(ifoutput)
-    
-    ! Hack BvS: simply write particles to text file
-    open(ifoutput,file='particles',position='append',action='write')
-    write(ifoutput,'(A2,I10,I10)') '# ',tnextdump,nplisted
-    write(ifoutput,'(I10,3F12.5)') (partids(n),(partdata(m,n),m=1,ndata),n=1,nplisted)
-    close(ifoutput) 
-    
-    deallocate (partdata)
-    deallocate (partids)
-
-  end subroutine writeparticles
 
 
 
@@ -314,25 +240,121 @@ contains
     particle%vres_prev = particle%vres
     particle%wres_prev = particle%wres
 
-    !  call checkbound(particle)
+    call checkbound(particle)
+    
     !  if (floor(particle%z)/=floor(particle%z_prev)) then
     !    particle%z = floor(particle%z) + (particle%z -floor(particle%z))*dzf(floor(particle%z_prev))/dzf(floor(particle%z))
     !  end if
 
    if ( nstep==3 ) then
-      particle%ures_prev = 0.
-      particle%vres_prev = 0.
-      particle%wres_prev = 0.
+      particle%ures_prev   = 0.
+      particle%vres_prev   = 0.
+      particle%wres_prev   = 0.
+      particle%x_prev      = particle%x
+      particle%y_prev      = particle%y
+      particle%z_prev      = particle%z
     end if
 
   end subroutine rk3
 
+  !--------------------------------------------------------------------------
+  ! subroutine checkbound
+  !--------------------------------------------------------------------------
+  subroutine checkbound(particle)
+    use grid, only : nxp, nyp, zm
+    implicit none
 
+    type (particle_record), pointer:: particle
 
+    ! Cyclic boundaries
+    particle%x      = modulo(particle%x-3,real(nxp-4))+3
+    particle%y      = modulo(particle%y-3,real(nyp-4))+3
+    particle%x_prev = modulo(particle%x_prev-3,real(nxp-4))+3
+    particle%y_prev = modulo(particle%y_prev-3,real(nyp-4))+3
 
+    ! Reflect particles of surface and model top
+    if (particle%z >= size(zm)) then
+      particle%z = size(zm)-0.0001
+      particle%wres = -abs(particle%wres)
+    elseif (particle%z < 1.01) then
+      particle%z = abs(particle%z-1.01)+1.01
+      particle%wres =  abs(particle%wres)
+    end if
 
+    if (particle%z_prev >= size(zm)) then
+      particle%z_prev = size(zm)-0.0001
+    elseif (particle%z_prev < 1.01) then
+      particle%z_prev = abs(particle%z_prev-1.01)+1.01
+    end if
 
+  end subroutine checkbound
 
+  !--------------------------------------------------------------------------
+  ! subroutine writeparticles -> raw dump of particle field
+  !--------------------------------------------------------------------------
+  subroutine writeparticles
+    use grid, only : deltax, deltay, dzi_t, zm
+    implicit none
+    
+    real, allocatable,dimension (:,:) :: partdata
+    integer(KIND=selected_int_kind(11)), allocatable, dimension (:) :: partids
+    type (particle_record), pointer:: particle
+    integer :: ndata = 3         ! Hardcoded for now
+    integer :: n, m
+    integer :: ifoutput = 99
+
+    n = 0
+
+    allocate (partdata(ndata,nplisted))
+    allocate (partids(nplisted))
+
+    particle => head
+    do while( associated(particle) )
+      n = n + 1
+      partids(n) = particle%unique
+
+      if (ndata > 0) then
+         partdata(1,n) = (particle%x-3)*deltax
+      endif
+      if (ndata > 1) then
+         partdata(2,n) = (particle%y-3)*deltay
+      endif
+      if (ndata > 2) then
+         partdata(3,n) = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
+      endif
+      !if (ndata > 3) then
+      !   partdata(4,n) = (particle%ures+particle%usgs)*dx
+      !endif
+      !if (ndata > 4) then
+      !   partdata(5,n) = (particle%vres+particle%vsgs)*dy
+      !endif
+      !if (ndata > 5) then
+      !   partdata(6,n) = (particle%wres+particle%wsgs)*dzf(floor(particle%z))
+      !endif
+      !if (ndata > 6) then
+      !   partdata(7,n) = thlpart
+      !endif
+      !if (ndata > 7) then
+      !   partdata(8,n) = thvpart
+      !endif
+      !if (ndata > 8) then
+      !   partdata(9,n) = qtpart * 1000.
+      !endif
+      !if (ndata > 9) then
+      !   partdata(10,n)= qlpart * 1000.
+      !endif
+      particle => particle%next
+    end do
+
+    open(ifoutput,file='particles',position='append',action='write')
+    write(ifoutput,'(A2,I10,I10)') '# ',tnextdump,nplisted
+    write(ifoutput,'(I10,3F12.5)') (partids(n),(partdata(m,n),m=1,ndata),n=1,nplisted)
+    close(ifoutput) 
+    
+    deallocate (partdata)
+    deallocate (partids)
+
+  end subroutine writeparticles
 
   !--------------------------------------------------------------------------
   !
@@ -380,8 +402,6 @@ contains
           if ( zm(k)<zstart ) exit
         end do
         particle%z = k + (zstart-zm(k))*dzi_t(k)
-
-        print*,'-----> INIT POS: ',particle%x,particle%y,particle%z
 
         particle%xstart = xstart
         particle%ystart = ystart
