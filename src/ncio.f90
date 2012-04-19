@@ -133,11 +133,11 @@ contains
           case ('ym')
              iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,ymID    ,VarID)
           case ('tttt')
-             !if (present(n2) .and. present(n3)) then
-             !   iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tttt,VarID, deflate_level = deflate_level)
-             !else
+             if (present(n2) .and. present(n3)) then
+                iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tttt,VarID)!, deflate_level = deflate_level)
+             else
                 iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tt,VarID)
-             !end if
+             end if
              if (sx(n).eq."l") then
                 iret=nf90_put_att(ncID,VarID,'nu',cldw%nu)
                 iret=nf90_put_att(ncID,VarID,'mu',cldw%mu)
@@ -422,7 +422,7 @@ contains
     if (level >= 2)  then
 !        nn = nn+1
        iret = nf90_inq_varid(ncid0, sanal(17), VarID)
-       iret = nf90_put_var(ncid0, VarID,liquid(:,i1:i2,j1:j2), start=ibeg, &
+       iret = nf90_put_var(ncid0, VarID, liquid(:,i1:i2,j1:j2), start=ibeg, &
             count=icnt)
     end if
     nn = nbase+2
