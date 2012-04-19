@@ -35,8 +35,10 @@ module modparticles
   integer            :: np
   integer            :: tnextdump
 
+  integer            :: nrpartvar   = 3
+
   ! Particle structure
-  TYPE :: particle_record
+  type :: particle_record
     real     :: unique, tstart
     integer  :: partstep
     real     :: x, x_prev, ures_prev, xstart, ures, usgs, usgs_prev
@@ -44,11 +46,11 @@ module modparticles
     real     :: z, z_prev, wres_prev, zstart, wres, wsgs, wsgs_prev
     !real     :: sigma2_sgs
 
-    TYPE (particle_record), POINTER :: next,prev
-  end TYPE
+    type (particle_record), pointer :: next,prev
+  end type
 
   integer            :: nplisted
-  TYPE (particle_record), POINTER :: head, tail
+  type (particle_record), pointer :: head, tail
 
 contains
   !--------------------------------------------------------------------------
@@ -93,11 +95,7 @@ contains
     particle => head
     do while( associated(particle) )
       if ( time - particle%tstart >= 0 ) then
-    !    select case(intmeth)
-    !    case(inomove)
-    !      !no movement
-    !    case(irk3)
-           call rk3(particle)
+        call rk3(particle)
       end if
 
     if (nstep==3) then
@@ -113,16 +111,58 @@ contains
     end do
 
     !Exchange particle to other processors
-    !call partcommunicate
+    call partcomm
 
   end subroutine particles
 
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine partcomm
+  !--------------------------------------------------------------------------
+  !
+  subroutine partcomm
+    use mpi_interface, only : wrxid, wryid, ranktable, nxg, nyg, xcomm, ycomm, ierror, mpi_status_size, mpi_integer
+    implicit none
+
+    type (particle_record), pointer:: particle,ptr
+    real, allocatable, dimension(:) :: buffsend, buffrecv
+    integer:: status(mpi_status_size)
+    ! Number of particles to ('to') and from ('fr') N,E,S,W
+    integer :: nton,ntos,ntoe,ntow
+    integer :: nfrn,nfrs,nfre,nfrw 
+
+    nton = 0
+    ntos = 0
+    ntoe = 0
+    ntow = 0
+
+    ! First: all north to south (j) and vice versa
+    particle => head
+    do while(associated(particle) )
+      if( particle%y >= nyg + 2 ) nton = nton + 1
+      if( particle%y < 3        ) ntos = ntos + 1
+      particle => particle%next
+    end do 
+
+    call mpi_sendrecv(nton,1,mpi_integer,ranktable(wrxid,wryid-1),4, &
+                      nfrs,1,mpi_integer,ranktable(wrxid,wryid+1),4, &
+                      ycomm,status,ierror) 
+
+    call mpi_sendrecv(ntos,1,mpi_integer,ranktable(wrxid,wryid+1),5, &
+                      nfrn,1,mpi_integer,ranktable(wrxid,wryid-1),5, &
+                      ycomm,status,ierror) 
+
+    !if(nton > 0) allocate(buffsend(npartvar * nton)
+    !if(ntos > 0) allocate(buffsend(npartvar * ntos)
 
 
+  end subroutine partcomm
 
+  !
   !--------------------------------------------------------------------------
   ! subroutine velocity_ures: trilinear interpolation of u-component
   !--------------------------------------------------------------------------
+  !
   function velocity_ures(x,y,z)
     use grid, only : a_up, dzi_m, dzi_t, zt, zm
     implicit none
@@ -225,13 +265,9 @@ contains
   !--------------------------------------------------------------------------
   subroutine rk3(particle)
     use grid, only : rkalpha, rkbeta, nstep, dt, deltax
-    !use step, only : time
     implicit none
-    real :: rk3coef
-
     TYPE (particle_record), POINTER:: particle
 
-    rk3coef = dt / (4. - dble(nstep))
     particle%x   = particle%x + rkalpha(nstep) * (particle%ures+particle%usgs) * dt + rkbeta(nstep) * (particle%ures_prev + particle%usgs_prev) * dt
     particle%y   = particle%y + rkalpha(nstep) * (particle%vres+particle%vsgs) * dt + rkbeta(nstep) * (particle%vres_prev + particle%vsgs_prev) * dt
     particle%z   = particle%z + rkalpha(nstep) * (particle%wres+particle%wsgs) * dt + rkbeta(nstep) * (particle%wres_prev + particle%wsgs_prev) * dt

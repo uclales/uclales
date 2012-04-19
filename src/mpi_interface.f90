@@ -53,6 +53,8 @@ module mpi_interface
   integer :: stridetype,xstride,ystride,xystride,xylarry,xyzlarry,&
        fxytype,fxyztype
 
+  integer :: ierror
+
 contains
   !
   !----------------------------------------------------------------------
@@ -60,7 +62,7 @@ contains
   !
   subroutine init_mpi
 
-    integer ierror
+    !integer :: ierror
     character (len=8) date
 
     call mpi_init(ierror)  
@@ -310,6 +312,7 @@ contains
        if (nxprocs<nyprocs) print "(15x,I5)", yoffset(nxprocs:nyprocs-1)
     end if
 
+
 61 format (/1x,49('-')/2x,A15,I5,2(A6,I5))
 
   end subroutine define_decomp
@@ -323,7 +326,6 @@ contains
     integer, intent(in) :: nxp,nyp,nzp
 
     integer :: nx, ny, i, j, k, ii, jj, ierr, cnt, typesize,nynzg, nxnzg
-
 
     nx = max(1,nxp-4)
     ny = max(1,nyp-4)
