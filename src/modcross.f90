@@ -552,7 +552,7 @@ contains
       case('w')
         do j=3,nyp-2
           do i=3,nxp-2
-              do k=1,nzp
+              do k=2,nzp
                 interp(k,i,j) = 0.5*dzi_t(k) * (a_wp(k-1,i,j) / dzi_m(k) + a_wp(k,i,j) / dzi_m(k-1))
               end do
           end do
