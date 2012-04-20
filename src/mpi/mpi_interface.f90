@@ -53,7 +53,6 @@ module mpi_interface
   integer :: stridetype,xstride,ystride,xystride,xylarry,xyzlarry,&
        fxytype,fxyztype
 
-  integer my_real
   integer ierror
 
 contains
