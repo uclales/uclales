@@ -35,8 +35,6 @@ module modparticles
   integer            :: np
   integer            :: tnextdump
 
-  integer            :: nrpartvar   = 3
-
   ! Particle structure
   type :: particle_record
     real     :: unique, tstart
@@ -51,6 +49,9 @@ module modparticles
 
   integer            :: nplisted
   type (particle_record), pointer :: head, tail
+
+  integer            :: ipunique, ipx, ipy, ipz, ipxstart, ipystart, ipzstart, iptsart, ipxprev, ipyprev, ipzprev
+  integer            :: ipures, ipvres, ipwres, ipusgs, ipvsgs, ipwsgs, ipusgs_prev, ipvsgs_prev, ipwsgs_prev, ipartstep, nrpartvar
 
 contains
   !--------------------------------------------------------------------------
@@ -69,11 +70,16 @@ contains
     do while( associated(particle) )
       if (  time - particle%tstart >= 0 ) then
         particle%partstep = particle%partstep + 1
-        
+       
+        !print*,time,nstep,particle%unique,particle%x,particle%y,particle%z
+ 
         ! Interpolation of the velocity field
         particle%ures = velocity_ures(particle%x,particle%y,particle%z) / deltax
         particle%vres = velocity_vres(particle%x,particle%y,particle%z) / deltay
         particle%wres = velocity_wres(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
+
+        !print*,particle%ures,particle%vres,particle%wres
+        !print*,'------'
 
         !if (lpartsgs) then
         !  if (rk3step==1) then
@@ -121,42 +127,328 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine partcomm
-    use mpi_interface, only : wrxid, wryid, ranktable, nxg, nyg, xcomm, ycomm, ierror, mpi_status_size, mpi_integer
+    use mpi_interface, only : wrxid, wryid, ranktable, nxg, nyg, xcomm, ycomm, ierror, mpi_status_size, mpi_integer, mpi_double_precision, mpi_comm_world, nyprocs, nxprocs
     implicit none
+
+    integer :: ifoutput2 = 666
+ 
+
 
     type (particle_record), pointer:: particle,ptr
     real, allocatable, dimension(:) :: buffsend, buffrecv
-    integer:: status(mpi_status_size)
+    integer :: status(mpi_status_size)
+    integer :: ii, n
     ! Number of particles to ('to') and from ('fr') N,E,S,W
     integer :: nton,ntos,ntoe,ntow
-    integer :: nfrn,nfrs,nfre,nfrw 
+    integer :: nfrn,nfrs,nfre,nfrw
+    integer :: nyloc, nxloc 
 
     nton = 0
     ntos = 0
     ntoe = 0
     ntow = 0
 
+    nyloc = nyg / nyprocs
+    nxloc = nxg / nxprocs
+
+    ! --------------------------------------------
     ! First: all north to south (j) and vice versa
+    ! --------------------------------------------
     particle => head
     do while(associated(particle) )
-      if( particle%y >= nyg + 2 ) nton = nton + 1
-      if( particle%y < 3        ) ntos = ntos + 1
+      if( particle%y >= nyloc + 3 ) nton = nton + 1
+      if( particle%y < 3          ) ntos = ntos + 1
       particle => particle%next
     end do 
 
     call mpi_sendrecv(nton,1,mpi_integer,ranktable(wrxid,wryid-1),4, &
                       nfrs,1,mpi_integer,ranktable(wrxid,wryid+1),4, &
-                      ycomm,status,ierror) 
+                      mpi_comm_world,status,ierror) 
 
     call mpi_sendrecv(ntos,1,mpi_integer,ranktable(wrxid,wryid+1),5, &
                       nfrn,1,mpi_integer,ranktable(wrxid,wryid-1),5, &
-                      ycomm,status,ierror) 
+                      mpi_comm_world,status,ierror) 
 
-    !if(nton > 0) allocate(buffsend(npartvar * nton)
-    !if(ntos > 0) allocate(buffsend(npartvar * ntos)
+    !if( nton > 0 ) allocate(buffsend(nrpartvar * nton))
+    !if( ntos > 0 ) allocate(buffsend(nrpartvar * ntos))
+    allocate(buffsend(nrpartvar * nton))
+    allocate(buffrecv(nrpartvar * nfrs))
 
+    if( nton > 0 ) then
+      particle => head
+      ii = 0
+      do while( associated(particle) )
+        if( particle%y >= nyloc + 3 ) then
+          
+          open(ifoutput2,file='particlelog',position='append',action='write')
+          write(ifoutput2,*) 'toN',tnextdump,particle%unique,particle%x,particle%y,particle%z,ranktable(wrxid,wryid),ranktable(wrxid,wryid-1)
+          close(ifoutput2)
+
+          particle%y      = particle%y      - nyloc
+          particle%y_prev = particle%y_prev - nyloc
+
+          call partbuffer(particle, buffsend(ii+1:ii+nrpartvar),ii,.true.)
+          ptr => particle
+          particle => particle%next
+          call delete_particle(ptr)
+          ii=ii+nrpartvar
+        else
+          particle => particle%next
+        end if
+      end do
+    end if
+
+    call mpi_sendrecv(buffsend,nrpartvar*nton,mpi_double_precision,ranktable(wrxid,wryid-1),6, &
+                      buffrecv,nrpartvar*nfrs,mpi_double_precision,ranktable(wrxid,wryid+1),6, &
+                      mpi_comm_world, status, ierror)
+
+    ii = 0
+    do n = 1,nfrs
+      call add_particle(particle)
+      call partbuffer(particle, buffrecv(ii+1:ii+nrpartvar),ii,.false.)
+      ii=ii+nrpartvar
+    end do
+
+    !if( nton > 0 ) deallocate(buffsend)
+    !if( nfrs > 0 ) deallocate(buffrecv)
+    !if( ntos > 0 ) allocate(buffsend(nrpartvar*ntos))
+    !if( nfrn > 0 ) allocate(buffrecv(nrpartvar*nfrn))
+    deallocate(buffsend)
+    deallocate(buffrecv)
+    allocate(buffsend(nrpartvar*ntos))
+    allocate(buffrecv(nrpartvar*nfrn))
+
+    if( ntos > 0 ) then
+      particle => head
+      ii = 0
+      do while( associated(particle) )
+        if( particle%y < 3 ) then
+
+          open(ifoutput2,file='particlelog',position='append',action='write')
+          write(ifoutput2,*) 'toS',tnextdump,particle%unique,particle%x,particle%y,particle%z,ranktable(wrxid,wryid),ranktable(wrxid,wryid+1)
+          close(ifoutput2)
+          
+          particle%y      = particle%y      + nyloc
+          particle%y_prev = particle%y_prev + nyloc
+
+          call partbuffer(particle, buffsend(ii+1:ii+nrpartvar),ii,.true.)
+
+          ptr => particle
+          particle => particle%next
+          call delete_particle(ptr)
+          ii=ii+nrpartvar
+        else
+          particle => particle%next
+        end if
+      end do
+
+    end if
+
+    call mpi_sendrecv(buffsend,nrpartvar*ntos,mpi_double_precision,ranktable(wrxid,wryid+1),7, &
+                      buffrecv,nrpartvar*nfrn,mpi_double_precision,ranktable(wrxid,wryid-1),7, &
+                      mpi_comm_world, status, ierror)
+
+    ii = 0
+    do n = 1,nfrn
+      particle => head
+      call add_particle(particle)
+      call partbuffer(particle, buffrecv(ii+1:ii+nrpartvar),ii,.false.)
+      ii=ii+nrpartvar
+    end do
+
+    !if( ntos > 0 ) deallocate(buffsend)
+    !if( nfrn > 0 ) deallocate(buffrecv)
+    deallocate(buffsend)
+    deallocate(buffrecv)
+
+    ! --------------------------------------------
+    ! Second: all east to west (i) and vice versa
+    ! --------------------------------------------
+    particle => head
+    do while(associated(particle) )
+      if( particle%x >= nxloc + 3 ) ntoe = ntoe + 1
+      if( particle%x < 3          ) ntow = ntow + 1
+      particle => particle%next
+    end do 
+
+    call mpi_sendrecv(ntoe,1,mpi_integer,ranktable(wrxid+1,wryid),8, &
+                      nfrw,1,mpi_integer,ranktable(wrxid-1,wryid),8, &
+                      mpi_comm_world,status,ierror) 
+
+    call mpi_sendrecv(ntow,1,mpi_integer,ranktable(wrxid-1,wryid),9, &
+                      nfre,1,mpi_integer,ranktable(wrxid+1,wryid),9, &
+                      mpi_comm_world,status,ierror) 
+
+    !if(ntoe > 0) allocate(buffsend(nrpartvar * ntoe))
+    !if(ntow > 0) allocate(buffsend(nrpartvar * ntow))
+    allocate(buffsend(nrpartvar * ntoe))
+    allocate(buffrecv(nrpartvar * nfrw))
+
+    if( ntoe > 0 ) then
+      particle => head
+      ii = 0
+      do while( associated(particle) )
+        if( particle%x >= nxloc + 3 ) then
+          
+          open(ifoutput2,file='particlelog',position='append',action='write')
+          write(ifoutput2,*) 'toE',tnextdump,particle%unique,particle%x,particle%y,particle%z,ranktable(wrxid,wryid),ranktable(wrxid+1,wryid)
+          close(ifoutput2)
+          
+          particle%x      = particle%x      - nxloc
+          particle%x_prev = particle%x_prev - nxloc
+
+          call partbuffer(particle, buffsend(ii+1:ii+nrpartvar),ii,.true.)
+          ptr => particle
+          particle => particle%next
+          call delete_particle(ptr)
+          ii=ii+nrpartvar
+        else
+          particle => particle%next
+        end if
+      end do
+    end if
+
+    call mpi_sendrecv(buffsend,nrpartvar*ntoe,mpi_double_precision,ranktable(wrxid+1,wryid),10, &
+                      buffrecv,nrpartvar*nfrw,mpi_double_precision,ranktable(wrxid-1,wryid),10, &
+                      mpi_comm_world, status, ierror)
+
+    ii = 0
+    do n = 1,nfrw
+      call add_particle(particle)
+      call partbuffer(particle, buffrecv(ii+1:ii+nrpartvar),ii,.false.)
+      ii=ii+nrpartvar
+    end do
+
+    !if( ntoe > 0 ) deallocate(buffsend)
+    !if( nfrw > 0 ) deallocate(buffrecv)
+    !if( ntow > 0 ) allocate(buffsend(nrpartvar*ntow))
+    !if( nfre > 0 ) allocate(buffrecv(nrpartvar*nfre))
+    deallocate(buffsend)
+    deallocate(buffrecv)
+    allocate(buffsend(nrpartvar*ntow))
+    allocate(buffrecv(nrpartvar*nfre))
+
+    if( ntow > 0 ) then
+      particle => head
+      ii = 0
+      do while( associated(particle) )
+        if( particle%x < 3 ) then
+
+          open(ifoutput2,file='particlelog',position='append',action='write')
+          write(ifoutput2,*) 'toW',tnextdump,particle%unique,particle%x,particle%y,particle%z,ranktable(wrxid,wryid),ranktable(wrxid-1,wryid)
+          close(ifoutput2)
+          
+          particle%x      = particle%x      + nxloc
+          particle%x_prev = particle%x_prev + nxloc
+
+          call partbuffer(particle, buffsend(ii+1:ii+nrpartvar),ii,.true.)
+
+          ptr => particle
+          particle => particle%next
+          call delete_particle(ptr)
+          ii=ii+nrpartvar
+        else
+          particle => particle%next
+        end if
+      end do
+
+    end if
+
+    call mpi_sendrecv(buffsend,nrpartvar*ntow,mpi_double_precision,ranktable(wrxid-1,wryid),11, &
+                      buffrecv,nrpartvar*nfre,mpi_double_precision,ranktable(wrxid+1,wryid),11, &
+                      mpi_comm_world, status, ierror)
+
+    ii = 0
+    do n = 1,nfre
+      particle => head
+      call add_particle(particle)
+      call partbuffer(particle, buffrecv(ii+1:ii+nrpartvar),ii,.false.)
+      ii=ii+nrpartvar
+    end do
+
+    !if( ntow > 0 ) deallocate(buffsend)
+    !if( nfre > 0 ) deallocate(buffrecv)
+    deallocate(buffsend)
+    deallocate(buffrecv)
 
   end subroutine partcomm
+
+
+  !--------------------------------------------------------------------------
+  ! subroutine partbuffer
+  !--------------------------------------------------------------------------
+  !
+  subroutine partbuffer(particle, buffer, n, send)
+    implicit none
+    logical,intent(in)                :: send
+    integer,intent(in)                :: n
+    real,dimension(n+1:n+nrpartvar)   :: buffer
+    TYPE (particle_record), POINTER:: particle
+    
+    if (send) then
+      buffer(n+ipunique)    = particle%unique
+      buffer(n+ipx)         = particle%x
+      buffer(n+ipy)         = particle%y
+      buffer(n+ipz)         = particle%z
+      buffer(n+ipures)      = particle%ures
+      buffer(n+ipvres)      = particle%vres
+      buffer(n+ipwres)      = particle%wres
+      buffer(n+ipusgs)      = particle%usgs
+      buffer(n+ipvsgs)      = particle%vsgs
+      buffer(n+ipwsgs)      = particle%wsgs
+      buffer(n+ipusgs_prev) = particle%usgs_prev
+      buffer(n+ipvsgs_prev) = particle%vsgs_prev
+      buffer(n+ipwsgs_prev) = particle%wsgs_prev
+      buffer(n+ipxstart)    = particle%xstart
+      buffer(n+ipystart)    = particle%ystart
+      buffer(n+ipzstart)    = particle%zstart
+      buffer(n+iptsart)     = particle%tstart
+      buffer(n+ipartstep)   = particle%partstep
+      buffer(n+ipxprev)     = particle%x_prev
+      buffer(n+ipyprev)     = particle%y_prev
+      buffer(n+ipzprev)     = particle%z_prev
+      !if (intmeth == irk3 .or. lpartsgs) then
+      !   buffer(n+ipxprev) = particle%x_prev
+      !   buffer(n+ipyprev) = particle%y_prev
+      !   buffer(n+ipzprev) = particle%z_prev
+      ! end if
+      ! if (lpartsgs) then
+      !   buffer(n+ipsigma2_sgs)=particle%sigma2_sgs
+      ! end if
+    else
+      particle%unique       = buffer(n+ipunique)
+      particle%x            = buffer(n+ipx)
+      particle%y            = buffer(n+ipy)
+      particle%z            = buffer(n+ipz)
+      particle%ures         = buffer(n+ipures)
+      particle%vres         = buffer(n+ipvres)
+      particle%wres         = buffer(n+ipwres)
+      particle%usgs         = buffer(n+ipusgs)
+      particle%vsgs         = buffer(n+ipvsgs)
+      particle%wsgs         = buffer(n+ipwsgs)
+      particle%usgs_prev    = buffer(n+ipusgs_prev)
+      particle%vsgs_prev    = buffer(n+ipvsgs_prev)
+      particle%wsgs_prev    = buffer(n+ipwsgs_prev)
+      particle%xstart       = buffer(n+ipxstart)
+      particle%ystart       = buffer(n+ipystart)
+      particle%zstart       = buffer(n+ipzstart)
+      particle%tstart       = buffer(n+iptsart)
+      particle%partstep     = buffer(n+ipartstep)
+      particle%x_prev       = buffer(n+ipxprev)
+      particle%y_prev       = buffer(n+ipyprev)
+      particle%z_prev       = buffer(n+ipzprev)
+      !if (intmeth == irk3 .or. lpartsgs) then
+      !  particle%x_prev =  buffer(n+ipxprev)
+      !  particle%y_prev =  buffer(n+ipyprev)
+      !  particle%z_prev =  buffer(n+ipzprev)
+      !end if
+      !if (lpartsgs) then
+      !  particle%sigma2_sgs=buffer(n+ipsigma2_sgs)
+      !end if
+    end if
+  
+  end subroutine partbuffer
+
 
   !
   !--------------------------------------------------------------------------
@@ -240,7 +532,7 @@ contains
     implicit none
     real, intent(in) :: x, y, z
     integer          :: xbottom, ybottom, zbottom
-    real             :: velocity_wres, deltax, deltay, deltaz, sign
+    real             :: velocity_wres, deltax, deltay, deltaz
 
     xbottom = floor(x - 0.5)
     ybottom = floor(y - 0.5)
@@ -257,7 +549,7 @@ contains
     &                (  deltaz) * (1-deltay) * (  deltax) *  a_wp(zbottom + 1, xbottom + 1, ybottom    ) + &    ! x+1, z+1
     &                (  deltaz) * (  deltay) * (1-deltax) *  a_wp(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
     &                (  deltaz) * (  deltay) * (  deltax) *  a_wp(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
-    
+   
   end function velocity_wres
 
   !--------------------------------------------------------------------------
@@ -302,11 +594,11 @@ contains
 
     type (particle_record), pointer:: particle
 
-    ! Cyclic boundaries
-    particle%x      = modulo(particle%x-3,real(nxp-4))+3
-    particle%y      = modulo(particle%y-3,real(nyp-4))+3
-    particle%x_prev = modulo(particle%x_prev-3,real(nxp-4))+3
-    particle%y_prev = modulo(particle%y_prev-3,real(nyp-4))+3
+    ! Cyclic boundaries -> not needed with 2d parallel grid
+    !particle%x      = modulo(particle%x-3,real(nxp-4))+3
+    !particle%y      = modulo(particle%y-3,real(nyp-4))+3
+    !particle%x_prev = modulo(particle%x_prev-3,real(nxp-4))+3
+    !particle%y_prev = modulo(particle%y_prev-3,real(nyp-4))+3
 
     ! Reflect particles of surface and model top
     if (particle%z >= size(zm)) then
@@ -329,6 +621,7 @@ contains
   ! subroutine writeparticles -> raw dump of particle field
   !--------------------------------------------------------------------------
   subroutine writeparticles
+    use mpi_interface, only : wrxid, wryid, nxg, nyg, myid, nxprocs, nyprocs 
     use grid, only : deltax, deltay, dzi_t, zm
     implicit none
     
@@ -338,7 +631,9 @@ contains
     integer :: ndata = 3         ! Hardcoded for now
     integer :: n, m
     integer :: ifoutput = 99
-
+    character(3) :: cmyid
+    write(cmyid,'(i3.3)') myid  
+ 
     n = 0
 
     allocate (partdata(ndata,nplisted))
@@ -350,10 +645,10 @@ contains
       partids(n) = particle%unique
 
       if (ndata > 0) then
-         partdata(1,n) = (particle%x-3)*deltax
+         partdata(1,n) = (wrxid * (nxg / nxprocs) + particle%x - 3) * deltax
       endif
       if (ndata > 1) then
-         partdata(2,n) = (particle%y-3)*deltay
+         partdata(2,n) = (wryid * (nyg / nyprocs) + particle%y - 3) * deltay
       endif
       if (ndata > 2) then
          partdata(3,n) = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
@@ -382,7 +677,10 @@ contains
       particle => particle%next
     end do
 
-    open(ifoutput,file='particles',position='append',action='write')
+
+
+
+    open(ifoutput,file='particles.'//cmyid,position='append',action='write')
     write(ifoutput,'(A2,I10,I10)') '# ',tnextdump,nplisted
     write(ifoutput,'(I10,3F12.5)') (partids(n),(partdata(m,n),m=1,ndata),n=1,nplisted)
     close(ifoutput) 
@@ -401,16 +699,18 @@ contains
   ! etc. Called from subroutine initialize (init.f90)
   !--------------------------------------------------------------------------
   subroutine init_particles
-    use mpi_interface, only : myid
+    use mpi_interface, only : wrxid, wryid, nxg, nyg, myid, nxprocs, nyprocs
     use grid, only : zm, deltax, deltay, zt,dzi_t
     use grid, only : a_up, a_vp, a_wp
 
     integer :: k, n, ierr, kmax
-    real :: tstart, xstart, ystart, zstart
+    real :: tstart, xstart, ystart, zstart, ysizelocal, xsizelocal
     type (particle_record), pointer:: particle
 
+    xsizelocal = (nxg / nxprocs) * deltax
+    ysizelocal = (nyg / nyprocs) * deltay
     kmax = size(zm)
-  
+
     np = 0
     startfile = 'partstartpos'
     open(ifinput,file=startfile,status='old',position='rewind',action='read')
@@ -423,42 +723,62 @@ contains
     ! read particles from partstartpos, create linked list
     do n = 1, np
       read(ifinput,*) tstart, xstart, ystart, zstart
-
-    ! $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-    ! NEEDS TO BE CHANGED FOR 2D PARALLEL
-    ! $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-      !if (floor(ystart/ysizelocal) == nprocs) ystart = 0.
-      !if (floor(ystart/ysizelocal) == myid) then
-        call add_particle(particle)
-
-        particle%unique = n + myid/1000.0
-        particle%x = xstart/deltax + 3      ! +3 here for ghost cells.
-        particle%y = ystart/deltay + 3      ! +3 here for ghost cells.
-        do k=kmax,1,1
-          if ( zm(k)<zstart ) exit
-        end do
-        particle%z = k + (zstart-zm(k))*dzi_t(k)
-
-        particle%xstart = xstart
-        particle%ystart = ystart
-        particle%zstart = zstart
-        particle%tstart = tstart
-        particle%ures = 0.
-        particle%vres = 0.
-        particle%wres = 0.
-        particle%usgs = 0.
-        particle%vsgs = 0.
-        particle%wsgs = 0.
-        particle%usgs_prev = 0.
-        particle%vsgs_prev = 0.
-        particle%wsgs_prev = 0.
-        particle%x_prev = particle%x
-        particle%y_prev = particle%y
-        particle%z_prev = particle%z
-        particle%partstep = 0
-    !    particle%sigma2_sgs = epsilon(particle%sigma2_sgs)
-    !  !end if
+      if(floor(xstart / xsizelocal) == wrxid) then
+        if(floor(ystart / ysizelocal) == wryid) then
+          print*,wrxid,wryid
+          call add_particle(particle)
+          particle%unique      = n + myid/1000.0
+          particle%x           = (xstart - (float(wrxid) * xsizelocal)) / deltax + 3.  ! +3 here for ghost cells.
+          particle%y           = (ystart - (float(wryid) * ysizelocal)) / deltay + 3.  ! +3 here for ghost cells.
+          do k=kmax,1,1
+            if ( zm(k)<zstart ) exit
+          end do
+          particle%z           = k + (zstart-zm(k))*dzi_t(k)
+          particle%xstart      = xstart
+          particle%ystart      = ystart
+          particle%zstart      = zstart
+          particle%tstart      = tstart
+          particle%ures        = 0.
+          particle%vres        = 0.
+          particle%wres        = 0.
+          particle%usgs        = 0.
+          particle%vsgs        = 0.
+          particle%wsgs        = 0.
+          particle%usgs_prev   = 0.
+          particle%vsgs_prev   = 0.
+          particle%wsgs_prev   = 0.
+          particle%x_prev      = particle%x
+          particle%y_prev      = particle%y
+          particle%z_prev      = particle%z
+          particle%partstep    = 0
+          !particle%sigma2_sgs = epsilon(particle%sigma2_sgs)
+        end if
+      end if
     end do
+
+    ipunique       = 1
+    ipx            = 2
+    ipy            = 3
+    ipz            = 4
+    ipxstart       = 5
+    ipystart       = 6
+    ipzstart       = 7
+    iptsart        = 8
+    ipures         = 9
+    ipvres         = 10
+    ipwres         = 11
+    ipusgs         = 12
+    ipvsgs         = 13
+    ipwsgs         = 14
+    ipusgs_prev    = 15
+    ipvsgs_prev    = 16
+    ipwsgs_prev    = 17
+    ipartstep      = 18
+    ipxprev        = 19
+    ipyprev        = 20
+    ipzprev        = 21
+    nrpartvar      = ipzprev
+
 
     ! Set first dump times
     tnextdump = frqpartdump
