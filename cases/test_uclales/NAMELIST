@@ -1,0 +1,27 @@
+ &model
+  nxp = 36 
+  nyp = 36
+  nzp = 107
+  deltax = 25
+  deltay = 25
+  deltaz = 20
+  nxpart = .true.
+  dzrat = 1.
+  dtlong  = 5.
+  timmax = 18000.
+  runtype= 'INITIAL'
+  hfilin = 'dcbl.rst'
+  filprf = 'dcbl_x'
+  frqanl = 3600.
+  level  = 2
+  th00 = 300.
+  zrand = 20.
+  ps = 1020.0, 5000.,
+  ts = 300.,  320.,
+  rts=   10.,   10.,
+  us =   0.,    0.,
+  vs =  -0.,   -0.,
+  lpartic = .true.
+  lpartdump = .true.
+  frqpartdump = 5 
+/
