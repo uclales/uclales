@@ -452,6 +452,85 @@ contains
 
   !
   !--------------------------------------------------------------------------
+  ! subroutine partbuffer
+  !--------------------------------------------------------------------------
+  !
+  subroutine partbuffer(particle, buffer, n, send)
+    implicit none
+
+    logical,intent(in)                :: send
+    integer,intent(in)                :: n
+    real,dimension(n+1:n+nrpartvar)   :: buffer
+    TYPE (particle_record), POINTER:: particle
+
+    if (send) then
+      buffer(n+ipunique)    = particle%unique
+      buffer(n+ipx)         = particle%x
+      buffer(n+ipy)         = particle%y
+      buffer(n+ipz)         = particle%z
+      buffer(n+ipures)      = particle%ures
+      buffer(n+ipvres)      = particle%vres
+      buffer(n+ipwres)      = particle%wres
+      buffer(n+ipusgs)      = particle%usgs
+      buffer(n+ipvsgs)      = particle%vsgs
+      buffer(n+ipwsgs)      = particle%wsgs
+      buffer(n+ipusgs_prev) = particle%usgs_prev
+      buffer(n+ipvsgs_prev) = particle%vsgs_prev
+      buffer(n+ipwsgs_prev) = particle%wsgs_prev
+      buffer(n+ipxstart)    = particle%xstart
+      buffer(n+ipystart)    = particle%ystart
+      buffer(n+ipzstart)    = particle%zstart
+      buffer(n+iptsart)     = particle%tstart
+      buffer(n+ipartstep)   = particle%partstep
+      buffer(n+ipxprev)     = particle%x_prev
+      buffer(n+ipyprev)     = particle%y_prev
+      buffer(n+ipzprev)     = particle%z_prev
+      
+      !if (intmeth == irk3 .or. lpartsgs) then
+      !   buffer(n+ipxprev) = particle%x_prev
+      !   buffer(n+ipyprev) = particle%y_prev
+      !   buffer(n+ipzprev) = particle%z_prev
+      ! end if
+      ! if (lpartsgs) then
+      !   buffer(n+ipsigma2_sgs)=particle%sigma2_sgs
+      ! end if
+    else
+      particle%unique       = buffer(n+ipunique)
+      particle%x            = buffer(n+ipx)
+      particle%y            = buffer(n+ipy)
+      particle%z            = buffer(n+ipz)
+      particle%ures         = buffer(n+ipures)
+      particle%vres         = buffer(n+ipvres)
+      particle%wres         = buffer(n+ipwres)
+      particle%usgs         = buffer(n+ipusgs)
+      particle%vsgs         = buffer(n+ipvsgs)
+      particle%wsgs         = buffer(n+ipwsgs)
+      particle%usgs_prev    = buffer(n+ipusgs_prev)
+      particle%vsgs_prev    = buffer(n+ipvsgs_prev)
+      particle%wsgs_prev    = buffer(n+ipwsgs_prev)
+      particle%xstart       = buffer(n+ipxstart)
+      particle%ystart       = buffer(n+ipystart)
+      particle%zstart       = buffer(n+ipzstart)
+      particle%tstart       = buffer(n+iptsart)
+      particle%partstep     = buffer(n+ipartstep)
+      particle%x_prev       = buffer(n+ipxprev)
+      particle%y_prev       = buffer(n+ipyprev)
+      particle%z_prev       = buffer(n+ipzprev)
+      
+      !if (intmeth == irk3 .or. lpartsgs) then
+      !  particle%x_prev =  buffer(n+ipxprev)
+      !  particle%y_prev =  buffer(n+ipyprev)
+      !  particle%z_prev =  buffer(n+ipzprev)
+      !end if
+      !if (lpartsgs) then
+      !  particle%sigma2_sgs=buffer(n+ipsigma2_sgs)
+      !end if
+    end if
+
+  end subroutine partbuffer
+
+  !
+  !--------------------------------------------------------------------------
   ! subroutine velocity_ures: trilinear interpolation of u-component
   !--------------------------------------------------------------------------
   !
@@ -779,6 +858,20 @@ contains
     ipzprev        = 21
     nrpartvar      = ipzprev
 
+    !if (lpartsgs) then
+    !  ipuresprev = nrpartvar+1
+    !  ipvresprev = nrpartvar+2
+    !  ipwresprev = nrpartvar+3
+    !  ipxprev = nrpartvar+4
+    !  ipyprev = nrpartvar+5
+    !  ipzprev = nrpartvar+6
+    !  nrpartvar=nrpartvar+6
+    !end if
+
+    !if (lpartsgs) then
+    !  ipsigma2_sgs = nrpartvar + 1
+    !  nrpartvar = nrpartvar + 1
+    !end if
 
     ! Set first dump times
     tnextdump = frqpartdump
