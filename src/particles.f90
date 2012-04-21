@@ -157,12 +157,12 @@ contains
       particle => particle%next
     end do 
 
-    call mpi_sendrecv(nton,1,mpi_integer,ranktable(wrxid,wryid-1),4, &
-                      nfrs,1,mpi_integer,ranktable(wrxid,wryid+1),4, &
+    call mpi_sendrecv(nton,1,mpi_integer,ranktable(wrxid,wryid+1),4, &
+                      nfrs,1,mpi_integer,ranktable(wrxid,wryid-1),4, &
                       mpi_comm_world,status,ierror) 
 
-    call mpi_sendrecv(ntos,1,mpi_integer,ranktable(wrxid,wryid+1),5, &
-                      nfrn,1,mpi_integer,ranktable(wrxid,wryid-1),5, &
+    call mpi_sendrecv(ntos,1,mpi_integer,ranktable(wrxid,wryid-1),5, &
+                      nfrn,1,mpi_integer,ranktable(wrxid,wryid+1),5, &
                       mpi_comm_world,status,ierror) 
 
     !if( nton > 0 ) allocate(buffsend(nrpartvar * nton))
@@ -177,7 +177,7 @@ contains
         if( particle%y >= nyloc + 3 ) then
           
           open(ifoutput2,file='particlelog',position='append',action='write')
-          write(ifoutput2,*) 'toN',tnextdump,particle%unique,particle%x,particle%y,particle%z,ranktable(wrxid,wryid),ranktable(wrxid,wryid-1)
+          write(ifoutput2,*) 'toN',tnextdump,particle%unique,particle%x,particle%y,particle%z,ranktable(wrxid,wryid),ranktable(wrxid,wryid+1)
           close(ifoutput2)
 
           particle%y      = particle%y      - nyloc
@@ -194,8 +194,8 @@ contains
       end do
     end if
 
-    call mpi_sendrecv(buffsend,nrpartvar*nton,mpi_double_precision,ranktable(wrxid,wryid-1),6, &
-                      buffrecv,nrpartvar*nfrs,mpi_double_precision,ranktable(wrxid,wryid+1),6, &
+    call mpi_sendrecv(buffsend,nrpartvar*nton,mpi_double_precision,ranktable(wrxid,wryid+1),6, &
+                      buffrecv,nrpartvar*nfrs,mpi_double_precision,ranktable(wrxid,wryid-1),6, &
                       mpi_comm_world, status, ierror)
 
     ii = 0
@@ -221,7 +221,7 @@ contains
         if( particle%y < 3 ) then
 
           open(ifoutput2,file='particlelog',position='append',action='write')
-          write(ifoutput2,*) 'toS',tnextdump,particle%unique,particle%x,particle%y,particle%z,ranktable(wrxid,wryid),ranktable(wrxid,wryid+1)
+          write(ifoutput2,*) 'toS',tnextdump,particle%unique,particle%x,particle%y,particle%z,ranktable(wrxid,wryid),ranktable(wrxid,wryid-1)
           close(ifoutput2)
           
           particle%y      = particle%y      + nyloc
@@ -240,8 +240,8 @@ contains
 
     end if
 
-    call mpi_sendrecv(buffsend,nrpartvar*ntos,mpi_double_precision,ranktable(wrxid,wryid+1),7, &
-                      buffrecv,nrpartvar*nfrn,mpi_double_precision,ranktable(wrxid,wryid-1),7, &
+    call mpi_sendrecv(buffsend,nrpartvar*ntos,mpi_double_precision,ranktable(wrxid,wryid-1),7, &
+                      buffrecv,nrpartvar*nfrn,mpi_double_precision,ranktable(wrxid,wryid+1),7, &
                       mpi_comm_world, status, ierror)
 
     ii = 0
