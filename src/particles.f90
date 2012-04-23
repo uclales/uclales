@@ -126,10 +126,6 @@ contains
     use mpi_interface, only : wrxid, wryid, ranktable, nxg, nyg, xcomm, ycomm, ierror, mpi_status_size, mpi_integer, mpi_double_precision, mpi_comm_world, nyprocs, nxprocs
     implicit none
 
-    integer :: ifoutput2 = 666
- 
-
-
     type (particle_record), pointer:: particle,ptr
     real, allocatable, dimension(:) :: buffsend, buffrecv
     integer :: status(mpi_status_size)
@@ -175,11 +171,6 @@ contains
       ii = 0
       do while( associated(particle) )
         if( particle%y >= nyloc + 3 ) then
-          
-          open(ifoutput2,file='particlelog',position='append',action='write')
-          write(ifoutput2,*) 'toN',tnextdump,particle%unique,particle%x,particle%y,particle%z,ranktable(wrxid,wryid),ranktable(wrxid,wryid+1)
-          close(ifoutput2)
-
           particle%y      = particle%y      - nyloc
           particle%y_prev = particle%y_prev - nyloc
 
@@ -219,11 +210,6 @@ contains
       ii = 0
       do while( associated(particle) )
         if( particle%y < 3 ) then
-
-          open(ifoutput2,file='particlelog',position='append',action='write')
-          write(ifoutput2,*) 'toS',tnextdump,particle%unique,particle%x,particle%y,particle%z,ranktable(wrxid,wryid),ranktable(wrxid,wryid-1)
-          close(ifoutput2)
-          
           particle%y      = particle%y      + nyloc
           particle%y_prev = particle%y_prev + nyloc
 
@@ -285,11 +271,6 @@ contains
       ii = 0
       do while( associated(particle) )
         if( particle%x >= nxloc + 3 ) then
-          
-          open(ifoutput2,file='particlelog',position='append',action='write')
-          write(ifoutput2,*) 'toE',tnextdump,particle%unique,particle%x,particle%y,particle%z,ranktable(wrxid,wryid),ranktable(wrxid+1,wryid)
-          close(ifoutput2)
-          
           particle%x      = particle%x      - nxloc
           particle%x_prev = particle%x_prev - nxloc
 
@@ -329,11 +310,6 @@ contains
       ii = 0
       do while( associated(particle) )
         if( particle%x < 3 ) then
-
-          open(ifoutput2,file='particlelog',position='append',action='write')
-          write(ifoutput2,*) 'toW',tnextdump,particle%unique,particle%x,particle%y,particle%z,ranktable(wrxid,wryid),ranktable(wrxid-1,wryid)
-          close(ifoutput2)
-          
           particle%x      = particle%x      + nxloc
           particle%x_prev = particle%x_prev + nxloc
 
