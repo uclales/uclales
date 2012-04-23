@@ -53,7 +53,6 @@ module mpi_interface
   integer :: stridetype,xstride,ystride,xystride,xylarry,xyzlarry,&
        fxytype,fxyztype
 
-  integer my_real
   integer ierror
 
 contains
@@ -251,7 +250,6 @@ contains
 
     modx = modulo(nxpg-4,nxprocs)
     mody = modulo(nypg-4,nyprocs)
-
     !
     ! offsets for each processor in x and y directons(nxp x nyp)
     !

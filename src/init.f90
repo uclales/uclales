@@ -47,7 +47,7 @@ contains
     use thrm, only : thermo
     use mcrp, only : initmcrp
     use modcross, only : initcross, triggercross
-    use modparticles, only: init_particles, lpartic
+    use modparticles, only: init_particles, lpartic, lpartdump, initparticledump
 
     implicit none
 
@@ -77,6 +77,7 @@ contains
 
     if (lpartic) then
       call init_particles
+      if(lpartdump) call initparticledump(time)
     end if
 
     ! write analysis and history files from restart if appropriate

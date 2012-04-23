@@ -8,7 +8,7 @@
   nxpart = .true.
   dzrat = 1.
   dtlong  = 5.
-  timmax = 18000.
+  timmax =  900.
   runtype= 'INITIAL'
   hfilin = 'dcbl.rst'
   filprf = 'dcbl_x'

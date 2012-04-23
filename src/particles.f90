@@ -23,7 +23,7 @@ module modparticles
   ! module modparticles: Langrangian particle tracking, ad(o/a)pted from DALES
   !--------------------------------------------------------------------------
   implicit none
-  PUBLIC :: init_particles, particles, exit_particles
+  PUBLIC :: init_particles, particles, exit_particles, initparticledump
 
   ! For/from namelist  
   logical            :: lpartic     = .false.
@@ -37,13 +37,12 @@ module modparticles
 
   ! Particle structure
   type :: particle_record
-    real     :: unique, tstart
-    integer  :: partstep
-    real     :: x, x_prev, ures_prev, xstart, ures, usgs, usgs_prev
-    real     :: y, y_prev, vres_prev, ystart, vres, vsgs, vsgs_prev
-    real     :: z, z_prev, wres_prev, zstart, wres, wsgs, wsgs_prev
-    !real     :: sigma2_sgs
-
+    real             :: unique, tstart
+    integer          :: partstep
+    real             :: x, x_prev, ures_prev, xstart, ures, usgs, usgs_prev
+    real             :: y, y_prev, vres_prev, ystart, vres, vsgs, vsgs_prev
+    real             :: z, z_prev, wres_prev, zstart, wres, wsgs, wsgs_prev
+    !real            :: sigma2_sgs
     type (particle_record), pointer :: next,prev
   end type
 
@@ -54,10 +53,12 @@ module modparticles
   integer            :: ipures, ipvres, ipwres, ipusgs, ipvsgs, ipwsgs, ipusgs_prev, ipvsgs_prev, ipwsgs_prev 
   integer            :: ipures_prev, ipvres_prev, ipwres_prev, ipartstep, nrpartvar
 
+  integer            :: ncpartid, ncpartrec
+
 contains
   !
   !--------------------------------------------------------------------------
-  ! subroutine particles: Main routine, called every .. step
+  ! subroutine particles: Main routine, called every RK3-step
   !--------------------------------------------------------------------------
   !
   subroutine particles(time)
@@ -95,23 +96,19 @@ contains
     particle => particle%next
     end do
     
-    !Time integration
+    ! Time integration
     particle => head
     do while( associated(particle) )
       if ( time - particle%tstart >= 0 ) then
         call rk3(particle)
       end if
 
+    ! Statistics
     if (nstep==3) then
       if(time + dt >= tnextdump) then
-        call writeparticles   ! OLD!
-        call particledump
-
-
+        call particledump(time)
         tnextdump = tnextdump + frqpartdump
       end if
-
-      !call statistics
     end if
 
     particle => particle%next
@@ -122,86 +119,10 @@ contains
 
   end subroutine particles
 
-
   !
   !--------------------------------------------------------------------------
-  ! subroutine initparticledump
-  !--------------------------------------------------------------------------
-  !
-  subroutine initparticledump
-    use modnetcdf,       only : open_nc, addvar_nc
-    use grid,            only : nzp, nxp, tname, tlongname, tunit, filprf
-    implicit none
-    
-  end subroutine initparticledump
-
-  !
-  !--------------------------------------------------------------------------
-  ! subroutine particledump
-  !--------------------------------------------------------------------------
-  !
-  subroutine particledump
-    use mpi_interface, only : mpi_comm_world, myid, mpi_integer, mpi_double_precision, ierror, wrxid, wryid, nxprocs, nyprocs,ranktable, mpi_status_size
-    implicit none
-    type (particle_record), pointer:: particle
-    integer                :: nlocal, ii, i, start
-    integer, allocatable   :: nremote(:)
-    integer                :: status(mpi_status_size)
-    integer                :: nvar = 4       ! id,x,y,z,u,v,w,..,..,..,
-    real, allocatable      :: sendbuff(:), recvbuff(:)
-
-    ! Count local particles
-    nlocal = 0
-    particle => head
-    do while( associated(particle) )
-      nlocal = nlocal + 1
-      particle => particle%next
-    end do
-
-    ! Communicate number of local particles to main proces (0)
-    allocate(nremote(0:(nxprocs*nyprocs)-1))
-    call mpi_gather(nlocal,1,mpi_integer,nremote,1,mpi_integer,0,mpi_comm_world,ierror)
-
-    ! Create buffer
-    allocate(sendbuff(nvar * nlocal))
-    ii = 1
-    particle => head
-    do while( associated(particle) )
-      sendbuff(ii)   = particle%unique
-      sendbuff(ii+1) = particle%x
-      sendbuff(ii+2) = particle%y
-      sendbuff(ii+3) = particle%z
-
-      !print*,sendbuff(ii),sendbuff(ii+1),sendbuff(ii+2),sendbuff(ii+3)
-
-      ii = ii + nvar
-      particle => particle%next
-    end do
-
-    print*,'about to send...'
-
-    call mpi_send(sendbuff,1,mpi_double_precision,0,myid,mpi_comm_world,ierror)
-
-    print*,'did send..'    
-
-    if(myid == 0) then
-      do i = 0,(nxprocs*nyprocs)-1
-        allocate(recvbuff(nremote(i)*nvar))
-        call mpi_recv(recvbuff,1,mpi_double_precision,i,i,mpi_comm_world,status,ierror)   
-        print*,i,recvbuff   
-        deallocate(recvbuff)
-      end do
-    end if
-
-
-    deallocate(nremote)
- 
-  end subroutine particledump
-
-
-  !
-  !--------------------------------------------------------------------------
-  ! subroutine partcomm
+  ! subroutine partcomm : send and receives particles between different
+  !   processes and handles cyclic boundaries
   !--------------------------------------------------------------------------
   !
   subroutine partcomm
@@ -429,7 +350,8 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine partbuffer
+  ! subroutine partbuffer : used to create send/receive buffer for 
+  !   routine partcomm()
   !--------------------------------------------------------------------------
   !
   subroutine partbuffer(particle, buffer, n, send)
@@ -465,15 +387,6 @@ contains
       buffer(n+ipxprev)     = particle%x_prev
       buffer(n+ipyprev)     = particle%y_prev
       buffer(n+ipzprev)     = particle%z_prev
-      
-      !if (intmeth == irk3 .or. lpartsgs) then
-      !   buffer(n+ipxprev) = particle%x_prev
-      !   buffer(n+ipyprev) = particle%y_prev
-      !   buffer(n+ipzprev) = particle%z_prev
-      ! end if
-      ! if (lpartsgs) then
-      !   buffer(n+ipsigma2_sgs)=particle%sigma2_sgs
-      ! end if
     else
       particle%unique       = buffer(n+ipunique)
       particle%x            = buffer(n+ipx)
@@ -499,22 +412,103 @@ contains
       particle%x_prev       = buffer(n+ipxprev)
       particle%y_prev       = buffer(n+ipyprev)
       particle%z_prev       = buffer(n+ipzprev)
-      
-      !if (intmeth == irk3 .or. lpartsgs) then
-      !  particle%x_prev =  buffer(n+ipxprev)
-      !  particle%y_prev =  buffer(n+ipyprev)
-      !  particle%z_prev =  buffer(n+ipzprev)
-      !end if
-      !if (lpartsgs) then
-      !  particle%sigma2_sgs=buffer(n+ipsigma2_sgs)
-      !end if
     end if
 
   end subroutine partbuffer
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine velocity_ures: trilinear interpolation of u-component
+  ! subroutine particledump : communicates all particles to process #0 and
+  !   writes it to NetCDF(4)
+  !--------------------------------------------------------------------------
+  !
+  subroutine particledump(time)
+    use mpi_interface, only : mpi_comm_world, myid, mpi_integer, mpi_double_precision, ierror, nxprocs, nyprocs, mpi_status_size, wrxid, wryid, nxg, nyg
+    use grid,          only : tname, tlongname, tunit, deltax, deltay, dzi_t, zm
+    use modnetcdf,     only : writevar_nc, fillvalue_double
+    implicit none
+
+    real, intent(in)                     :: time
+    type (particle_record), pointer:: particle
+    integer                              :: nlocal, ii, i, start, pid, nparttot, partid
+    integer, allocatable, dimension(:)   :: nremote
+    integer                              :: status(mpi_status_size)
+    integer                              :: nvar = 4       ! id,x,y,z,u,v,w,..,..,..,
+    real, allocatable, dimension(:)      :: sendbuff, recvbuff
+    real, allocatable, dimension(:,:)    :: particles_merged
+
+    ! Count local particles
+    nlocal = 0
+    particle => head
+    do while( associated(particle) )
+      nlocal = nlocal + 1
+      particle => particle%next
+    end do
+
+    ! Communicate number of local particles to main proces (0)
+    allocate(nremote(0:(nxprocs*nyprocs)-1))
+    call mpi_gather(nlocal,1,mpi_integer,nremote,1,mpi_integer,0,mpi_comm_world,ierror)
+
+    ! Create buffer
+    allocate(sendbuff(nvar * nlocal))
+    ii = 1
+    particle => head
+    do while( associated(particle) )
+      sendbuff(ii)   = particle%unique
+      sendbuff(ii+1) = (wrxid * (nxg / nxprocs) + particle%x - 3) * deltax
+      sendbuff(ii+2) = (wryid * (nyg / nyprocs) + particle%y - 3) * deltay
+      sendbuff(ii+3) = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
+      ii = ii + nvar
+      particle => particle%next
+    end do
+
+    ! Dont send when main process
+    if(myid .ne. 0) call mpi_send(sendbuff,nvar*nlocal,mpi_double_precision,0,myid,mpi_comm_world,ierror)
+
+    if(myid .eq. 0) then
+      allocate(particles_merged(np,nvar-1))
+
+      ! Add local particles
+      ii = 1
+      do i=1,nlocal
+        partid = int(sendbuff(ii))
+        particles_merged(partid,1) = sendbuff(ii+1)
+        particles_merged(partid,2) = sendbuff(ii+2)
+        particles_merged(partid,3) = sendbuff(ii+3)
+        ii = ii + nvar 
+      end do 
+
+      ! Add remote particles
+      do pid = 1,(nxprocs*nyprocs)-1
+        allocate(recvbuff(nremote(pid)*nvar))
+        call mpi_recv(recvbuff,nremote(pid)*nvar,mpi_double_precision,pid,pid,mpi_comm_world,status,ierror)   
+        ii = 1
+        do i=1,nremote(pid)
+          partid = int(recvbuff(ii))
+          particles_merged(partid,1) = recvbuff(ii+1)
+          particles_merged(partid,2) = recvbuff(ii+2)
+          particles_merged(partid,3) = recvbuff(ii+3)
+          ii = ii + nvar 
+        end do 
+        deallocate(recvbuff)
+      end do
+
+      ! Write to NetCDF
+      call writevar_nc(ncpartid,tname,time,ncpartrec)
+      call writevar_nc(ncpartid,'x',particles_merged(:,1),ncpartrec)
+      call writevar_nc(ncpartid,'y',particles_merged(:,2),ncpartrec)
+      call writevar_nc(ncpartid,'z',particles_merged(:,3),ncpartrec)
+
+    end if
+    
+    if(myid==0) deallocate(particles_merged)
+    deallocate(nremote, sendbuff)
+ 
+  end subroutine particledump
+
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine velocity_ures : trilinear interpolation of u-component
   !--------------------------------------------------------------------------
   !
   function velocity_ures(x,y,z)
@@ -550,9 +544,11 @@ contains
 
   end function velocity_ures
 
+  !
   !--------------------------------------------------------------------------
-  ! subroutine velocity_vres: trilinear interpolation of v-component
+  ! subroutine velocity_vres : trilinear interpolation of v-component
   !--------------------------------------------------------------------------
+  !
   function velocity_vres(x,y,z)
     use grid, only : a_vp, dzi_m, dzi_t, zt, zm
     implicit none
@@ -585,10 +581,12 @@ contains
     &                (  deltaz) * (  deltay) * (  deltax) *        a_vp(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
 
   end function velocity_vres
-
+  
+  !
   !--------------------------------------------------------------------------
-  ! subroutine velocity_wres: trilinear interpolation of w-component
+  ! subroutine velocity_wres : trilinear interpolation of w-component
   !--------------------------------------------------------------------------
+  !
   function velocity_wres(x,y,z)
     use grid, only : a_wp, dzi_m, dzi_t, zt, zm
     implicit none
@@ -614,9 +612,11 @@ contains
    
   end function velocity_wres
 
+  !
   !--------------------------------------------------------------------------
-  ! subroutine rk3
+  ! subroutine rk3 : Third order Runge-Kutta scheme for spatial integration
   !--------------------------------------------------------------------------
+  !
   subroutine rk3(particle)
     use grid, only : rkalpha, rkbeta, nstep, dt, deltax
     implicit none
@@ -647,9 +647,11 @@ contains
 
   end subroutine rk3
 
+  !
   !--------------------------------------------------------------------------
-  ! subroutine checkbound
+  ! subroutine checkbound : bounces particles of surface and model top
   !--------------------------------------------------------------------------
+  !
   subroutine checkbound(particle)
     use grid, only : nxp, nyp, zm
     implicit none
@@ -680,86 +682,15 @@ contains
   end subroutine checkbound
 
   !--------------------------------------------------------------------------
-  ! subroutine writeparticles -> raw dump of particle field
-  !--------------------------------------------------------------------------
-  subroutine writeparticles
-    use mpi_interface, only : wrxid, wryid, nxg, nyg, myid, nxprocs, nyprocs 
-    use grid, only : deltax, deltay, dzi_t, zm
-    implicit none
-    
-    real, allocatable,dimension (:,:) :: partdata
-    integer(KIND=selected_int_kind(11)), allocatable, dimension (:) :: partids
-    type (particle_record), pointer:: particle
-    integer :: ndata = 3         ! Hardcoded for now
-    integer :: n, m
-    integer :: ifoutput = 99
-    character(3) :: cmyid
-    write(cmyid,'(i3.3)') myid  
- 
-    n = 0
-
-    allocate (partdata(ndata,nplisted))
-    allocate (partids(nplisted))
-
-    particle => head
-    do while( associated(particle) )
-      n = n + 1
-      partids(n) = particle%unique
-
-      if (ndata > 0) then
-         partdata(1,n) = (wrxid * (nxg / nxprocs) + particle%x - 3) * deltax
-      endif
-      if (ndata > 1) then
-         partdata(2,n) = (wryid * (nyg / nyprocs) + particle%y - 3) * deltay
-      endif
-      if (ndata > 2) then
-         partdata(3,n) = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
-      endif
-      !if (ndata > 3) then
-      !   partdata(4,n) = (particle%ures+particle%usgs)*dx
-      !endif
-      !if (ndata > 4) then
-      !   partdata(5,n) = (particle%vres+particle%vsgs)*dy
-      !endif
-      !if (ndata > 5) then
-      !   partdata(6,n) = (particle%wres+particle%wsgs)*dzf(floor(particle%z))
-      !endif
-      !if (ndata > 6) then
-      !   partdata(7,n) = thlpart
-      !endif
-      !if (ndata > 7) then
-      !   partdata(8,n) = thvpart
-      !endif
-      !if (ndata > 8) then
-      !   partdata(9,n) = qtpart * 1000.
-      !endif
-      !if (ndata > 9) then
-      !   partdata(10,n)= qlpart * 1000.
-      !endif
-      particle => particle%next
-    end do
-
-
-
-    ! Shouldn't be here......
-    open(ifoutput,file='particles.'//cmyid,position='append',action='write')
-    write(ifoutput,'(A2,I10,I10)') '# ',tnextdump,nplisted
-    write(ifoutput,'(I10,3F12.5)') (partids(n),(partdata(m,n),m=1,ndata),n=1,nplisted)
-    close(ifoutput) 
-    
-    deallocate (partdata)
-    deallocate (partids)
-
-  end subroutine writeparticles
-
-  !--------------------------------------------------------------------------
   !
   ! BELOW: ONLY INIT / EXIT PARTICLES
   !
   !--------------------------------------------------------------------------
+  !
   ! subroutine init_particles: initialize particles, reading initial position, 
   ! etc. Called from subroutine initialize (init.f90)
   !--------------------------------------------------------------------------
+  !
   subroutine init_particles
     use mpi_interface, only : wrxid, wryid, nxg, nyg, myid, nxprocs, nyprocs
     use grid, only : zm, deltax, deltay, zt,dzi_t
@@ -862,7 +793,7 @@ contains
     !end if
 
     ! Initialize particle dump to NetCDF
-    if(lpartdump) call initparticledump
+    !if(lpartdump) call initparticledump
 
     ! Set first dump times
     tnextdump = frqpartdump
@@ -870,10 +801,12 @@ contains
     close(ifinput)
 
   end subroutine init_particles
-
+  
+  !
   !--------------------------------------------------------------------------
   ! subroutine exit_particles
   !--------------------------------------------------------------------------
+  !
   subroutine exit_particles
     implicit none
 
@@ -884,9 +817,69 @@ contains
   print "(//' ',49('-')/,' ',/,'  Lagrangian particles removed.')"
   end subroutine exit_particles
 
+  !
   !--------------------------------------------------------------------------
-  ! subroutine init_particles: descr
+  ! subroutine initparticledump : creates NetCDF file for particle dump. 
+  !   Called from: init.f90
   !--------------------------------------------------------------------------
+  !
+  subroutine initparticledump(time)
+    use modnetcdf,       only : open_nc, addvar_nc
+    use grid,            only : nzp, nxp, tname, tlongname, tunit, filprf
+    use mpi_interface,   only : myid
+    use grid,            only : tname, tlongname, tunit
+    implicit none
+
+    real, intent(in)                  :: time
+    character (40), dimension(2)      :: dimname, dimlongname, dimunit
+    real, allocatable, dimension(:,:) :: dimvalues
+    integer, dimension(2)             :: dimsize
+    integer                           :: k
+
+    print*,np
+    allocate(dimvalues(np,2))
+
+    dimvalues      = 0
+    do k=1,np
+      dimvalues(k,1) = k
+    end do
+
+    dimname(1)     = 'particle'
+    dimlongname(1) = 'ID of particle'
+    dimunit(1)     = '-'    
+    dimsize(1)     = np
+    dimname(2)     = tname
+    dimlongname(2) = tlongname
+    dimunit(2)     = tunit
+    dimsize(2)     = 0
+ 
+    if(myid == 0) then
+      call open_nc(trim(filprf)//'.particles.nc', ncpartid, ncpartrec, time, .true.)
+      call addvar_nc(ncpartid,'x','x-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartid,'y','y-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartid,'z','z-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues)
+    end if 
+ 
+  end subroutine initparticledump
+
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine exitparticledump
+  !--------------------------------------------------------------------------
+  !
+  subroutine exitparticledump
+    use modnetcdf,       only : close_nc
+    implicit none
+
+    call close_nc(ncpartid)     
+ 
+  end subroutine exitparticledump
+
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine init_particles
+  !--------------------------------------------------------------------------
+  !
   subroutine add_particle(ptr)
     implicit none
     TYPE (particle_record), POINTER:: ptr
@@ -909,10 +902,12 @@ contains
 
   end SUBROUTINE add_particle
 
+  !
   !--------------------------------------------------------------------------
   ! subroutine init_particles: clears pointers to start and end of linked
   ! particle list
   !--------------------------------------------------------------------------
+  !
   subroutine particle_initlist()
     implicit none
 
@@ -921,9 +916,11 @@ contains
     nplisted = 0
   end subroutine particle_initlist
 
+  !
   !--------------------------------------------------------------------------
   ! subroutine delete_particle
   !--------------------------------------------------------------------------
+  !
   subroutine delete_particle(ptr)
     implicit none
     TYPE (particle_record), POINTER:: ptr

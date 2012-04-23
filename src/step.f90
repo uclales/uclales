@@ -65,7 +65,7 @@ contains
     use modcross, only : triggercross, exitcross, lcross
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
-    use modparticles, only : lpartic, exit_particles
+    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
@@ -167,7 +167,10 @@ contains
 
     if (lcross) call exitcross
 
-    if (lpartic) call exit_particles
+    if (lpartic) then
+      call exit_particles
+      if(lpartdump) call exitparticledump
+    end if
 
     iret = close_stat()
 
