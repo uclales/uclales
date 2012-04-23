@@ -55,9 +55,11 @@ module modparticles
   integer            :: ipures_prev, ipvres_prev, ipwres_prev, ipartstep, nrpartvar
 
 contains
+  !
   !--------------------------------------------------------------------------
   ! subroutine particles: Main routine, called every .. step
   !--------------------------------------------------------------------------
+  !
   subroutine particles(time)
     use grid, only : deltax, deltay, nstep, dzi_t, dt
     implicit none
@@ -102,7 +104,10 @@ contains
 
     if (nstep==3) then
       if(time + dt >= tnextdump) then
-        call writeparticles
+        call writeparticles   ! OLD!
+        call particledump
+
+
         tnextdump = tnextdump + frqpartdump
       end if
 
@@ -116,6 +121,83 @@ contains
     call partcomm
 
   end subroutine particles
+
+
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine initparticledump
+  !--------------------------------------------------------------------------
+  !
+  subroutine initparticledump
+    use modnetcdf,       only : open_nc, addvar_nc
+    use grid,            only : nzp, nxp, tname, tlongname, tunit, filprf
+    implicit none
+    
+  end subroutine initparticledump
+
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine particledump
+  !--------------------------------------------------------------------------
+  !
+  subroutine particledump
+    use mpi_interface, only : mpi_comm_world, myid, mpi_integer, mpi_double_precision, ierror, wrxid, wryid, nxprocs, nyprocs,ranktable, mpi_status_size
+    implicit none
+    type (particle_record), pointer:: particle
+    integer                :: nlocal, ii, i, start
+    integer, allocatable   :: nremote(:)
+    integer                :: status(mpi_status_size)
+    integer                :: nvar = 4       ! id,x,y,z,u,v,w,..,..,..,
+    real, allocatable      :: sendbuff(:), recvbuff(:)
+
+    ! Count local particles
+    nlocal = 0
+    particle => head
+    do while( associated(particle) )
+      nlocal = nlocal + 1
+      particle => particle%next
+    end do
+
+    ! Communicate number of local particles to main proces (0)
+    allocate(nremote(0:(nxprocs*nyprocs)-1))
+    call mpi_gather(nlocal,1,mpi_integer,nremote,1,mpi_integer,0,mpi_comm_world,ierror)
+
+    ! Create buffer
+    allocate(sendbuff(nvar * nlocal))
+    ii = 1
+    particle => head
+    do while( associated(particle) )
+      sendbuff(ii)   = particle%unique
+      sendbuff(ii+1) = particle%x
+      sendbuff(ii+2) = particle%y
+      sendbuff(ii+3) = particle%z
+
+      !print*,sendbuff(ii),sendbuff(ii+1),sendbuff(ii+2),sendbuff(ii+3)
+
+      ii = ii + nvar
+      particle => particle%next
+    end do
+
+    print*,'about to send...'
+
+    call mpi_send(sendbuff,1,mpi_double_precision,0,myid,mpi_comm_world,ierror)
+
+    print*,'did send..'    
+
+    if(myid == 0) then
+      do i = 0,(nxprocs*nyprocs)-1
+        allocate(recvbuff(nremote(i)*nvar))
+        call mpi_recv(recvbuff,1,mpi_double_precision,i,i,mpi_comm_world,status,ierror)   
+        print*,i,recvbuff   
+        deallocate(recvbuff)
+      end do
+    end if
+
+
+    deallocate(nremote)
+ 
+  end subroutine particledump
+
 
   !
   !--------------------------------------------------------------------------
@@ -659,7 +741,7 @@ contains
 
 
 
-
+    ! Shouldn't be here......
     open(ifoutput,file='particles.'//cmyid,position='append',action='write')
     write(ifoutput,'(A2,I10,I10)') '# ',tnextdump,nplisted
     write(ifoutput,'(I10,3F12.5)') (partids(n),(partdata(m,n),m=1,ndata),n=1,nplisted)
@@ -706,7 +788,7 @@ contains
       if(floor(xstart / xsizelocal) == wrxid) then
         if(floor(ystart / ysizelocal) == wryid) then
           call add_particle(particle)
-          particle%unique      = n + myid/1000.0
+          particle%unique      = n !+ myid/1000.0
           particle%x           = (xstart - (float(wrxid) * xsizelocal)) / deltax + 3.  ! +3 here for ghost cells.
           particle%y           = (ystart - (float(wryid) * ysizelocal)) / deltay + 3.  ! +3 here for ghost cells.
           do k=kmax,1,1
@@ -778,6 +860,9 @@ contains
     !  ipsigma2_sgs = nrpartvar + 1
     !  nrpartvar = nrpartvar + 1
     !end if
+
+    ! Initialize particle dump to NetCDF
+    if(lpartdump) call initparticledump
 
     ! Set first dump times
     tnextdump = frqpartdump
