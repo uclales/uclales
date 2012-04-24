@@ -79,7 +79,7 @@ contains
   subroutine open_nc(fname, ncid,nrec, rtimee, ldelete)
     use grid,   only : tname
     use netcdf, only : nf90_create, nf90_open, nf90_inquire, nf90_inquire_dimension, &
-                       nf90_inq_varid, nf90_get_var, nf90_put_var, nf90_sync, nf90_share, &
+                       nf90_inq_varid, nf90_get_var, nf90_put_var, nf90_sync, nf90_hdf5, &
                        nf90_write, nf90_noerr, nf90_inquire_variable, nf90_short
     integer, intent (out)          :: ncid   !< NetCDF file number
     integer, intent (out),optional :: nrec   !< The record number that corresponds to the current simulation time
@@ -109,7 +109,7 @@ contains
     ncall = 0
     if (.not.exists) then ! Write the header of the file, and ensure we're in data mode
       call date_and_time(date,time)
-      iret = nf90_create(fname,NF90_SHARE,ncid)
+      iret = nf90_create(fname,NF90_HDF5,ncid)
       if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
       iret = putatt_nc(ncid, 'title', trim(fname))
       if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
@@ -230,7 +230,7 @@ contains
 !> Add a variable to a NetCDF file. The procedure checks whether the variable(name) is already present,
 !! and if not, adds it to the file. The same holds for the dimension(names) of the variable.
   subroutine addvar_nc(ncID, name, lname, unit, dimname, dimlongname, dimunit, dimsize, dimvalues, icompress, datamin, datamax)
-    use netcdf, only : nf90_def_var, nf90_inq_varid, nf90_float, nf90_short, nf90_double, nf90_noerr!, nf90_def_var_deflate
+    use netcdf, only : nf90_def_var, nf90_inq_varid, nf90_float, nf90_short, nf90_double, nf90_noerr, nf90_def_var_deflate
     integer, intent (in)                              :: ncID        !< NetCDF file number
     character (*), intent (in)                        :: name        !< Netcdf name of the variable
     character (*), intent (in)                        :: lname       !< Longname of the variable
@@ -278,14 +278,14 @@ contains
       case default
         datatype = NF90_FLOAT
       end select
-      iret=nf90_def_var(ncID, trim(validate(name)), datatype, ncdim,VarID)!, deflate_level = deflate_level)
+      iret=nf90_def_var(ncID, trim(validate(name)), datatype, ncdim,VarID, deflate_level = deflate_level)
       if (iret/=0) then
         write (*,*) 'Variable ',trim(name), ncdim
         call nchandle_error(ncid, iret)
       end if
-      !if (nrdim > 2 .and. deflate_level > 0) then
-      !  iret=nf90_def_var_deflate(ncid, varid, 0, 1, deflate_level = deflate_level)
-      !end if
+      if (nrdim > 2 .and. deflate_level > 0) then
+        iret=nf90_def_var_deflate(ncid, varid, 0, 1, deflate_level = deflate_level)
+      end if
       iret = putatt_nc(ncID, 'longname', lname, trim(name))
       if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
       iret = putatt_nc(ncID, 'units', unit, trim(name))
