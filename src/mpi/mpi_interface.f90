@@ -45,7 +45,7 @@ module mpi_interface
   integer, allocatable, dimension(:) :: xoffset, yoffset, nxpa, nypa, &
        nynza, nxnza
 
-  ! these are the parameters used in the alltoallw call in the fft
+  ! these are the parameters used in the alltoallw2 call in the fft
 
   integer, allocatable, dimension(:,:) :: ranktable,xtype,ytype,xdisp,&
        ydisp,xcount,ycount
@@ -324,7 +324,6 @@ contains
 
     integer :: nx, ny, i, j, k, ii, jj, ierr, cnt, typesize,nynzg, nxnzg
 
-
     nx = max(1,nxp-4)
     ny = max(1,nyp-4)
     nxg=nxpg-4
@@ -526,15 +525,15 @@ contains
   end subroutine appl_finalize
 
   subroutine xshuffle(a,atmp,nx,ny,nz,isign)
-
+  implicit none
     integer, intent(in):: nx,ny,nz,isign
     complex, intent(inout):: a(nx,ny,nz),atmp((nx+1)*(ny+1)*(nz+1))
     integer ierr,ll,i,j,k
 
     if(isign .eq. 1) then
        if(nxprocs .ne. 1)then
-          call mpi_alltoallw( a,xcount(0:,1) , xdisp(0:,1), xtype(0:,1), atmp, &
-               xcount(0:,2), xdisp(0:,2),xtype(0:,2),xcomm,ierr)
+          call mpi_alltoallw( a,xcount(0 ,1) , xdisp(0 ,1), xtype(0 ,1), atmp, &
+               xcount(0 ,2), xdisp(0 ,2),xtype(0 ,2),xcomm,ierr)
        else
           ll=0
           do k=1,nz
@@ -549,8 +548,8 @@ contains
        endif
     else
        if(nxprocs .ne. 1)then
-          call mpi_alltoallw(atmp,xcount(0:,2),xdisp(0:,2),xtype(0:,2),a, &
-               xcount(0:,1), xdisp(0:,1),xtype(0:,1),xcomm,ierr)
+          call mpi_alltoallw(atmp,xcount(0 ,2),xdisp(0 ,2),xtype(0 ,2),a, &
+               xcount(0 ,1), xdisp(0 ,1),xtype(0 ,1),xcomm,ierr)
        else
           ll=0
           do k=1,nz
@@ -568,15 +567,15 @@ contains
   end subroutine xshuffle
 
   subroutine yshuffle(a,atmp,nx,ny,nz,isign)
-
+    implicit none
     integer, intent(in):: nx,ny,nz,isign
     complex, intent(inout):: a(ny,nx,nz),atmp((nx+1)*(ny+1)*(nz+1))
     integer ierr,ll,i,j,k
 
     if(isign .eq. 1) then
        if(nyprocs .ne. 1)then
-          call mpi_alltoallw( a,ycount(0:,1),ydisp(0:,1),ytype(0:,1),atmp, &
-               ycount(0:,2),ydisp(0:,2),ytype(0:,2),ycomm,ierr)
+          call mpi_alltoallw( a,ycount(0 ,1),ydisp(0 ,1),ytype(0 ,1),atmp, &
+               ycount(0 ,2),ydisp(0 ,2),ytype(0 ,2),ycomm,ierr)
        else
           ll=0
           do k=1,nz
@@ -590,8 +589,8 @@ contains
        endif
     else
        if(nyprocs .ne. 1)then
-          call mpi_alltoallw(atmp,ycount(0:,2),ydisp(0:,2),ytype(0:,2),a, &
-               ycount(0:,1),ydisp(0:,1),ytype(0:,1),ycomm,ierr)
+          call mpi_alltoallw(atmp,ycount(0 ,2),ydisp(0 ,2),ytype(0 ,2),a, &
+               ycount(0,1),ydisp(0,1),ytype(0,1),ycomm,ierr)
        else
           ll=0
           do k=1,nz
