@@ -101,7 +101,12 @@ module grid
        a_ngrp,   a_ngrt,    &
        a_rhailp, a_rhailt,  & ! hail
        a_nhailp, a_nhailt, a_rct, a_cld, a_cvrxp, a_cvrxt
- 
+ ! linda,b, output of tendencies
+  real, dimension (:,:,:), allocatable :: &
+        mp_qt, mp_qr, mp_qi, mp_qs, mp_qg, mp_qh, &
+        mp_nqt, mp_nqr, mp_nqi, mp_nqs, mp_nqg, mp_nqh, &
+        mp_tlt
+! linda, e 
 
   character(40)      :: zname      = 'zt'
   character(40)      :: zhname     = 'zm'
@@ -337,8 +342,40 @@ contains
 
     shls(:)=0.
     lhls(:)=0.
-!linda,e
 
+    if (level >= 5) then
+       allocate(mp_qt(nzp,nxp,nyp))
+       allocate(mp_qr(nzp,nxp,nyp))
+       allocate(mp_qi(nzp,nxp,nyp))
+       allocate(mp_qs(nzp,nxp,nyp))
+       allocate(mp_qg(nzp,nxp,nyp))
+       allocate(mp_qh(nzp,nxp,nyp))
+       allocate(mp_nqt(nzp,nxp,nyp))
+       allocate(mp_nqr(nzp,nxp,nyp))
+       allocate(mp_nqi(nzp,nxp,nyp))
+       allocate(mp_nqs(nzp,nxp,nyp))
+       allocate(mp_nqg(nzp,nxp,nyp))
+       allocate(mp_nqh(nzp,nxp,nyp))
+       allocate(mp_tlt(nzp,nxp,nyp))
+
+       memsize = memsize + 13.*nxyzp
+
+       mp_qt(:,:,:) = 0.
+       mp_qr(:,:,:) = 0.
+       mp_qi(:,:,:) = 0.
+       mp_qs(:,:,:) = 0.
+       mp_qh(:,:,:) = 0.
+       mp_qg(:,:,:) = 0.
+       mp_nqt(:,:,:) = 0.
+       mp_nqr(:,:,:) = 0.
+       mp_nqi(:,:,:) = 0.
+       mp_nqs(:,:,:) = 0.
+       mp_nqg(:,:,:) = 0.
+       mp_nqh(:,:,:) = 0.
+       mp_tlt(:,:,:) = 0.
+
+    end if
+!linda,e
     if(myid == 0) then
        print "(//' ',49('-')/,' ',/3x,i3.3,' prognostic scalars')", nscl
        print "('   memory to be allocated  -  ',f8.3,' mbytes')", &
