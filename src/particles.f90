@@ -27,7 +27,8 @@ module modparticles
 
   ! For/from namelist  
   logical            :: lpartic     = .false.
-  logical            :: lpartdump   = .true.
+  logical            :: lpartsgs    = .true.
+  logical            :: lpartdump   = .false.
   real               :: frqpartdump = 5
 
   character(30)      :: startfile
@@ -55,6 +56,8 @@ module modparticles
 
   integer            :: ncpartid, ncpartrec
 
+  real, allocatable, dimension(:,:,:) :: sgstke
+
 contains
   !
   !--------------------------------------------------------------------------
@@ -62,14 +65,46 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine particles(time)
-    use grid, only : deltax, deltay, nstep, dzi_t, dt
+    use grid, only : deltax, deltay, nstep, dzi_t, dt, a_km, nzp
+    use mpi_interface, only : nxg, nyg
     implicit none
     real, intent(in)               :: time
     type (particle_record), pointer:: particle
+    integer :: i,j,k
+    real, allocatable, dimension(:) :: sgstke_prof
 
     if ( np < 1 ) return      ! Just to be sure..
-    !if (lpartsgs) call sgsinit
 
+    if (lpartsgs) then
+      call calc_sgstke
+      !call sgsinit
+    end if
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! DEBUG
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !print*,sgstke(2,10,10)
+    !if(time > 3600) then
+    !  allocate(sgstke_prof(nzp))
+    !  sgstke_prof = 0.
+    !  do j=1,nyg
+    !     do i=1,nxg
+    !        do k=1,nzp
+    !          sgstke_prof(k) = sgstke_prof(k) + sgstke(k,i,j)
+    !        end do
+    !     end do
+    !  end do
+
+    !  sgstke_prof = sgstke_prof / (nxg * nyg)
+    !  
+    !  do k=1,nzp
+    !    print*,k,sgstke_prof(k)
+    !  end do
+    !  
+    !  stop
+    !end if
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
     particle => head
     do while( associated(particle) )
       if (  time - particle%tstart >= 0 ) then
@@ -105,7 +140,7 @@ contains
 
     ! Statistics
     if (nstep==3) then
-      if(time + dt >= tnextdump) then
+      if((time + dt > tnextdump) .and. lpartdump) then
         call particledump(time)
         tnextdump = tnextdump + frqpartdump
       end if
@@ -118,6 +153,38 @@ contains
     call partcomm
 
   end subroutine particles
+
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine calc_sgstke : estimates SGS-TKE from eddy diffusivity Km
+  !   or dissipation (a_scr7)
+  !--------------------------------------------------------------------------
+  !
+  subroutine calc_sgstke
+    use grid, only             : a_km, nzp, zm, dxi, dyi, a_scr7
+    use mpi_interface, only    : nxg, nyg 
+    use defs, only             : pi, vonk
+    implicit none
+    
+    real                       :: labda0, labda, ceps
+    integer                    :: i,j,k
+    real, parameter            :: alpha = 1.5
+
+    ! Doesn't take grid stretching into account? (see sgsm.f90)
+    labda0 = (zm(2)/dxi/dyi)**0.333333333
+
+    do j=1,nyg
+       do i=1,nxg
+          do k=1,nzp
+            labda            = (1. / ((1. / labda0**2.) + (1. / (0.4 * (zm(k) + 0.0001)**2.))))**0.5
+            ceps             = 0.19 + 0.51 * (labda / labda0)
+            sgstke(k,i,j)    = (a_scr7(k,i,j) * (labda / ceps))**(0.66666666666666666)           
+            !sgstke(k,i,j)    = (a_km(k,i,j) / ((delta * (3.5 / (2. * pi)) * (1.5 * alpha)**(-1.5))))**2.        
+          end do
+       end do
+    end do
+
+  end subroutine calc_sgstke
 
   !
   !--------------------------------------------------------------------------
@@ -693,16 +760,18 @@ contains
   !
   subroutine init_particles
     use mpi_interface, only : wrxid, wryid, nxg, nyg, myid, nxprocs, nyprocs
-    use grid, only : zm, deltax, deltay, zt,dzi_t
+    use grid, only : zm, deltax, deltay, zt,dzi_t, nzp
     use grid, only : a_up, a_vp, a_wp
 
     integer :: k, n, ierr, kmax
-    real :: tstart, xstart, ystart, zstart, ysizelocal, xsizelocal
+    real :: tstart, xstart, ystart, zstart, ysizelocal, xsizelocal, firststart
     type (particle_record), pointer:: particle
 
     xsizelocal = (nxg / nxprocs) * deltax
     ysizelocal = (nyg / nyprocs) * deltay
     kmax = size(zm)
+
+    firststart = 1e9
 
     np = 0
     startfile = 'partstartpos'
@@ -747,6 +816,9 @@ contains
           particle%z_prev      = particle%z
           particle%partstep    = 0
           !particle%sigma2_sgs = epsilon(particle%sigma2_sgs)
+
+          if(tstart < firststart) firststart = tstart
+
         end if
       end if
     end do
@@ -796,9 +868,12 @@ contains
     !if(lpartdump) call initparticledump
 
     ! Set first dump times
-    tnextdump = frqpartdump
-
+    tnextdump = firststart !frqpartdump
+    print*,'----------->',tnextdump
     close(ifinput)
+
+    ! Allocate field for calculation of SGS-TKE
+    allocate(sgstke(nzp,nxg,nyg))
 
   end subroutine init_particles
   
@@ -814,6 +889,8 @@ contains
       call delete_particle(tail)
     end do
 
+    deallocate(sgstke)
+
   print "(//' ',49('-')/,' ',/,'  Lagrangian particles removed.')"
   end subroutine exit_particles
 
@@ -825,7 +902,7 @@ contains
   !
   subroutine initparticledump(time)
     use modnetcdf,       only : open_nc, addvar_nc
-    use grid,            only : nzp, nxp, tname, tlongname, tunit, filprf
+    use grid,            only : nzp, tname, tlongname, tunit, filprf
     use mpi_interface,   only : myid
     use grid,            only : tname, tlongname, tunit
     implicit none
