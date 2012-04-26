@@ -167,7 +167,7 @@ contains
     if (.not.Initialized) stop 'TERMINATING: Cloud not Initialized'
 
     do k = 1, nv
-       cwmks = pcw(k)*1.e-3
+       cwmks = pcw(k)*1.e-3!convert to m to km
        if ( cwmks .ge. 1.e-8) then
           j = 0
           do while (j<nsizes .and. pre(k) > re(j+1))
@@ -227,8 +227,8 @@ contains
     if (.not.iceInitialized) stop 'TERMINATING: Ice not Initialized'
 
     do k = 1, nv
-       cwmks = pci(k)*1.e-3
-       if ( (cwmks .ge. 1.e-8).and.(pde(k).gt.0.)) then
+       cwmks = pci(k)!here we don't need the factor 1000
+       if ( (cwmks .ge. 1.e-5).and.(pde(k).gt.0.)) then
 	     fw1 = pde(k)
 	     fw2 = fw1 * pde(k)
 	     fw3 = fw2 * pde(k)
@@ -312,7 +312,7 @@ contains
     y3 = 7.0 * x3
     y4 = 9.0 * x4
     do i = 1, nv
-       cwmks = pcg(i)*1.e-3
+       cwmks = pcg(i)*1.e-3! convert to km
        if ( cwmks .lt. 1.0e-8 ) then
           tgr(i) = 0.0
           wgr(i) = 0.0
