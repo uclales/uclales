@@ -251,31 +251,63 @@ contains
              end if
           end do
        end do     
-          !
-          ! calculate the ratio of slopes
-          !
+       !
+       ! calculate the ratio of slopes
+       !
        select case (lmtr)
        case (1) ! minmod
           do k = 2, n1-1 
              do i = 2,n2-2
+                gamma = int(-sign(1.,cfl(i,k)))
+                if (abs(scr(i,k) - scp0(k,i,j)) > spacing(scr(i,k))) then
+                   i2 = i+gamma
+                   i1 = i+gamma+1
+                   r(i,k) = (scp0(k,i1,j)-scp0(k,i2,j))/(scr(i,k)-scp0(k,i,j))
+                else
+                   r(i,k) = 0.
+                endif
                 C(i,k) = max(0., min(1., r(i,k)))
              enddo
           enddo
        case(2)  ! superbee
           do k = 2, n1-1 
              do i = 2,n2-2
+                gamma = int(-sign(1.,cfl(i,k)))
+                if (abs(scr(i,k) - scp0(k,i,j)) > spacing(scr(i,k))) then
+                   i2 = i+gamma
+                   i1 = i+gamma+1
+                   r(i,k) = (scp0(k,i1,j)-scp0(k,i2,j))/(scr(i,k)-scp0(k,i,j))
+                else
+                   r(i,k) = 0.
+                endif
                 C(i,k) = max(0., min(1., 2.*r(i,k)), min(2., r(i,k)))
              enddo
           enddo
        case(3)  ! mc
           do k = 2, n1-1 
              do i = 2,n2-2
+                gamma = int(-sign(1.,cfl(i,k)))
+                if (abs(scr(i,k) - scp0(k,i,j)) > spacing(scr(i,k))) then
+                   i2 = i+gamma
+                   i1 = i+gamma+1
+                   r(i,k) = (scp0(k,i1,j)-scp0(k,i2,j))/(scr(i,k)-scp0(k,i,j))
+                else
+                   r(i,k) = 0.
+                endif
                 C(i,k) = max(0., min(2.*r(i,k),(1.+r(i,k))/2., 2.))
              enddo
           enddo
        case(4)  ! van Leer
           do k = 2, n1-1 
              do i = 2,n2-2
+                gamma = int(-sign(1.,cfl(i,k)))
+                if (abs(scr(i,k) - scp0(k,i,j)) > spacing(scr(i,k))) then
+                   i2 = i+gamma
+                   i1 = i+gamma+1
+                   r(i,k) = (scp0(k,i1,j)-scp0(k,i2,j))/(scr(i,k)-scp0(k,i,j))
+                else
+                   r(i,k) = 0.
+                endif
                 C(i,k) = (r(i,k) + abs(r(i,k)))/(1. + abs(r(i,k)))
              enddo
           enddo
@@ -288,15 +320,6 @@ contains
        end select
        do k = 2, n1-1 
           do i = 2,n2-2
-             gamma = int(-sign(1.,cfl(i,k)))
-             if (abs(scr(i,k) - scp0(k,i,j)) > spacing(scr(i,k))) then
-                i2 = i+gamma
-                i1 = i+gamma+1
-                r(i,k) = (scp0(k,i1,j)-scp0(k,i2,j))/(scr(i,k)-scp0(k,i,j))
-             else
-                r(i,k) = 0.
-             endif
-
              scr(i,k) = 0.5 * u(k,i,j) * (scr(i,k)+scp0(k,i,j)) -      &
                   0.5 * (scr(i,k)-scp0(k,i,j)) *                        &
                   ((1.-C(i,k))*abs(u(k,i,j)) + u(k,i,j)*cfl(i,k)*C(i,k))
@@ -304,7 +327,7 @@ contains
 
           do i = 3,n2-2
              scp(k,i,j) = scp(k,i,j) - ((scr(i,k)-scr(i-1,k)) -         &
-                  scp0(k,i,j)*(u(k,i,j)-u(k,i-1,j)))*dt*dxi
+                     scp0(k,i,j)*(u(k,i,j)-u(k,i-1,j)))*dt*dxi
           enddo
        enddo
 
@@ -356,24 +379,56 @@ contains
        case (1) ! minmod
           do k = 2, n1-1 
              do j = 2,n3-2
+                gamma = int(-sign(1.,cfl(j,k)))
+                if (abs(scr(j,k) - scp0(k,i,j)) > spacing(scr(j,k))) then
+                   j2 = j+gamma
+                   j1 = j+gamma+1
+                   r(j,k) = (scp0(k,i,j1)-scp0(k,i,j2))/(scr(j,k)-scp0(k,i,j))
+                else
+                   r(j,k) = 0.
+                endif
                 C(j,k) = max(0., min(1., r(j,k)))
              enddo
-          enddo
+           enddo
        case(2)  ! superbee
           do k = 2, n1-1 
              do j = 2,n3-2
+                gamma = int(-sign(1.,cfl(j,k)))
+                if (abs(scr(j,k) - scp0(k,i,j)) > spacing(scr(j,k))) then
+                   j2 = j+gamma
+                   j1 = j+gamma+1
+                   r(j,k) = (scp0(k,i,j1)-scp0(k,i,j2))/(scr(j,k)-scp0(k,i,j))
+                else
+                   r(j,k) = 0.
+                endif
                 C(j,k) = max(0., min(1., 2.*r(j,k)), min(2., r(j,k)))
              enddo
           enddo
        case(3)  ! mc
           do k = 2, n1-1 
              do j = 2,n3-2
+                gamma = int(-sign(1.,cfl(j,k)))
+                if (abs(scr(j,k) - scp0(k,i,j)) > spacing(scr(j,k))) then
+                   j2 = j+gamma
+                   j1 = j+gamma+1
+                   r(j,k) = (scp0(k,i,j1)-scp0(k,i,j2))/(scr(j,k)-scp0(k,i,j))
+                else
+                   r(j,k) = 0.
+                endif
                 C(j,k) = max(0., min(2.*r(j,k),(1.+r(j,k))/2., 2.))
              enddo
           enddo
        case(4)  ! van Leer
           do k = 2, n1-1 
              do j = 2,n3-2
+                gamma = int(-sign(1.,cfl(j,k)))
+                if (abs(scr(j,k) - scp0(k,i,j)) > spacing(scr(j,k))) then
+                   j2 = j+gamma
+                   j1 = j+gamma+1
+                   r(j,k) = (scp0(k,i,j1)-scp0(k,i,j2))/(scr(j,k)-scp0(k,i,j))
+                else
+                   r(j,k) = 0.
+                endif
                 C(j,k) = (r(j,k) + abs(r(j,k)))/(1. + abs(r(j,k)))
              enddo
           enddo
@@ -387,14 +442,6 @@ contains
 
        do k = 2, n1-1 
           do j = 2,n3-2
-             gamma = int(-sign(1.,cfl(j,k)))
-             if (abs(scr(j,k) - scp0(k,i,j)) > spacing(scr(j,k))) then
-                j2 = j+gamma
-                j1 = j+gamma+1
-                r(j,k) = (scp0(k,i,j1)-scp0(k,i,j2))/(scr(j,k)-scp0(k,i,j))
-             else
-                r(j,k) = 0.
-             endif
 
              scr(j,k) = 0.5 * v(k,i,j) * (scr(j,k)+scp0(k,i,j)) -      &
                   0.5 * (scr(j,k)-scp0(k,i,j)) *                        &
