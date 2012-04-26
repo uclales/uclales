@@ -106,7 +106,7 @@ module radiation
                if (present(ice)) then
                  piwc(kk) = 1000.*dn0(k)*ice(k,i,j)
                  if (nice(k,i,j).gt.0.0) then
-                    pde(kk)  = 1.e6*(piwc(kk)/(1000.*pri*nice(k,i,j)))**(1./3.)
+                    pde(kk)  = 1.e6*(piwc(kk)/(1000.*pri*nice(k,i,j)*dn0(k)))**(1./3.)
                     reff(k,i,j)=pde(kk)
                     pde(kk)=min(max(pde(kk),20.),180.)
                  else
