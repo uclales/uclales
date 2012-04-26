@@ -8,7 +8,7 @@
   nxpart = .true.
   dzrat = 1.
   dtlong  = 5.
-  timmax = 21600 
+  timmax = 90 
   runtype= 'INITIAL'
   hfilin = 'dcbl.rst'
   filprf = 'dcbl_x'
@@ -23,5 +23,6 @@
   vs =  -0.,   -0.,
   lpartic = .true.
   lpartdump = .true.
-  frqpartdump = 1800 
+  lpartdumpui = .false.
+  frqpartdump = 10 
 /

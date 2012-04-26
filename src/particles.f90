@@ -27,9 +27,10 @@ module modparticles
 
   ! For/from namelist  
   logical            :: lpartic     = .false.
-  logical            :: lpartsgs    = .true.
+  logical            :: lpartsgs    = .false.
   logical            :: lpartdump   = .false.
-  real               :: frqpartdump = 5
+  logical            :: lpartdumpui = .false.
+  real               :: frqpartdump = 3600
 
   character(30)      :: startfile
   integer            :: ifinput     = 1
@@ -500,9 +501,12 @@ contains
     integer                              :: nlocal, ii, i, start, pid, nparttot, partid
     integer, allocatable, dimension(:)   :: nremote
     integer                              :: status(mpi_status_size)
-    integer                              :: nvar = 4       ! id,x,y,z,u,v,w,..,..,..,
+    integer                              :: nvar
     real, allocatable, dimension(:)      :: sendbuff, recvbuff
     real, allocatable, dimension(:,:)    :: particles_merged
+
+    nvar = 4                           ! id,x,y,z
+    if(lpartdumpui) nvar = nvar + 3    ! u,v,w
 
     ! Count local particles
     nlocal = 0
@@ -525,6 +529,11 @@ contains
       sendbuff(ii+1) = (wrxid * (nxg / nxprocs) + particle%x - 3) * deltax
       sendbuff(ii+2) = (wryid * (nyg / nyprocs) + particle%y - 3) * deltay
       sendbuff(ii+3) = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
+      if(lpartdumpui) then
+        sendbuff(ii+4) = particle%ures
+        sendbuff(ii+5) = particle%vres
+        sendbuff(ii+6) = particle%wres
+      end if
       ii = ii + nvar
       particle => particle%next
     end do
@@ -542,6 +551,11 @@ contains
         particles_merged(partid,1) = sendbuff(ii+1)
         particles_merged(partid,2) = sendbuff(ii+2)
         particles_merged(partid,3) = sendbuff(ii+3)
+        if(lpartdumpui) then
+          particles_merged(partid,4) = sendbuff(ii+4)
+          particles_merged(partid,5) = sendbuff(ii+5)
+          particles_merged(partid,6) = sendbuff(ii+6)
+        end if
         ii = ii + nvar 
       end do 
 
@@ -555,6 +569,11 @@ contains
           particles_merged(partid,1) = recvbuff(ii+1)
           particles_merged(partid,2) = recvbuff(ii+2)
           particles_merged(partid,3) = recvbuff(ii+3)
+          if(lpartdumpui) then
+            particles_merged(partid,4) = recvbuff(ii+4)
+            particles_merged(partid,5) = recvbuff(ii+5)
+            particles_merged(partid,6) = recvbuff(ii+6)
+          end if
           ii = ii + nvar 
         end do 
         deallocate(recvbuff)
@@ -565,7 +584,11 @@ contains
       call writevar_nc(ncpartid,'x',particles_merged(:,1),ncpartrec)
       call writevar_nc(ncpartid,'y',particles_merged(:,2),ncpartrec)
       call writevar_nc(ncpartid,'z',particles_merged(:,3),ncpartrec)
-
+      if(lpartdumpui) then
+        call writevar_nc(ncpartid,'u',particles_merged(:,4),ncpartrec)
+        call writevar_nc(ncpartid,'v',particles_merged(:,5),ncpartrec)
+        call writevar_nc(ncpartid,'w',particles_merged(:,6),ncpartrec)
+      end if
     end if
     
     if(myid==0) deallocate(particles_merged)
@@ -913,7 +936,6 @@ contains
     integer, dimension(2)             :: dimsize
     integer                           :: k
 
-    print*,np
     allocate(dimvalues(np,2))
 
     dimvalues      = 0
@@ -935,6 +957,11 @@ contains
       call addvar_nc(ncpartid,'x','x-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues)
       call addvar_nc(ncpartid,'y','y-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues)
       call addvar_nc(ncpartid,'z','z-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      if(lpartdumpui) then
+        call addvar_nc(ncpartid,'u','resolved u-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
+        call addvar_nc(ncpartid,'v','resolved v-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
+        call addvar_nc(ncpartid,'w','resolved w-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      end if
     end if 
  
   end subroutine initparticledump
