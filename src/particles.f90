@@ -23,19 +23,22 @@ module modparticles
   ! module modparticles: Langrangian particle tracking, ad(o/a)pted from DALES
   !--------------------------------------------------------------------------
   implicit none
-  PUBLIC :: init_particles, particles, exit_particles, initparticledump
+  PUBLIC :: init_particles, particles, exit_particles, initparticledump, initparticlestat
 
   ! For/from namelist  
-  logical            :: lpartic     = .false.
-  logical            :: lpartsgs    = .false.
-  logical            :: lpartdump   = .false.
-  logical            :: lpartdumpui = .false.
-  real               :: frqpartdump = 3600
+  logical            :: lpartic     = .false.        ! Switch for particles
+  logical            :: lpartsgs    = .false.        ! Switch for particle subgrid scheme
+  logical            :: lpartstat   = .false.        ! Switch for particle statistics
+  real               :: frqpartstat =  3600.         ! Time interval for statistics writing
+  real               :: avpartstat  =  60.           ! Averaging time before writing stats
+  logical            :: lpartdump   = .false.        ! Switch for particle dump
+  logical            :: lpartdumpui = .false.        ! Switch for writing velocities to dump
+  real               :: frqpartdump =  3600          ! Time interval for particle dump
 
   character(30)      :: startfile
   integer            :: ifinput     = 1
   integer            :: np
-  integer            :: tnextdump
+  integer            :: tnextdump, tnextstat
 
   ! Particle structure
   type :: particle_record
@@ -55,7 +58,11 @@ module modparticles
   integer            :: ipures, ipvres, ipwres, ipusgs, ipvsgs, ipwsgs, ipusgs_prev, ipvsgs_prev, ipwsgs_prev 
   integer            :: ipures_prev, ipvres_prev, ipwres_prev, ipartstep, nrpartvar
 
-  integer            :: ncpartid, ncpartrec
+  ! Statistics and particle dump
+  integer            :: ncpartid, ncpartrec             ! Particle dump
+  integer            :: ncpartstatid, ncpartstatrec     ! Particle statistics
+  integer            :: nstatsamp
+  real, allocatable, dimension(:) :: npartbin,npartbinl
 
   real, allocatable, dimension(:,:,:) :: sgstke
 
@@ -66,7 +73,7 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine particles(time)
-    use grid, only : deltax, deltay, nstep, dzi_t, dt, a_km, nzp
+    use grid, only : deltax, deltay, nstep, dzi_t, dt
     use mpi_interface, only : nxg, nyg
     implicit none
     real, intent(in)               :: time
@@ -85,7 +92,7 @@ contains
     ! DEBUG
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !print*,sgstke(2,10,10)
-    !if(time > 3600) then
+    !if(time > 600) then
     !  allocate(sgstke_prof(nzp))
     !  sgstke_prof = 0.
     !  do j=1,nyg
@@ -138,17 +145,28 @@ contains
       if ( time - particle%tstart >= 0 ) then
         call rk3(particle)
       end if
+    particle => particle%next
+    end do
 
     ! Statistics
     if (nstep==3) then
+      ! Particle dump
       if((time + dt > tnextdump) .and. lpartdump) then
         call particledump(time)
         tnextdump = tnextdump + frqpartdump
       end if
-    end if
 
-    particle => particle%next
-    end do
+      ! Average statistics
+      if((time + dt > tnextstat - avpartstat) .and. lpartstat) then
+        call particlestat(.false.,time)
+      end if
+
+      ! Write statistics
+      if((time + dt > tnextstat) .and. lpartstat) then
+        call particlestat(.false.,time)
+        call particlestat(.true.,time)
+      end if
+    end if
 
     !Exchange particle to other processors
     call partcomm
@@ -170,6 +188,7 @@ contains
     real                       :: labda0, labda, ceps
     integer                    :: i,j,k
     real, parameter            :: alpha = 1.5
+    real, parameter            :: cf    = 2.5
 
     ! Doesn't take grid stretching into account? (see sgsm.f90)
     labda0 = (zm(2)/dxi/dyi)**0.333333333
@@ -179,8 +198,7 @@ contains
           do k=1,nzp
             labda            = (1. / ((1. / labda0**2.) + (1. / (0.4 * (zm(k) + 0.0001)**2.))))**0.5
             ceps             = 0.19 + 0.51 * (labda / labda0)
-            sgstke(k,i,j)    = (a_scr7(k,i,j) * (labda / ceps))**(0.66666666666666666)           
-            !sgstke(k,i,j)    = (a_km(k,i,j) / ((delta * (3.5 / (2. * pi)) * (1.5 * alpha)**(-1.5))))**2.        
+            sgstke(k,i,j)    = (a_km(k,i,j) / ((labda * (cf / (2. * pi)) * (1.5 * alpha)**(-1.5))))**2.        
           end do
        end do
     end do
@@ -486,13 +504,60 @@ contains
 
   !
   !--------------------------------------------------------------------------
+  ! subroutine particlestat : Time averages slab-averaged statistics and
+  !   writes them to NetCDF
+  !--------------------------------------------------------------------------
+  !
+  subroutine particlestat(dowrite,time)
+    use mpi_interface, only : mpi_comm_world, myid, mpi_double_precision, mpi_sum, ierror, nxprocs, nyprocs 
+    use modnetcdf,     only : writevar_nc, fillvalue_double
+    use grid,          only : tname,nzp
+    implicit none
+
+    logical, intent(in)     :: dowrite
+    real, intent(in)        :: time
+    integer                 :: k
+    type (particle_record), pointer:: particle
+
+    ! Time averaging step
+    if(.not. dowrite) then
+      particle => head
+      do while(associated(particle))
+        k              = floor(particle%z)
+        npartbinl(k)   = npartbinl(k) + 1
+        particle => particle%next
+      end do 
+      nstatsamp = nstatsamp + 1
+    end if
+
+    ! Write to NetCDF
+    if(dowrite) then
+      npartbinl = npartbinl / nstatsamp
+      
+      call mpi_allreduce(npartbinl,npartbin,nzp-2,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+
+      if(myid == 0) then
+        call writevar_nc(ncpartstatid,tname,time,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'np',npartbin,ncpartstatrec)
+      end if
+
+      npartbin  = 0
+      npartbinl = 0
+      nstatsamp = 0
+      tnextstat = tnextstat + frqpartstat
+    end if
+
+  end subroutine particlestat
+
+  !
+  !--------------------------------------------------------------------------
   ! subroutine particledump : communicates all particles to process #0 and
   !   writes it to NetCDF(4)
   !--------------------------------------------------------------------------
   !
   subroutine particledump(time)
     use mpi_interface, only : mpi_comm_world, myid, mpi_integer, mpi_double_precision, ierror, nxprocs, nyprocs, mpi_status_size, wrxid, wryid, nxg, nyg
-    use grid,          only : tname, tlongname, tunit, deltax, deltay, dzi_t, zm
+    use grid,          only : tname, deltax, deltay, dzi_t, zm
     use modnetcdf,     only : writevar_nc, fillvalue_double
     implicit none
 
@@ -755,19 +820,19 @@ contains
     !particle%y_prev = modulo(particle%y_prev-3,real(nyp-4))+3
 
     ! Reflect particles of surface and model top
-    if (particle%z >= size(zm)) then
-      particle%z = size(zm)-0.0001
-      particle%wres = -abs(particle%wres)
-    elseif (particle%z < 1.01) then
+    !if (particle%z >= size(zm)) then
+    !  particle%z = size(zm)-0.0001
+    !  particle%wres = -abs(particle%wres)
+    if (particle%z < 1.01) then
       particle%z = abs(particle%z-1.01)+1.01
       particle%wres =  abs(particle%wres)
     end if
 
-    if (particle%z_prev >= size(zm)) then
-      particle%z_prev = size(zm)-0.0001
-    elseif (particle%z_prev < 1.01) then
-      particle%z_prev = abs(particle%z_prev-1.01)+1.01
-    end if
+    !if (particle%z_prev >= size(zm)) then
+    !  particle%z_prev = size(zm)-0.0001
+    !elseif (particle%z_prev < 1.01) then
+    !  particle%z_prev = abs(particle%z_prev-1.01)+1.01
+    !end if
 
   end subroutine checkbound
 
@@ -802,8 +867,10 @@ contains
     read(ifinput,'(I10.1)') np
     if ( np < 1 ) return
    
-    ! clear pointers to head and tail, sets nplisted=0
-    call particle_initlist()
+    ! clear pointers to head and tail
+    nullify(head)
+    nullify(tail)
+    nplisted = 0
 
     ! read particles from partstartpos, create linked list
     do n = 1, np
@@ -891,8 +958,13 @@ contains
     !if(lpartdump) call initparticledump
 
     ! Set first dump times
-    tnextdump = firststart !frqpartdump
-    print*,'----------->',tnextdump
+    tnextdump = firststart
+    tnextstat = 0
+    nstatsamp = 0 
+    if(lpartstat) then
+      allocate(npartbin(nzp-2),npartbinl(nzp-2))
+    end if
+
     close(ifinput)
 
     ! Allocate field for calculation of SGS-TKE
@@ -906,6 +978,7 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine exit_particles
+    use mpi_interface, only : myid
     implicit none
 
     do while( associated(tail) )
@@ -913,8 +986,11 @@ contains
     end do
 
     deallocate(sgstke)
+    if(lpartstat) then
+      deallocate(npartbin,npartbinl)
+    end if
 
-  print "(//' ',49('-')/,' ',/,'  Lagrangian particles removed.')"
+    if(myid == 0) print "(//' ',49('-')/,' ',/,'  Lagrangian particles removed.')"
   end subroutine exit_particles
 
   !
@@ -968,16 +1044,66 @@ contains
 
   !
   !--------------------------------------------------------------------------
+  ! subroutine initparticlestat : creates NetCDF file for particle statistics. 
+  !   Called from: init.f90
+  !--------------------------------------------------------------------------
+  !
+  subroutine initparticlestat(time)
+    use modnetcdf,       only : open_nc, addvar_nc
+    use grid,            only : nzp, tname, tlongname, tunit, filprf
+    use mpi_interface,   only : myid
+    use grid,            only : tname, tlongname, tunit, zname, zlongname, zunit, zt
+    implicit none
+
+    real, intent(in)                  :: time
+    character (40), dimension(2)      :: dimname, dimlongname, dimunit
+    real, allocatable, dimension(:,:) :: dimvalues
+    integer, dimension(2)             :: dimsize
+    integer                           :: k
+
+    allocate(dimvalues(nzp-2,2))
+    dimvalues = 0
+    dimvalues(1:nzp-2,1)  = zt(2:nzp-1)
+
+    dimname(1)     = zname
+    dimlongname(1) = zlongname
+    dimunit(1)     = zunit
+    dimsize(1)     = nzp-2
+    dimname(2)     = tname
+    dimlongname(2) = tlongname
+    dimunit(2)     = tunit
+    dimsize(2)     = 0
+ 
+    if(myid == 0) then
+      call open_nc(trim(filprf)//'.particlestat.nc', ncpartstatid, ncpartstatrec, time, .true.)
+      call addvar_nc(ncpartstatid,'np','Number of particles','-',dimname,dimlongname,dimunit,dimsize,dimvalues)
+    end if 
+ 
+  end subroutine initparticlestat
+
+  !
+  !--------------------------------------------------------------------------
   ! subroutine exitparticledump
+  !   Called from: step.f90
   !--------------------------------------------------------------------------
   !
   subroutine exitparticledump
     use modnetcdf,       only : close_nc
     implicit none
-
     call close_nc(ncpartid)     
- 
   end subroutine exitparticledump
+
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine exitparticlestat
+  !   Called from: step.f90
+  !--------------------------------------------------------------------------
+  !
+  subroutine exitparticlestat
+    use modnetcdf,       only : close_nc
+    implicit none
+    call close_nc(ncpartstatid)     
+  end subroutine exitparticlestat
 
   !
   !--------------------------------------------------------------------------
@@ -1005,20 +1131,6 @@ contains
     ptr => tail
 
   end SUBROUTINE add_particle
-
-  !
-  !--------------------------------------------------------------------------
-  ! subroutine init_particles: clears pointers to start and end of linked
-  ! particle list
-  !--------------------------------------------------------------------------
-  !
-  subroutine particle_initlist()
-    implicit none
-
-    nullify(head)
-    nullify(tail)
-    nplisted = 0
-  end subroutine particle_initlist
 
   !
   !--------------------------------------------------------------------------
