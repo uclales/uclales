@@ -62,7 +62,12 @@ module modparticles
   integer            :: ncpartid, ncpartrec             ! Particle dump
   integer            :: ncpartstatid, ncpartstatrec     ! Particle statistics
   integer            :: nstatsamp
-  real, allocatable, dimension(:) :: npartbin,npartbinl
+  
+  ! Arrays for local and domain averaged values
+  real, allocatable, dimension(:) :: npartbin,npartbinl, &
+                                     ubin, ubinl, &
+                                     vbin, vbinl, &
+                                     wbin, wbinl
 
   real, allocatable, dimension(:,:,:) :: sgstke
 
@@ -73,7 +78,7 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine particles(time)
-    use grid, only : deltax, deltay, nstep, dzi_t, dt
+    use grid, only : dxi, dyi, nstep, dzi_t, dt
     use mpi_interface, only : nxg, nyg
     implicit none
     real, intent(in)               :: time
@@ -120,8 +125,8 @@ contains
         particle%partstep = particle%partstep + 1
 
         ! Interpolation of the velocity field
-        particle%ures = velocity_ures(particle%x,particle%y,particle%z) / deltax
-        particle%vres = velocity_vres(particle%x,particle%y,particle%z) / deltay
+        particle%ures = velocity_ures(particle%x,particle%y,particle%z) * dxi
+        particle%vres = velocity_vres(particle%x,particle%y,particle%z) * dyi
         particle%wres = velocity_wres(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
 
         !if (lpartsgs) then
@@ -177,11 +182,13 @@ contains
   end subroutine particles
 
   !
+  !--------------------------------------------------------------------------
+  ! Quick and dirty divergence check, only for CPU #0
+  !--------------------------------------------------------------------------
   !
   subroutine checkdiv
-  !
-  !
   use grid, only : dxi, dyi, dzi_t, a_up, a_vp, a_wp, nxp, nyp, nzp, dn0
+  use mpi_interface, only : myid
   implicit none
   integer :: i,j,k
   real :: dudx,dvdy,dwdz,div
@@ -206,8 +213,8 @@ contains
       end do
     end do
   end do
-  
-  print*,'   divergence; max=',divmax, ', total=',divtot 
+ 
+  if(myid==0) print*,'   divergence; max=',divmax, ', total=',divtot 
 
   end subroutine checkdiv
 
@@ -550,12 +557,12 @@ contains
   subroutine particlestat(dowrite,time)
     use mpi_interface, only : mpi_comm_world, myid, mpi_double_precision, mpi_sum, ierror, nxprocs, nyprocs 
     use modnetcdf,     only : writevar_nc, fillvalue_double
-    use grid,          only : tname,nzp
+    use grid,          only : tname,nzp,dxi,dyi,dzi_t
     implicit none
 
     logical, intent(in)     :: dowrite
     real, intent(in)        :: time
-    integer                 :: k
+    integer                 :: k,nplocal
     type (particle_record), pointer:: particle
 
     ! Time averaging step
@@ -564,6 +571,9 @@ contains
       do while(associated(particle))
         k              = floor(particle%z)
         npartbinl(k)   = npartbinl(k) + 1
+        ubinl(k)       = ubinl(k)     + (particle%ures / dxi)
+        vbinl(k)       = vbinl(k)     + (particle%vres / dyi)
+        wbinl(k)       = wbinl(k)     + (particle%wres / dzi_t(floor(particle%z)))
         particle => particle%next
       end do 
       nstatsamp = nstatsamp + 1
@@ -572,16 +582,31 @@ contains
     ! Write to NetCDF
     if(dowrite) then
       npartbinl = npartbinl / nstatsamp
+      ubinl     = ubinl     / (nstatsamp * npartbinl)
+      vbinl     = vbinl     / (nstatsamp * npartbinl)
+      wbinl     = wbinl     / (nstatsamp * npartbinl)
       
       call mpi_allreduce(npartbinl,npartbin,nzp-2,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      call mpi_allreduce(ubinl,ubin,nzp-2,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      call mpi_allreduce(vbinl,vbin,nzp-2,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      call mpi_allreduce(wbinl,wbin,nzp-2,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
 
       if(myid == 0) then
         call writevar_nc(ncpartstatid,tname,time,ncpartstatrec)
         call writevar_nc(ncpartstatid,'np',npartbin,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'u',ubin,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'v',vbin,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'w',wbin,ncpartstatrec)
       end if
 
       npartbin  = 0
       npartbinl = 0
+      ubin      = 0
+      ubinl     = 0
+      vbin      = 0
+      vbinl     = 0
+      wbin      = 0
+      wbinl     = 0
       nstatsamp = 0
       tnextstat = tnextstat + frqpartstat
     end if
@@ -999,15 +1024,12 @@ contains
     ! Set first dump times
     tnextdump = firststart
     tnextstat = 0
-    nstatsamp = 0 
-    if(lpartstat) then
-      allocate(npartbin(nzp-2),npartbinl(nzp-2))
-    end if
-
+    nstatsamp = 0
+ 
+    if(lpartstat) allocate(npartbin(nzp-2),npartbinl(nzp-2),ubin(nzp-2),ubinl(nzp-2),vbin(nzp-2),vbinl(nzp-2),wbin(nzp-2),wbinl(nzp-2))
+    if(lpartsgs)  allocate(sgstke(nzp,nxg,nyg))
+    
     close(ifinput)
-
-    ! Allocate field for calculation of SGS-TKE
-    allocate(sgstke(nzp,nxg,nyg))
 
   end subroutine init_particles
   
@@ -1024,10 +1046,8 @@ contains
       call delete_particle(tail)
     end do
 
-    deallocate(sgstke)
-    if(lpartstat) then
-      deallocate(npartbin,npartbinl)
-    end if
+    if(lpartsgs)  deallocate(sgstke)
+    if(lpartstat) deallocate(npartbin,npartbinl,ubin,ubinl,vbin,vbinl,wbin,wbinl)
 
     if(myid == 0) print "(//' ',49('-')/,' ',/,'  Lagrangian particles removed.')"
   end subroutine exit_particles
@@ -1050,6 +1070,7 @@ contains
     real, allocatable, dimension(:,:) :: dimvalues
     integer, dimension(2)             :: dimsize
     integer                           :: k
+    integer, parameter                :: precis = 0
 
     allocate(dimvalues(np,2))
 
@@ -1069,13 +1090,13 @@ contains
  
     if(myid == 0) then
       call open_nc(trim(filprf)//'.particles.nc', ncpartid, ncpartrec, time, .true.)
-      call addvar_nc(ncpartid,'x','x-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues)
-      call addvar_nc(ncpartid,'y','y-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues)
-      call addvar_nc(ncpartid,'z','z-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartid,'x','x-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      call addvar_nc(ncpartid,'y','y-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      call addvar_nc(ncpartid,'z','z-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
       if(lpartdumpui) then
-        call addvar_nc(ncpartid,'u','resolved u-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
-        call addvar_nc(ncpartid,'v','resolved v-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
-        call addvar_nc(ncpartid,'w','resolved w-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
+        call addvar_nc(ncpartid,'u','resolved u-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+        call addvar_nc(ncpartid,'v','resolved v-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+        call addvar_nc(ncpartid,'w','resolved w-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
       end if
     end if 
  
@@ -1116,6 +1137,9 @@ contains
     if(myid == 0) then
       call open_nc(trim(filprf)//'.particlestat.nc', ncpartstatid, ncpartstatrec, time, .true.)
       call addvar_nc(ncpartstatid,'np','Number of particles','-',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'u','resolved u-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'v','resolved v-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'w','resolved w-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
     end if 
  
   end subroutine initparticlestat
