@@ -78,7 +78,7 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine particles(time)
-    use grid, only : dxi, dyi, nstep, dzi_t, dt
+    use grid, only : dxi, dyi, nstep, dzi_t, dt, a_up
     use mpi_interface, only : nxg, nyg
     implicit none
     real, intent(in)               :: time
@@ -128,7 +128,7 @@ contains
         particle%ures = velocity_ures(particle%x,particle%y,particle%z) * dxi
         particle%vres = velocity_vres(particle%x,particle%y,particle%z) * dyi
         particle%wres = velocity_wres(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
-
+        
         !if (lpartsgs) then
         !  if (rk3step==1) then
         !    particle%usgs_prev = particle%usgs
@@ -751,8 +751,8 @@ contains
       sign = 1
     end if      
 
-    deltaz = ((zm(floor(z)) + (z - floor(z)) / dzi_t(floor(z))) - zt(floor(z))) * dzi_m(floor(z))
-    velocity_ures =  (1-deltaz) * (1-deltay) * (1-deltax) * sign * a_up(zbottom    , xbottom    , ybottom    ) + &    !
+    deltaz = ((zm(floor(z)) + (z - floor(z)) / dzi_t(floor(z))) - zt(zbottom)) * dzi_m(zbottom)
+    velocity_ures =  (1-deltaz) * (1-deltay) * ( 1-deltax) * sign * a_up(zbottom    , xbottom    , ybottom    ) + &    !
     &                (1-deltaz) * (1-deltay) * (  deltax) * sign * a_up(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
     &                (1-deltaz) * (  deltay) * (1-deltax) * sign * a_up(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
     &                (1-deltaz) * (  deltay) * (  deltax) * sign * a_up(zbottom    , xbottom + 1, ybottom + 1) + &    ! x+1,y+1
@@ -789,7 +789,7 @@ contains
       sign = 1
     end if      
 
-    deltaz = ((zm(floor(z)) + (z - floor(z)) / dzi_t(floor(z))) - zt(floor(z))) * dzi_m(floor(z))
+    deltaz = ((zm(floor(z)) + (z - floor(z)) / dzi_t(floor(z))) - zt(zbottom)) * dzi_m(zbottom)
     velocity_vres =  (1-deltaz) * (1-deltay) * (1-deltax) * sign * a_vp(zbottom    , xbottom    , ybottom    ) + &    !
     &                (1-deltaz) * (1-deltay) * (  deltax) * sign * a_vp(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
     &                (1-deltaz) * (  deltay) * (1-deltax) * sign * a_vp(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
