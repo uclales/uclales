@@ -11,7 +11,7 @@ def find_nearest(array,value):
 ncfile = Dataset('test_uclales/dcbl.particles.nc', 'r')
 ncfile2 = Dataset('test_uclales/dcbl.particlestat.nc', 'r')
 
-if(True):
+if(False):
   # Open statistics at once..
   zts = ncfile2.variables["zt"][:]
   nps = ncfile2.variables["np"][:,:]
@@ -23,9 +23,9 @@ if(True):
     plot(nps[i,:],zts,label=str(ts[i]))
   legend()
 
-if(False):
+if(True):
   #####################
-  for time in range(0,10):
+  for time in range(0,50):
   #####################
     # Open particle NetCDF file
     t      = ncfile.variables["time"][:]
@@ -36,7 +36,12 @@ if(False):
     v      = ncfile.variables["v"][time,:]
     w      = ncfile.variables["w"][time,:]
     np     = size(x[:])
-  
+ 
+    print numpy.average(w)
+
+    figure()
+    plot(w,'o',ms=1)
+ 
     figure()
     scatter(x,z,marker='o',s=1)
     ylim(2000,2120)
@@ -45,6 +50,6 @@ if(False):
   
     name = 'figs/' + str(time).zfill(5) + '.png'
     savefig(name)
-
+    close('all')
 
 

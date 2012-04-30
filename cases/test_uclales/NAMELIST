@@ -2,9 +2,9 @@
   nxp          = 36 
   nyp          = 36
   nzp          = 52 
-  deltax       = 25
-  deltay       = 25
-  deltaz       = 10
+  deltax       = 20
+  deltay       = 20
+  deltaz       = 20
   nxpart       = .true.
   dzrat        = 1.
   dtlong       = 5.
@@ -28,5 +28,5 @@
   avpartstat   = 60.
   lpartdump    = .true.
   lpartdumpui  = .true.
-  frqpartdump  = 20 
+  frqpartdump  = 10 
 /

@@ -3,19 +3,19 @@
 # Input:
 # ---------------
 tstart = 0
-nx     = 64
-ny     = 64
-nz     = 40
+nx     = 32
+ny     = 32
+nz     = 1
 dx     = 25
 dy     = 25
-dz     = 10
+dz     = 20
 # ---------------
 
 # No need to change below.....
 npart  = nx * ny * nz
-x = dx / 2.
-y = dy / 2.
-z = dz / 2.
+x = (dx / 2.) #+ 0.01
+y = (dy / 2.) #+ 0.01
+z = (dz / 2.) #+ 0.01
 
 partfile = open('partstartpos','w')
 partfile.write(str(npart)+'\n')
@@ -28,7 +28,7 @@ for i in range(nx):
     z = dz / 2.  
     y += dy
   z = dz / 2.
-  y = dy / 2.
+  y = (dy / 2.) #+ 0.01
   x += dx 
 
 partfile.close()

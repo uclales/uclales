@@ -81,6 +81,7 @@ contains
     integer :: i,j,k
     real, allocatable, dimension(:) :: sgstke_prof
 
+
     if ( np < 1 ) return      ! Just to be sure..
 
     if (lpartsgs) then
@@ -150,6 +151,8 @@ contains
 
     ! Statistics
     if (nstep==3) then
+      call checkdiv
+      
       ! Particle dump
       if((time + dt > tnextdump) .and. lpartdump) then
         call particledump(time)
@@ -172,6 +175,42 @@ contains
     call partcomm
 
   end subroutine particles
+
+  !
+  !
+  subroutine checkdiv
+  !
+  !
+  use grid, only : dxi, dyi, dzi_t, a_up, a_vp, a_wp, nxp, nyp, nzp, dn0
+  implicit none
+  integer :: i,j,k
+  real :: dudx,dvdy,dwdz,div
+  real :: divmax,divtot
+  real :: dnp,dnm
+
+  div = 0.
+  divmax = 0.
+  divtot = 0.
+
+  do j=3,nyp-2
+    do i=3,nxp-2
+      do k=2,nzp-2
+        dnp  = 0.5 * (dn0(k) + dn0(k+1))
+        dnm  = 0.5 * (dn0(k) + dn0(k-1))
+        dudx = (a_up(k,i,j) - a_up(k,i-1,j)) * dxi * dn0(k)
+        dvdy = (a_vp(k,i,j) - a_vp(k,i,j-1)) * dyi * dn0(k)
+        dwdz = ((a_wp(k,i,j) * dnp) - (a_wp(k-1,i,j) * dnm)) * dzi_t(k)
+        div  = dudx + dvdy + dwdz
+        divtot = divtot + div
+        if(abs(div) > divmax) divmax = abs(div)
+      end do
+    end do
+  end do
+  
+  print*,'   divergence; max=',divmax, ', total=',divtot 
+
+  end subroutine checkdiv
+
 
   !
   !--------------------------------------------------------------------------
