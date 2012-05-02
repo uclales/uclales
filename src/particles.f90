@@ -78,14 +78,13 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine particles(time)
-    use grid, only : dxi, dyi, nstep, dzi_t, dt, a_up
-    use mpi_interface, only : nxg, nyg
+    use grid, only : dxi, dyi, nstep, dzi_t, dt
+    !use mpi_interface, only : nxg, nyg
     implicit none
     real, intent(in)               :: time
     type (particle_record), pointer:: particle
     integer :: i,j,k
     real, allocatable, dimension(:) :: sgstke_prof
-
 
     if ( np < 1 ) return      ! Just to be sure..
 
@@ -128,7 +127,7 @@ contains
         particle%ures = velocity_ures(particle%x,particle%y,particle%z) * dxi
         particle%vres = velocity_vres(particle%x,particle%y,particle%z) * dyi
         particle%wres = velocity_wres(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
-        
+       
         !if (lpartsgs) then
         !  if (rk3step==1) then
         !    particle%usgs_prev = particle%usgs
@@ -752,7 +751,7 @@ contains
     end if      
 
     deltaz = ((zm(floor(z)) + (z - floor(z)) / dzi_t(floor(z))) - zt(zbottom)) * dzi_m(zbottom)
-    velocity_ures =  (1-deltaz) * (1-deltay) * ( 1-deltax) * sign * a_up(zbottom    , xbottom    , ybottom    ) + &    !
+    velocity_ures =  (1-deltaz) * (1-deltay) * (1-deltax) * sign * a_up(zbottom    , xbottom    , ybottom    ) + &    !
     &                (1-deltaz) * (1-deltay) * (  deltax) * sign * a_up(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
     &                (1-deltaz) * (  deltay) * (1-deltax) * sign * a_up(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
     &                (1-deltaz) * (  deltay) * (  deltax) * sign * a_up(zbottom    , xbottom + 1, ybottom + 1) + &    ! x+1,y+1
@@ -1022,7 +1021,7 @@ contains
     !if(lpartdump) call initparticledump
 
     ! Set first dump times
-    tnextdump = firststart
+    tnextdump = 0 !firststart
     tnextstat = 0
     nstatsamp = 0
  
