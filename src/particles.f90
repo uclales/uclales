@@ -64,12 +64,15 @@ module modparticles
   integer            :: nstatsamp
   
   ! Arrays for local and domain averaged values
-  real, allocatable, dimension(:) :: npartbin,npartbinl, &
-                                     ubin, ubinl, &
-                                     vbin, vbinl, &
-                                     wbin, wbinl
+  real, allocatable, dimension(:)     :: npartprof,npartprofl, &
+                                         uprof, uprofl, &
+                                         vprof, vprofl, &
+                                         wprof, wprofl, &
+                                         fsprof, fsprofl, &
+                                         eprof, eprofl
 
-  real, allocatable, dimension(:,:,:) :: sgstke
+  real, allocatable, dimension(:,:,:) :: sgse
+  real, allocatable, dimension(:)     :: fs
 
 contains
   !
@@ -89,8 +92,8 @@ contains
     if ( np < 1 ) return      ! Just to be sure..
 
     if (lpartsgs) then
-      call calc_sgstke
-      !call sgsinit
+      call sgstke
+      call fsubgrid
     end if
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -180,43 +183,66 @@ contains
 
   end subroutine particles
 
+
   !
   !--------------------------------------------------------------------------
-  ! Quick and dirty divergence check, only for CPU #0
+  ! subroutine fsubgrid : calculates fs (contribution sgs turbulence to
+  !   total turbulence)
   !--------------------------------------------------------------------------
   !
-  subroutine checkdiv
-  use grid, only : dxi, dyi, dzi_t, a_up, a_vp, a_wp, nxp, nyp, nzp, dn0
-  use mpi_interface, only : myid
-  implicit none
-  integer :: i,j,k
-  real :: dudx,dvdy,dwdz,div
-  real :: divmax,divtot
-  real :: dnp,dnm
+  subroutine fsubgrid
+    use grid, only : a_up, a_vp, a_wp, nzp, nxp, nyp
+    use mpi_interface, only : ierror, mpi_double_precision, mpi_sum, mpi_comm_world, nxg, nyg
+    implicit none
+   
+    integer    :: k
+    real, allocatable, dimension(:)   :: &
+       u_avl, v_avl, u2_avl, v2_avl, w2_avl, sgse_avl,     &
+       u_av,  v_av,  u2_av,  v2_av,  w2_av,  sgse_av, e_res
 
-  div = 0.
-  divmax = 0.
-  divtot = 0.
+    allocate(u_avl(nzp), v_avl(nzp), u2_avl(nzp), v2_avl(nzp), w2_avl(nzp), sgse_avl(nzp),   &
+             u_av(nzp),  v_av(nzp),  u2_av(nzp),  v2_av(nzp),  w2_av(nzp),  sgse_av(nzp),    &
+             e_res(nzp))
 
-  do j=3,nyp-2
-    do i=3,nxp-2
-      do k=2,nzp-2
-        dnp  = 0.5 * (dn0(k) + dn0(k+1))
-        dnm  = 0.5 * (dn0(k) + dn0(k-1))
-        dudx = (a_up(k,i,j) - a_up(k,i-1,j)) * dxi * dn0(k)
-        dvdy = (a_vp(k,i,j) - a_vp(k,i,j-1)) * dyi * dn0(k)
-        dwdz = ((a_wp(k,i,j) * dnp) - (a_wp(k-1,i,j) * dnm)) * dzi_t(k)
-        div  = dudx + dvdy + dwdz
-        divtot = divtot + div
-        if(abs(div) > divmax) divmax = abs(div)
-      end do
-    end do
-  end do
+    do k=1,nzp
+      u_avl(k)    = sum(a_up(k,3:nxp-2,3:nyp-2))
+      v_avl(k)    = sum(a_vp(k,3:nxp-2,3:nyp-2))
+      w2_avl(k)   = sum(a_wp(k,3:nxp-2,3:nyp-2)**2.)
+      sgse_avl(k) = sum(sgse(k,3:nxp-2,3:nyp-2))
+    end do 
+
+    call mpi_allreduce(u_avl,u_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+    call mpi_allreduce(v_avl,v_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+    call mpi_allreduce(w2_avl,w2_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+    call mpi_allreduce(sgse_avl,sgse_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+   
+    u_av        = u_av    / (nxg * nyg)  
+    v_av        = v_av    / (nxg * nyg)     
  
-  if(myid==0) print*,'   divergence; max=',divmax, ', total=',divtot 
+    do k=1,nzp
+      u2_avl(k) = sum((a_up(k,3:nxp-2,3:nyp-2) - u_av(k))**2.)
+      v2_avl(k) = sum((a_vp(k,3:nxp-2,3:nyp-2) - v_av(k))**2.)
+    end do 
 
-  end subroutine checkdiv
+    call mpi_allreduce(u2_avl,u2_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+    call mpi_allreduce(v2_avl,v2_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
 
+    u2_av       = u2_av   / (nxg * nyg)    
+    v2_av       = v2_av   / (nxg * nyg)    
+    w2_av       = w2_av   / (nxg * nyg)    
+    sgse_av     = sgse_av / (nxg * nyg) 
+  
+    do k=2, nzp
+      e_res(k)  = 0.5 * (u2_av(k) + v2_av(k) + 0.5*(w2_av(k) + w2_av(k-1)))
+      fs(k)     = sgse_av(k) / (sgse_av(k) + e_res(k))
+      !print*,k,fs(k),sgse_av(k),e_res(k)
+    end do
+
+    fs(1) = 1.   ! below surface......
+
+    deallocate(u_avl,v_avl,u2_avl,v2_avl,w2_avl,sgse_avl,u_av,v_av,u2_av,v2_av,w2_av,sgse_av,e_res)
+
+  end subroutine fsubgrid
 
   !
   !--------------------------------------------------------------------------
@@ -224,10 +250,10 @@ contains
   !   or dissipation (a_scr7)
   !--------------------------------------------------------------------------
   !
-  subroutine calc_sgstke
-    use grid, only             : a_km, nzp, zm, dxi, dyi, a_scr7
-    use mpi_interface, only    : nxg, nyg 
+  subroutine sgstke
+    use grid, only             : a_km, nzp, zm, dxi, dyi, a_scr7, nxp, nyp
     use defs, only             : pi, vonk
+    use mpi_interface, only    : nxg, nyg
     implicit none
     
     real                       :: labda0, labda, ceps
@@ -238,17 +264,17 @@ contains
     ! Doesn't take grid stretching into account? (see sgsm.f90)
     labda0 = (zm(2)/dxi/dyi)**0.333333333
 
-    do j=1,nyg
-       do i=1,nxg
+    do j=1,nyp
+       do i=1,nxp
           do k=1,nzp
-            labda            = (1. / ((1. / labda0**2.) + (1. / (0.4 * (zm(k) + 0.0001)**2.))))**0.5
+            labda            = (1. / ((1. / labda0**2.) + (1. / (0.4 * (zm(k) + 0.001)**2.))))**0.5
             ceps             = 0.19 + 0.51 * (labda / labda0)
-            sgstke(k,i,j)    = (a_km(k,i,j) / ((labda * (cf / (2. * pi)) * (1.5 * alpha)**(-1.5))))**2.        
+            sgse(k,i,j)      = (a_km(k,i,j) / ((labda * (cf / (2. * pi)) * (1.5 * alpha)**(-1.5))))**2.        
           end do
        end do
     end do
 
-  end subroutine calc_sgstke
+  end subroutine sgstke
 
   !
   !--------------------------------------------------------------------------
@@ -554,9 +580,9 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine particlestat(dowrite,time)
-    use mpi_interface, only : mpi_comm_world, myid, mpi_double_precision, mpi_sum, ierror, nxprocs, nyprocs 
+    use mpi_interface, only : mpi_comm_world, myid, mpi_double_precision, mpi_sum, ierror, nxprocs, nyprocs, nxg, nyg
     use modnetcdf,     only : writevar_nc, fillvalue_double
-    use grid,          only : tname,nzp,dxi,dyi,dzi_t
+    use grid,          only : tname,nzp,dxi,dyi,dzi_t,nxp,nyp
     implicit none
 
     logical, intent(in)     :: dowrite
@@ -569,43 +595,63 @@ contains
       particle => head
       do while(associated(particle))
         k              = floor(particle%z)
-        npartbinl(k)   = npartbinl(k) + 1
-        ubinl(k)       = ubinl(k)     + (particle%ures / dxi)
-        vbinl(k)       = vbinl(k)     + (particle%vres / dyi)
-        wbinl(k)       = wbinl(k)     + (particle%wres / dzi_t(floor(particle%z)))
+        npartprofl(k)   = npartprofl(k) + 1
+        uprofl(k)       = uprofl(k)     + (particle%ures / dxi)
+        vprofl(k)       = vprofl(k)     + (particle%vres / dyi)
+        wprofl(k)       = wprofl(k)     + (particle%wres / dzi_t(floor(particle%z)))
         particle => particle%next
       end do 
+
+      do k = 1,nzp-2 
+        fsprofl(k)      = fsprofl(k)    + fs(k+1)
+        eprofl(k)       = eprofl(k)     + sum(sgse(k+1,3:nxp-2,3:nyp-2)) / (nxg * nyg)
+      end do     
+
       nstatsamp = nstatsamp + 1
     end if
 
     ! Write to NetCDF
     if(dowrite) then
-      npartbinl = npartbinl / nstatsamp
-      ubinl     = ubinl     / (nstatsamp * npartbinl)
-      vbinl     = vbinl     / (nstatsamp * npartbinl)
-      wbinl     = wbinl     / (nstatsamp * npartbinl)
-      
-      call mpi_allreduce(npartbinl,npartbin,nzp-2,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-      call mpi_allreduce(ubinl,ubin,nzp-2,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-      call mpi_allreduce(vbinl,vbin,nzp-2,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-      call mpi_allreduce(wbinl,wbin,nzp-2,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      npartprofl = npartprofl / nstatsamp
+      uprofl     = uprofl     / (nstatsamp * npartprofl)
+      vprofl     = vprofl     / (nstatsamp * npartprofl)
+      wprofl     = wprofl     / (nstatsamp * npartprofl)
+      fsprofl    = fsprofl    / nstatsamp
+      eprofl     = eprofl     / nstatsamp     
+
+      call mpi_allreduce(npartprofl,npartprof,nzp-2,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      call mpi_allreduce(uprofl,uprof,nzp-2,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      call mpi_allreduce(vprofl,vprof,nzp-2,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      call mpi_allreduce(wprofl,wprof,nzp-2,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      call mpi_allreduce(fsprofl,fsprof,nzp-2,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      call mpi_allreduce(eprofl,eprof,nzp-2,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+
+      !do k =1,nzp-2
+      !  print*,k,fsprof(k),eprof(k)
+      !end do
 
       if(myid == 0) then
         call writevar_nc(ncpartstatid,tname,time,ncpartstatrec)
-        call writevar_nc(ncpartstatid,'np',npartbin,ncpartstatrec)
-        call writevar_nc(ncpartstatid,'u',ubin,ncpartstatrec)
-        call writevar_nc(ncpartstatid,'v',vbin,ncpartstatrec)
-        call writevar_nc(ncpartstatid,'w',wbin,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'np',npartprof,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'u',uprof,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'v',vprof,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'w',wprof,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'fs',fsprof,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'e',eprof,ncpartstatrec)
       end if
 
-      npartbin  = 0
-      npartbinl = 0
-      ubin      = 0
-      ubinl     = 0
-      vbin      = 0
-      vbinl     = 0
-      wbin      = 0
-      wbinl     = 0
+      npartprof  = 0
+      npartprofl = 0
+      uprof      = 0
+      uprofl     = 0
+      vprof      = 0
+      vprofl     = 0
+      wprof      = 0
+      wprofl     = 0
+      fsprof     = 0
+      fsprofl    = 0
+      eprof      = 0
+      eprofl     = 0
       nstatsamp = 0
       tnextstat = tnextstat + frqpartstat
     end if
@@ -867,6 +913,43 @@ contains
 
   !
   !--------------------------------------------------------------------------
+  ! Quick and dirty (Eulerian) divergence check, only for CPU #0
+  !--------------------------------------------------------------------------
+  !
+  subroutine checkdiv
+  use grid, only : dxi, dyi, dzi_t, a_up, a_vp, a_wp, nxp, nyp, nzp, dn0
+  use mpi_interface, only : myid
+  implicit none
+  integer :: i,j,k
+  real :: dudx,dvdy,dwdz,div
+  real :: divmax,divtot
+  real :: dnp,dnm
+
+  div = 0.
+  divmax = 0.
+  divtot = 0.
+
+  do j=3,nyp-2
+    do i=3,nxp-2
+      do k=2,nzp-2
+        dnp  = 0.5 * (dn0(k) + dn0(k+1))
+        dnm  = 0.5 * (dn0(k) + dn0(k-1))
+        dudx = (a_up(k,i,j) - a_up(k,i-1,j)) * dxi * dn0(k)
+        dvdy = (a_vp(k,i,j) - a_vp(k,i,j-1)) * dyi * dn0(k)
+        dwdz = ((a_wp(k,i,j) * dnp) - (a_wp(k-1,i,j) * dnm)) * dzi_t(k)
+        div  = dudx + dvdy + dwdz
+        divtot = divtot + div
+        if(abs(div) > divmax) divmax = abs(div)
+      end do
+    end do
+  end do
+ 
+  if(myid==0) print*,'   divergence; max=',divmax, ', total=',divtot 
+
+  end subroutine checkdiv
+
+  !
+  !--------------------------------------------------------------------------
   ! subroutine checkbound : bounces particles of surface and model top
   !--------------------------------------------------------------------------
   !
@@ -911,7 +994,7 @@ contains
   !
   subroutine init_particles
     use mpi_interface, only : wrxid, wryid, nxg, nyg, myid, nxprocs, nyprocs
-    use grid, only : zm, deltax, deltay, zt,dzi_t, nzp
+    use grid, only : zm, deltax, deltay, zt,dzi_t, nzp, nxp, nyp
     use grid, only : a_up, a_vp, a_wp
 
     integer :: k, n, ierr, kmax
@@ -1025,8 +1108,8 @@ contains
     tnextstat = 0
     nstatsamp = 0
  
-    if(lpartstat) allocate(npartbin(nzp-2),npartbinl(nzp-2),ubin(nzp-2),ubinl(nzp-2),vbin(nzp-2),vbinl(nzp-2),wbin(nzp-2),wbinl(nzp-2))
-    if(lpartsgs)  allocate(sgstke(nzp,nxg,nyg))
+    if(lpartstat) allocate(npartprof(nzp-2),npartprofl(nzp-2),uprof(nzp-2),uprofl(nzp-2),vprof(nzp-2),vprofl(nzp-2),wprof(nzp-2),wprofl(nzp-2),fsprof(nzp-2),fsprofl(nzp-2),eprof(nzp-2), eprofl(nzp-2))
+    if(lpartsgs)  allocate(sgse(nzp,nxp,nyp),fs(nzp))
     
     close(ifinput)
 
@@ -1045,8 +1128,8 @@ contains
       call delete_particle(tail)
     end do
 
-    if(lpartsgs)  deallocate(sgstke)
-    if(lpartstat) deallocate(npartbin,npartbinl,ubin,ubinl,vbin,vbinl,wbin,wbinl)
+    if(lpartsgs)  deallocate(sgse)
+    if(lpartstat) deallocate(npartprof,npartprofl,uprof,uprofl,vprof,vprofl,wprof,wprofl,fs,fsprof,fsprofl,eprof,eprofl)
 
     if(myid == 0) print "(//' ',49('-')/,' ',/,'  Lagrangian particles removed.')"
   end subroutine exit_particles
@@ -1139,6 +1222,8 @@ contains
       call addvar_nc(ncpartstatid,'u','resolved u-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
       call addvar_nc(ncpartstatid,'v','resolved v-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
       call addvar_nc(ncpartstatid,'w','resolved w-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'fs','subgrid turbulence fraction','-',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'e','subgrid TKE','m2/s2',dimname,dimlongname,dimunit,dimsize,dimvalues)
     end if 
  
   end subroutine initparticlestat
