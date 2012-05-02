@@ -183,6 +183,67 @@ contains
 
   end subroutine particles
 
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine fsubgrid : calculates fs (contribution sgs turbulence to
+  !   total turbulence)
+  !--------------------------------------------------------------------------
+  !
+  subroutine fsubgrid
+    use grid, only : a_up, a_vp, a_wp, nzp, nxp, nyp
+    use mpi_interface, only : ierror, mpi_double_precision, mpi_sum, mpi_comm_world, nxg, nyg
+    implicit none
+   
+    integer    :: k
+    real, allocatable, dimension(:)   :: &
+       u_avl, v_avl, u2_avl, v2_avl, w2_avl, sgse_avl,     &
+       u_av,  v_av,  u2_av,  v2_av,  w2_av,  sgse_av, e_res
+
+    allocate(u_avl(nzp), v_avl(nzp), u2_avl(nzp), v2_avl(nzp), w2_avl(nzp), sgse_avl(nzp),   &
+             u_av(nzp),  v_av(nzp),  u2_av(nzp),  v2_av(nzp),  w2_av(nzp),  sgse_av(nzp),    &
+             e_res(nzp))
+
+    do k=1,nzp
+      u_avl(k)    = sum(a_up(k,3:nxp-2,3:nyp-2))
+      v_avl(k)    = sum(a_vp(k,3:nxp-2,3:nyp-2))
+      w2_avl(k)   = sum(a_wp(k,3:nxp-2,3:nyp-2)**2.)
+      sgse_avl(k) = sum(sgse(k,3:nxp-2,3:nyp-2))
+    end do 
+
+    call mpi_allreduce(u_avl,u_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+    call mpi_allreduce(v_avl,v_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+    call mpi_allreduce(w2_avl,w2_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+    call mpi_allreduce(sgse_avl,sgse_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+   
+    u_av        = u_av    / (nxg * nyg)  
+    v_av        = v_av    / (nxg * nyg)     
+ 
+    do k=1,nzp
+      u2_avl(k) = sum((a_up(k,3:nxp-2,3:nyp-2) - u_av(k))**2.)
+      v2_avl(k) = sum((a_vp(k,3:nxp-2,3:nyp-2) - v_av(k))**2.)
+    end do 
+
+    call mpi_allreduce(u2_avl,u2_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+    call mpi_allreduce(v2_avl,v2_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+
+    u2_av       = u2_av   / (nxg * nyg)    
+    v2_av       = v2_av   / (nxg * nyg)    
+    w2_av       = w2_av   / (nxg * nyg)    
+    sgse_av     = sgse_av / (nxg * nyg) 
+  
+    do k=2, nzp
+      e_res(k)  = 0.5 * (u2_av(k) + v2_av(k) + 0.5*(w2_av(k) + w2_av(k-1)))
+      fs(k)     = sgse_av(k) / (sgse_av(k) + e_res(k))
+      !print*,k,fs(k),sgse_av(k),e_res(k)
+    end do
+
+    fs(1) = 1.   ! below surface......
+
+    deallocate(u_avl,v_avl,u2_avl,v2_avl,w2_avl,sgse_avl,u_av,v_av,u2_av,v2_av,w2_av,sgse_av,e_res)
+
+  end subroutine fsubgrid
+
+
 
   !
   !--------------------------------------------------------------------------
@@ -247,11 +308,10 @@ contains
   !
   !--------------------------------------------------------------------------
   ! subroutine calc_sgstke : estimates SGS-TKE from eddy diffusivity Km
-  !   or dissipation (a_scr7)
   !--------------------------------------------------------------------------
   !
   subroutine sgstke
-    use grid, only             : a_km, nzp, zm, dxi, dyi, a_scr7, nxp, nyp
+    use grid, only             : a_km, nzp, zm, dxi, dyi, nxp, nyp
     use defs, only             : pi, vonk
     use mpi_interface, only    : nxg, nyg
     implicit none
@@ -261,7 +321,6 @@ contains
     real, parameter            :: alpha = 1.5
     real, parameter            :: cf    = 2.5
 
-    ! Doesn't take grid stretching into account? (see sgsm.f90)
     labda0 = (zm(2)/dxi/dyi)**0.333333333
 
     do j=1,nyp
