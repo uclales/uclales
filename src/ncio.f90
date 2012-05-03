@@ -439,7 +439,7 @@ contains
     if (level >= 2)  then
 !        nn = nn+1
        iret = nf90_inq_varid(ncid0, sanal(17), VarID)
-       iret = nf90_put_var(ncid0, VarID, reff(:,i1:i2,j1:j2), start=ibeg, &
+       iret = nf90_put_var(ncid0, VarID, liquid(:,i1:i2,j1:j2), start=ibeg, &
             count=icnt)
     end if
     nn = nbase+2
