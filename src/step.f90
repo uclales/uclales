@@ -215,7 +215,10 @@ contains
        if (lsvarflg) then
           call varlscale(time,case_name,sst,div,u0,v0)
        end if
-       call surface(sst)      
+
+       xtime = xtime - strtim
+       call surface(sst,xtime)      
+       xtime = xtime + strtim
 
        call diffuse
        call fadvect

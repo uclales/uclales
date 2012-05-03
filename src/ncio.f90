@@ -364,11 +364,15 @@ contains
 
     use netcdf
     use mpi_interface, only : myid, appl_abort
+    use defs, only : cp, alvl
 
     real, intent (in) :: time
 
     integer :: iret, VarID, nn, n
     integer :: ibeg(4), icnt(4), i1, i2, j1, j2
+    
+    real :: press1(nzp,nxp,nyp)
+    real :: a_rp1 (nzp,nxp,nyp)
 
     !return 
     icnt = (/nzp,nxp-4,nyp-4,1   /)
@@ -411,13 +415,19 @@ contains
     iret = nf90_inq_varid(ncid0, sanal(14), VarID)
     iret = nf90_put_var(ncid0, VarID, a_theta(:,i1:i2,j1:j2), start=ibeg, &
          count=icnt)
+
+    !Malte: dump fluxes in wrong arrays for now
+    press1 = press
+    press1(1,i1:i2,j1:j2) = wt_sfc(i1:i2,j1:j2)*cp*(dn0(1)+dn0(2))*0.5
+    a_rp1  = a_rp
+    a_rp1(1,i1:i2,j1:j2)  = wq_sfc(i1:i2,j1:j2)*alvl*(dn0(1)+dn0(2))*0.5
+
     iret = nf90_inq_varid(ncid0, sanal(15), VarID)
-    iret = nf90_put_var(ncid0, VarID, press(:,i1:i2,j1:j2), start=ibeg, &
+    iret = nf90_put_var(ncid0, VarID, press1(:,i1:i2,j1:j2), start=ibeg, &
          count=icnt)
     iret = nf90_inq_varid(ncid0, sanal(16), VarID)
-    iret = nf90_put_var(ncid0, VarID, a_rp(:,i1:i2,j1:j2), start=ibeg, &
+    iret = nf90_put_var(ncid0, VarID, a_rp1(:,i1:i2,j1:j2), start=ibeg, &
          count=icnt)
-
 
     if (level >= 2)  then
 !        nn = nn+1

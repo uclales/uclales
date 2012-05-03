@@ -15,6 +15,7 @@ module lsmdata
   logical          :: local      = .true.   !<  Switch to MOST locally to get local Obukhov length
   logical          :: smoothflux = .false.  !<  Create uniform sensible & latent heat over domain
   logical          :: neutral    = .false.  !<  Disable stability corrections
+  logical          :: hetero     = .false.  !<  Switch to heteogeneous surface conditions
   logical          :: filter     = .false.  !<  Filter variables at 3 dx to  prevent peak in
                                             !<  dimensionless wind profile if MOST-local enabled
 
@@ -23,6 +24,9 @@ module lsmdata
 
   ! Domain-uniform properties
   integer,parameter :: ksoilmax = 4       !<  Number of soil layers [-]
+
+  ! Surface heterogeneity variables
+  integer           :: hetper = 1         !<  Set number of heterogeneity periods in the domain
 
   real              :: lambdasat          !<  heat conductivity saturated soil [W/m/K]
   real              :: Ke                 !<  Kersten number [-]
@@ -96,6 +100,7 @@ module lsmdata
   real              :: albedoav = 0.25
 
   real, allocatable :: LAI        (:,:) !<  Leaf area index vegetation [-]
+  real, allocatable :: LAIG       (:,:) !<  Global leaf area index vegetation [-]
   real              :: LAIav    = 2.
 
   real, allocatable :: Cskin      (:,:) !<  Heat capacity skin layer [J]
@@ -156,10 +161,10 @@ module lsmdata
   real              :: v0av             !<  Mean v-wind component
   real, allocatable :: u0bar    (:,:,:) !<  Filtered u-wind component
   real, allocatable :: v0bar    (:,:,:) !<  Filtered v-wind component
-  real, allocatable :: thetaav (:,:)   !<  Filtered liquid water pot temp at first level
-  real, allocatable :: vaporav (:,:)   !<  Filtered specific humidity at first full level
-  real, allocatable :: tskinav (:,:)   !<  Filtered surface temperature
-  real, allocatable :: qskinav (:,:)   !<  Filtered surface specific humidity
+  real, allocatable :: thetaav  (:,:)   !<  Filtered liquid water pot temp at first level
+  real, allocatable :: vaporav  (:,:)   !<  Filtered specific humidity at first full level
+  real, allocatable :: tskinav  (:,:)   !<  Filtered surface temperature
+  real, allocatable :: qskinav  (:,:)   !<  Filtered surface specific humidity
 
   contains
 
@@ -170,6 +175,8 @@ module lsmdata
   !
   subroutine initlsm
   use grid, only : nzp, nxp, nyp, th00, vapor, iradtyp
+  use mpi_interface, only: myid, xoffset, yoffset, wrxid, wryid, nxpg, nypg
+ 
   !use forc, only : sfc_albedo
 
     integer :: k,ierr
@@ -179,7 +186,7 @@ module lsmdata
     !
     namelist/SURFNAMELIST/ & 
     !< Switches
-    local, filter, smoothflux, neutral, &
+    local, filter, smoothflux, neutral, hetero, &
     !< Soil related variables
     tsoilav, tsoildeepav, phiwav, rootfav, &
     !< Land surface related variables
@@ -269,6 +276,9 @@ module lsmdata
     allocate(gD(nxp,nyp))
     allocate(Wl(nxp,nyp))
     allocate(Wlm(nxp,nyp))
+
+    ! Allocate global variables (nxpg,nypg)
+    allocate(LAIG(nxpg,nypg))
 
     ! Allocate filtered variables
     allocate(u0bar(nzp,nxp,nyp))
@@ -361,11 +371,51 @@ module lsmdata
     rsmin      = rsminav
     rssoilmin  = rssoilminav
     LAI        = LAIav
+    LAIG       = 999.
     gD         = gDav
     cveg       = cvegav
     cliq       = 0.
     Wl         = Wlav
     !sfc_albedo = albedoav
+
+    ! --------------------------------------------------------
+    ! Static Heterogeneity of Vegetation
+    ! 
+    ! std:    LAI=4. albedo=0.20 z0mav=0.035 z0hav=0.035
+    ! gras:   LAI=2. albedo=0.25 z0mav=0.035 z0hav=0.035
+    ! forest: LAI=6. albedo=0.15 z0mav=0.500 z0hav=0.500
+    
+    if (hetero) then
+     
+    !Set number of heterogeneity periods in the domain
+    hetper = 1
+     
+    if (hetper==1) then
+       LAIG(3:((nxpg-2)/2),:) = 2.
+       LAIG(((nxpg-2)/2):(nxpg-2),:) = 6.
+    end if 
+    
+    if (hetper==2) then
+       LAIG(3:((nxpg-2)/4)                ,:) = 2.
+       LAIG(((nxpg-2)/4)   :((nxpg-2)/2)   ,:) = 6.
+       LAIG(((nxpg-2)/2)   :((nxpg-2)*3/4) ,:) = 2.
+       LAIG(((nxpg-2)*3/4) :(nxpg-2)       ,:) = 6.
+    end if
+    
+    print*,"CHECK INPUT:::",LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
+                            3+yoffset(wryid):nyp+yoffset(wryid)-2 )
+
+    print*,"myid:",myid,"xoffset:",xoffset(wrxid)
+    print*,"myid:",myid,"yoffset:",yoffset(wrxid)
+
+    LAI(3:(nxp-2),3:(nyp-2)) = LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
+                               3+yoffset(wryid):nyp+yoffset(wryid)-2 )
+
+    print*,"myid:",myid,"LAIG:",LAIG(:,3)
+    print*,"myid:",myid,"LAI:",LAI(:,3)
+    deallocate(LAIG)
+
+    end if 
 
   end subroutine initlsm
 

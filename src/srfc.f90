@@ -40,12 +40,12 @@ contains
   !     isfctyp=4: fix surface temperature to yield a constant surface buoyancy flux
   !     isfctyp=5: variable surface temperature and humidity using LSM (van Heerwarden)
   !irina
-  subroutine surface(sst)
+  subroutine surface(sst,time_in)
 
     use defs, only: vonk, p00, rcp, g, cp, alvl, ep2
     use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, zt, psrf,   &
          th00, umean, vmean, dn0, level, a_ustar, a_tstar, a_rstar,        &
-         uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, nstep
+         uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, nstep, shls, lhls, usls, timels
     use thrm, only: rslf
     use stat, only: sfc_stat, sflg
     use mpi_interface, only : nypg, nxpg, double_array_par_sum
@@ -53,13 +53,16 @@ contains
 
     implicit none
  
-    real, optional, intent (inout) :: sst
-    integer		:: i, j, iterate
+    real, optional, intent (inout) :: sst,time_in
+    integer		:: i, j, l, iterate
     real		:: zs, bflx0,bflx, ffact, sst1, bflx1, Vbulk, Vzt, usum
     real (kind=8)	:: bfl(2), bfg(2)
 
     real :: dtdz(nxp,nyp), drdz(nxp,nyp), usfc(nxp,nyp), vsfc(nxp,nyp) &
             ,wspd(nxp,nyp), bfct(nxp,nyp), ustar(nxp,nyp)
+
+    real :: times,tfrac
+    integer:: tcnt
 
     select case(isfctyp)
 
@@ -189,9 +192,9 @@ contains
 
        !Initialize Land Surface 
        if (init_lsm) then
-          print*,"Start Case(5) - initialize LSM"
+          print*,myid,": Start Case(5) - initialize LSM"
           call initlsm
-          print*,"Land surface initialized..."
+          print*,myid,": Land surface initialized..."
           init_lsm = .false.
        end if
 
@@ -242,9 +245,6 @@ contains
           end do
        end do
 
-       !switch between homogeneous and heterogeneous ra
-       !ra(:,:) = sum(ra(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-
        !Get skin temperature and humidity from land surface model(van Heerwarden)
        call lsm
 
@@ -277,38 +277,8 @@ contains
              a_rstar(i,j) = - wq_sfc(i,j)/a_ustar(i,j)
              a_tstar(i,j) = - wt_sfc(i,j)/a_ustar(i,j)
 
-          !if  (wt_sfc(i,j) .lt. 0) then
-          !   wt_sfc(i,j) = 0.
-          !end if
-
-          !if  (wq_sfc(i,j) .lt. 0) then
-          !   wq_sfc(i,j) = 0.
-          !end if
-
           end do
        end do
-
-       if (nstep==1 .and. i==nxp-2 .and. j==nyp-2 .and. .false.) then
-         print*,"*****************************************************************"
-         print*,"LHF(mean),LHF(max),LHF(min):",sum(wq_sfc(3:nxp-2,3:nyp-2))*alvl*(dn0(1)+dn0(2))*0.5/(nxp-4)/(nyp-4),  &
-                 maxval(wq_sfc(3:nxp-2,3:nyp-2)*alvl*(dn0(1)+dn0(2))*0.5), minval(wq_sfc(3:nxp-2,3:nyp-2)*alvl*(dn0(1)+dn0(2))*0.5)
-         print*,"*****************************************************************"
-       end if
-
-       if (nstep == 1 .and. myid == 3 .and. .false.) then
-         print*,"********************************"
-         print*,"*********SURFACE SCALARS********"
-         print*,"********************************"
-         print*,"obl (min)",minval(obl(3:nxp-2,3:nyp-2))
-         print*,"obl (max)",maxval(obl(3:nxp-2,3:nyp-2))
-         print*,"ustar (min)",minval(a_ustar(3:nxp-2,3:nyp-2))
-         print*,"ustar (max)",maxval(a_ustar(3:nxp-2,3:nyp-2))
-         print*,"tstar (min)",minval(a_tstar(3:nxp-2,3:nyp-2))
-         print*,"tstar (max)",maxval(a_tstar(3:nxp-2,3:nyp-2))
-         print*,"********************************"
-         print*,"********************************"
-         print*,"********************************"
-       end if
 
   !
   ! ----------------------------------------------------------------------
@@ -317,37 +287,54 @@ contains
   !
    case default
 
-       ffact = 1.
-       wt_sfc(1,1)  = ffact* dthcon/(0.5*(dn0(1)+dn0(2))*cp)
-       wq_sfc(1,1)  = ffact* drtcon/(0.5*(dn0(1)+dn0(2))*alvl)
+      ffact = 1.
 
-       if (zrough <= 0.) then
-          usum = 0.
-          do j=3,nyp-2
-             do i=3,nxp-2
-                usum = usum + a_ustar(i,j)
-             end do
-          end do
-          usum = max(ubmin,usum/float((nxp-4)*(nyp-4)))
-          zs = max(0.0001,(0.016/g)*usum**2)
-       else
-          zs = zrough
-       end if
+      !homogeneous surface fluxes from nc file
+      !if (myid==1)print*,shls
+
+      if (.true.) then
+         times=time_in*24.0*3600.0
+         if (times .lt. timels(1))then
+            tcnt = 1
+            tfrac = 0.
+         else
+            do l=1,2883
+               if ( (times .ge. timels(l)) .and. (times .lt. timels(l+1)) ) then
+                 tcnt = l
+                 go to 10
+               end if
+            end do
+         10 continue
+         tfrac = (times - timels(tcnt)) / (timels(tcnt+1)-timels(tcnt))
+         end if 
+         if (myid==1) print*,times,timels(tcnt),tcnt
+
+         wt_sfc(1,1)=(shls(tcnt)+(shls(tcnt+1)-shls(tcnt))*tfrac)/(0.5*(dn0(1)+dn0(2))*cp)
+         wq_sfc(1,1)=(lhls(tcnt)+(lhls(tcnt+1)-lhls(tcnt))*tfrac)/(0.5*(dn0(1)+dn0(2))*alvl)
+         a_ustar(1,1)=(usls(tcnt)+(usls(tcnt+1)-usls(tcnt))*tfrac) 
+      else
+         wt_sfc(1,1)  = ffact*dthcon/(0.5*(dn0(1)+dn0(2))*cp)
+         wq_sfc(1,1)  = ffact*drtcon/(0.5*(dn0(1)+dn0(2))*alvl)
+
+      end if
+
+      !homogeneous surface end
 
        do j=3,nyp-2
           do i=3,nxp-2
              wt_sfc(i,j)=wt_sfc(1,1)
              wq_sfc(i,j)=wq_sfc(1,1)
+             a_ustar(i,j)=a_ustar(1,1)
 
              wspd(i,j)    = max(0.1,                                    &
                   sqrt((a_up(2,i,j)+umean)**2+(a_vp(2,i,j)+vmean)**2))
-             if (ubmin > 0.) then
-                bflx = g*wt_sfc(1,1)/th00
-                if (level >= 2) bflx = bflx + g*ep2*wq_sfc(i,j)
-                a_ustar(i,j) = diag_ustar(zt(2),zs,bflx,wspd(i,j))
-             else
-                a_ustar(i,j) = abs(ubmin)
-             end if
+             !if (ubmin > 0.) then
+             !   bflx = g*wt_sfc(1,1)/th00
+             !   if (level >= 2) bflx = bflx + g*ep2*wq_sfc(i,j)
+             !   a_ustar(i,j) = diag_ustar(zt(2),zs,bflx,wspd(i,j))
+             !else
+             !   a_ustar(i,j) = abs(ubmin)
+             !end if
 
              ffact = a_ustar(i,j)*a_ustar(i,j)/wspd(i,j)
              uw_sfc(i,j)  = -ffact*(a_up(2,i,j)+umean)

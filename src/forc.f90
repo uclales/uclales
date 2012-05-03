@@ -147,18 +147,18 @@ contains
     end if
 
     !Malte: Relax the mean wind profile to the initial state (u0,v0)
-    do k=2,nzp-2
-       um(k)=get_avg(nzp,nxp,nyp,k,a_up)
-       vm(k)=get_avg(nzp,nxp,nyp,k,a_vp)
-    end do
-    do j=3,nyp-2
-       do i=3,nxp-2
-          do k=2,nzp-2
-             a_ut(k,i,j) = a_ut(k,i,j)-(um(k)-u0(k))/3600.0
-             a_vt(k,i,j) = a_vt(k,i,j)-(vm(k)-v0(k))/3600.0
-          end do
-       end do
-    end do
+    !do k=2,nzp-2
+    !   um(k)=get_avg(nzp,nxp,nyp,k,a_up)
+    !   vm(k)=get_avg(nzp,nxp,nyp,k,a_vp)
+    !end do
+    !do j=3,nyp-2
+    !   do i=3,nxp-2
+    !      do k=2,nzp-2
+    !         a_ut(k,i,j) = a_ut(k,i,j)-(um(k)-u0(k))/3600.0
+    !         a_vt(k,i,j) = a_vt(k,i,j)-(vm(k)-v0(k))/3600.0
+    !      end do
+    !   end do
+    !end do
 
   end subroutine forcings
   !

@@ -75,6 +75,10 @@ module grid
        cnd_acc, &  ! accumulated condensation  [kg/m2] (diagnostic for 2D output)
        cev_acc, &  ! accumulated evaporation of cloud water [kg/m2] (diagnostic for 2D output)
        rev_acc     ! accumulated evaporation of rainwater   [kg/m2] (diagnostic for 2D output)
+
+  !Malte: read homogeneous fluxes from nc file
+  real, dimension (:), allocatable :: shls, lhls, usls, timels
+ 
   !
   ! 3D Arrays 
   !irina
@@ -277,6 +281,13 @@ contains
     allocate (a_ustar(nxp,nyp),a_tstar(nxp,nyp),a_rstar(nxp,nyp))
     allocate (uw_sfc(nxp,nyp),vw_sfc(nxp,nyp),ww_sfc(nxp,nyp))
     allocate (wt_sfc(nxp,nyp),wq_sfc(nxp,nyp))
+
+    !Malte: allocate homogeneous fluxes
+    allocate(shls(2883))
+    allocate(lhls(2883))
+    allocate(usls(2883))
+    allocate(timels(2883))
+    memsize = memsize + 4*2883
 
     if (level >= 2) then
        allocate(prc_c(nzp,nxp,nyp))

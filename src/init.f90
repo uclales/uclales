@@ -43,11 +43,11 @@ contains
 !irina use lsvarflg
     use step, only : time, outflg,lsvarflg
     use stat, only : init_stat
+    use srfc, only : isfctyp
     use mpi_interface, only : appl_abort, myid
     use thrm, only : thermo
     use mcrp, only : initmcrp
     use modcross, only : initcross, triggercross
-!
 
     implicit none
 
@@ -73,7 +73,14 @@ contains
        if (lsvarflg) then
        call lsvar_init
        end if
-    !    
+
+    !print*,"just before reading surface fluxes"
+    !Malte: prescribe homogeneous surface fluxes
+    if (isfctyp==0) then
+        call homo_surf
+    end if
+
+    !
     ! write analysis and history files from restart if appropriate
     ! 
     if (outflg) then
@@ -645,7 +652,49 @@ contains
     return
   end subroutine lsvar_init
 
-  !
+ !-----------------------
+ ! homo_surf read SHF LHF 
+ !
+ subroutine homo_surf
+
+   use netcdf
+   use grid, only: shls, lhls, usls, timels
+
+   implicit none
+
+   integer            :: ncid, status
+   integer            :: shid, lhid, usid, timeid
+
+!*  Open
+      status=nf90_open('homo_fluxes.ts.nc',nf90_nowrite,ncid)
+      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+!* Read
+      status=nf90_inq_varid(ncid,"shf_bar",shid)
+      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+      status=nf90_get_var(ncid,shid,shls)
+      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+
+      status=nf90_inq_varid(ncid,"lhf_bar",lhid)
+      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+      status=nf90_get_var(ncid,lhid,lhls)
+      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+
+      status=nf90_inq_varid(ncid,"ustar",usid)
+      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+      status=nf90_get_var(ncid,usid,usls)
+      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+
+      status=nf90_inq_varid(ncid,"time",timeid)
+      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+      status=nf90_get_var(ncid,timeid,timels)
+      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+!* Close
+      status=nf90_close(ncid)
+      if (status.ne.nf90_noerr) print*,nf90_strerror(status)   
+
+return
+ end subroutine homo_surf
+
 
 
 end module init
