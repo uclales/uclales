@@ -73,6 +73,7 @@ module modparticles
 
   real, allocatable, dimension(:,:,:) :: sgse
   real, allocatable, dimension(:)     :: fs
+  integer (KIND=selected_int_kind(10)):: idum = -12345
 
 contains
   !
@@ -96,31 +97,6 @@ contains
       call fsubgrid
     end if
 
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    ! DEBUG
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !print*,sgstke(2,10,10)
-    !if(time > 600) then
-    !  allocate(sgstke_prof(nzp))
-    !  sgstke_prof = 0.
-    !  do j=1,nyg
-    !     do i=1,nxg
-    !        do k=1,nzp
-    !          sgstke_prof(k) = sgstke_prof(k) + sgstke(k,i,j)
-    !        end do
-    !     end do
-    !  end do
-
-    !  sgstke_prof = sgstke_prof / (nxg * nyg)
-    !  
-    !  do k=1,nzp
-    !    print*,k,sgstke_prof(k)
-    !  end do
-    !  
-    !  stop
-    !end if
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
     particle => head
     do while( associated(particle) )
       if (  time - particle%tstart >= 0 ) then
@@ -182,68 +158,6 @@ contains
     call partcomm
 
   end subroutine particles
-
-  !
-  !--------------------------------------------------------------------------
-  ! subroutine fsubgrid : calculates fs (contribution sgs turbulence to
-  !   total turbulence)
-  !--------------------------------------------------------------------------
-  !
-  subroutine fsubgrid
-    use grid, only : a_up, a_vp, a_wp, nzp, nxp, nyp
-    use mpi_interface, only : ierror, mpi_double_precision, mpi_sum, mpi_comm_world, nxg, nyg
-    implicit none
-   
-    integer    :: k
-    real, allocatable, dimension(:)   :: &
-       u_avl, v_avl, u2_avl, v2_avl, w2_avl, sgse_avl,     &
-       u_av,  v_av,  u2_av,  v2_av,  w2_av,  sgse_av, e_res
-
-    allocate(u_avl(nzp), v_avl(nzp), u2_avl(nzp), v2_avl(nzp), w2_avl(nzp), sgse_avl(nzp),   &
-             u_av(nzp),  v_av(nzp),  u2_av(nzp),  v2_av(nzp),  w2_av(nzp),  sgse_av(nzp),    &
-             e_res(nzp))
-
-    do k=1,nzp
-      u_avl(k)    = sum(a_up(k,3:nxp-2,3:nyp-2))
-      v_avl(k)    = sum(a_vp(k,3:nxp-2,3:nyp-2))
-      w2_avl(k)   = sum(a_wp(k,3:nxp-2,3:nyp-2)**2.)
-      sgse_avl(k) = sum(sgse(k,3:nxp-2,3:nyp-2))
-    end do 
-
-    call mpi_allreduce(u_avl,u_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-    call mpi_allreduce(v_avl,v_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-    call mpi_allreduce(w2_avl,w2_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-    call mpi_allreduce(sgse_avl,sgse_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-   
-    u_av        = u_av    / (nxg * nyg)  
-    v_av        = v_av    / (nxg * nyg)     
- 
-    do k=1,nzp
-      u2_avl(k) = sum((a_up(k,3:nxp-2,3:nyp-2) - u_av(k))**2.)
-      v2_avl(k) = sum((a_vp(k,3:nxp-2,3:nyp-2) - v_av(k))**2.)
-    end do 
-
-    call mpi_allreduce(u2_avl,u2_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-    call mpi_allreduce(v2_avl,v2_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-
-    u2_av       = u2_av   / (nxg * nyg)    
-    v2_av       = v2_av   / (nxg * nyg)    
-    w2_av       = w2_av   / (nxg * nyg)    
-    sgse_av     = sgse_av / (nxg * nyg) 
-  
-    do k=2, nzp
-      e_res(k)  = 0.5 * (u2_av(k) + v2_av(k) + 0.5*(w2_av(k) + w2_av(k-1)))
-      fs(k)     = sgse_av(k) / (sgse_av(k) + e_res(k))
-      !print*,k,fs(k),sgse_av(k),e_res(k)
-    end do
-
-    fs(1) = 1.   ! below surface......
-
-    deallocate(u_avl,v_avl,u2_avl,v2_avl,w2_avl,sgse_avl,u_av,v_av,u2_av,v2_av,w2_av,sgse_av,e_res)
-
-  end subroutine fsubgrid
-
-
 
   !
   !--------------------------------------------------------------------------
@@ -661,10 +575,12 @@ contains
         particle => particle%next
       end do 
 
-      do k = 1,nzp-2 
-        fsprofl(k)      = fsprofl(k)    + fs(k+1)
-        eprofl(k)       = eprofl(k)     + sum(sgse(k+1,3:nxp-2,3:nyp-2)) / (nxg * nyg)
-      end do     
+      if(lpartsgs) then
+        do k = 1,nzp-2 
+          fsprofl(k)      = fsprofl(k)    + fs(k+1)
+          eprofl(k)       = eprofl(k)     + sum(sgse(k+1,3:nxp-2,3:nyp-2)) / (nxg * nyg)
+        end do     
+      end if
 
       nstatsamp = nstatsamp + 1
     end if
@@ -937,6 +853,50 @@ contains
 
   !
   !--------------------------------------------------------------------------
+  ! function sgstke : trilinear interpolation of subgrid TKE
+  !--------------------------------------------------------------------------
+  !
+  !function sgstke(x, y, z)
+  !  implicit none
+  !  real, intent(in) :: x, y, z
+
+  !  integer  :: xbottom, ybottom, zbottom
+  !  real     :: sgstke, deltax, deltay, deltaz
+
+  !  xbottom = floor(x - 0.5)
+  !  ybottom = floor(y - 0.5)
+  !  zbottom = floor(z - 0.5)
+  !  deltax = x - 0.5 - xbottom
+  !  deltay = y - 0.5 - ybottom
+  !  deltaz = z - 0.5 - zbottom
+
+  !      
+  !   if (zbottom == 0)  then
+  !    sgstke =     (2-deltaz) * (1-deltay) * (1-deltax) * (  e120(xbottom    , ybottom    , 1)**2) + &
+  !        &        (2-deltaz) * (1-deltay) * (  deltax) * (  e120(xbottom + 1, ybottom    , 1)**2) + &
+  !        &        (2-deltaz) * (  deltay) * (1-deltax) * (  e120(xbottom    , ybottom + 1, 1)**2) + &
+  !        &        (2-deltaz) * (  deltay) * (  deltax) * (  e120(xbottom + 1, ybottom + 1, 1)**2) + &
+  !        &        (deltaz-1) * (1-deltay) * (1-deltax) *    e120(xbottom    , ybottom    , 2)**2  + &
+  !        &        (deltaz-1) * (1-deltay) * (  deltax) *    e120(xbottom + 1, ybottom    , 2)**2  + &
+  !        &        (deltaz-1) * (  deltay) * (1-deltax) *    e120(xbottom    , ybottom + 1, 2)**2  + &
+  !        &        (deltaz-1) * (  deltay) * (  deltax) *    e120(xbottom + 1, ybottom + 1, 2)**2
+  !  else
+  !    sgstke =     (1-deltaz) * (1-deltay) * (1-deltax) *   e120(xbottom    , ybottom    , zbottom    )**2 + &
+  !        &        (1-deltaz) * (1-deltay) * (  deltax) *   e120(xbottom + 1, ybottom    , zbottom    )**2 + &
+  !        &        (1-deltaz) * (  deltay) * (1-deltax) *   e120(xbottom    , ybottom + 1, zbottom    )**2 + &
+  !        &        (1-deltaz) * (  deltay) * (  deltax) *   e120(xbottom + 1, ybottom + 1, zbottom    )**2
+  !        &        (  deltaz) * (1-deltay) * (1-deltax) *   e120(xbottom    , ybottom    , zbottom + 1)**2 + &
+  !        &        (  deltaz) * (1-deltay) * (  deltax) *   e120(xbottom + 1, ybottom    , zbottom + 1)**2 + &
+  !        &        (  deltaz) * (  deltay) * (1-deltax) *   e120(xbottom    , ybottom + 1, zbottom + 1)**2 + &
+  !        &        (  deltaz) * (  deltay) * (  deltax) *   e120(xbottom + 1, ybottom + 1, zbottom + 1)**2
+  !    end if
+  !  end if
+  !  sgstke = max(sgstke,e12min**2)
+
+  !end function sgstke
+
+  !
+  !--------------------------------------------------------------------------
   ! subroutine rk3 : Third order Runge-Kutta scheme for spatial integration
   !--------------------------------------------------------------------------
   !
@@ -1040,6 +1000,83 @@ contains
     !end if
 
   end subroutine checkbound
+
+  !
+  !--------------------------------------------------------------------------
+  ! function xi & random : creates component of white Gaussian noise  
+  !--------------------------------------------------------------------------
+  !
+  function xi(idum)
+    implicit none
+    integer (KIND=selected_int_kind(10)):: idum
+    integer (KIND=selected_int_kind(10)):: iset
+    real :: xi, fac, gset, rsq, v1, v2
+    save iset, gset
+    data iset /0/
+    
+    rsq   = 0.
+    v1    = 0.
+    v2    = 0.
+
+    if (iset == 0) then
+      do while (rsq >= 1 .or. rsq == 0)
+        v1        = 2. * random(idum)-1.
+        v2        = 2. * random(idum)-1.
+        rsq       = v1 * v1 + v2 * v2
+      end do
+      fac         = sqrt(-2. * log(rsq) / rsq)
+      gset        = v1 * fac
+      xi          = v2 * fac
+      iset        = 1
+    else
+      xi          = gset
+      iset        = 0
+    end if
+    return
+  end function xi
+
+  function random(idum)
+    implicit none
+    integer, parameter :: ntab = 32
+    integer (KIND=selected_int_kind(10)):: idum 
+    integer (KIND=selected_int_kind(10)):: ia, im, iq, ir, iv(ntab), iy, ndiv, threshold=1
+    real :: random, am, eps1, rnmx
+
+    integer :: j, k
+    save iv, iy
+
+    ia     = 16807
+    im     = 2147483647
+    am     = 1. / real(im)
+    iq     = 127773
+    ir     = 2836
+    ndiv   = 1 +  (im-1)/real(ntab)
+    eps1   = 1.2E-7
+    rnmx   = 1. - eps1
+
+    data iv /ntab*0/ , iy /0/
+
+    if (idum <= 0 .or. iy == 0 ) then
+      idum    = max(idum,threshold)
+      do j    = ntab + 8, 1, -1
+        k     = idum / real(iq)
+        idum  = ia * (idum - k * iq) - ir * k
+        if (idum < 0) idum = idum + im
+        if (j <= ntab ) iv(j) = idum
+      end do
+      iy = iv(1)
+    end if
+    
+    k      = idum / real(iq)
+    idum   = ia * (idum - k * iq) - ir * k
+    if (idum <= 0) idum = idum + im
+    j      = 1 + iy / real(ndiv)
+    iy     = iv(j)
+    iv(j)  = idum
+    random = min(am*iy,rnmx)
+    return
+  end function random
+
 
   !--------------------------------------------------------------------------
   !
@@ -1281,8 +1318,10 @@ contains
       call addvar_nc(ncpartstatid,'u','resolved u-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
       call addvar_nc(ncpartstatid,'v','resolved v-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
       call addvar_nc(ncpartstatid,'w','resolved w-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
-      call addvar_nc(ncpartstatid,'fs','subgrid turbulence fraction','-',dimname,dimlongname,dimunit,dimsize,dimvalues)
-      call addvar_nc(ncpartstatid,'e','subgrid TKE','m2/s2',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      if(lpartsgs) then
+        call addvar_nc(ncpartstatid,'fs','subgrid turbulence fraction','-',dimname,dimlongname,dimunit,dimsize,dimvalues)
+        call addvar_nc(ncpartstatid,'e','subgrid TKE','m2/s2',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      end if
     end if 
  
   end subroutine initparticlestat
