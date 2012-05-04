@@ -52,9 +52,9 @@ module modparticles
   type :: particle_record
     real             :: unique, tstart
     integer          :: partstep
-    real             :: x, x_prev, ures_prev, xstart, ures, usgs, usgs_prev
-    real             :: y, y_prev, vres_prev, ystart, vres, vsgs, vsgs_prev
-    real             :: z, z_prev, wres_prev, zstart, wres, wsgs, wsgs_prev
+    real             :: x, xstart, x_prev, ures, ures_prev, usgs, usgs_prev, usgs_tend, usgs_tend_prev
+    real             :: y, ystart, y_prev, vres, vres_prev, vsgs, vsgs_prev, vsgs_tend, vsgs_tend_prev
+    real             :: z, zstart, z_prev, wres, wres_prev, wsgs, wsgs_prev, wsgs_tend, wsgs_tend_prev
     real             :: sigma2_sgs
     type (particle_record), pointer :: next,prev
   end type
@@ -63,7 +63,8 @@ module modparticles
   type (particle_record), pointer :: head, tail
 
   integer            :: ipunique, ipx, ipy, ipz, ipxstart, ipystart, ipzstart, iptsart, ipxprev, ipyprev, ipzprev
-  integer            :: ipures, ipvres, ipwres, ipusgs, ipvsgs, ipwsgs, ipusgs_prev, ipvsgs_prev, ipwsgs_prev 
+  integer            :: ipures, ipvres, ipwres, ipusgs, ipvsgs, ipwsgs, ipusgs_prev, ipvsgs_prev, ipwsgs_prev
+  integer            :: iusgs_tend, ivsgs_tend, iwsgs_tend, iusgs_tend_prev, ivsgs_tend_prev, iwsgs_tend_prev 
   integer            :: ipures_prev, ipvres_prev, ipwres_prev, ipartstep, nrpartvar, isigma2_sgs
 
   ! Statistics and particle dump
@@ -122,15 +123,16 @@ contains
 
         ! Subgrid velocities 
         if (lpartsgs) then
-          if (nstep==1) then
-            particle%usgs_prev = particle%usgs
-            particle%vsgs_prev = particle%vsgs
-            particle%wsgs_prev = particle%wsgs
-          end if
+          !if (nstep==1) then
+          !  particle%usgs_prev = particle%usgs
+          !  particle%vsgs_prev = particle%vsgs
+          !  particle%wsgs_prev = particle%wsgs
+          !end if
+          ! Calculate subgrid velocity tendencies
           call prep_ui_sgs(particle)
-          particle%usgs = velocity_usgs(particle) * dxi
-          particle%vsgs = velocity_vsgs(particle) * dyi
-          particle%wsgs = velocity_wsgs(particle) * dzi_t(floor(particle%z))
+          particle%usgs_tend = tend_usgs(particle) !* dxi
+          particle%vsgs_tend = tend_vsgs(particle) !* dyi
+          particle%wsgs_tend = tend_wsgs(particle) !* dzi_t(floor(particle%z))
         end if
 
         !if(nstep == 3) then
@@ -438,17 +440,19 @@ contains
     real :: zparticle
     TYPE (particle_record), POINTER:: particle
 
-    sigma2l      = (2./3.) * sca2part(particle%x,particle%y,particle%z,sgse,.true.)
+    sigma2l      = sca2part(particle%x,particle%y,particle%z,sgse,.true.) * (2./3.)
     epsl         = sca2part(particle%x,particle%y,particle%z,a_scr7,.false.)
-    fsl          = 1.
-    dsigma2dx    = (2./3.) * (sca2part(particle%x+0.5,particle%y,particle%z,sgse,.true.) - sca2part(particle%x-0.5,particle%y,particle%z,sgse,.true.)) * dxi
-    dsigma2dy    = (2./3.) * (sca2part(particle%x,particle%y+0.5,particle%z,sgse,.true.) - sca2part(particle%x,particle%y-0.5,particle%z,sgse,.true.)) * dyi
-    dsigma2dz    = (2./3.) * (sca2part(particle%x,particle%y,particle%z+0.5,sgse,.true.) - sca2part(particle%x,particle%y,particle%z-0.5,sgse,.true.)) * dzi_t(floor(particle%z))    ! <--------------- just for testing, very crude assumptions....
+    fsl          = 1. ! <-------------- Fixed for testing....
+    dsigma2dx    = (2./3.) * (sca2part(particle%x+0.5,particle%y,particle%z,sgse,.true.) - &
+                              sca2part(particle%x-0.5,particle%y,particle%z,sgse,.true.)) * dxi
+    dsigma2dy    = (2./3.) * (sca2part(particle%x,particle%y+0.5,particle%z,sgse,.true.) - &
+                              sca2part(particle%x,particle%y-0.5,particle%z,sgse,.true.)) * dyi
+    dsigma2dz    = (2./3.) * (sca2part(particle%x,particle%y,particle%z+0.5,sgse,.true.) - &
+                              sca2part(particle%x,particle%y,particle%z-0.5,sgse,.true.)) * dzi_t(floor(particle%z))    !just for testing, very crude assumptions....
     dsigma2dt    = (sigma2l - particle%sigma2_sgs) / dt
     dsigma2dt    = sign(1.,dsigma2dt) * min(abs(dsigma2dt),1. / dt)     ! Limit dsigma2dt term
     particle%sigma2_sgs = sigma2l
     
- 
     !dsigma2dt    = (log(sigma2l) - log(particle%sigma2_sgs)) / dt
     !zparticle    = zm(floor(particle%z)) + (particle%z - floor(particle%z)) * dzi_t(floor(particle%z))
     !labda        = (1. / ((1. / ((zm(2)/dxi/dyi)**(1./3.))**2.) + (1. / (0.4 * (zparticle + 0.001)**2.))))**0.5
@@ -462,21 +466,21 @@ contains
   !   NOTE: a_scr7 contains the dissipation rate (eps)
   !--------------------------------------------------------------------------
   !
-  function velocity_usgs(particle)
+  function tend_usgs(particle)
     use grid, only : dxi, dt
     implicit none
 
-    real :: t1, t2, t3, velocity_usgs
+    real :: t1, t2, t3, tend_usgs
     TYPE (particle_record), POINTER:: particle
 
     !t1        = -0.5 * fsl * C0 * (particle%usgs_prev / dxi) * dt * 1.5 * (ceps/labda) * (1.5 * sigma2l)**0.5
-    t1        = -0.5 * C0 * fsl * epsl * (particle%usgs_prev / dxi) / sigma2l * dt
-    t2        =  0.5 * ((1. / sigma2l) * dsigma2dt * (particle%usgs_prev / dxi) + dsigma2dx) * dt  
-    t3        = (fsl * C0 * epsl)**0.5 * xi(idum)
+    t1        = -0.5 * C0 * fsl * epsl * (particle%usgs_prev / dxi) / sigma2l
+    t2        =  0.5 * ((1. / sigma2l) * dsigma2dt * (particle%usgs_prev / dxi) + dsigma2dx) 
+    t3        = ((fsl * C0 * epsl)**0.5 * xi(idum)) / dt
 
-    velocity_usgs = (particle%usgs_prev / dxi) + t1 + t2 + t3  
+    tend_usgs = t1 + t2 + t3  
 
-  end function velocity_usgs
+  end function tend_usgs
 
   !
   !--------------------------------------------------------------------------
@@ -484,20 +488,20 @@ contains
   !   NOTE: a_scr7 contains the dissipation rate (eps)
   !--------------------------------------------------------------------------
   !
-  function velocity_vsgs(particle)
+  function tend_vsgs(particle)
     use grid, only : dyi, dt
     implicit none
 
-    real :: t1, t2, t3, velocity_vsgs
+    real :: t1, t2, t3, tend_vsgs
     TYPE (particle_record), POINTER:: particle
 
-    t1        = -0.5 * C0 * fsl * epsl * (particle%vsgs_prev / dyi) / sigma2l * dt
-    t2        =  0.5 * ((1. / sigma2l) * dsigma2dt * (particle%vsgs_prev / dyi) + dsigma2dy) * dt  
-    t3        = (fsl * C0 * epsl)**0.5 * xi(idum)
+    t1        = -0.5 * C0 * fsl * epsl * (particle%vsgs_prev / dyi) / sigma2l
+    t2        =  0.5 * ((1. / sigma2l) * dsigma2dt * (particle%vsgs_prev / dyi) + dsigma2dy)
+    t3        = ((fsl * C0 * epsl)**0.5 * xi(idum)) / dt
  
-    velocity_vsgs = (particle%vsgs_prev / dyi) + t1 + t2 + t3  
+    tend_vsgs = t1 + t2 + t3  
 
-  end function velocity_vsgs
+  end function tend_vsgs
 
   !
   !--------------------------------------------------------------------------
@@ -505,20 +509,20 @@ contains
   !   NOTE: a_scr7 contains the dissipation rate (eps)
   !--------------------------------------------------------------------------
   !
-  function velocity_wsgs(particle)
+  function tend_wsgs(particle)
     use grid, only : dzi_t, dt
     implicit none
 
-    real :: t1, t2, t3, velocity_wsgs
+    real :: t1, t2, t3, tend_wsgs
     TYPE (particle_record), POINTER:: particle
 
-    t1        = -0.5 * C0 * fsl * epsl * (particle%wsgs_prev / dzi_t(floor(particle%z))) / sigma2l * dt
-    t2        =  0.5 * ((1. / sigma2l) * dsigma2dt * (particle%wsgs_prev / dzi_t(floor(particle%z))) + dsigma2dz) * dt  
-    t3        = (fsl * C0 * epsl)**0.5 * xi(idum)
+    t1        = -0.5 * C0 * fsl * epsl * (particle%wsgs_prev / dzi_t(floor(particle%z))) / sigma2l 
+    t2        =  0.5 * ((1. / sigma2l) * dsigma2dt * (particle%wsgs_prev / dzi_t(floor(particle%z))) + dsigma2dz)   
+    t3        = ((fsl * C0 * epsl)**0.5 * xi(idum)) / dt
  
-    velocity_wsgs = (particle%wsgs_prev / dzi_t(floor(particle%z))) + t1 + t2 + t3  
+    tend_wsgs = t1 + t2 + t3  
 
-  end function velocity_wsgs
+  end function tend_wsgs
 
   !
   !--------------------------------------------------------------------------
@@ -539,10 +543,15 @@ contains
     particle%wres_prev = particle%wres
 
     call checkbound(particle)
-    
-    !  if (floor(particle%z)/=floor(particle%z_prev)) then
-    !    particle%z = floor(particle%z) + (particle%z -floor(particle%z))*dzf(floor(particle%z_prev))/dzf(floor(particle%z))
-    !  end if
+   
+    ! Integrate subgrid velocities
+    particle%usgs_prev = particle%usgs
+    particle%vsgs_prev = particle%vsgs
+    particle%wsgs_prev = particle%wsgs
+
+    particle%usgs = particle%usgs + rkalpha(nstep) * particle%usgs_tend * dt + rkbeta(nstep) * particle%usgs_tend_prev * dt
+    particle%vsgs = particle%vsgs + rkalpha(nstep) * particle%vsgs_tend * dt + rkbeta(nstep) * particle%vsgs_tend_prev * dt
+    particle%wsgs = particle%wsgs + rkalpha(nstep) * particle%wsgs_tend * dt + rkbeta(nstep) * particle%wsgs_tend_prev * dt
 
    if ( nstep==3 ) then
       particle%ures_prev   = 0.
@@ -799,57 +808,69 @@ contains
     TYPE (particle_record), POINTER:: particle
 
     if (send) then
-      buffer(n+ipunique)    = particle%unique
-      buffer(n+ipx)         = particle%x
-      buffer(n+ipy)         = particle%y
-      buffer(n+ipz)         = particle%z
-      buffer(n+ipures)      = particle%ures
-      buffer(n+ipvres)      = particle%vres
-      buffer(n+ipwres)      = particle%wres
-      buffer(n+ipures_prev) = particle%ures_prev
-      buffer(n+ipvres_prev) = particle%vres_prev
-      buffer(n+ipwres_prev) = particle%wres_prev
-      buffer(n+ipusgs)      = particle%usgs
-      buffer(n+ipvsgs)      = particle%vsgs
-      buffer(n+ipwsgs)      = particle%wsgs
-      buffer(n+ipusgs_prev) = particle%usgs_prev
-      buffer(n+ipvsgs_prev) = particle%vsgs_prev
-      buffer(n+ipwsgs_prev) = particle%wsgs_prev
-      buffer(n+ipxstart)    = particle%xstart
-      buffer(n+ipystart)    = particle%ystart
-      buffer(n+ipzstart)    = particle%zstart
-      buffer(n+iptsart)     = particle%tstart
-      buffer(n+ipartstep)   = particle%partstep
-      buffer(n+ipxprev)     = particle%x_prev
-      buffer(n+ipyprev)     = particle%y_prev
-      buffer(n+ipzprev)     = particle%z_prev
-      buffer(n+isigma2_sgs) = particle%sigma2_sgs
+      buffer(n+ipunique)        = particle%unique
+      buffer(n+ipx)             = particle%x
+      buffer(n+ipy)             = particle%y
+      buffer(n+ipz)             = particle%z
+      buffer(n+ipures)          = particle%ures
+      buffer(n+ipvres)          = particle%vres
+      buffer(n+ipwres)          = particle%wres
+      buffer(n+ipures_prev)     = particle%ures_prev
+      buffer(n+ipvres_prev)     = particle%vres_prev
+      buffer(n+ipwres_prev)     = particle%wres_prev
+      buffer(n+ipusgs)          = particle%usgs
+      buffer(n+ipvsgs)          = particle%vsgs
+      buffer(n+ipwsgs)          = particle%wsgs
+      buffer(n+ipusgs_prev)     = particle%usgs_prev
+      buffer(n+ipvsgs_prev)     = particle%vsgs_prev
+      buffer(n+ipwsgs_prev)     = particle%wsgs_prev
+      buffer(n+ipxstart)        = particle%xstart
+      buffer(n+ipystart)        = particle%ystart
+      buffer(n+ipzstart)        = particle%zstart
+      buffer(n+iptsart)         = particle%tstart
+      buffer(n+ipartstep)       = particle%partstep
+      buffer(n+ipxprev)         = particle%x_prev
+      buffer(n+ipyprev)         = particle%y_prev
+      buffer(n+ipzprev)         = particle%z_prev
+      buffer(n+iusgs_tend)      = particle%usgs_tend
+      buffer(n+ivsgs_tend)      = particle%vsgs_tend
+      buffer(n+iwsgs_tend)      = particle%wsgs_tend
+      buffer(n+iusgs_tend_prev) = particle%usgs_tend_prev
+      buffer(n+ivsgs_tend_prev) = particle%vsgs_tend_prev
+      buffer(n+iwsgs_tend_prev) = particle%wsgs_tend_prev
+      buffer(n+isigma2_sgs)     = particle%sigma2_sgs
     else
-      particle%unique       = buffer(n+ipunique)
-      particle%x            = buffer(n+ipx)
-      particle%y            = buffer(n+ipy)
-      particle%z            = buffer(n+ipz)
-      particle%ures         = buffer(n+ipures)
-      particle%vres         = buffer(n+ipvres)
-      particle%wres         = buffer(n+ipwres)
-      particle%ures_prev    = buffer(n+ipures_prev)
-      particle%vres_prev    = buffer(n+ipvres_prev)
-      particle%wres_prev    = buffer(n+ipwres_prev)
-      particle%usgs         = buffer(n+ipusgs)
-      particle%vsgs         = buffer(n+ipvsgs)
-      particle%wsgs         = buffer(n+ipwsgs)
-      particle%usgs_prev    = buffer(n+ipusgs_prev)
-      particle%vsgs_prev    = buffer(n+ipvsgs_prev)
-      particle%wsgs_prev    = buffer(n+ipwsgs_prev)
-      particle%xstart       = buffer(n+ipxstart)
-      particle%ystart       = buffer(n+ipystart)
-      particle%zstart       = buffer(n+ipzstart)
-      particle%tstart       = buffer(n+iptsart)
-      particle%partstep     = buffer(n+ipartstep)
-      particle%x_prev       = buffer(n+ipxprev)
-      particle%y_prev       = buffer(n+ipyprev)
-      particle%z_prev       = buffer(n+ipzprev)
-      particle%sigma2_sgs   = buffer(n+isigma2_sgs)
+      particle%unique           = buffer(n+ipunique)
+      particle%x                = buffer(n+ipx)
+      particle%y                = buffer(n+ipy)
+      particle%z                = buffer(n+ipz)
+      particle%ures             = buffer(n+ipures)
+      particle%vres             = buffer(n+ipvres)
+      particle%wres             = buffer(n+ipwres)
+      particle%ures_prev        = buffer(n+ipures_prev)
+      particle%vres_prev        = buffer(n+ipvres_prev)
+      particle%wres_prev        = buffer(n+ipwres_prev)
+      particle%usgs             = buffer(n+ipusgs)
+      particle%vsgs             = buffer(n+ipvsgs)
+      particle%wsgs             = buffer(n+ipwsgs)
+      particle%usgs_prev        = buffer(n+ipusgs_prev)
+      particle%vsgs_prev        = buffer(n+ipvsgs_prev)
+      particle%wsgs_prev        = buffer(n+ipwsgs_prev)
+      particle%xstart           = buffer(n+ipxstart)
+      particle%ystart           = buffer(n+ipystart)
+      particle%zstart           = buffer(n+ipzstart)
+      particle%tstart           = buffer(n+iptsart)
+      particle%partstep         = buffer(n+ipartstep)
+      particle%x_prev           = buffer(n+ipxprev)
+      particle%y_prev           = buffer(n+ipyprev)
+      particle%z_prev           = buffer(n+ipzprev)
+      particle%usgs_tend        = buffer(n+iusgs_tend)
+      particle%vsgs_tend        = buffer(n+ivsgs_tend)
+      particle%wsgs_tend        = buffer(n+iwsgs_tend)
+      particle%usgs_tend_prev   = buffer(n+iusgs_tend_prev)
+      particle%vsgs_tend_prev   = buffer(n+ivsgs_tend_prev)
+      particle%wsgs_tend_prev   = buffer(n+iwsgs_tend_prev)
+      particle%sigma2_sgs       = buffer(n+isigma2_sgs)
     end if
 
   end subroutine partbuffer
@@ -1255,34 +1276,40 @@ contains
       if(floor(xstart / xsizelocal) == wrxid) then
         if(floor(ystart / ysizelocal) == wryid) then
           call add_particle(particle)
-          particle%unique      = n !+ myid/1000.0
-          particle%x           = (xstart - (float(wrxid) * xsizelocal)) / deltax + 3.  ! +3 here for ghost cells.
-          particle%y           = (ystart - (float(wryid) * ysizelocal)) / deltay + 3.  ! +3 here for ghost cells.
+          particle%unique         = n !+ myid/1000.0
+          particle%x              = (xstart - (float(wrxid) * xsizelocal)) / deltax + 3.  ! +3 here for ghost cells.
+          particle%y              = (ystart - (float(wryid) * ysizelocal)) / deltay + 3.  ! +3 here for ghost cells.
           do k=kmax,1,1
             if ( zm(k)<zstart ) exit
           end do
-          particle%z           = k + (zstart-zm(k))*dzi_t(k)
-          particle%xstart      = xstart
-          particle%ystart      = ystart
-          particle%zstart      = zstart
-          particle%tstart      = tstart
-          particle%ures        = 0.
-          particle%vres        = 0.
-          particle%wres        = 0.
-          particle%ures_prev   = 0.
-          particle%vres_prev   = 0.
-          particle%wres_prev   = 0.
-          particle%usgs        = 0.
-          particle%vsgs        = 0.
-          particle%wsgs        = 0.
-          particle%usgs_prev   = 0.
-          particle%vsgs_prev   = 0.
-          particle%wsgs_prev   = 0.
-          particle%x_prev      = particle%x
-          particle%y_prev      = particle%y
-          particle%z_prev      = particle%z
-          particle%partstep    = 0
-          particle%sigma2_sgs = epsilon(particle%sigma2_sgs)
+          particle%z              = k + (zstart-zm(k))*dzi_t(k)
+          particle%xstart         = xstart
+          particle%ystart         = ystart
+          particle%zstart         = zstart
+          particle%tstart         = tstart
+          particle%ures           = 0.
+          particle%vres           = 0.
+          particle%wres           = 0.
+          particle%ures_prev      = 0.
+          particle%vres_prev      = 0.
+          particle%wres_prev      = 0.
+          particle%usgs           = 0.
+          particle%vsgs           = 0.
+          particle%wsgs           = 0.
+          particle%usgs_prev      = 0.
+          particle%vsgs_prev      = 0.
+          particle%wsgs_prev      = 0.
+          particle%usgs_tend      = 0.
+          particle%vsgs_tend      = 0.
+          particle%wsgs_tend      = 0.
+          particle%usgs_tend_prev = 0.
+          particle%vsgs_tend_prev = 0.
+          particle%wsgs_tend_prev = 0.
+          particle%x_prev         = particle%x
+          particle%y_prev         = particle%y
+          particle%z_prev         = particle%z
+          particle%partstep       = 0
+          particle%sigma2_sgs     = epsilon(particle%sigma2_sgs)
 
           if(tstart < firststart) firststart = tstart
 
@@ -1290,32 +1317,38 @@ contains
       end if
     end do
 
-    ipunique       = 1
-    ipx            = 2
-    ipy            = 3
-    ipz            = 4
-    ipxstart       = 5
-    ipystart       = 6
-    ipzstart       = 7
-    iptsart        = 8
-    ipures         = 9
-    ipvres         = 10
-    ipwres         = 11
-    ipures_prev    = 12
-    ipvres_prev    = 13
-    ipwres_prev    = 14
-    ipusgs         = 15
-    ipvsgs         = 16
-    ipwsgs         = 17
-    ipusgs_prev    = 18
-    ipvsgs_prev    = 19
-    ipwsgs_prev    = 20
-    ipartstep      = 21
-    ipxprev        = 22
-    ipyprev        = 23
-    ipzprev        = 24
-    isigma2_sgs    = 25
-    nrpartvar      = isigma2_sgs
+    ipunique        = 1
+    ipx             = 2
+    ipy             = 3
+    ipz             = 4
+    ipxstart        = 5
+    ipystart        = 6
+    ipzstart        = 7
+    iptsart         = 8
+    ipures          = 9
+    ipvres          = 10
+    ipwres          = 11
+    ipures_prev     = 12
+    ipvres_prev     = 13
+    ipwres_prev     = 14
+    ipusgs          = 15
+    ipvsgs          = 16
+    ipwsgs          = 17
+    ipusgs_prev     = 18
+    ipvsgs_prev     = 19
+    ipwsgs_prev     = 20
+    ipartstep       = 21
+    ipxprev         = 22
+    ipyprev         = 23
+    ipzprev         = 24
+    iusgs_tend      = 25
+    ivsgs_tend      = 26
+    iwsgs_tend      = 27
+    iusgs_tend_prev = 28
+    ivsgs_tend_prev = 29
+    iwsgs_tend_prev = 30 
+    isigma2_sgs     = 31
+    nrpartvar       = isigma2_sgs
 
     !if (lpartsgs) then
     !  ipuresprev = nrpartvar+1
