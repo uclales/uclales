@@ -81,6 +81,7 @@ module modparticles
                                          eprof, eprofl
 
   real, allocatable, dimension(:,:,:) :: sgse
+  real, parameter                     :: minsgse = 1e-10
   real, allocatable, dimension(:)     :: fs
   integer (KIND=selected_int_kind(10)):: idum = -12345
   real, parameter                     :: C0   = 6.
@@ -123,21 +124,15 @@ contains
 
         ! Subgrid velocities 
         if (lpartsgs) then
-          !if (nstep==1) then
-          !  particle%usgs_prev = particle%usgs
-          !  particle%vsgs_prev = particle%vsgs
-          !  particle%wsgs_prev = particle%wsgs
-          !end if
-          ! Calculate subgrid velocity tendencies
           call prep_ui_sgs(particle)
-          particle%usgs_tend = tend_usgs(particle) !* dxi
-          particle%vsgs_tend = tend_vsgs(particle) !* dyi
-          particle%wsgs_tend = tend_wsgs(particle) !* dzi_t(floor(particle%z))
+          particle%usgs_tend = tend_usgs(particle) 
+          particle%vsgs_tend = tend_vsgs(particle) 
+          particle%wsgs_tend = tend_wsgs(particle) 
         end if
 
         !if(nstep == 3) then
-          !print*,'{',particle%x,particle%y,particle%z,'}'
-          !print*,'{',particle%usgs/dxi,particle%vsgs/dyi,particle%wsgs/dzi_t(floor(particle%z)),'}'
+          !print*,'{xi',particle%x,particle%y,particle%z,'}'
+          !print*,'{uis',particle%usgs/dxi,particle%vsgs/dyi,particle%wsgs/dzi_t(floor(particle%z)),'}'
           !print*,'X,Y,Z:',particle%x,particle%y,particle%z
           !print*,'U---->',particle%ures/dxi,particle%usgs/dxi
           !print*,'V---->',particle%vres/dyi,particle%vsgs/dyi
@@ -236,7 +231,6 @@ contains
     do k=2, nzp
       e_res(k)  = 0.5 * (u2_av(k) + v2_av(k) + 0.5*(w2_av(k) + w2_av(k-1)))
       fs(k)     = sgse_av(k) / (sgse_av(k) + e_res(k))
-      !print*,k,fs(k),sgse_av(k),e_res(k)
     end do
 
     fs(1) = 1.   ! below surface......
@@ -268,7 +262,7 @@ contains
           do k=1,nzp
             labda            = (1. / ((1. / labda0**2.) + (1. / (0.4 * (zm(k) + 0.001)**2.))))**0.5
             ceps             = 0.19 + 0.51 * (labda / labda0)
-            sgse(k,i,j)      = (a_km(k,i,j) / ((labda * (cf / (2. * pi)) * (1.5 * alpha)**(-1.5))))**2.        
+            sgse(k,i,j)      = (a_km(k,i,j) / ((labda * (cf / (2. * pi)) * (1.5 * alpha)**(-1.5))))**2.  
           end do
        end do
     end do
@@ -423,8 +417,7 @@ contains
       &                (  deltaz) * (  deltay) * (  deltax) *  input(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
     end if
 
-
-    if(lim) sca2part = max(sca2part,1e-10) 
+    if(lim) sca2part = max(sca2part,minsgse) 
 
   end function sca2part
 
@@ -434,29 +427,35 @@ contains
   !--------------------------------------------------------------------------
   ! 
   subroutine prep_ui_sgs(particle)
-    use grid, only : dxi, dyi, dt, a_scr7, zm, dzi_t
+    use grid, only : dxi, dyi, dt, a_scr7, zm, zt, dzi_t, dzi_m
     implicit none
 
-    real :: zparticle
+    real     :: zparticle, deltaz
+    integer  :: zbottom
     TYPE (particle_record), POINTER:: particle
 
+    zbottom      = floor(particle%z + 0.5)
+    deltaz       = ((zm(floor(particle%z)) + (particle%z - floor(particle%z)) / dzi_t(floor(particle%z))) - zt(zbottom)) * dzi_m(zbottom)
+    fsl          = (1-deltaz) * fs(zbottom) + deltaz * fs(zbottom+1)
+    
     sigma2l      = sca2part(particle%x,particle%y,particle%z,sgse,.true.) * (2./3.)
     epsl         = sca2part(particle%x,particle%y,particle%z,a_scr7,.false.)
-    fsl          = 1. ! <-------------- Fixed for testing....
+    
     dsigma2dx    = (2./3.) * (sca2part(particle%x+0.5,particle%y,particle%z,sgse,.true.) - &
                               sca2part(particle%x-0.5,particle%y,particle%z,sgse,.true.)) * dxi
     dsigma2dy    = (2./3.) * (sca2part(particle%x,particle%y+0.5,particle%z,sgse,.true.) - &
                               sca2part(particle%x,particle%y-0.5,particle%z,sgse,.true.)) * dyi
     dsigma2dz    = (2./3.) * (sca2part(particle%x,particle%y,particle%z+0.5,sgse,.true.) - &
                               sca2part(particle%x,particle%y,particle%z-0.5,sgse,.true.)) * dzi_t(floor(particle%z))    !just for testing, very crude assumptions....
-    dsigma2dt    = (sigma2l - particle%sigma2_sgs) / dt
+    dsigma2dt    = (sigma2l - particle%sigma2_sgs) / (dt / 3.)
     dsigma2dt    = sign(1.,dsigma2dt) * min(abs(dsigma2dt),1. / dt)     ! Limit dsigma2dt term
+
     particle%sigma2_sgs = sigma2l
     
-    !dsigma2dt    = (log(sigma2l) - log(particle%sigma2_sgs)) / dt
-    !zparticle    = zm(floor(particle%z)) + (particle%z - floor(particle%z)) * dzi_t(floor(particle%z))
+    !zparticle    = zm(floor(particle%z)) + (particle%z - floor(particle%z)) / dzi_t(floor(particle%z))
     !labda        = (1. / ((1. / ((zm(2)/dxi/dyi)**(1./3.))**2.) + (1. / (0.4 * (zparticle + 0.001)**2.))))**0.5
-    !ceps         = 0.19 + 0.51 * (labda / ((zm(2)/dxi/dyi)**(1./3.)))
+    labda        = (zm(2)/dxi/dyi)**(1./3.)
+    ceps         = 0.19 + 0.51 * (labda / ((zm(2)/dxi/dyi)**(1./3.)))
 
   end subroutine prep_ui_sgs
 
@@ -473,12 +472,30 @@ contains
     real :: t1, t2, t3, tend_usgs
     TYPE (particle_record), POINTER:: particle
 
-    !t1        = -0.5 * fsl * C0 * (particle%usgs_prev / dxi) * dt * 1.5 * (ceps/labda) * (1.5 * sigma2l)**0.5
-    t1        = -0.5 * C0 * fsl * epsl * (particle%usgs_prev / dxi) / sigma2l
-    t2        =  0.5 * ((1. / sigma2l) * dsigma2dt * (particle%usgs_prev / dxi) + dsigma2dx) 
-    t3        = ((fsl * C0 * epsl)**0.5 * xi(idum)) / dt
+    !t1        = -0.5 * C0 * fsl * epsl * (particle%usgs / dxi) / sigma2l
+    !t3        = ((fsl * C0 * epsl)**0.5 * xi(idum)) / dt
+    
+    t1        = -0.75 * fsl * C0 * (particle%usgs / dxi) * (ceps/labda) * (1.5 * sigma2l)**0.5
+    if((1. / sigma2l) * dsigma2dt < -1.) then
+      t2      =  0.5 * (-(particle%usgs / dxi) + dsigma2dx) 
+    else
+      t2      =  0.5 * ((1. / sigma2l) * dsigma2dt * (particle%usgs / dxi) + dsigma2dx) 
+    end if
+    t3        = ((fsl * C0 * (ceps/labda) * (1.5*sigma2l)**(1.5))**0.5 * xi(idum)) / dt
+
+    !t1        = sign(1.,t1) * min(abs(t1),abs(particle%usgs/dxi))
+    !t2        = sign(1.,t2) * min(abs(t2),abs(particle%usgs/dxi))
 
     tend_usgs = t1 + t2 + t3  
+
+    if(abs(tend_usgs) > 1) then 
+      print*,'shit->fan'
+      print*,particle%x,particle%y,particle%z
+      print*,(particle%usgs / dxi)
+      print*,tend_usgs,t1,t2,t3
+      print*,epsl,sigma2l,dsigma2dt,dsigma2dx,(1.5 * sigma2l)**0.5,ceps,labda
+      print*,'----------------------------------------------------'
+    end if
 
   end function tend_usgs
 
@@ -495,11 +512,30 @@ contains
     real :: t1, t2, t3, tend_vsgs
     TYPE (particle_record), POINTER:: particle
 
-    t1        = -0.5 * C0 * fsl * epsl * (particle%vsgs_prev / dyi) / sigma2l
-    t2        =  0.5 * ((1. / sigma2l) * dsigma2dt * (particle%vsgs_prev / dyi) + dsigma2dy)
-    t3        = ((fsl * C0 * epsl)**0.5 * xi(idum)) / dt
+    !t1        = -0.5 * C0 * fsl * epsl * (particle%vsgs / dyi) / sigma2l
+    !t3        = ((fsl * C0 * epsl)**0.5 * xi(idum)) / dt
+    
+    t1        = -0.75 * fsl * C0 * (particle%vsgs / dyi) * (ceps/labda) * (1.5 * sigma2l)**0.5
+    if((1. / sigma2l) * dsigma2dt < -1.) then
+      t2      =  0.5 * (-(particle%vsgs / dyi) + dsigma2dy)
+    else
+      t2      =  0.5 * ((1. / sigma2l) * dsigma2dt * (particle%vsgs / dyi) + dsigma2dy)
+    end if
+    t3        = ((fsl * C0 * (ceps/labda) * (1.5*sigma2l)**(1.5))**0.5 * xi(idum)) / dt
+
+    !t1        = sign(1.,t1) * min(abs(t1),abs(particle%vsgs/dyi))
+    !t2        = sign(1.,t2) * min(abs(t2),abs(particle%vsgs/dyi))
  
     tend_vsgs = t1 + t2 + t3  
+
+    !if(tend_vsgs > 1) then 
+    !  print*,'shit->fan'
+    !  print*,'xyz=',particle%x,particle%y,particle%z
+    !  print*,'vsgs=',(particle%vsgs / dyi)
+    !  print*,'sgstend=',tend_vsgs,t1,t2,t3
+    !  print*,'eps,sigma,dsigdt,dsigdy=',epsl,sigma2l,dsigma2dt,dsigma2dy
+    !  print*,'----------------------------------------------------'
+    !end if
 
   end function tend_vsgs
 
@@ -516,9 +552,19 @@ contains
     real :: t1, t2, t3, tend_wsgs
     TYPE (particle_record), POINTER:: particle
 
-    t1        = -0.5 * C0 * fsl * epsl * (particle%wsgs_prev / dzi_t(floor(particle%z))) / sigma2l 
-    t2        =  0.5 * ((1. / sigma2l) * dsigma2dt * (particle%wsgs_prev / dzi_t(floor(particle%z))) + dsigma2dz)   
-    t3        = ((fsl * C0 * epsl)**0.5 * xi(idum)) / dt
+    !t1        = -0.5 * C0 * fsl * epsl * (particle%wsgs / dzi_t(floor(particle%z))) / sigma2l 
+    !t3        = ((fsl * C0 * epsl)**0.5 * xi(idum)) / dt
+
+    t1        = -0.75 * fsl * C0 * (particle%wsgs / dzi_t(floor(particle%z))) * (ceps/labda) * (1.5 * sigma2l)**0.5
+    if((1. / sigma2l) * dsigma2dt < -1.) then
+      t2        =  0.5 * (-(particle%wsgs / dzi_t(floor(particle%z))) + dsigma2dz)   
+    else
+      t2        =  0.5 * ((1. / sigma2l) * dsigma2dt * (particle%wsgs / dzi_t(floor(particle%z))) + dsigma2dz)   
+    end if
+    t3        = ((fsl * C0 * (ceps/labda) * (1.5*sigma2l)**(1.5))**0.5 * xi(idum)) / dt
+
+    !t1        = sign(1.,t1) * min(abs(t1),abs(particle%wsgs/dzi_t(floor(particle%z))))
+    !t2        = sign(1.,t2) * min(abs(t2),abs(particle%wsgs/dzi_t(floor(particle%z))))
  
     tend_wsgs = t1 + t2 + t3  
 
@@ -530,7 +576,7 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine rk3(particle)
-    use grid, only : rkalpha, rkbeta, nstep, dt
+    use grid, only : rkalpha, rkbeta, nstep, dt, dxi, dyi, dzi_t
     implicit none
     TYPE (particle_record), POINTER:: particle
 
@@ -548,18 +594,31 @@ contains
     particle%usgs_prev = particle%usgs
     particle%vsgs_prev = particle%vsgs
     particle%wsgs_prev = particle%wsgs
+    particle%usgs = ((particle%usgs / dxi)                      + rkalpha(nstep) * particle%usgs_tend      * dt + &
+                                                                  rkbeta(nstep)  * particle%usgs_tend_prev * dt) * dxi
+    particle%vsgs = ((particle%vsgs / dyi)                      + rkalpha(nstep) * particle%vsgs_tend      * dt + &
+                                                                  rkbeta(nstep)  * particle%vsgs_tend_prev * dt) * dyi
+    particle%wsgs = ((particle%wsgs / dzi_t(floor(particle%z))) + rkalpha(nstep) * particle%wsgs_tend      * dt + &
+                                                                  rkbeta(nstep)  * particle%wsgs_tend_prev * dt) * dzi_t(floor(particle%z))
 
-    particle%usgs = particle%usgs + rkalpha(nstep) * particle%usgs_tend * dt + rkbeta(nstep) * particle%usgs_tend_prev * dt
-    particle%vsgs = particle%vsgs + rkalpha(nstep) * particle%vsgs_tend * dt + rkbeta(nstep) * particle%vsgs_tend_prev * dt
-    particle%wsgs = particle%wsgs + rkalpha(nstep) * particle%wsgs_tend * dt + rkbeta(nstep) * particle%wsgs_tend_prev * dt
+    !print*,particle%usgs_prev,particle%usgs,particle%usgs_tend_prev,particle%usgs_tend
+
+    particle%usgs_tend_prev = particle%usgs_tend
+    particle%vsgs_tend_prev = particle%vsgs_tend
+    particle%wsgs_tend_prev = particle%wsgs_tend
+
 
    if ( nstep==3 ) then
       particle%ures_prev   = 0.
       particle%vres_prev   = 0.
       particle%wres_prev   = 0.
-      particle%x_prev      = particle%x
-      particle%y_prev      = particle%y
-      particle%z_prev      = particle%z
+      particle%usgs_prev   = 0.
+      particle%vsgs_prev   = 0.
+      particle%wsgs_prev   = 0.
+      
+      !particle%x_prev      = particle%x
+      !particle%y_prev      = particle%y
+      !particle%z_prev      = particle%z
     end if
 
   end subroutine rk3
@@ -906,7 +965,7 @@ contains
 
       if(lpartsgs) then
         do k = 1,nzp-2 
-          fsprofl(k)      = fsprofl(k)    + fs(k+1)
+          fsprofl(k)      = fsprofl(k)    + fs(k+1) / (nxprocs * nyprocs)
           eprofl(k)       = eprofl(k)     + sum(sgse(k+1,3:nxp-2,3:nyp-2)) / (nxg * nyg)
         end do     
       end if
@@ -918,7 +977,7 @@ contains
     if(dowrite) then
       do k = 1,nzp-2
         if(npartprofl(k) > 0) then 
-          npartprofl(k) = npartprofl(k) / nstatsamp
+          npartprofl(k) = npartprofl(k) /  nstatsamp
           uprofl(k)     = uprofl(k)     / (nstatsamp * npartprofl(k))
           vprofl(k)     = vprofl(k)     / (nstatsamp * npartprofl(k))
           wprofl(k)     = wprofl(k)     / (nstatsamp * npartprofl(k))
@@ -1150,6 +1209,7 @@ contains
     if (particle%z >= nzp-2) then
       particle%z = nzp-2-0.0001
       particle%wres = -abs(particle%wres)
+      particle%wsgs = -abs(particle%wsgs)
     elseif (particle%z < 1.01) then
       particle%z = abs(particle%z-1.01)+1.01
       particle%wres =  abs(particle%wres)
