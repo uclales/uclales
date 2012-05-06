@@ -3080,7 +3080,7 @@ contains
           jj = jlm(i)
           kk = klm(i)
            
-          hlp = R_l * (1.0 +  (R_l/R_d-1.0) * qv(kk,jj,ii)) 
+          hlp = R_l * (1.0 +  (R_d/R_l-1.0) * qv(kk,jj,ii)) 
 
           ! ... dynamics
           T_0(i,j,k)      = tk(kk,jj,ii)
