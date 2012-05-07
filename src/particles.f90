@@ -52,9 +52,9 @@ module modparticles
   type :: particle_record
     real             :: unique, tstart
     integer          :: partstep
-    real             :: x, xstart, x_prev, ures, ures_prev, usgs, usgs_prev, usgs_tend, usgs_tend_prev
-    real             :: y, ystart, y_prev, vres, vres_prev, vsgs, vsgs_prev, vsgs_tend, vsgs_tend_prev
-    real             :: z, zstart, z_prev, wres, wres_prev, wsgs, wsgs_prev, wsgs_tend, wsgs_tend_prev
+    real             :: x, xstart, x_prev, ures, ures_prev, usgs, usgs_prev
+    real             :: y, ystart, y_prev, vres, vres_prev, vsgs, vsgs_prev
+    real             :: z, zstart, z_prev, wres, wres_prev, wsgs, wsgs_prev
     real             :: sigma2_sgs
     type (particle_record), pointer :: next,prev
   end type
@@ -64,7 +64,6 @@ module modparticles
 
   integer            :: ipunique, ipx, ipy, ipz, ipxstart, ipystart, ipzstart, iptsart, ipxprev, ipyprev, ipzprev
   integer            :: ipures, ipvres, ipwres, ipusgs, ipvsgs, ipwsgs, ipusgs_prev, ipvsgs_prev, ipwsgs_prev
-  integer            :: iusgs_tend, ivsgs_tend, iwsgs_tend, iusgs_tend_prev, ivsgs_tend_prev, iwsgs_tend_prev 
   integer            :: ipures_prev, ipvres_prev, ipwres_prev, ipartstep, nrpartvar, isigma2_sgs
 
   ! Statistics and particle dump
@@ -102,8 +101,8 @@ contains
     implicit none
     real, intent(in)               :: time
     type (particle_record), pointer:: particle
-    integer :: i,j,k
-    real, allocatable, dimension(:) :: sgstke_prof
+    real                           :: maxsgsu, maxsgsv, maxsgsw
+    integer                        :: muz,mvz,mwz
 
     if ( np < 1 ) return   ! Just to be sure..
 
@@ -111,6 +110,10 @@ contains
       call sgstke          ! Estimates SGS-TKE
       call fsubgrid        ! Calculates fraction SGS-TKE / TOTAL-TKE
     end if
+
+    maxsgsu = 0.
+    maxsgsv = 0.
+    maxsgsw = 0.
 
     particle => head
     do while( associated(particle) )
@@ -128,12 +131,30 @@ contains
           particle%usgs   = tend_usgs(particle) * dxi 
           particle%vsgs   = tend_vsgs(particle) * dyi
           particle%wsgs   = tend_wsgs(particle) * dzi_t(floor(particle%z))
+
+          if(abs(particle%usgs / dxi) > maxsgsu) then
+            maxsgsu = abs(particle%usgs) / dxi
+            muz     = particle%z
+          end if
+          if(abs(particle%vsgs / dyi) > maxsgsv) then
+            maxsgsv = abs(particle%vsgs) / dyi
+            mvz     = particle%z
+          end if
+          if(abs(particle%wsgs / dzi_t(floor(particle%z))) > maxsgsw) then
+            maxsgsw = abs(particle%wsgs / dzi_t(floor(particle%z)))
+            mwz     = particle%z
+          end if
+
         end if
       end if
 
     particle => particle%next
     end do
-    
+   
+    if(nstep==1) print'(A,3E20.10,3I5)', '     max SGS u-v-w = ', maxsgsu,maxsgsv,maxsgsw,muz,mvz,mwz 
+    !if(nstep==1) print*,maxsgsu,maxsgsv,maxsgsw 
+
+ 
     ! Time integration
     particle => head
     do while( associated(particle) )
@@ -220,7 +241,7 @@ contains
   
     do k=2, nzp
       e_res(k)  = 0.5 * (u2_av(k) + v2_av(k) + 0.5*(w2_av(k) + w2_av(k-1)))
-      fs(k)     = sgse_av(k) / (sgse_av(k) + e_res(k))
+      fs(k)     = 1. !sgse_av(k) / (sgse_av(k) + e_res(k))
     end do
 
     fs(1) = 1. + (1.-fs(2))   ! below surface......
@@ -422,7 +443,7 @@ contains
     use grid, only : dxi, dyi, dt, a_scr7, zm, zt, dzi_t, dzi_m
     implicit none
 
-    real     :: zparticle, deltaz
+    real     :: deltaz
     integer  :: zbottom
     TYPE (particle_record), POINTER:: particle
 
@@ -536,13 +557,17 @@ contains
     implicit none
     TYPE (particle_record), POINTER:: particle
 
-    particle%x   = particle%x + rkalpha(nstep) * (particle%ures+particle%usgs) * dt + rkbeta(nstep) * (particle%ures_prev + particle%usgs_prev) * dt
-    particle%y   = particle%y + rkalpha(nstep) * (particle%vres+particle%vsgs) * dt + rkbeta(nstep) * (particle%vres_prev + particle%vsgs_prev) * dt
-    particle%z   = particle%z + rkalpha(nstep) * (particle%wres+particle%wsgs) * dt + rkbeta(nstep) * (particle%wres_prev + particle%wsgs_prev) * dt
+    particle%x   = particle%x + rkalpha(nstep) * (particle%ures+particle%usgs) * dt + rkbeta(nstep) * (particle%ures_prev + particle%usgs) * dt
+    particle%y   = particle%y + rkalpha(nstep) * (particle%vres+particle%vsgs) * dt + rkbeta(nstep) * (particle%vres_prev + particle%vsgs) * dt
+    particle%z   = particle%z + rkalpha(nstep) * (particle%wres+particle%wsgs) * dt + rkbeta(nstep) * (particle%wres_prev + particle%wsgs) * dt
 
     particle%ures_prev = particle%ures
     particle%vres_prev = particle%vres
     particle%wres_prev = particle%wres
+
+    particle%usgs_prev = particle%usgs
+    particle%vsgs_prev = particle%vsgs
+    particle%wsgs_prev = particle%wsgs
 
     call checkbound(particle)
    
@@ -550,6 +575,9 @@ contains
       particle%ures_prev   = 0.
       particle%vres_prev   = 0.
       particle%wres_prev   = 0.
+      particle%usgs_prev   = 0.
+      particle%vsgs_prev   = 0.
+      particle%wsgs_prev   = 0.
     end if
 
   end subroutine rk3
@@ -822,12 +850,6 @@ contains
       buffer(n+ipxprev)         = particle%x_prev
       buffer(n+ipyprev)         = particle%y_prev
       buffer(n+ipzprev)         = particle%z_prev
-      buffer(n+iusgs_tend)      = particle%usgs_tend
-      buffer(n+ivsgs_tend)      = particle%vsgs_tend
-      buffer(n+iwsgs_tend)      = particle%wsgs_tend
-      buffer(n+iusgs_tend_prev) = particle%usgs_tend_prev
-      buffer(n+ivsgs_tend_prev) = particle%vsgs_tend_prev
-      buffer(n+iwsgs_tend_prev) = particle%wsgs_tend_prev
       buffer(n+isigma2_sgs)     = particle%sigma2_sgs
     else
       particle%unique           = buffer(n+ipunique)
@@ -854,12 +876,6 @@ contains
       particle%x_prev           = buffer(n+ipxprev)
       particle%y_prev           = buffer(n+ipyprev)
       particle%z_prev           = buffer(n+ipzprev)
-      particle%usgs_tend        = buffer(n+iusgs_tend)
-      particle%vsgs_tend        = buffer(n+ivsgs_tend)
-      particle%wsgs_tend        = buffer(n+iwsgs_tend)
-      particle%usgs_tend_prev   = buffer(n+iusgs_tend_prev)
-      particle%vsgs_tend_prev   = buffer(n+ivsgs_tend_prev)
-      particle%wsgs_tend_prev   = buffer(n+iwsgs_tend_prev)
       particle%sigma2_sgs       = buffer(n+isigma2_sgs)
     end if
 
@@ -879,7 +895,7 @@ contains
 
     logical, intent(in)     :: dowrite
     real, intent(in)        :: time
-    integer                 :: k,nplocal
+    integer                 :: k
     type (particle_record), pointer:: particle
 
     ! Time averaging step
@@ -963,8 +979,8 @@ contains
       fsprofl    = 0
       eprof      = 0
       eprofl     = 0
-      nstatsamp = 0
-      tnextstat = tnextstat + frqpartstat
+      nstatsamp  = 0
+      tnextstat  = tnextstat + frqpartstat
     end if
 
   end subroutine particlestat
@@ -983,7 +999,7 @@ contains
 
     real, intent(in)                     :: time
     type (particle_record), pointer:: particle
-    integer                              :: nlocal, ii, i, start, pid, nparttot, partid
+    integer                              :: nlocal, ii, i, pid, partid
     integer, allocatable, dimension(:)   :: nremote
     integer                              :: status(mpi_status_size)
     integer                              :: nvar
@@ -1235,7 +1251,7 @@ contains
     use grid, only : zm, deltax, deltay, zt,dzi_t, nzp, nxp, nyp
     use grid, only : a_up, a_vp, a_wp
 
-    integer :: k, n, ierr, kmax
+    integer :: k, n, kmax
     real :: tstart, xstart, ystart, zstart, ysizelocal, xsizelocal, firststart
     type (particle_record), pointer:: particle
 
@@ -1285,12 +1301,6 @@ contains
           particle%usgs_prev      = 0.
           particle%vsgs_prev      = 0.
           particle%wsgs_prev      = 0.
-          particle%usgs_tend      = 0.
-          particle%vsgs_tend      = 0.
-          particle%wsgs_tend      = 0.
-          particle%usgs_tend_prev = 0.
-          particle%vsgs_tend_prev = 0.
-          particle%wsgs_tend_prev = 0.
           particle%x_prev         = particle%x
           particle%y_prev         = particle%y
           particle%z_prev         = particle%z
@@ -1327,13 +1337,7 @@ contains
     ipxprev         = 22
     ipyprev         = 23
     ipzprev         = 24
-    iusgs_tend      = 25
-    ivsgs_tend      = 26
-    iwsgs_tend      = 27
-    iusgs_tend_prev = 28
-    ivsgs_tend_prev = 29
-    iwsgs_tend_prev = 30 
-    isigma2_sgs     = 31
+    isigma2_sgs     = 25
     nrpartvar       = isigma2_sgs
 
     !if (lpartsgs) then
@@ -1452,7 +1456,6 @@ contains
     character (40), dimension(2)      :: dimname, dimlongname, dimunit
     real, allocatable, dimension(:,:) :: dimvalues
     integer, dimension(2)             :: dimsize
-    integer                           :: k
 
     allocate(dimvalues(nzp-2,2))
     dimvalues = 0
