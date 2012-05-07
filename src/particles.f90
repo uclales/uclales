@@ -129,16 +129,6 @@ contains
           particle%vsgs   = tend_vsgs(particle) * dyi
           particle%wsgs   = tend_wsgs(particle) * dzi_t(floor(particle%z))
         end if
-
-        !if(nstep == 3) then
-          !print*,'{xi',particle%x,particle%y,particle%z,'}'
-          !print*,'{uis',particle%usgs/dxi,particle%vsgs/dyi,particle%wsgs/dzi_t(floor(particle%z)),'}'
-          !print*,'X,Y,Z:',particle%x,particle%y,particle%z
-          !print*,'U---->',particle%ures/dxi,particle%usgs/dxi
-          !print*,'V---->',particle%vres/dyi,particle%vsgs/dyi
-          !print*,'W---->',particle%wres/dyi,particle%wsgs/dzi_t(floor(particle%z))
-        !end if
-
       end if
 
     particle => particle%next
@@ -233,7 +223,7 @@ contains
       fs(k)     = sgse_av(k) / (sgse_av(k) + e_res(k))
     end do
 
-    fs(1) = 1.   ! below surface......
+    fs(1) = 1. + (1.-fs(2))   ! below surface......
 
     deallocate(u_avl,v_avl,u2_avl,v2_avl,w2_avl,sgse_avl,u_av,v_av,u2_av,v2_av,w2_av,sgse_av,e_res)
 
@@ -245,7 +235,7 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine sgstke
-    use grid, only             : a_km, nzp, zm, dxi, dyi, nxp, nyp
+    use grid, only             : a_km, nzp, zt, dxi, dyi, nxp, nyp, zm
     use defs, only             : pi, vonk
     use mpi_interface, only    : nxg, nyg
     implicit none
@@ -255,15 +245,17 @@ contains
     real, parameter            :: alpha = 1.5
     real, parameter            :: cf    = 2.5
 
-    labda0 = (zm(2)/dxi/dyi)**0.333333333
+    labda0 = (zm(2)/dxi/dyi)**(1./3.)
 
     do j=1,nyp
        do i=1,nxp
-          do k=1,nzp
-            labda            = (1. / ((1. / labda0**2.) + (1. / (0.4 * (zm(k) + 0.001)**2.))))**0.5
+          do k=2,nzp-1
+            labda            = (1. / ((1. / labda0**2.) + (1. / (0.4 * (zt(k) + 0.001)**2.))))**0.5
             ceps             = 0.19 + 0.51 * (labda / labda0)
-            sgse(k,i,j)      = (a_km(k,i,j) / ((labda * (cf / (2. * pi)) * (1.5 * alpha)**(-1.5))))**2.  
+            sgse(k,i,j)      = (0.5*(a_km(k,i,j) + a_km(k-1,i,j)) / ((labda * (cf / (2. * pi)) * (1.5 * alpha)**(-1.5))))**2.  
           end do
+          sgse(1,i,j)     = sgse(2,i,j)
+          sgse(nzp,i,j)   = sgse(nzp-1,i,j)
        end do
     end do
 
@@ -397,16 +389,16 @@ contains
     deltay = y - 0.5 - ybottom
     deltaz = z + 0.5 - zbottom
     
-    if(zbottom == 1) then 
-      sca2part      =  (1-deltaz) * (1-deltay) * (1-deltax) *  0. + &    !
-      &                (1-deltaz) * (1-deltay) * (  deltax) *  0. + &    ! x+1
-      &                (1-deltaz) * (  deltay) * (1-deltax) *  0. + &    ! y+1
-      &                (1-deltaz) * (  deltay) * (  deltax) *  0. + &    ! x+1,y+1
-      &                (  deltaz) * (1-deltay) * (1-deltax) *  input(zbottom + 1, xbottom    , ybottom    ) + &    ! z+1
-      &                (  deltaz) * (1-deltay) * (  deltax) *  input(zbottom + 1, xbottom + 1, ybottom    ) + &    ! x+1, z+1
-      &                (  deltaz) * (  deltay) * (1-deltax) *  input(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
-      &                (  deltaz) * (  deltay) * (  deltax) *  input(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
-    else
+    !if(zbottom == 1) then 
+    !  sca2part      =  (1-deltaz) * (1-deltay) * (1-deltax) *  0. + &    !
+    !  &                (1-deltaz) * (1-deltay) * (  deltax) *  0. + &    ! x+1
+    !  &                (1-deltaz) * (  deltay) * (1-deltax) *  0. + &    ! y+1
+    !  &                (1-deltaz) * (  deltay) * (  deltax) *  0. + &    ! x+1,y+1
+    !  &                (  deltaz) * (1-deltay) * (1-deltax) *  input(zbottom + 1, xbottom    , ybottom    ) + &    ! z+1
+    !  &                (  deltaz) * (1-deltay) * (  deltax) *  input(zbottom + 1, xbottom + 1, ybottom    ) + &    ! x+1, z+1
+    !  &                (  deltaz) * (  deltay) * (1-deltax) *  input(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
+    !  &                (  deltaz) * (  deltay) * (  deltax) *  input(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
+    !else
       sca2part      =  (1-deltaz) * (1-deltay) * (1-deltax) *  input(zbottom    , xbottom    , ybottom    ) + &    !
       &                (1-deltaz) * (1-deltay) * (  deltax) *  input(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
       &                (1-deltaz) * (  deltay) * (1-deltax) *  input(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
@@ -415,7 +407,7 @@ contains
       &                (  deltaz) * (1-deltay) * (  deltax) *  input(zbottom + 1, xbottom + 1, ybottom    ) + &    ! x+1, z+1
       &                (  deltaz) * (  deltay) * (1-deltax) *  input(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
       &                (  deltaz) * (  deltay) * (  deltax) *  input(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
-    end if
+    !end if
 
     if(lim) sca2part = max(sca2part,minsgse) 
 
@@ -439,21 +431,17 @@ contains
     fsl          = (1-deltaz) * fs(zbottom) + deltaz * fs(zbottom+1)
     
     sigma2l      = sca2part(particle%x,particle%y,particle%z,sgse,.true.) * (2./3.)
-    epsl         = sca2part(particle%x,particle%y,particle%z,a_scr7,.false.)
+    !epsl         = sca2part(particle%x,particle%y,particle%z,a_scr7,.false.)
     
     dsigma2dx    = (2./3.) * (sca2part(particle%x+0.5,particle%y,particle%z,sgse,.true.) - &
                               sca2part(particle%x-0.5,particle%y,particle%z,sgse,.true.)) * dxi
     dsigma2dy    = (2./3.) * (sca2part(particle%x,particle%y+0.5,particle%z,sgse,.true.) - &
                               sca2part(particle%x,particle%y-0.5,particle%z,sgse,.true.)) * dyi
     dsigma2dz    = (2./3.) * (sca2part(particle%x,particle%y,particle%z+0.5,sgse,.true.) - &
-                              sca2part(particle%x,particle%y,particle%z-0.5,sgse,.true.)) * dzi_t(floor(particle%z))    !just for testing, very crude assumptions....
+                              sca2part(particle%x,particle%y,particle%z-0.5,sgse,.true.)) * dzi_t(floor(particle%z))
     dsigma2dt    = (sigma2l - particle%sigma2_sgs) / (dt / 3.)
     dsigma2dt    = sign(1.,dsigma2dt) * min(abs(dsigma2dt),1. / dt)     ! Limit dsigma2dt term
-
     particle%sigma2_sgs = sigma2l
-    
-    !zparticle    = zm(floor(particle%z)) + (particle%z - floor(particle%z)) / dzi_t(floor(particle%z))
-    !labda        = (1. / ((1. / ((zm(2)/dxi/dyi)**(1./3.))**2.) + (1. / (0.4 * (zparticle + 0.001)**2.))))**0.5
     labda        = (zm(2)/dxi/dyi)**(1./3.)
     ceps         = 0.19 + 0.51 * (labda / ((zm(2)/dxi/dyi)**(1./3.)))
 
@@ -479,13 +467,9 @@ contains
     ! 1. dissipation subgrid velocity cannot exceed subgrid velocity itself 
     if(sign(1.,t1 + particle%usgs / dxi) .ne. sign(1.,particle%usgs / dxi)) t1 = - particle%usgs / dxi
     ! 2. limit relative increase subgrid velocity to 1.
-    if(t2 / (epsilon(1.) + particle%usgs / dxi) .gt. 1.) t2 = particle%usgs / dxi 
-    
+    if(sign(1.,t2 + particle%usgs / dxi) .ne. sign(1.,particle%usgs / dxi)) t2 = - particle%usgs / dxi
+ 
     tend_usgs = (particle%usgs / dxi) + (t1 + t2 + t3)  
-
-    if(abs(tend_usgs) > 1.) then
-      print*,'u ',tend_usgs,t1,t2,t3
-    end if 
 
   end function tend_usgs
 
@@ -509,13 +493,9 @@ contains
     ! 1. dissipation subgrid velocity cannot exceed subgrid velocity itself 
     if(sign(1.,t1 + particle%vsgs / dyi) .ne. sign(1.,particle%vsgs / dyi)) t1 = - particle%vsgs / dyi
     ! 2. limit relative increase subgrid velocity to 1.
-    if(t2 / (epsilon(1.) + particle%vsgs / dyi) .gt. 1.) t2 = particle%vsgs / dyi 
-    
+    if(sign(1.,t2 + particle%vsgs / dyi) .ne. sign(1.,particle%vsgs / dyi)) t2 = - particle%vsgs / dyi
+ 
     tend_vsgs = (particle%vsgs / dyi) + (t1 + t2 + t3) 
-
-    if(abs(tend_vsgs) > 1.) then
-      print*,'v ',tend_vsgs,t1,t2,t3
-    end if 
 
   end function tend_vsgs 
 
@@ -540,14 +520,9 @@ contains
     ! 1. dissipation subgrid velocity cannot exceed subgrid velocity itself 
     if(sign(1.,t1 + particle%wsgs / dzi) .ne. sign(1.,particle%wsgs / dzi)) t1 = - particle%wsgs / dzi
     ! 2. limit relative increase subgrid velocity to 1.
-    if(t2 / (epsilon(1.) + particle%wsgs / dzi) .gt. 1.) t2 = particle%wsgs / dzi 
-    
+    if(sign(1.,t2 + particle%wsgs / dzi) .ne. sign(1.,particle%wsgs / dzi)) t2 = - particle%wsgs / dzi
+  
     tend_wsgs = (particle%wsgs / dzi) + (t1 + t2 + t3) 
-
-    if(abs(tend_wsgs) > 1.) then
-      print*,'w ',tend_wsgs,t1,t2,t3
-    end if 
-
 
   end function tend_wsgs
 
@@ -571,34 +546,10 @@ contains
 
     call checkbound(particle)
    
-    ! Integrate subgrid velocities
-    !particle%usgs_prev = particle%usgs
-    !particle%vsgs_prev = particle%vsgs
-    !particle%wsgs_prev = particle%wsgs
-    !particle%usgs = ((particle%usgs / dxi)                      + rkalpha(nstep) * particle%usgs_tend      * dt + &
-    !                                                              rkbeta(nstep)  * particle%usgs_tend_prev * dt) * dxi
-    !particle%vsgs = ((particle%vsgs / dyi)                      + rkalpha(nstep) * particle%vsgs_tend      * dt + &
-    !                                                              rkbeta(nstep)  * particle%vsgs_tend_prev * dt) * dyi
-    !particle%wsgs = ((particle%wsgs / dzi_t(floor(particle%z))) + rkalpha(nstep) * particle%wsgs_tend      * dt + &
-    !                                                              rkbeta(nstep)  * particle%wsgs_tend_prev * dt) * dzi_t(floor(particle%z))
-
-    !!print*,particle%usgs_prev,particle%usgs,particle%usgs_tend_prev,particle%usgs_tend
-
-    !particle%usgs_tend_prev = particle%usgs_tend
-    !particle%vsgs_tend_prev = particle%vsgs_tend
-    !particle%wsgs_tend_prev = particle%wsgs_tend
-
-
    if ( nstep==3 ) then
       particle%ures_prev   = 0.
       particle%vres_prev   = 0.
       particle%wres_prev   = 0.
-      !particle%usgs_prev   = 0.
-      !particle%vsgs_prev   = 0.
-      !particle%wsgs_prev   = 0.
-      !particle%x_prev      = particle%x
-      !particle%y_prev      = particle%y
-      !particle%z_prev      = particle%z
     end if
 
   end subroutine rk3
@@ -1179,20 +1130,15 @@ contains
 
     type (particle_record), pointer:: particle
 
-    ! Cyclic boundaries -> not needed with 2d parallel grid
-    !particle%x      = modulo(particle%x-3,real(nxp-4))+3
-    !particle%y      = modulo(particle%y-3,real(nyp-4))+3
-    !particle%x_prev = modulo(particle%x_prev-3,real(nxp-4))+3
-    !particle%y_prev = modulo(particle%y_prev-3,real(nyp-4))+3
-
     ! Reflect particles of surface and model top
-    if (particle%z >= nzp-2) then
-      particle%z = nzp-2-0.0001
+    if (particle%z >= nzp-1) then
+      particle%z = nzp-1-0.0001
       particle%wres = -abs(particle%wres)
       particle%wsgs = -abs(particle%wsgs)
     elseif (particle%z < 1.01) then
       particle%z = abs(particle%z-1.01)+1.01
       particle%wres =  abs(particle%wres)
+      particle%wsgs =  abs(particle%wsgs)
     end if
 
   end subroutine checkbound
