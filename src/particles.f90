@@ -123,11 +123,11 @@ contains
         particle%wres = velocity_wres(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
 
         ! Subgrid velocities 
-        if (lpartsgs) then
+        if (lpartsgs .and. nstep == 1) then
           call prep_ui_sgs(particle)
-          particle%usgs_tend = tend_usgs(particle) 
-          particle%vsgs_tend = tend_vsgs(particle) 
-          particle%wsgs_tend = tend_wsgs(particle) 
+          particle%usgs   = tend_usgs(particle) * dxi 
+          particle%vsgs   = tend_vsgs(particle) * dyi
+          particle%wsgs   = tend_wsgs(particle) * dzi_t(floor(particle%z))
         end if
 
         !if(nstep == 3) then
@@ -472,30 +472,20 @@ contains
     real :: t1, t2, t3, tend_usgs
     TYPE (particle_record), POINTER:: particle
 
-    !t1        = -0.5 * C0 * fsl * epsl * (particle%usgs / dxi) / sigma2l
-    !t3        = ((fsl * C0 * epsl)**0.5 * xi(idum)) / dt
+    t1        = (-0.75 * fsl * C0 * (particle%usgs / dxi) * (ceps/labda) * (1.5 * sigma2l)**0.5) * dt
+    t2        = ( 0.5 * ((1. / sigma2l) * dsigma2dt * (particle%usgs / dxi) + dsigma2dx)) * dt
+    t3        = ((fsl * C0 * (ceps/labda) * (1.5*sigma2l)**(1.5))**0.5 * xi(idum))
+
+    ! 1. dissipation subgrid velocity cannot exceed subgrid velocity itself 
+    if(sign(1.,t1 + particle%usgs / dxi) .ne. sign(1.,particle%usgs / dxi)) t1 = - particle%usgs / dxi
+    ! 2. limit relative increase subgrid velocity to 1.
+    if(t2 / (epsilon(1.) + particle%usgs / dxi) .gt. 1.) t2 = particle%usgs / dxi 
     
-    t1        = -0.75 * fsl * C0 * (particle%usgs / dxi) * (ceps/labda) * (1.5 * sigma2l)**0.5
-    if((1. / sigma2l) * dsigma2dt < -1.) then
-      t2      =  0.5 * (-(particle%usgs / dxi) + dsigma2dx) 
-    else
-      t2      =  0.5 * ((1. / sigma2l) * dsigma2dt * (particle%usgs / dxi) + dsigma2dx) 
-    end if
-    t3        = ((fsl * C0 * (ceps/labda) * (1.5*sigma2l)**(1.5))**0.5 * xi(idum)) / dt
+    tend_usgs = (particle%usgs / dxi) + (t1 + t2 + t3)  
 
-    !t1        = sign(1.,t1) * min(abs(t1),abs(particle%usgs/dxi))
-    !t2        = sign(1.,t2) * min(abs(t2),abs(particle%usgs/dxi))
-
-    tend_usgs = t1 + t2 + t3  
-
-    if(abs(tend_usgs) > 1) then 
-      print*,'shit->fan'
-      print*,particle%x,particle%y,particle%z
-      print*,(particle%usgs / dxi)
-      print*,tend_usgs,t1,t2,t3
-      print*,epsl,sigma2l,dsigma2dt,dsigma2dx,(1.5 * sigma2l)**0.5,ceps,labda
-      print*,'----------------------------------------------------'
-    end if
+    if(abs(tend_usgs) > 1.) then
+      print*,'u ',tend_usgs,t1,t2,t3
+    end if 
 
   end function tend_usgs
 
@@ -512,32 +502,22 @@ contains
     real :: t1, t2, t3, tend_vsgs
     TYPE (particle_record), POINTER:: particle
 
-    !t1        = -0.5 * C0 * fsl * epsl * (particle%vsgs / dyi) / sigma2l
-    !t3        = ((fsl * C0 * epsl)**0.5 * xi(idum)) / dt
+    t1        = (-0.75 * fsl * C0 * (particle%vsgs / dyi) * (ceps/labda) * (1.5 * sigma2l)**0.5) * dt
+    t2        = ( 0.5 * ((1. / sigma2l) * dsigma2dt * (particle%vsgs / dyi) + dsigma2dy)) * dt
+    t3        = ((fsl * C0 * (ceps/labda) * (1.5*sigma2l)**(1.5))**0.5 * xi(idum))
+
+    ! 1. dissipation subgrid velocity cannot exceed subgrid velocity itself 
+    if(sign(1.,t1 + particle%vsgs / dyi) .ne. sign(1.,particle%vsgs / dyi)) t1 = - particle%vsgs / dyi
+    ! 2. limit relative increase subgrid velocity to 1.
+    if(t2 / (epsilon(1.) + particle%vsgs / dyi) .gt. 1.) t2 = particle%vsgs / dyi 
     
-    t1        = -0.75 * fsl * C0 * (particle%vsgs / dyi) * (ceps/labda) * (1.5 * sigma2l)**0.5
-    if((1. / sigma2l) * dsigma2dt < -1.) then
-      t2      =  0.5 * (-(particle%vsgs / dyi) + dsigma2dy)
-    else
-      t2      =  0.5 * ((1. / sigma2l) * dsigma2dt * (particle%vsgs / dyi) + dsigma2dy)
-    end if
-    t3        = ((fsl * C0 * (ceps/labda) * (1.5*sigma2l)**(1.5))**0.5 * xi(idum)) / dt
+    tend_vsgs = (particle%vsgs / dyi) + (t1 + t2 + t3) 
 
-    !t1        = sign(1.,t1) * min(abs(t1),abs(particle%vsgs/dyi))
-    !t2        = sign(1.,t2) * min(abs(t2),abs(particle%vsgs/dyi))
- 
-    tend_vsgs = t1 + t2 + t3  
+    if(abs(tend_vsgs) > 1.) then
+      print*,'v ',tend_vsgs,t1,t2,t3
+    end if 
 
-    !if(tend_vsgs > 1) then 
-    !  print*,'shit->fan'
-    !  print*,'xyz=',particle%x,particle%y,particle%z
-    !  print*,'vsgs=',(particle%vsgs / dyi)
-    !  print*,'sgstend=',tend_vsgs,t1,t2,t3
-    !  print*,'eps,sigma,dsigdt,dsigdy=',epsl,sigma2l,dsigma2dt,dsigma2dy
-    !  print*,'----------------------------------------------------'
-    !end if
-
-  end function tend_vsgs
+  end function tend_vsgs 
 
   !
   !--------------------------------------------------------------------------
@@ -549,24 +529,25 @@ contains
     use grid, only : dzi_t, dt
     implicit none
 
-    real :: t1, t2, t3, tend_wsgs
+    real :: t1, t2, t3, tend_wsgs, dzi
     TYPE (particle_record), POINTER:: particle
 
-    !t1        = -0.5 * C0 * fsl * epsl * (particle%wsgs / dzi_t(floor(particle%z))) / sigma2l 
-    !t3        = ((fsl * C0 * epsl)**0.5 * xi(idum)) / dt
+    dzi        = dzi_t(floor(particle%z))
+    t1        = (-0.75 * fsl * C0 * (particle%wsgs / dzi) * (ceps/labda) * (1.5 * sigma2l)**0.5) * dt
+    t2        = ( 0.5 * ((1. / sigma2l) * dsigma2dt * (particle%wsgs / dzi) + dsigma2dz)) * dt
+    t3        = ((fsl * C0 * (ceps/labda) * (1.5*sigma2l)**(1.5))**0.5 * xi(idum))
 
-    t1        = -0.75 * fsl * C0 * (particle%wsgs / dzi_t(floor(particle%z))) * (ceps/labda) * (1.5 * sigma2l)**0.5
-    if((1. / sigma2l) * dsigma2dt < -1.) then
-      t2        =  0.5 * (-(particle%wsgs / dzi_t(floor(particle%z))) + dsigma2dz)   
-    else
-      t2        =  0.5 * ((1. / sigma2l) * dsigma2dt * (particle%wsgs / dzi_t(floor(particle%z))) + dsigma2dz)   
-    end if
-    t3        = ((fsl * C0 * (ceps/labda) * (1.5*sigma2l)**(1.5))**0.5 * xi(idum)) / dt
+    ! 1. dissipation subgrid velocity cannot exceed subgrid velocity itself 
+    if(sign(1.,t1 + particle%wsgs / dzi) .ne. sign(1.,particle%wsgs / dzi)) t1 = - particle%wsgs / dzi
+    ! 2. limit relative increase subgrid velocity to 1.
+    if(t2 / (epsilon(1.) + particle%wsgs / dzi) .gt. 1.) t2 = particle%wsgs / dzi 
+    
+    tend_wsgs = (particle%wsgs / dzi) + (t1 + t2 + t3) 
 
-    !t1        = sign(1.,t1) * min(abs(t1),abs(particle%wsgs/dzi_t(floor(particle%z))))
-    !t2        = sign(1.,t2) * min(abs(t2),abs(particle%wsgs/dzi_t(floor(particle%z))))
- 
-    tend_wsgs = t1 + t2 + t3  
+    if(abs(tend_wsgs) > 1.) then
+      print*,'w ',tend_wsgs,t1,t2,t3
+    end if 
+
 
   end function tend_wsgs
 
@@ -591,31 +572,30 @@ contains
     call checkbound(particle)
    
     ! Integrate subgrid velocities
-    particle%usgs_prev = particle%usgs
-    particle%vsgs_prev = particle%vsgs
-    particle%wsgs_prev = particle%wsgs
-    particle%usgs = ((particle%usgs / dxi)                      + rkalpha(nstep) * particle%usgs_tend      * dt + &
-                                                                  rkbeta(nstep)  * particle%usgs_tend_prev * dt) * dxi
-    particle%vsgs = ((particle%vsgs / dyi)                      + rkalpha(nstep) * particle%vsgs_tend      * dt + &
-                                                                  rkbeta(nstep)  * particle%vsgs_tend_prev * dt) * dyi
-    particle%wsgs = ((particle%wsgs / dzi_t(floor(particle%z))) + rkalpha(nstep) * particle%wsgs_tend      * dt + &
-                                                                  rkbeta(nstep)  * particle%wsgs_tend_prev * dt) * dzi_t(floor(particle%z))
+    !particle%usgs_prev = particle%usgs
+    !particle%vsgs_prev = particle%vsgs
+    !particle%wsgs_prev = particle%wsgs
+    !particle%usgs = ((particle%usgs / dxi)                      + rkalpha(nstep) * particle%usgs_tend      * dt + &
+    !                                                              rkbeta(nstep)  * particle%usgs_tend_prev * dt) * dxi
+    !particle%vsgs = ((particle%vsgs / dyi)                      + rkalpha(nstep) * particle%vsgs_tend      * dt + &
+    !                                                              rkbeta(nstep)  * particle%vsgs_tend_prev * dt) * dyi
+    !particle%wsgs = ((particle%wsgs / dzi_t(floor(particle%z))) + rkalpha(nstep) * particle%wsgs_tend      * dt + &
+    !                                                              rkbeta(nstep)  * particle%wsgs_tend_prev * dt) * dzi_t(floor(particle%z))
 
-    !print*,particle%usgs_prev,particle%usgs,particle%usgs_tend_prev,particle%usgs_tend
+    !!print*,particle%usgs_prev,particle%usgs,particle%usgs_tend_prev,particle%usgs_tend
 
-    particle%usgs_tend_prev = particle%usgs_tend
-    particle%vsgs_tend_prev = particle%vsgs_tend
-    particle%wsgs_tend_prev = particle%wsgs_tend
+    !particle%usgs_tend_prev = particle%usgs_tend
+    !particle%vsgs_tend_prev = particle%vsgs_tend
+    !particle%wsgs_tend_prev = particle%wsgs_tend
 
 
    if ( nstep==3 ) then
       particle%ures_prev   = 0.
       particle%vres_prev   = 0.
       particle%wres_prev   = 0.
-      particle%usgs_prev   = 0.
-      particle%vsgs_prev   = 0.
-      particle%wsgs_prev   = 0.
-      
+      !particle%usgs_prev   = 0.
+      !particle%vsgs_prev   = 0.
+      !particle%wsgs_prev   = 0.
       !particle%x_prev      = particle%x
       !particle%y_prev      = particle%y
       !particle%z_prev      = particle%z
