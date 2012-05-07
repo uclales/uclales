@@ -520,7 +520,7 @@ contains
     real, intent (in), dimension(n1,n2,n3)  :: p, w, th, tl, rl, rs, rt, rrate
     real, intent (out), dimension(n1,n2,n3) :: tv
 
-    integer                   :: k, i, j, km1
+    integer                   :: k, i, j, km1, kp1
     logical                   :: aflg
     real                      :: xy1mx
     real, dimension(n1)       :: a1, a2, a3, tvbar, svar1, svar2, svar3
@@ -616,6 +616,7 @@ contains
     if (debug) WRITE (0,*) 'accum_lvl2: sampling, tv2    myid=',myid
     xy1mx = 0.
     do k=1,n1
+       kp1 = min(n1,k+1)
        aflg = .false.
        do j=3,n3-2
           do i=3,n2-2
@@ -629,8 +630,9 @@ contains
           end do
        end do
 
+       svctr(k,64)=svctr(k,64)+get_avg(1,n2,n3,1,xy1)
+       svctr(k,74)=svctr(k,74)+get_avg(1,n2,n3,1,xy2)
        if (aflg) then
-          svctr(k,64)=svctr(k,64)+get_avg(1,n2,n3,1,xy1)
           svctr(k,65)=svctr(k,65)+get_csum(1,n2,n3,1,xy1,xy1)
           svctr(k,66)=svctr(k,66)+get_csum(n1,n2,n3,k,w,xy1)
           svctr(k,67)=svctr(k,67)+get_csum(n1,n2,n3,k,tl+th00,xy1)
@@ -638,7 +640,6 @@ contains
           svctr(k,69)=svctr(k,69)+get_csum(n1,n2,n3,k,rt,xy1)*1000.
           svctr(k,70)=svctr(k,70)+get_csum(n1,n2,n3,k,rl,xy1)*1000.
 
-          svctr(k,74)=svctr(k,74)+get_avg(1,n2,n3,1,xy2)
           svctr(k,75)=svctr(k,75)+get_csum(1,n2,n3,1,xy2,xy2)
           svctr(k,76)=svctr(k,76)+get_csum(n1,n2,n3,k,w,xy2)
           svctr(k,77)=svctr(k,77)+get_csum(n1,n2,n3,k,tl+th00,xy2)
@@ -648,7 +649,7 @@ contains
 
           do j=3,n3-2
              do i=3,n2-2
-                scr(i,j)=(.5*(tl(k,i,j)+tl(k+1,i,j))+th00)*w(k,i,j)
+                scr(i,j)=(.5*(tl(k,i,j)+tl(kp1,i,j))+th00)*w(k,i,j)
              end do
           end do
           svctr(k,71)=svctr(k,71)+get_csum(1,n2,n3,1,scr,xy1)
@@ -656,7 +657,7 @@ contains
 
           do j=3,n3-2
              do i=3,n2-2
-                scr(i,j)=(.5*(tv(k,i,j)+tv(k+1,i,j)))*w(k,i,j)
+                scr(i,j)=(.5*(tv(k,i,j)+tv(kp1,i,j)))*w(k,i,j)
              end do
           end do
           svctr(k,72)=svctr(k,72)+get_csum(1,n2,n3,1,scr,xy1)
@@ -664,7 +665,7 @@ contains
 
           do j=3,n3-2
              do i=3,n2-2
-                scr(i,j)=(.5*(rt(k,i,j)+rt(k+1,i,j)))*w(k,i,j)
+                scr(i,j)=(.5*(rt(k,i,j)+rt(kp1,i,j)))*w(k,i,j)
              end do
           end do
           svctr(k,73)=svctr(k,73)+get_csum(1,n2,n3,1,scr,xy1)
@@ -733,9 +734,9 @@ contains
        end do
        svctr(k,84)=svctr(k,84) + CCN*dn0(k)/1000. ! Nc in dm^-3 (1/liter)
        svctr(k,86)=svctr(k,86) + a1(k)*1000.
+       svctr(k,91)=svctr(k,91)+get_avg(1,n2,n3,1,scr1)
        if (aflg) then
           svctr(k,85)=svctr(k,85)+get_csum(n1,n2,n3,k,nr*dn0(k)/1000.,scr1) ! Nr in dm^-3 (1/liter)
-          svctr(k,91)=svctr(k,91)+get_avg(1,n2,n3,1,scr1)
        end if
     end do
     !
@@ -761,10 +762,10 @@ contains
              end if
           end do
        end do
+       svctr(k-1,89)=svctr(k-1,89)+get_avg(1,n2,n3,1,scr1)
        if (aflg) then
           if (k == 2 ) ssclr(24) = rrcnt
           svctr(k-1,90)=svctr(k-1,90)+get_csum(n1,n2,n3,k,rrate,scr1)
-          svctr(k-1,89)=svctr(k-1,89)+get_avg(1,n2,n3,1,scr1)
        end if
     end do
     !
