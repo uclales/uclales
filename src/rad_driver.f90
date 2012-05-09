@@ -135,8 +135,13 @@ module radiation
             !print *, "pre",pre(:)
             !print *, "u0",u0
 
-            call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
-                 fds, fus, fdir, fuir, plwc=plwc, pre=pre, piwc=piwc, pde=pde, pgwc=pgwc, useMcICA=.true.)
+            if (present(ice).and.present(grp)) then
+               call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
+                    fds, fus, fdir, fuir, plwc=plwc, pre=pre, piwc=piwc, pde=pde, pgwc=pgwc, useMcICA=.true.)
+            else
+               call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
+                    fds, fus, fdir, fuir, plwc=plwc, pre=pre, useMcICA=.true.)
+            end if
 
             do k=1,n1
                kk = nv1 - (k-1)
