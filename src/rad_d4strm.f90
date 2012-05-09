@@ -91,10 +91,20 @@ contains
 
     if(present(useMcICA)) McICA = useMcICA
     
-    call rad_ir(pts, ee, pp, pt, ph, po, fdir, fuir, &
-                 plwc, pre, piwc, pde, prwc, pgwc, McICA  )
-    call rad_vis(as, u0, ss, pp, pt, ph, po, fds, fus,  &
-                 plwc, pre, piwc, pde, prwc, pgwc, McICA  )
+    if (present(piwc).and.present(pgwc)) then
+       call rad_ir(pts, ee, pp, pt, ph, po, fdir, fuir, &
+                   plwc, pre, piwc, pde, prwc, pgwc, McICA  )
+    else
+       call rad_ir(pts, ee, pp, pt, ph, po, fdir, fuir, &
+                   plwc, pre, prwc=prwc, useMcICA=McICA  )
+    endif
+    if (present(piwc).and.present(pgwc)) then
+       call rad_vis(as, u0, ss, pp, pt, ph, po, fds, fus,  &
+                    plwc, pre, piwc, pde, prwc, pgwc, McICA  )
+    else
+       call rad_vis(as, u0, ss, pp, pt, ph, po, fds, fus,  &
+                    plwc, pre,prwc=prwc, useMcICA=McICA  )
+    endif
 
   end subroutine rad
 
