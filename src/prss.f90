@@ -225,21 +225,26 @@ contains
 
     integer :: k,l,m
     real    :: fctl,fctm,xl,xm,af,cf
+    integer :: xof, yof
+
     fctl=2.*pi/float(nxpg-4)
     fctm=2.*pi/float(nypg-4)
 
+    xof=xoffset(wrxid)
+    yof=yoffset(wryid)
+
     do l=1,ix
-          if(l+xoffset(wrxid) .le. (nxpg-4)/2+1) then
-            xl=float(l-1+xoffset(wrxid))
+          if(l+xof .le. int((nxpg-4)/2)+1) then
+            xl=float(l-1+xof)
           else
-             xl=float(l-(nxpg-4)-1+xoffset(wrxid))
+             xl=float(l-(nxpg-4)-1+xof)
           endif
       
        do m=1,iy
-          if(m+yoffset(wryid) .le. (nypg-4)/2+1) then
-             xm=float(m-1+yoffset(wryid))
+          if(m+yof .le. int((nypg-4)/2)+1) then
+             xm=float(m-1+yof)
           else
-             xm=float(m-(nypg-4)-1+yoffset(wryid))
+             xm=float(m-(nypg-4)-1+yof)
           endif
           wv(l,m)=2.*((cos(fctl*xl)-1.)*dx*dx + (cos(fctm*xm)-1.)*dy*dy)
        enddo
@@ -272,8 +277,8 @@ contains
 
        do k=2,n1-1
           do l=1,ix
-             if (m+yoffset(wryid)+l+xoffset(wrxid)>2) bk(l,k)=aimag(s1(l,m,k))
-             if (m+yoffset(wryid)+l+xoffset(wrxid)>2) s1(l,m,k)=xk(l,k)
+             if (m+yof+l+xof>2) bk(l,k)=aimag(s1(l,m,k))
+             if (m+yof+l+xof>2) s1(l,m,k)=xk(l,k)
           enddo
        enddo
       
@@ -281,7 +286,7 @@ contains
 
        do k=2,n1-1
           do l=1,ix
-             if (m+yoffset(wryid)+l+xoffset(wrxid) > 2)                &
+             if (m+yof+l+xof > 2)                &
                   s1(l,m,k)=cmplx(real(s1(l,m,k)),xk(l,k))
           enddo
        enddo
