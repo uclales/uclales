@@ -37,7 +37,7 @@ module radiation
   contains
 
     subroutine d4stream(n1, n2, n3, alat, time, sknt, sfc_albedo, CCN, dn0, &
-         pi0, pi1, dzi_m, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,sflxd,reff, albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa, rr,ice,nice,grp,istp)
+         pi0, pi1, dzi_m, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,sflxd, albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa, rr,ice,nice,grp)
 
 
       integer, intent (in) :: n1, n2, n3
@@ -45,9 +45,8 @@ module radiation
       real, dimension (n1), intent (in)                 :: dn0, pi0, pi1, dzi_m
       real, dimension (n1,n2,n3), intent (in)           :: pip, th, rv, rc
       real, optional, dimension (n1,n2,n3), intent (in) :: rr,ice,nice,grp
-      real, dimension (n1,n2,n3), intent (inout)        :: tt, rflx, sflx, lflxu, lflxd, sflxu, sflxd,reff 
+      real, dimension (n1,n2,n3), intent (inout)        :: tt, rflx, sflx, lflxu, lflxd, sflxu, sflxd
       real, dimension (n2,n3), intent (out),optional    :: albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa
-      integer, optional, intent (in) :: istp
 
       integer :: kk
       real    :: xfact, prw, pri, p0(n1), exner(n1), pres(n1)
@@ -107,16 +106,13 @@ module radiation
                  piwc(kk) = 1000.*dn0(k)*ice(k,i,j)
                  if (nice(k,i,j).gt.0.0) then
                     pde(kk)  = 1.e6*(piwc(kk)/(1000.*pri*nice(k,i,j)*dn0(k)))**(1./3.)
-                    reff(k,i,j)=pde(kk)
                     pde(kk)=min(max(pde(kk),20.),180.)
                  else
                     pde(kk)  = 0.0
-                    reff(k,i,j)=0.0
                  endif
                else
                   piwc(kk) = 0.
                   pde(kk) = 0.0
-                  reff(k,i,j) = 0.0
                end if
                if (present(grp)) then
                  pgwc(kk) = 1000.*dn0(k)*grp(k,i,j)
@@ -135,8 +131,13 @@ module radiation
             !print *, "pre",pre(:)
             !print *, "u0",u0
 
-            call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
-                 fds, fus, fdir, fuir, plwc=plwc, pre=pre, piwc=piwc, pde=pde, pgwc=pgwc, useMcICA=.true.)
+            if (present(ice).and.present(grp)) then
+               call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
+                    fds, fus, fdir, fuir, plwc=plwc, pre=pre, piwc=piwc, pde=pde, pgwc=pgwc, useMcICA=.true.)
+            else
+               call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
+                    fds, fus, fdir, fuir, plwc=plwc, pre=pre, useMcICA=.true.)
+            end if
 
             do k=1,n1
                kk = nv1 - (k-1)
@@ -187,8 +188,6 @@ module radiation
                  stop
                endif
                tt(k,i,j) = tt(k,i,j) - (rflx(k,i,j) - rflx(k-1,i,j))*xfact
-!             if (present(istp).and.(istp==14))  print *, 'dt', k, i,j, rc(k,i,j),ice(k,i,j),(rflx(k,i,j) - rflx(k-1,i,j))*xfact*3600.,tt(k,i,j)
-             !  print *, 'dt', k, rc(k,i,j),(rflx(k,i,j) - rflx(k-1,i,j))*xfact*3600.
             end do
 
          end do

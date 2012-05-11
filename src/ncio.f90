@@ -272,7 +272,7 @@ contains
     if (level  >= 3) nvar0 = nvar0+2
     if (level  >= 4) nvar0 = nvar0+4
     if (level  >= 5) nvar0 = nvar0+4
-     if (iradtyp > 1) nvar0 = nvar0+3
+    if (iradtyp > 1) nvar0 = nvar0+3
     if (level  >= 5) nvar0 = nvar0+7 ! linda, output from microphysics
 
     allocate (sanal(nvar0))
@@ -439,61 +439,81 @@ contains
     if (level >= 2)  then
 !        nn = nn+1
        iret = nf90_inq_varid(ncid0, sanal(17), VarID)
-       iret = nf90_put_var(ncid0, VarID, reff(:,i1:i2,j1:j2), start=ibeg, &
+       iret = nf90_put_var(ncid0, VarID, liquid(:,i1:i2,j1:j2), start=ibeg, &
             count=icnt)
     end if
     nn = nbase+2
-!     if (level >=3) then
-      do n = nbase+2, nvar0-1-7-3
+    if (level >=3) then
+      do n = nbase+2, 18
        nn = nn+1
        call newvar(nn-12)
        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
             count=icnt)
       end do
-  
-      if (iradtyp > 1)  then
-         nn = nn+1
-         iret = nf90_inq_varid(ncid0, sanal(28), VarID)
-         iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
-              count=icnt)  
-         nn = nn+1
-         iret = nf90_inq_varid(ncid0, sanal(29), VarID)
-         iret = nf90_put_var(ncid0, VarID, a_lflxu(:,i1:i2,j1:j2), start=ibeg, &
-              count=icnt)
-         nn = nn+1
-         iret = nf90_inq_varid(ncid0, sanal(30), VarID)
-         iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
-              count=icnt)
-      end if
+    endif  
 
-      if (level >= 5)  then
+    if (level >=4) then
+      do n = 20, 23
+       nn = nn+1
+       call newvar(nn-12)
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
+            count=icnt)
+      end do
+    endif  
+
+    if (level >=5) then
+      do n = 24, 27
+       nn = nn+1
+       call newvar(nn-12)
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
+            count=icnt)
+      end do
+    endif  
+
+    if (iradtyp > 1)  then
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)  
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_lflxu(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+    end if
+    if (level >= 5)  then
          nn = nn+1
-         iret = nf90_inq_varid(ncid0, sanal(31), VarID)
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
          iret = nf90_put_var(ncid0, VarID, mp_tlt(:,i1:i2,j1:j2), start=ibeg, &
               count=icnt)
          nn = nn+1
-         iret = nf90_inq_varid(ncid0, sanal(32), VarID)
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
          iret = nf90_put_var(ncid0, VarID, mp_qt(:,i1:i2,j1:j2), start=ibeg, &
               count=icnt)
          nn = nn+1
-         iret = nf90_inq_varid(ncid0, sanal(33), VarID)
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
          iret = nf90_put_var(ncid0, VarID, mp_qr(:,i1:i2,j1:j2), start=ibeg, &
               count=icnt)
          nn = nn+1
-         iret = nf90_inq_varid(ncid0, sanal(34), VarID)
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
          iret = nf90_put_var(ncid0, VarID, mp_qi(:,i1:i2,j1:j2), start=ibeg, &
               count=icnt)
          nn = nn+1
-         iret = nf90_inq_varid(ncid0, sanal(35), VarID)
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
          iret = nf90_put_var(ncid0, VarID, mp_qs(:,i1:i2,j1:j2), start=ibeg, &
               count=icnt)
          nn = nn+1
-         iret = nf90_inq_varid(ncid0, sanal(36), VarID)
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
          iret = nf90_put_var(ncid0, VarID, mp_qg(:,i1:i2,j1:j2), start=ibeg, &
               count=icnt)
          nn = nn+1
-         iret = nf90_inq_varid(ncid0, sanal(37), VarID)
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
          iret = nf90_put_var(ncid0, VarID, mp_qh(:,i1:i2,j1:j2), start=ibeg, &
               count=icnt)
       end if
@@ -585,7 +605,7 @@ contains
        if (itype==1) ncinfo = 'm/s'
        if (itype==2) ncinfo = 'mttt'
     case('t')
-       if (itype==0) ncinfo = 'Liquid Water Potential temperature'
+       if (itype==0) ncinfo = 'Potential temperature'
        if (itype==1) ncinfo = 'K'
        if (itype==2) ncinfo = 'tttt'
     case('p')
@@ -594,10 +614,6 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('q')
        if (itype==0) ncinfo = 'Total water mixing ratio'
-       if (itype==1) ncinfo = 'g/kg'
-       if (itype==2) ncinfo = 'tttt'
-    case('reff')
-       if (itype==0) ncinfo = 'Liquid water mixing ratio'
        if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
     case('l')

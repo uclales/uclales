@@ -48,7 +48,7 @@ contains
   ! -------------------------------------------------------------------
   ! subroutine forcings:  calls the appropriate large-scale forcings
   !irina
-  subroutine forcings(time_in, cntlat, sst,div, case_name,istp)
+  subroutine forcings(time_in, cntlat, sst,div, case_name)
 
 !irina
     use grid, only: nxp, nyp, nzp, zm, zt, dzi_t, dzi_m, dn0, iradtyp, liquid  &
@@ -65,7 +65,6 @@ contains
 !irina
     real :: xref1, xref2
     integer :: i, j, k, kp1
-    integer :: istp
 
 !irina
     select case(iradtyp)
@@ -100,9 +99,9 @@ contains
           case(4,5)
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,   &
                   dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt,&
-                  a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, reff, albedo, &
+                  a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
                   rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
-                  lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa,ice=a_ricep,nice=a_nicep,grp=a_rgrp,istp=istp)
+                  lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa,ice=a_ricep,nice=a_nicep,grp=a_rgrp)
             !old      
             ! call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
             !      dn0, pi0, pi1, dzi_t, a_pexnr, a_scr1, vapor, liquid, a_tt,&
