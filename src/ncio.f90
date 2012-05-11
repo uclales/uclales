@@ -453,6 +453,26 @@ contains
       end do
     endif  
 
+    if (level >=4) then
+      do n = 20, 23
+       nn = nn+1
+       call newvar(nn-12)
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
+            count=icnt)
+      end do
+    endif  
+
+    if (level >=5) then
+      do n = 24, 27
+       nn = nn+1
+       call newvar(nn-12)
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
+            count=icnt)
+      end do
+    endif  
+
     if (iradtyp > 1)  then
        nn = nn+1
        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
@@ -585,7 +605,7 @@ contains
        if (itype==1) ncinfo = 'm/s'
        if (itype==2) ncinfo = 'mttt'
     case('t')
-       if (itype==0) ncinfo = 'Liquid Water Potential temperature'
+       if (itype==0) ncinfo = 'Potential temperature'
        if (itype==1) ncinfo = 'K'
        if (itype==2) ncinfo = 'tttt'
     case('p')
