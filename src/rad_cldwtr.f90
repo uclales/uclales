@@ -212,7 +212,7 @@ contains
   ! ice [g/m^3] and effective radius [microns] by interpolating based on
   ! known optical properties at predefined sizes  
   !
-  subroutine cloud_ice ( ib, pde, pci, dz, ti, wi, wwi,ch )
+  subroutine cloud_ice ( ib, pde, pci, dz, ti, wi, wwi )
 
     implicit none
 
@@ -223,7 +223,7 @@ contains
     integer :: k
     real    :: gg, wght, cwmks
     real    :: fw1, fw2, fw3, wf1, wf2, wf3, wf4, x1, x2, x3, x4, ibr, fd
-    character(len=3):: ch
+
     if (.not.iceInitialized) stop 'TERMINATING: Ice not Initialized'
 
     do k = 1, nv
@@ -236,8 +236,8 @@ contains
       	     ap(2,ib) / fw1 + ap(3,ib) / fw2 )
              wi(k) = 1.0 - ( bp(1,ib) + bp(2,ib) * fw1 + &
       	     bp(3,ib) * fw2 + bp(4,ib) * fw3 )
-             if (wi(k).lt.0.) print*,'bad wi, ',wi(k),ib,k,bp(1,ib),bp(2,ib),bp(3,ib),bp(4,ib),fw1,fw2,fw3,ch
-             if (ti(k).lt.0.) print*,'bad ti, ',ti(k),ib,k,cwmks,dz(k),ap(1,ib),ap(2,ib),ap(3,ib),fw1,fw2,ch
+             if (wi(k).lt.0.) print*,'bad wi, ',wi(k),ib,k,bp(1,ib),bp(2,ib),bp(3,ib),bp(4,ib),fw1,fw2,fw3
+             if (ti(k).lt.0.) print*,'bad ti, ',ti(k),ib,k,cwmks,dz(k),ap(1,ib),ap(2,ib),ap(3,ib),fw1,fw2
 	     if ( ib .le. mbs ) then ! shortwave
 	       fd = dps(1,ib) + dps(2,ib) * fw1 + &
                dps(3,ib) * fw2 + dps(4,ib) * fw3
