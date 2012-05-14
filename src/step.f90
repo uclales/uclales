@@ -161,6 +161,12 @@ contains
         
     enddo
 
+    if (lpartic) then
+      call exit_particles
+      if(lpartdump) call exitparticledump
+      if(lpartstat) call exitparticlestat
+    end if
+
     call write_hist(1, time)
 
     iret = close_anal()

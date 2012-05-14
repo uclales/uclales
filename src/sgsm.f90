@@ -271,8 +271,14 @@ contains
              ! variable km represents what is commonly known as Km, the eddy viscosity
              ! variable kh represents strain rate factor S^2 (dummy variable)
              !
-             km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) &
-                  *0.5*(dn0(k)+dn0(k+1))/(1./(delta*csx)**1+1./(zm(k)*vonk)**1)
+             
+             ! Original:
+             !km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) &
+             !     *0.5*(dn0(k)+dn0(k+1))/(1./(delta*csx)**2+1./(zm(k)*vonk)**2)
+
+             ! Hack BvS: remove damping
+             km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) * 0.5 * (dn0(k)+dn0(k+1)) * (csx * delta)**2. 
+
              !
              ! after kh is multiplied with the factor (1-ri/pr), the product of kh 
              ! and km represents the dissipation rate epsilon 

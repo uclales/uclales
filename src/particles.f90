@@ -81,7 +81,7 @@ module modparticles
                                          eprof, eprofl
 
   real, allocatable, dimension(:,:,:) :: sgse,dthvdz
-  real, parameter                     :: minsgse = 1e-10
+  real, parameter                     :: minsgse = 5e-5
   real, allocatable, dimension(:)     :: fs
   integer (KIND=selected_int_kind(10)):: idum = -12345
   real, parameter                     :: C0   = 6.
@@ -236,7 +236,7 @@ contains
  
     do k=2, nzp
       e_res(k)  = 0.5 * (u2_av(k) + v2_av(k) + 0.5*(w2_av(k) + w2_av(k-1)))
-      fs(k)     = sgse_av(k) / (sgse_av(k) + e_res(k))
+      fs(k)     = 1. !sgse_av(k) / (sgse_av(k) + e_res(k))
     end do
 
     e_res(1)    = -e_res(2)         ! e_res -> 0 at surface
@@ -253,7 +253,6 @@ contains
 
     !  close(ifoutput) 
     !end if
-
 
     deallocate(u_avl,v_avl,u2_avl,v2_avl,w2_avl,sgse_avl,u_av,v_av,u2_av,v2_av,w2_av,sgse_av,e_res)
 
@@ -296,9 +295,9 @@ contains
           do k=2,nzp-1
             ! 1. SGS-TKE
             ! ---------------------------
-            labda             = (1. / ((1. / labda0**1.) + (1. / (0.4 * (zt(k) + 0.001)**1.))))**0.5
+            labda             = labda0 !(1. / ((1. / labda0**2.) + (1. / (0.4 * (zt(k) + 0.001)**2.))))**0.5
             sz1               = (0.5*(a_km(k,i,j) + a_km(k-1,i,j)))**2.
-            sgse(k,i,j)       = sz1 / (labda*pi*(csx**2))**2
+            sgse(k,i,j)       = max(sz1 / (labda*pi*(csx**2))**2,minsgse)
  
             !sz1              = 1./sqrt(1./(labda0 * csx)**2 + 1./(zt(k) * vonk+0.001)**2)
             !ceps             = 0.19 + 0.51 * (labda / labda0)
@@ -490,8 +489,8 @@ contains
                               sca2part(particle%x,particle%y-0.5,particle%z,sgse,.true.)) * dyi
     dsigma2dz    = (2./3.) * (sca2part(particle%x,particle%y,particle%z+0.5,sgse,.true.) - &
                               sca2part(particle%x,particle%y,particle%z-0.5,sgse,.true.)) * dzi_t(floor(particle%z))
-    dsigma2dt    = (sigma2l - particle%sigma2_sgs) / (dt / 3.)
-    dsigma2dt    = sign(1.,dsigma2dt) * min(abs(dsigma2dt),1. / dt)     ! Limit dsigma2dt term
+    dsigma2dt    = (sigma2l - particle%sigma2_sgs) / dt
+    !dsigma2dt    = sign(1.,dsigma2dt) * min(abs(dsigma2dt),1. / dt)     ! Limit dsigma2dt term
     particle%sigma2_sgs = sigma2l
 
     N            = (g/th00) * sca2part(particle%x,particle%y,particle%z,dthvdz,.false.)
@@ -1219,6 +1218,10 @@ contains
       particle%z = nzp-1-0.0001
       particle%wres = -abs(particle%wres)
       particle%wsgs = -abs(particle%wsgs)
+    !elseif(particle%z < 2.0) then
+    !  particle%z = 2.01
+    !  particle%wres =  abs(particle%wres)
+    !  particle%wsgs =  abs(particle%wsgs)
     elseif (particle%z < 1.01) then
       particle%z = abs(particle%z-1.01)+1.01
       particle%wres =  abs(particle%wres)
