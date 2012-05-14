@@ -173,12 +173,6 @@ contains
 
     if (lcross) call exitcross
 
-    if (lpartic) then
-      call exit_particles
-      if(lpartdump) call exitparticledump
-      if(lpartstat) call exitparticlestat
-    end if
-
     iret = close_stat()
 
   end subroutine stepper

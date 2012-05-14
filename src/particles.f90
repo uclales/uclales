@@ -1454,8 +1454,25 @@ contains
       call delete_particle(tail)
     end do
 
-    if(lpartsgs)  deallocate(sgse,dthvdz)
-    if(lpartstat) deallocate(npartprof,npartprofl,uprof,uprofl,vprof,vprofl,wprof,wprofl,fs,fsprof,fsprofl,eprof,eprofl)
+    if(allocated(sgse))       deallocate(sgse)
+    if(allocated(dthvdz))     deallocate(dthvdz)
+    if(allocated(fs))         deallocate(fs)
+
+    if(allocated(npartprof))  deallocate(npartprof)
+    if(allocated(npartprofl)) deallocate(npartprofl)
+    if(allocated(uprof))      deallocate(uprof)
+    if(allocated(uprofl))     deallocate(uprofl)
+    if(allocated(vprof))      deallocate(vprof)
+    if(allocated(vprofl))     deallocate(vprofl)
+    if(allocated(wprof))      deallocate(wprof)
+    if(allocated(wprofl))     deallocate(wprofl)
+    if(allocated(fsprof))     deallocate(fsprof)
+    if(allocated(fsprofl))    deallocate(fsprofl)
+    if(allocated(eprof))      deallocate(eprof)
+    if(allocated(eprofl))     deallocate(eprofl)
+
+    !if(lpartsgs)  deallocate(sgse,dthvdz,fs)
+    !if(lpartstat) deallocate(npartprof,npartprofl,uprof,uprofl,vprof,vprofl,wprof,wprofl,fsprof,fsprofl,eprof,eprofl)
 
     if(myid == 0) print "(//' ',49('-')/,' ',/,'  Lagrangian particles removed.')"
   end subroutine exit_particles
@@ -1660,4 +1677,5 @@ contains
     end if
 
   end subroutine delete_particle
+
 end module modparticles
