@@ -205,7 +205,7 @@ contains
         call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tw, ww, www)
       end if
       if (present(piwc)) then
-        call cloud_ice(ib + size(solar_bands), pde, piwc, dz, ti, wi, wwi,'ir')
+        call cloud_ice(ib + size(solar_bands), pde, piwc, dz, ti, wi, wwi)
         call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, ti, wi, wwi)
       end if
       if (present(pgwc)) then
@@ -355,7 +355,7 @@ contains
            call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tw,ww,www)
         end if
         if (present(piwc)) then
-           call cloud_ice(ib, pde, piwc, dz, ti, wi, wwi,'vis')
+           call cloud_ice(ib, pde, piwc, dz, ti, wi, wwi)
            call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, ti,wi,wwi)
          end if 
         if (present(pgwc)) then
