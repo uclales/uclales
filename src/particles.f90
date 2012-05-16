@@ -102,7 +102,7 @@ contains
     implicit none
     real, intent(in)               :: time
     type (particle_record), pointer:: particle
-    integer                        :: muz,mvz,mwz,k
+    !tinteger                        :: muz,mvz,mwz,k
 
     if ( np < 1 ) return   ! Just to be sure..
 
@@ -265,54 +265,106 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine calc_fields
-    use grid, only             : a_km, nzp, zt, dxi, dyi, nxp, nyp, zm, a_rp, a_tp, dzi_t
-    use defs, only             : pi, vonk
+    use grid, only             : nzp, zt, dxi, dyi, nxp, nyp, zm, a_rp, a_tp, dzi_t, dzi_m, a_up, a_vp, a_wp, th00
+    use defs, only             : pi, vonk, g
     use mpi_interface, only    : nxg, nyg
     implicit none
     
-    real                       :: labda0, sz1,thvp,thvm
-    integer                    :: i,j,k
-    real, parameter            :: alpha = 1.5
-    real, parameter            :: cf    = 2.5
-    real, parameter            :: csx   = 0.23
+    real                       :: thvp,thvm
+    real                       :: S,N2,cm,ch,ceps
+    integer                    :: i,j,k,ip,im,jp,jm,kp,km
+    real, parameter            :: alpha = 1.6
+    !real, parameter            :: cf    = 2.5
+    !real, parameter            :: csx   = 0.23
+    real, parameter            :: gamma = 1.34
 
-    labda0 = (zm(2)/dxi/dyi)**(1./3.)
+    cm   = (1./pi) * ((2./3.)*alpha)**(3./2.)
+    ch   = (4./3.) * gamma * (1./pi) * ((2./3.)*alpha)**0.5 
+    ceps = pi * ((2./3.)*alpha)**(3./2.)
 
-    !do j=1,nyp
-    !   do i=1,nxp
-    !      do k=2,nzp-1
-    !        labda            = (1. / ((1. / labda0**2.) + (1. / (0.4 * (zt(k) + 0.001)**2.))))**0.5
-    !        ceps             = 0.19 + 0.51 * (labda / labda0)
-    !        sgse(k,i,j)      = (0.5*(a_km(k,i,j) + a_km(k-1,i,j)) / ((labda * (cf / (2. * pi)) * (1.5 * alpha)**(-1.5))))**2.  
-    !      end do
-    !      sgse(1,i,j)     = sgse(2,i,j)
-    !      sgse(nzp,i,j)   = sgse(nzp-1,i,j)
-    !   end do
-    !end do
-
-    do j=1,nyp
-       do i=1,nxp
+    do j=2,nyp-1
+       jp = j+1
+       jm = j-1
+       do i=2,nxp-1
+          ip = i+1
+          im = i-1
           do k=2,nzp-1
+            kp = k+1
+            km = k-1            
+
+            ! 1. Brunt-Vaisala^2
+            thvp = (0.5*(a_tp(k,i,j) + a_tp(kp,i,j))) * (1. + 0.61 * (0.5*(a_rp(k,i,j) + a_rp(kp,i,j))))
+            thvm = (0.5*(a_tp(k,i,j) + a_tp(km,i,j))) * (1. + 0.61 * (0.5*(a_rp(k,i,j) + a_rp(km,i,j))))
+            N2   = (g/th00) * (thvp - thvm) * dzi_t(k)
+
+            ! 2. Calculate S^2, prevents using scratch arrays in sgsm.f90
+            ! and bypasses unnecessary double interpolation
+
+            ! {11,22,33}^2 = dudx^2 + dvdy^2 + dwdz^2
+            S = ( &
+              ((a_up(k,i,j)   -  a_up(k,im,j))   * dxi       )**2    + &
+              ((a_vp(k,i,j)   -  a_vp(k,i,jm))   * dyi       )**2    + &
+              ((a_wp(k,i,j)   -  a_wp(km,i,j))   * dzi_t(k)  )**2) 
+
+            ! {13 = 31}^2 = dvdz^2 + dwdx^2
+            S = S + 0.125 * ( &
+              ((a_wp(k,i,j)   -  a_wp(k,im,j))   * dxi       + &
+               (a_up(kp,im,j) -  a_up(k,im,j))   * dzi_m(k)  )**2   + &
+              ((a_wp(km,i,j)  -  a_wp(km,im,j))  * dxi       + &
+               (a_up(k,im,j)  -  a_up(km,im,j))  * dzi_m(km) )**2   + &
+              ((a_wp(km,ip,j) -  a_wp(km,i,j))   * dxi       + &
+               (a_up(k,i,j)   -  a_up(km,i,j))   * dzi_m(km) )**2   + &
+              ((a_wp(k,ip,j)  -  a_wp(k,i,j))    * dxi       + &
+               (a_up(kp,i,j)  -  a_up(k,i,j))    * dzi_m(k)  )**2)
+
+            ! {23 = 32}^2 = dvdz^2 + dwdy^2
+            S = S + 0.125 * ( &
+              ((a_wp(k,i,j)   -  a_wp(k,i,jm))   * dyi       + &
+               (a_vp(kp,i,jm) -  a_vp(k,i,jm))   * dzi_m(k)  )**2   + &
+              ((a_wp(km,i,j)  -  a_wp(km,i,jm))  * dyi       + &
+               (a_vp(k,i,jm)  -  a_vp(km,i,jm))  * dzi_m(km) )**2   + &
+              ((a_wp(km,i,jp) -  a_wp(km,i,j))   * dyi       + &
+               (a_vp(k,i,j)   -  a_vp(km,i,j))   * dzi_m(km) )**2   + &
+              ((a_wp(k,i,jp)  -  a_wp(k,i,j))    * dyi       + &
+               (a_vp(kp,i,j)  -  a_vp(k,i,j))    * dzi_m(k)  )**2)
+
+            ! {12 = 21}^2 = dudy^2 + dvdx^2
+            S = S + 0.125 * ( &
+              ((a_up(k,im,jp) -  a_up(k,im,j))   * dyi      + &
+               (a_vp(k,i,j)   -  a_vp(k,im,j))   * dxi      )**2   + &
+              ((a_up(k,im,j)  -  a_up(k,im,jm))  * dyi      + &
+               (a_vp(k,i,jm)  -  a_vp(k,im,jm))  * dxi      )**2   + &
+              ((a_up(k,i,j)   -  a_up(k,i,jm))   * dyi      + &
+               (a_vp(k,ip,jm) -  a_vp(k,i,jm))   * dxi      )**2   + &
+              ((a_up(k,i,jp)  -  a_up(k,i,j))    * dyi      + &
+               (a_vp(k,ip,j)  -  a_vp(k,i,j))    * dxi      )**2)
+
+
+            ! Test, no stability corrections
+            labda = ((1/dzi_t(k))/dxi/dyi)**(1./3.)
+            sgse(k,i,j) = ((cm / ceps) * labda**2 * S) - ((ch / ceps) * labda**2 * N2)  
+ 
+
             ! 1. SGS-TKE
             ! ---------------------------
-            labda             = labda0 !(1. / ((1. / labda0**2.) + (1. / (0.4 * (zt(k) + 0.001)**2.))))**0.5
-            sz1               = (0.5*(a_km(k,i,j) + a_km(k-1,i,j)))**2.
-            sgse(k,i,j)       = max(sz1 / (labda*pi*(csx**2))**2,minsgse)
+            !labda             = labda0 !(1. / ((1. / labda0**2.) + (1. / (0.4 * (zt(k) + 0.001)**2.))))**0.5
+            !sz1               = (0.5*(a_km(k,i,j) + a_km(k-1,i,j)))**2.
+            !sgse(k,i,j)       = max(sz1 / (labda*pi*(csx**2))**2,minsgse)
  
             !sz1              = 1./sqrt(1./(labda0 * csx)**2 + 1./(zt(k) * vonk+0.001)**2)
             !ceps             = 0.19 + 0.51 * (labda / labda0)
-            !sgse(k,i,j)      = (0.5*(a_km(k,i,j) + a_km(k-1,i,j)) / ((labda * (cf / (2. * pi)) * (1.5 * alpha)**(-1.5))))**2.  
+            !sgse(k,i,j)      = (0.5*(a_km(k,i,j) + a_km(k-1,i,j)) / ((labda * (cf / (2. * pi)) * (1.5 * alpha)**(-1.5))))**2.
 
             ! 2. Vertical gradient thetav
             ! ---------------------------
-            thvp = (0.5*(a_tp(k,i,j) + a_tp(k+1,i,j))) * (1. + 0.61 * (0.5*(a_rp(k,i,j) + a_rp(k+1,i,j))))
-            thvm = (0.5*(a_tp(k,i,j) + a_tp(k-1,i,j))) * (1. + 0.61 * (0.5*(a_rp(k,i,j) + a_rp(k-1,i,j))))
-            dthvdz(k,i,j) = (thvp - thvm) * dzi_t(k)
+            !thvp = (0.5*(a_tp(k,i,j) + a_tp(k+1,i,j))) * (1. + 0.61 * (0.5*(a_rp(k,i,j) + a_rp(k+1,i,j))))
+            !thvm = (0.5*(a_tp(k,i,j) + a_tp(k-1,i,j))) * (1. + 0.61 * (0.5*(a_rp(k,i,j) + a_rp(k-1,i,j))))
+            !dthvdz(k,i,j) = (thvp - thvm) * dzi_t(k)
           end do
           sgse(1,i,j)     = - sgse(2,i,j)
           sgse(nzp,i,j)   = sgse(nzp-1,i,j)
-          dthvdz(1,i,j)   = dthvdz(2,i,j)
-          dthvdz(nzp,i,j) = dthvdz(nzp-1,i,j)
+          !dthvdz(1,i,j)   = dthvdz(2,i,j)
+          !dthvdz(nzp,i,j) = dthvdz(nzp-1,i,j)
        end do
     end do
 
@@ -473,14 +525,14 @@ contains
     integer  :: zbottom
     TYPE (particle_record), POINTER:: particle
 
-    real     :: el,N,vgradthv
+    !real     :: el,N,vgradth
 
     zbottom      = floor(particle%z + 0.5)
     deltaz       = ((zm(floor(particle%z)) + (particle%z - floor(particle%z)) / dzi_t(floor(particle%z))) - zt(zbottom)) * dzi_m(zbottom)
     fsl          = (1-deltaz) * fs(zbottom) + deltaz * fs(zbottom+1)
     
     sigma2l      = sca2part(particle%x,particle%y,particle%z,sgse,.true.) * (2./3.)
-    el           = sca2part(particle%x,particle%y,particle%z,sgse,.true.)
+    !el           = sca2part(particle%x,particle%y,particle%z,sgse,.true.)
     !epsl         = sca2part(particle%x,particle%y,particle%z,a_scr7,.false.)
     
     dsigma2dx    = (2./3.) * (sca2part(particle%x+0.5,particle%y,particle%z,sgse,.true.) - &
@@ -493,8 +545,8 @@ contains
     !dsigma2dt    = sign(1.,dsigma2dt) * min(abs(dsigma2dt),1. / dt)     ! Limit dsigma2dt term
     particle%sigma2_sgs = sigma2l
 
-    N            = (g/th00) * sca2part(particle%x,particle%y,particle%z,dthvdz,.false.)
-    labda        = min(labda,(0.76 * (sqrt(1.5 * sigma2l)/N)))
+    !N            = (g/th00) * sca2part(particle%x,particle%y,particle%z,dthvdz,.false.)
+    !labda        = min(labda,(0.76 * (sqrt(1.5 * sigma2l)/N)))
     ceps         = 0.19 + 0.51 * labda  
 
     !if(N .gt. 0.0001) then
