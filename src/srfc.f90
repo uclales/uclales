@@ -21,7 +21,6 @@ module srfc
 
 use lsmdata
 
-  integer :: isfctyp = 0
   real    :: zrough =  0.01
   real    :: ubmin  =  0.20
   real    :: dthcon = 100.0
@@ -33,19 +32,20 @@ contains
   ! SURFACE: Calcualtes surface fluxes using an algorithm chosen by ISFCTYP
   ! and fills the appropriate 2D arrays
   !
-  !       default: specified thermo-fluxes (drtcon, dthcon)
-  !     isfctyp=1: specified surface layer gradients (drtcon, dthcon)
-  !     isfctyp=2: fixed lower boundary of water at certain sst
-  !     isfctyp=3: bulk aerodynamic law with coefficeints (drtcon, dthcon)
-  !     isfctyp=4: fix surface temperature to yield a constant surface buoyancy flux
-  !     isfctyp=5: variable surface temperature and humidity using LSM (van Heerwarden)
+  !     default: specified thermo-fluxes (drtcon, dthcon)
+  !   isfctyp=1: specified surface layer gradients (drtcon, dthcon)
+  !   isfctyp=2: fixed lower boundary of water at certain sst
+  !   isfctyp=3: bulk aerodynamic law with coefficeints (drtcon, dthcon)
+  !   isfctyp=4: fix surface temperature to yield a constant surface buoyancy flux
+  !   isfctyp=5: surface temperature and humidity determined using LSM (van Heerwarden)
   !irina
   subroutine surface(sst,time_in)
 
     use defs, only: vonk, p00, rcp, g, cp, alvl, ep2
     use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, zt, psrf,   &
          th00, umean, vmean, dn0, level, a_ustar, a_tstar, a_rstar,        &
-         uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, nstep, shls, lhls, usls, timels
+         uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, nstep, shls, lhls, usls,  &
+         timels, a_tskin, a_qskin, isfctyp
     use thrm, only: rslf
     use stat, only: sfc_stat, sflg
     use mpi_interface, only : nypg, nxpg, double_array_par_sum
@@ -53,7 +53,7 @@ contains
 
     implicit none
  
-    real, optional, intent (inout) :: sst,time_in
+    real, optional, intent (inout) :: sst, time_in
     integer		:: i, j, l, iterate
     real		:: zs, bflx0,bflx, ffact, sst1, bflx1, Vbulk, Vzt, usum
     real (kind=8)	:: bfl(2), bfg(2)
@@ -192,9 +192,8 @@ contains
 
        !Initialize Land Surface 
        if (init_lsm) then
-          print*,myid,": Start Case(5) - initialize LSM"
           call initlsm
-          print*,myid,": Land surface initialized..."
+          print*,myid,": Land surface (case 5) initialized..."
           init_lsm = .false.
        end if
 
@@ -204,15 +203,16 @@ contains
        v0bar(:,:,:) = a_vp(:,:,:)
        thetaav(:,:) = a_theta(2,:,:)
        vaporav(:,:) = vapor(2,:,:)
-       tskinav(:,:) = tskin(:,:)
-       qskinav(:,:) = qskin(:,:)
+       tskinav(:,:) = a_tskin(:,:)
+       qskinav(:,:) = a_qskin(:,:)
        else
+       !Insert filter method here:
        u0av         = sum(a_up(2,3:nxp-2,3:nxp-2))/(nxp-4)/(nyp-4) + umean
        v0av         = sum(a_vp(2,3:nxp-2,3:nxp-2))/(nxp-4)/(nyp-4) + vmean
        thetaav(:,:) = sum(a_theta(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
        vaporav(:,:) = sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-       tskinav(:,:) = sum(tskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-       qskinav(:,:) = sum(qskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+       tskinav(:,:) = sum(a_tskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+       qskinav(:,:) = sum(a_qskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
        end if
 
        !Calculate surface wind for flux calculation
@@ -225,7 +225,7 @@ contains
              drdz(i,j) = vaporav(i,j) - qskinav(i,j)
           end do
        end do
-       tskinavg = sum(tskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+       tskinavg = sum(a_tskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
        sst = tskinavg*(psrf/p00)**(rcp)
        call srfcscls(nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,drdz,a_ustar,a_tstar,a_rstar,obl)
 
@@ -250,11 +250,12 @@ contains
 
       !Update tskin and qskin (local or filtered) for flux calculation
        if (local) then
-         tskinav(:,:) = tskin(:,:)
-         qskinav(:,:) = qskin(:,:)
+         tskinav(:,:) = a_tskin(:,:)
+         qskinav(:,:) = a_qskin(:,:)
          else
-         tskinav(:,:) = sum(tskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-         qskinav(:,:) = sum(qskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+         !Insert filter method here:
+         tskinav(:,:) = sum(a_tskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+         qskinav(:,:) = sum(a_qskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
        end if
 
        !Calculate the surface fluxes with bulk law (Fairall, 2003)
@@ -754,7 +755,7 @@ contains
   !
   subroutine qtsurf
     use defs, only : tmelt, R, Rm, rcp, p00
-    use grid, only : nxp, nyp, vapor, psrf
+    use grid, only : nxp, nyp, vapor, psrf, a_tskin, a_qskin
 
     implicit none
     real       :: exner, tsurf, qsatsurf, surfwet, es, qtsl
@@ -764,12 +765,12 @@ contains
     do j=3,nyp-2
       do i=3,nxp-2
         exner      = (psrf / p00)**rcp
-        tsurf      = tskin(i,j) * exner
+        tsurf      = a_tskin(i,j) * exner
         es = 0.611e3 * exp(17.2694 * (tsurf - tmelt) / (tsurf - 35.86))
 
         qsatsurf   = R / Rm * es / psrf
-        surfwet    = ra(i,j) / (ra(i,j) + rs(i,j))
-        qskin(i,j) = surfwet * qsatsurf + (1. - surfwet) * vapor(2,i,j)
+        surfwet    = ra(i,j) / (ra(i,j) + rsurf(i,j))
+        a_qskin(i,j) = surfwet * qsatsurf + (1. - surfwet) * vapor(2,i,j)
       end do
     end do
 
@@ -787,7 +788,9 @@ contains
     use defs, only: p00, stefan, rcp, cp, R, alvl, rowt, g
     use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, liquid, zt, &
                     psrf, th00, umean, vmean, dn0, iradtyp, dt, &
-		    a_lflxu, a_lflxd, a_sflxu, a_sflxd, nstep, press
+		    a_lflxu, a_lflxd, a_sflxu, a_sflxd, nstep, press, &
+                    a_lflxu_avn, a_lflxd_avn, a_sflxu_avn, a_sflxd_avn, &
+                    a_tsoil, a_phiw, a_tskin, a_Wl, a_qskin
     use mpi_interface, only: myid
 
     integer  :: i, j, k
@@ -810,12 +813,12 @@ contains
 
         phitot(i,j) = 0.0
         do k = 1, ksoilmax
-          phitot(i,j) = phitot(i,j) + phiw(i,j,k) * dzsoil(k)
+          phitot(i,j) = phitot(i,j) + a_phiw(i,j,k) * dzsoil(k)
         end do
         phitot(i,j) = phitot(i,j) / zsoil(ksoilmax)
 
         do k = 1, ksoilmax
-          phifrac(i,j,k) = phiw(i,j,k)*dzsoil(k) / zsoil(ksoilmax) / phitot(i,j)
+          phifrac(i,j,k) = a_phiw(i,j,k)*dzsoil(k) / zsoil(ksoilmax) / phitot(i,j)
         end do
 
       end do
@@ -828,33 +831,23 @@ contains
         if(iradtyp == 4) then
             if(nstep == 1) then
 
-              !if (i==3 .and. j==3) Qnetm(:,:) = Qnetn(:,:)
-              !if (i==3 .and. j==3) rsvegm(:,:) = rsveg(:,:)  
-              !if (i==3 .and. j==3) rssoilm(:,:) = rssoil(:,:)
+              a_sflxd_avn(2:nradtime,i,j) = a_sflxd_avn(1:nradtime-1,i,j)
+              a_sflxu_avn(2:nradtime,i,j) = a_sflxu_avn(1:nradtime-1,i,j)
+              a_lflxd_avn(2:nradtime,i,j) = a_lflxd_avn(1:nradtime-1,i,j)
+              a_lflxu_avn(2:nradtime,i,j) = a_lflxu_avn(1:nradtime-1,i,j)
 
-              sflxd_avn(2:nradtime,i,j) = sflxd_avn(1:nradtime-1,i,j)
-              sflxu_avn(2:nradtime,i,j) = sflxu_avn(1:nradtime-1,i,j)
-              lflxd_avn(2:nradtime,i,j) = lflxd_avn(1:nradtime-1,i,j)
-              lflxu_avn(2:nradtime,i,j) = lflxu_avn(1:nradtime-1,i,j)
-
-              sflxd_avn(1,i,j) = a_sflxd(2,i,j)
-              sflxu_avn(1,i,j) = a_sflxu(2,i,j)
-              lflxd_avn(1,i,j) = a_lflxd(2,i,j)
-              lflxu_avn(1,i,j) = a_lflxu(2,i,j)
+              a_sflxd_avn(1,i,j) = a_sflxd(2,i,j)
+              a_sflxu_avn(1,i,j) = a_sflxu(2,i,j)
+              a_lflxd_avn(1,i,j) = a_lflxd(2,i,j)
+              a_lflxu_avn(1,i,j) = a_lflxu(2,i,j)
 
             end if
 
               !Surface radiation averaged over nradtime but depends on location
-              sflxd_av = sum(sflxd_avn(:,i,j))/nradtime
-              sflxu_av = sum(sflxu_avn(:,i,j))/nradtime
-              lflxd_av = sum(lflxd_avn(:,i,j))/nradtime
-              lflxu_av = sum(lflxu_avn(:,i,j))/nradtime
-
-              !Surface radiation averaged over nradtime and over domain
-              !sflxd_av = sum(sflxd_avn(:,3:nxp-2,3:nyp-2))/nradtime/(nxp-4)/(nyp-4)
-              !sflxu_av = sum(sflxu_avn(:,3:nxp-2,3:nyp-2))/nradtime/(nxp-4)/(nyp-4)
-              !lflxd_av = sum(lflxd_avn(:,3:nxp-2,3:nyp-2))/nradtime/(nxp-4)/(nyp-4)
-              !lflxu_av = sum(lflxu_avn(:,3:nxp-2,3:nyp-2))/nradtime/(nxp-4)/(nyp-4)
+              sflxd_av = sum(a_sflxd_avn(:,i,j))/nradtime
+              sflxu_av = sum(a_sflxu_avn(:,i,j))/nradtime
+              lflxd_av = sum(a_lflxd_avn(:,i,j))/nradtime
+              lflxu_av = sum(a_lflxu_avn(:,i,j))/nradtime
 
               !Surface radiation averaged over domain per timestep
               !sflxd_av = sum(a_sflxd(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
@@ -900,22 +893,19 @@ contains
         rsveg(i,j)  = rsmin(i,j) / LAI(i,j) * f1 * f2 * f3 * f4
 
         !" 2.2 - Calculate soil resistance based on ECMWF method
-        fsoil  = (phifc - phiwp) / (phiw(i,j,1) - phiwp)
+        fsoil  = (phifc - phiwp) / (a_phiw(i,j,1) - phiwp)
         fsoil  = max(fsoil, 1.)
         fsoil  = min(1.e8, fsoil)
         rssoil(i,j) = rssoilmin(i,j) * fsoil
 
-        !"Switch between homogeneous and heterogeneous surface resistance
-        !rsveg(:,:) = sum(rsvegm(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-        !rssoil(:,:) = sum(rssoilm(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
 
         !" 2.3 - Calculate the heat transport properties of the soil.
         !" Put in init function, as we don't have prognostic soil moisture atm.
 
         !"Save temperature and liquid water from previous timestep 
         if (nstep == 1) then
-          tskinm(i,j) = tskin(i,j)
-          Wlm(i,j)    = Wl(i,j)
+          tskinm(i,j) = a_tskin(i,j)
+          Wlm(i,j)    = a_Wl(i,j)
         end if
 
         !"Solve the surface temperature implicitly including variations in LWout
@@ -937,8 +927,8 @@ contains
         end if
 
         Wlmx      = LAI(i,j) * Wmax
-        Wl(i,j)   = min(Wl(i,j), Wlmx)
-        cliq(i,j) = Wl(i,j) / Wlmx
+        a_Wl(i,j) = min(a_Wl(i,j), Wlmx)
+        cliq(i,j) = a_Wl(i,j) / Wlmx
 
         !" Calculate coefficients for surface fluxes
         fH      = 0.5*(dn0(1)+dn0(2)) * cp / ra(i,j) 
@@ -957,24 +947,24 @@ contains
         Acoef   = Qnet(i,j) - stefan * (tskinm(i,j)*exner) **4. &
                   + 4. * stefan * (tskinm(i,j)*exner)**4. + fH*Tatm &
                   + fLE * (dqsatdT* (tskinm(i,j)*exner) - qsat + vapor(2,i,j)) &
-                  + lambdaskin(i,j) * tsoil(i,j,1)
+                  + lambdaskin(i,j) * a_tsoil(i,j,1)
         Bcoef   = 4. * stefan * (tskinm(i,j)* exner) ** 3. + fH &
                   + fLE * dqsatdT + lambdaskin(i,j)
 
         if (Cskin(i,j) == 0.) then
-           tskin(i,j) = Acoef * Bcoef ** (-1.) / exner
+           a_tskin(i,j) = Acoef * Bcoef ** (-1.) / exner
         else
-           tskin(i,j) = (1. + rk3coef/Cskin(i,j) * Bcoef) ** (-1.) / exner &
+           a_tskin(i,j) = (1. + rk3coef/Cskin(i,j) * Bcoef) ** (-1.) / exner &
                        * ((tskinm(i,j)*exner) + rk3coef/Cskin(i,j) * Acoef) 
         end if
 
         Qnet(i,j) = Qnet(i,j) - (stefan* (tskinm(i,j)*exner)**4.  &
-                    + 4.*stefan * (tskinm(i,j)*exner)**3. *(tskin(i,j)*exner - &
+                    + 4.*stefan * (tskinm(i,j)*exner)**3. *(a_tskin(i,j)*exner - &
                     tskinm(i,j)*exner))
 
-        G0(i,j)   = lambdaskin(i,j) * ( tskin(i,j) * exner - tsoil(i,j,1) )
+        G0(i,j)   = lambdaskin(i,j) * ( a_tskin(i,j) * exner - a_tsoil(i,j,1) )
 
-        qskinn    = (dqsatdT * (tskin(i,j)*exner - tskinm(i,j)*exner) + qsat)
+        qskinn    = (dqsatdT * (a_tskin(i,j)*exner - tskinm(i,j)*exner) + qsat)
 
         LE(i,j)   = - fLE     * ( vapor(2,i,j) - qskinn)
         LEveg     = - fLEveg  * ( vapor(2,i,j) - qskinn)
@@ -982,47 +972,47 @@ contains
         LEliq     = - fLEliq  * ( vapor(2,i,j) - qskinn)
 
         if(LE(i,j) == 0.) then
-          rs(i,j) = 1.e8           ! "WHY???
+          rsurf(i,j) = 1.e8           ! "WHY???
         else
-          rs(i,j) = -0.5*(dn0(1)+dn0(2)) * alvl * (vapor(2,i,j) - qskinn) &
+          rsurf(i,j) = -0.5*(dn0(1)+dn0(2)) * alvl * (vapor(2,i,j) - qskinn) &
                     / LE(i,j) - ra(i,j) 
         end if
 
-        H(i,j)    = - fH  * ( a_theta(2,i,j)*exner - tskin(i,j)*exner )
-        tndskin(i,j) = Cskin(i,j)*(tskin(i,j) - tskinm(i,j)) * exner / rk3coef
+        H(i,j)    = - fH  * ( a_theta(2,i,j)*exner - a_tskin(i,j)*exner )
+        tndskin(i,j) = Cskin(i,j)*(a_tskin(i,j) - tskinm(i,j)) * exner / rk3coef
 
-        !" In case of dew formation, allow all water to enter skin reservoir Wl
+        !" In case of dew formation, allow all water to enter skin reservoir a_Wl
         if(qsat - vapor(2,i,j) < 0.) then
-          Wl(i,j) =  Wlm(i,j) - rk3coef*((LEliq + LEsoil + LEveg)/(rowt * alvl))
+          a_Wl(i,j) =  Wlm(i,j) - rk3coef*((LEliq + LEsoil + LEveg)/(rowt * alvl))
         else
-          Wl(i,j) =  Wlm(i,j) - rk3coef*(LEliq / (rowt * alvl))
+          a_Wl(i,j) =  Wlm(i,j) - rk3coef*(LEliq / (rowt * alvl))
         end if
 
         !" Save temperature and liquid water from previous timestep 
         if(nstep == 1) then
-          tsoilm(i,j,:) = tsoil(i,j,:)
-          phiwm(i,j,:)  = phiw(i,j,:)
+          tsoilm(i,j,:) = a_tsoil(i,j,:)
+          phiwm(i,j,:)  = a_phiw(i,j,:)
         end if
 
         !" Calculate soil heat capacity and conductivity(based on water content)
         do k = 1, ksoilmax
-          pCs(i,j,k)    = (1. - phi) * pCm + phiw(i,j,k) * pCw
-          Ke            = log10(max(0.1,(phiw(i,j,k)/phi))) + 1.
+          pCs(i,j,k)    = (1. - phi) * pCm + a_phiw(i,j,k) * pCw
+          Ke            = log10(max(0.1,(a_phiw(i,j,k)/phi))) + 1.
           lambda(i,j,k) = Ke * (lambdasat - lambdadry) + lambdadry
         end do
      
         !" Calculate soil heat conductivity at half levels
         do k = 1, ksoilmax-1
           lambdah(i,j,k) = 0.5 * (lambda(i,j,k) * dzsoil(k) &
-                            + lambda(i,j,k+1) * dzsoil(k+1)) / dzsoilh(k)
+                           + lambda(i,j,k+1) * dzsoil(k+1)) / dzsoilh(k)
         end do
         lambdah(i,j,ksoilmax) = lambda(i,j,ksoilmax)
 
         !" Calculate soil moisture conductivity and difusivity 
         do k = 1, ksoilmax
-          gammas(i,j,k)  = gammasat * (phiw(i,j,k) / phi) ** (2. * bc + 3.)
+          gammas(i,j,k)  = gammasat * (a_phiw(i,j,k) / phi) ** (2. * bc + 3.)
           lambdas(i,j,k) = bc * gammasat * (-1.) * psisat / phi &
-                           * (phiw(i,j,k) / phi) ** (bc + 2.)
+                           * (a_phiw(i,j,k) / phi) ** (bc + 2.)
         end do
 
         !" Calculate soil moisture conductivity and difusivity at half levels
@@ -1035,77 +1025,27 @@ contains
         lambdash(i,j,ksoilmax) = lambdas(i,j,ksoilmax)
 
         !" Solve the diffusion equation for the heat transport
-        tsoil(i,j,1) = tsoilm(i,j,1) + rk3coef * ( lambdah(i,j,1) * (tsoil(i,j,2) - tsoil(i,j,1)) / dzsoilh(1) + G0(i,j) ) / dzsoil(1) / pCs(i,j,1)
+        a_tsoil(i,j,1) = tsoilm(i,j,1) + rk3coef * ( lambdah(i,j,1) * (a_tsoil(i,j,2) - a_tsoil(i,j,1)) / dzsoilh(1) + G0(i,j) ) / dzsoil(1) / pCs(i,j,1)
 
         do k = 2, ksoilmax-1
-          tsoil(i,j,k) = tsoilm(i,j,k) + rk3coef / pCs(i,j,k) * ( lambdah(i,j,k) * (tsoil(i,j,k+1) - tsoil(i,j,k)) / dzsoilh(k) - lambdah(i,j,k-1) * (tsoil(i,j,k) - tsoil(i,j,k-1)) / dzsoilh(k-1) ) / dzsoil(k)
+          a_tsoil(i,j,k) = tsoilm(i,j,k) + rk3coef / pCs(i,j,k) * ( lambdah(i,j,k) * (a_tsoil(i,j,k+1) - a_tsoil(i,j,k)) / dzsoilh(k) - lambdah(i,j,k-1) * (a_tsoil(i,j,k) - a_tsoil(i,j,k-1)) / dzsoilh(k-1) ) / dzsoil(k)
         end do
 
-        tsoil(i,j,ksoilmax) = tsoilm(i,j,ksoilmax) + rk3coef / pCs(i,j,ksoilmax) * ( lambda(i,j,ksoilmax) * (tsoildeep(i,j) - tsoil(i,j,ksoilmax)) / dzsoil(ksoilmax) - lambdah(i,j,ksoilmax-1) * (tsoil(i,j,ksoilmax) - tsoil(i,j,ksoilmax-1)) / dzsoil(ksoilmax-1) ) / dzsoil(ksoilmax)
+        a_tsoil(i,j,ksoilmax) = tsoilm(i,j,ksoilmax) + rk3coef / pCs(i,j,ksoilmax) * ( lambda(i,j,ksoilmax) * (tsoildeep(i,j) - a_tsoil(i,j,ksoilmax)) / dzsoil(ksoilmax) - lambdah(i,j,ksoilmax-1) * (a_tsoil(i,j,ksoilmax) - a_tsoil(i,j,ksoilmax-1)) / dzsoil(ksoilmax-1) ) / dzsoil(ksoilmax)
 
         !" Solve the diffusion equation for the moisture transport (closed bottom for now)
-        phiw(i,j,1) = phiwm(i,j,1) + rk3coef * ( lambdash(i,j,1) * (phiw(i,j,2) - phiw(i,j,1)) / dzsoilh(1) - gammash(i,j,1) - (phifrac(i,j,1) * LEveg + LEsoil) / (rowt*alvl)) / dzsoil(1)
+        a_phiw(i,j,1) = phiwm(i,j,1) + rk3coef * ( lambdash(i,j,1) * (a_phiw(i,j,2) - a_phiw(i,j,1)) / dzsoilh(1) - gammash(i,j,1) - (phifrac(i,j,1) * LEveg + LEsoil) / (rowt*alvl)) / dzsoil(1)
 
         do k = 2, ksoilmax-1
-          phiw(i,j,k) = phiwm(i,j,k) + rk3coef * ( lambdash(i,j,k) * (phiw(i,j,k+1) - phiw(i,j,k)) / dzsoilh(k) - gammash(i,j,k) - lambdash(i,j,k-1) * (phiw(i,j,k) - phiw(i,j,k-1)) / dzsoilh(k-1) + gammash(i,j,k-1) - (phifrac(i,j,k) * LEveg) / (rowt*alvl)) / dzsoil(k)
+          a_phiw(i,j,k) = phiwm(i,j,k) + rk3coef * ( lambdash(i,j,k) * (a_phiw(i,j,k+1) - a_phiw(i,j,k)) / dzsoilh(k) - gammash(i,j,k) - lambdash(i,j,k-1) * (a_phiw(i,j,k) - a_phiw(i,j,k-1)) / dzsoilh(k-1) + gammash(i,j,k-1) - (phifrac(i,j,k) * LEveg) / (rowt*alvl)) / dzsoil(k)
         end do
 
-        phiw(i,j,ksoilmax) = phiwm(i,j,ksoilmax) + rk3coef * (- lambdash(i,j,ksoilmax-1) * (phiw(i,j,ksoilmax) - phiw(i,j,ksoilmax-1)) / dzsoil(ksoilmax-1) + gammash(i,j,ksoilmax-1) - (phifrac(i,j,ksoilmax) * LEveg) / (rowt*alvl) ) / dzsoil(ksoilmax)
+        a_phiw(i,j,ksoilmax) = phiwm(i,j,ksoilmax) + rk3coef * (- lambdash(i,j,ksoilmax-1) * (a_phiw(i,j,ksoilmax) - a_phiw(i,j,ksoilmax-1)) / dzsoil(ksoilmax-1) + gammash(i,j,ksoilmax-1) - (phifrac(i,j,ksoilmax) * LEveg) / (rowt*alvl) ) / dzsoil(ksoilmax)
 
       end do
     end do
       
     call qtsurf
-
-        if (nstep==1 .and. .false.) then
-        print*,"********************************"
-        print*,"timestep dt (0,...,dtlong)",dt
-        print*,"********************************"
-        print*,"Tskin (potential temp skin)",maxval(tskin(3:nxp-2,3:nyp-2))
-        print*,"Tskin*exner (temp skin)",maxval(tskin(3:nxp-2,3:nyp-2))*exner
-        print*,"Tskinm (potential temp skin, previous timestep)",maxval(tskinm(3:nxp-2,3:nyp-2))
-        print*,"tskinm*exner (temp skin, previous timestep)",maxval(tskinm(3:nxp-2,3:nyp-2))*exner
-        print*,"a_theta (potential temp first model layer)",maxval(a_theta(1,3:nxp-2,3:nyp-2))
-        print*,"a_theta*exner (temp first model layer)",maxval(a_theta(1,3:nxp-2,3:nyp-2)*exner)
-        print*,"delta T",minval((a_theta(1,3:nxp-2,3:nyp-2)*exner-tskin(3:nxp-2,3:nyp-2))*exner)
-        print*,"********************************"
-        print*,"lambdaskin (lambdaskinav=5.)",minval(lambdaskin(3:nxp-2,3:nyp-2))
-        print*,"lambda (conductivity 1st layer, dry: 0.19)",minval(lambda(3:nxp-2,3:nyp-2,1))
-        print*,"lambdah (conductivity at half levels)",minval(lambdah(3:nxp-2,3:nyp-2,1))
-        print*,"lambda (conductivity 2nd layer, dry: 0.19)",minval(lambda(3:nxp-2,3:nyp-2,2))
-        print*,"lambdas 1st layer",minval(lambdas(3:nxp-2,3:nyp-2,1))
-        print*,"lambdash (at 1st half level)",minval(lambdash(3:nxp-2,3:nyp-2,1))
-        print*,"lambdas 2nd layer",minval(lambdas(3:nxp-2,3:nyp-2,2))
-        print*,"lambdasat",lambdasat
-        print*,"pCs (2.2e6,....,4.2e6)",minval(pCs(3:nxp-2,3:nyp-2,1))
-        print*,"Ke(0,...,1)",Ke
-        print*,"********************************"
-        print*,"phiw (water content 1st layer, 0.3)",minval(phiw(3:nxp-2,3:nyp-2,1))
-        print*,"phiw (water content 2nd layer, 0.3)",minval(phiw(3:nxp-2,3:nyp-2,2))
-        print*,"phiw (water content 2nd layer, 0.3)",minval(phiw(3:nxp-2,3:nyp-2,3))
-        print*,"phiw (water content 2nd layer, 0.3)",minval(phiw(3:nxp-2,3:nyp-2,4))
-        print*,"tsoil (soil temperature 1st layer, 290K)",minval(tsoil(3:nxp-2,3:nyp-2,1))
-        print*,"tsoil (soil temperature 2nd layer, 287K)",minval(tsoil(3:nxp-2,3:nyp-2,2))
-        print*,"tsoil (soil temperature 3rd layer, 285K)",minval(tsoil(3:nxp-2,3:nyp-2,3))
-        print*,"tsoil (soil temperature 4th layer, 283K)",minval(tsoil(3:nxp-2,3:nyp-2,4))
-        print*,"tsoil (soil temperature deeeeeeep, 283K)",minval(tsoildeep(3:nxp-2,3:nyp-2))
-        print*,"********************************"
-        print*,"Qnet(450 W/m2)",sum(Qnet(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-        print*,"G0 (min)",minval(G0(3:nxp-2,3:nyp-2))
-        print*,"G0 (max)",maxval(G0(3:nxp-2,3:nyp-2))
-        print*,"Tndskin (min)",minval(tndskin(3:nxp-2,3:nyp-2))
-        print*,"Tndskin (max)",maxval(tndskin(3:nxp-2,3:nyp-2))
-        print*,"********************************"
-        print*,"Qnet-H-LE-G-tendSkin (min) !=! 0 -->",minval(Qnet(3:nxp-2,3:nyp-2)-(H(3:nxp-2,3:nyp-2)+LE(3:nxp-2,3:nyp-2)+G0(3:nxp-2,3:nyp-2))-tndskin(3:nxp-2,3:nyp-2))
-        print*,"Qnet-H-LE-G-tendSkin (max) !=! 0 -->",maxval(Qnet(3:nxp-2,3:nyp-2)-(H(3:nxp-2,3:nyp-2)+LE(3:nxp-2,3:nyp-2)+G0(3:nxp-2,3:nyp-2))-tndskin(3:nxp-2,3:nyp-2))
-        print*,"********************************"
-        print*,"********************************"
-        print*,"SH (min,lsm):",minval(H(3:nxp-2,3:nyp-2))
-        print*,"SH (max,lsm):",maxval(H(3:nxp-2,3:nyp-2))
-        print*,"LH (min,lsm):",minval(LE(3:nxp-2,3:nyp-2))
-        print*,"LH (max,lsm):",maxval(LE(3:nxp-2,3:nyp-2))
-        print*,"********************************"
-        end if
 
   end subroutine lsm
 

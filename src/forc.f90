@@ -22,26 +22,23 @@ module forc
   use defs, only      : cp
   use radiation, only : d4stream
   !irina
-  use rad_gcss, only : gcss_rad
+  use rad_gcss, only  : gcss_rad
   !cgils
-  use grid, only : wfls,dthldtls,dqtdtls
+  use grid, only      : wfls, dthldtls, dqtdtls, sfc_albedo
   use modnudge, only : nudge 
   implicit none
 
-   !character (len=5), parameter :: case_name = 'xxxx'
-   !irina
-   !initializes the large scale forcing
-   integer, parameter    :: nls = 500
-   real, dimension(nls)  :: t_ls=0.
-   real, dimension(nls)  :: div_ls=0.
-   real, dimension(nls)  :: sst_ls=0.
-   real, dimension(nls)  :: ugeo_ls=0.
-   real, dimension(nls)  :: vgeo_ls=0.
-   real :: sfc_albedo = 0.05
-!cgils
-   logical :: lstendflg=.false.
-
-
+  !character (len=5), parameter :: case_name = 'xxxx'
+  !irina
+  !initializes the large scale forcing
+  integer, parameter    :: nls = 500
+  real, dimension(nls)  :: t_ls=0.
+  real, dimension(nls)  :: div_ls=0.
+  real, dimension(nls)  :: sst_ls=0.
+  real, dimension(nls)  :: ugeo_ls=0.
+  real, dimension(nls)  :: vgeo_ls=0.
+  !cgils
+  logical :: lstendflg=.false.
     
 contains
   !

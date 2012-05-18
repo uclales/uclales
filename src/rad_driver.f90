@@ -22,10 +22,10 @@ module radiation
   use defs, only       : cp, rcp, cpr, rowt, p00, pi, nv1, nv, SolarConstant
   use fuliou, only     : rad
   implicit none
- character (len=10), parameter :: background = 'backrad_in'
- ! character (len=19), parameter :: background = 'datafiles/s11.lay'
- ! character (len=19), parameter :: background = 'datafiles/astx.lay'
- !  character (len=19), parameter :: background = 'datafiles/dsrt.lay'
+  character (len=10), parameter :: background = 'backrad_in'
+ !character (len=19), parameter :: background = 'datafiles/s11.lay'
+ !character (len=19), parameter :: background = 'datafiles/astx.lay'
+ !character (len=19), parameter :: background = 'datafiles/dsrt.lay'
 
   logical, save     :: first_time = .True.
   real, allocatable, save ::  pp(:), pt(:), ph(:), po(:), pre(:), pde(:), &

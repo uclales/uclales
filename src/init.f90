@@ -43,7 +43,7 @@ contains
 !irina use lsvarflg
     use step, only : time, outflg,lsvarflg
     use stat, only : init_stat
-    use srfc, only : isfctyp
+    use grid, only : isfctyp
     use mpi_interface, only : appl_abort, myid
     use thrm, only : thermo
     use mcrp, only : initmcrp

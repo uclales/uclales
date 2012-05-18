@@ -1263,7 +1263,7 @@ contains
        if (itype==0) ncinfo = 'Aerodynamic resistance'
        if (itype==1) ncinfo = 's/m'
        if (itype==2) ncinfo = 'time'
-    case('rs')    
+    case('rsurf')    
        if (itype==0) ncinfo = 'Surface resistance'
        if (itype==1) ncinfo = 's/m'
        if (itype==2) ncinfo = 'time'
@@ -1291,7 +1291,7 @@ contains
        if (itype==0) ncinfo = 'Fraction of vegetated surface covered with liquid water'
        if (itype==1) ncinfo = '-'
        if (itype==2) ncinfo = 'time'
-    case('Wl')    
+    case('a_Wl')    
        if (itype==0) ncinfo = 'Liquid water reservoir'
        if (itype==1) ncinfo = '-'
        if (itype==2) ncinfo = 'time'

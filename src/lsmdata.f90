@@ -7,11 +7,12 @@ module lsmdata
 
   SAVE
 
-  integer           :: nradtime  = 200
+  integer           :: nradtime  = 100
 
   ! Flags
   ! ----------------------------------------------------------
-  logical          :: init_lsm   = .true.   !<   Flag for initializing LSM
+  logical          :: init_lsm   = .true.   !<  Flag for initializing LSM
+  logical          :: first_init = .true.   !<  Flag for first initalization of LSM
   logical          :: local      = .true.   !<  Switch to MOST locally to get local Obukhov length
   logical          :: smoothflux = .false.  !<  Create uniform sensible & latent heat over domain
   logical          :: neutral    = .false.  !<  Disable stability corrections
@@ -49,7 +50,7 @@ module lsmdata
   real, allocatable :: rootf   (:,:,:)    !<  Root fraction per soil layer [-]
   real              :: rootfav (ksoilmax) !<  Average root fraction per soil layer [-]
 
-  real, allocatable :: phiw    (:,:,:)    !<  Water content soil matrix [-]
+ !real, allocatable :: phiw    (:,:,:)    !<  Water content soil matrix [-]
   real              :: phiwav  (ksoilmax) !<  Average water content soil matrix [-]
 
   real, allocatable :: phiwm   (:,:,:)    !<  Water content soil matrix previous time step [-]
@@ -58,12 +59,12 @@ module lsmdata
   real, allocatable :: pCs     (:,:,:)    !<  Volumetric heat capacity [J/m3/K]
   real, allocatable :: Dh      (:,:,:)    !<  Heat diffusivity
 
-  real, allocatable :: sflxd_avn (:,:,:)  !<  Radiation of nradtime timesteps
-  real, allocatable :: sflxu_avn (:,:,:)  !<  Radiation of nradtime timesteps
-  real, allocatable :: lflxd_avn (:,:,:)  !<  Radiation of nradtime timesteps
-  real, allocatable :: lflxu_avn (:,:,:)  !<  Radiation of nradtime timesteps
+ !real, allocatable :: sflxd_avn (:,:,:)  !<  Radiation of nradtime timesteps
+ !real, allocatable :: sflxu_avn (:,:,:)  !<  Radiation of nradtime timesteps
+ !real, allocatable :: lflxd_avn (:,:,:)  !<  Radiation of nradtime timesteps
+ !real, allocatable :: lflxu_avn (:,:,:)  !<  Radiation of nradtime timesteps
 
-  real, allocatable :: tsoil   (:,:,:)    !<  Soil temperature [K]
+ !real, allocatable :: tsoil   (:,:,:)    !<  Soil temperature [K]
   real, allocatable :: tsoilm  (:,:,:)    !<  Soil temperature previous time step [K]
   real              :: tsoilav (ksoilmax) !<  Average Soil temperature [K]
 
@@ -97,7 +98,6 @@ module lsmdata
   real              :: z0hav    = 0.025
 
   real, allocatable :: albedo     (:,:) !<  Surface albedo [-]
-  real              :: albedoav = 0.25
 
   real, allocatable :: LAI        (:,:) !<  Leaf area index vegetation [-]
   real, allocatable :: LAIG       (:,:) !<  Global leaf area index vegetation [-]
@@ -112,16 +112,16 @@ module lsmdata
   real, allocatable :: lambdaskin (:,:) !<  Heat conductivity skin layer [W/m/K]
   real              :: lambdaskinav = 5.
 
-  real, allocatable :: Wl         (:,:) !<  Liquid water reservoir [m]
-  real              :: Wlav    = 0.     
+ !real, allocatable :: Wl         (:,:) !<  Liquid water reservoir [m]
+  real              :: Wlav     = 0.     
                              
-  real, parameter   :: Wmax    = 0.0002 !<  Maximum layer of liquid water on surface [m]
+  real, parameter   :: Wmax     = 0.0002 !<  Maximum layer of liquid water on surface [m]
   real, allocatable :: Wlm        (:,:) !<  Liquid water reservoir previous timestep [m]
 
   real, allocatable :: cliq       (:,:) !<  Fraction of vegetated surface covered with liquid water 
-  real, allocatable :: tskin      (:,:) !<  Skin temperature [K]
+ !real, allocatable :: tskin      (:,:) !<  Skin temperature [K]
   real, allocatable :: tskinm     (:,:) !<  Skin temperature previous timestep [K]
-  real, allocatable :: qskin      (:,:) !<  Skin specific humidity [kg/kg]
+ !real, allocatable :: qskin      (:,:) !<  Skin specific humidity [kg/kg]
   real              :: tskinavg = 0.    !<  Slab average of tskin used by srfcsclrs 
 
   ! Surface energy balance
@@ -143,13 +143,12 @@ module lsmdata
   real, allocatable :: H        (:,:)   !<  Sensible heat flux [W/m2]
   real, allocatable :: G0       (:,:)   !<  Ground heat flux [W/m2]
   real, allocatable :: ra       (:,:)   !<  Aerodynamic resistance [s/m]
-  real, allocatable :: rs       (:,:)   !<  Composite resistance [s/m]
+  real, allocatable :: rsurf    (:,:)   !<  Composite resistance [s/m]
   real, allocatable :: rsveg    (:,:)   !<  Vegetation resistance [s/m]
   real, allocatable :: rsvegm   (:,:)   !<  Vegetation resistance previous timestep [s/m]
   real, allocatable :: rssoil   (:,:)   !<  Soil evaporation resistance [s/m]
   real, allocatable :: rssoilm  (:,:)   !<  Soil evaporation resistance previous timestep [s/m]
   real, allocatable :: tndskin  (:,:)   !<  Tendency of skin [W/m2]
-  !real              :: rsisurf2 = 0.   !<  Vegetation resistance [s/m] if isurf2 is used
 
   ! Turbulent exchange variables
   real, allocatable :: obl     (:,:)    !<  local obuhkov length [m]
@@ -173,13 +172,15 @@ module lsmdata
   ! Malte: initialize LSM and surface layer
   ! Adopted from DALES (vanHeerwaarden)
   !
-  subroutine initlsm
-  use grid, only : nzp, nxp, nyp, th00, vapor, iradtyp
-  use mpi_interface, only: myid, xoffset, yoffset, wrxid, wryid, nxpg, nypg
- 
-  !use forc, only : sfc_albedo
+  subroutine initlsm(time_in)
+    
+    use grid, only : nzp, nxp, nyp, th00, vapor, iradtyp, sfc_albedo, &
+                   a_tskin, a_qskin, a_phiw, a_tsoil, a_Wl
+
+    use mpi_interface, only: myid, xoffset, yoffset, wrxid, wryid, nxpg, nypg
 
     integer :: k,ierr
+    real, optional, intent (in) :: time_in
 
     ! --------------------------------------------------------
     ! Read LSM-specific NAMELIST (SURFNAMELIST)
@@ -190,8 +191,8 @@ module lsmdata
     !< Soil related variables
     tsoilav, tsoildeepav, phiwav, rootfav, &
     !< Land surface related variables
-    z0mav, z0hav, rsisurf2, &
-    Cskinav, lambdaskinav, albedoav, Qnetav, cvegav, Wlav, &
+    z0mav, z0hav, Cskinav, &
+    lambdaskinav, Qnetav, cvegav, Wlav, &
     !< Jarvis-Steward related variables
     rsminav, rssoilminav, LAIav, gDav
 
@@ -206,30 +207,18 @@ module lsmdata
     close(17)
 
     ! --------------------------------------------------------
-    ! Allocate surface arrays
+    ! Allocate land surface arrays
     ! 
+
+    !Allocate surface scheme arrays
     allocate(obl(nxp,nyp))
     allocate(ra(nxp,nyp))
-    allocate(rs(nxp,nyp))
+    allocate(rsurf(nxp,nyp))
     allocate(z0m(nxp,nyp))
     allocate(z0h(nxp,nyp))
-    allocate(tskin(nxp,nyp))
-    allocate(qskin(nxp,nyp))
     allocate(cm(nxp,nyp))
     allocate(cs(nxp,nyp))
     allocate(albedo(nxp,nyp))
-
-    if(iradtyp == 4) then
-      allocate(sflxd_avn(nradtime,nxp,nyp))
-      allocate(sflxu_avn(nradtime,nxp,nyp))
-      allocate(lflxd_avn(nradtime,nxp,nyp))
-      allocate(lflxu_avn(nradtime,nxp,nyp))
-      
-      sflxd_avn (:,:,:) = 0.
-      sflxu_avn (:,:,:) = 0.
-      lflxd_avn (:,:,:) = 0.
-      lflxu_avn (:,:,:) = 0.
-    end if
 
     ! Allocate LSM arrays
     allocate(zsoil(ksoilmax))
@@ -243,15 +232,13 @@ module lsmdata
     allocate(gammas(nxp,nyp,ksoilmax))
     allocate(gammash(nxp,nyp,ksoilmax))
     allocate(Dh(nxp,nyp,ksoilmax))
-    allocate(phiw(nxp,nyp,ksoilmax))
+    allocate(phitot(nxp,nyp))
     allocate(phiwm(nxp,nyp,ksoilmax))
     allocate(phifrac(nxp,nyp,ksoilmax))
     allocate(pCs(nxp,nyp,ksoilmax))
     allocate(rootf(nxp,nyp,ksoilmax))
-    allocate(tsoil(nxp,nyp,ksoilmax))
     allocate(tsoilm(nxp,nyp,ksoilmax))
     allocate(tsoildeep(nxp,nyp))
-    allocate(phitot(nxp,nyp))
 
     allocate(Qnet(nxp,nyp))
     allocate(Qnetm(nxp,nyp))
@@ -274,7 +261,6 @@ module lsmdata
     allocate(lambdaskin(nxp,nyp))
     allocate(LAI(nxp,nyp))
     allocate(gD(nxp,nyp))
-    allocate(Wl(nxp,nyp))
     allocate(Wlm(nxp,nyp))
 
     ! Allocate global variables (nxpg,nypg)
@@ -288,24 +274,43 @@ module lsmdata
     allocate(tskinav(nxp,nyp))
     allocate(qskinav(nxp,nyp))
 
+    !Variables are now defined in grid
+    !allocate(Wl(nxp,nyp))
+    !allocate(tskin(nxp,nyp))
+    !allocate(qskin(nxp,nyp))
+    !allocate(phiw(nxp,nyp,ksoilmax))
+    !allocate(tsoil(nxp,nyp,ksoilmax))
+
     ! --------------------------------------------------------
     ! Initialize arrays
     ! 
-    tskinm	= th00
-    tskin	= th00
-    qskin       = sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-    albedo	= albedoav
-    z0m		= z0mav
-    z0h		= z0hav
-    ra		= 1.
-    obl 	= -10e10
-    oblav	= -10e10
-    qskin	= sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
 
-    dzsoil(1) = 0.07    ! z = 0.07 m  COSMO config from Linda
-    dzsoil(2) = 0.27    ! z = 0.34 m
-    dzsoil(3) = 1.13    ! z = 1.47 m
-    dzsoil(4) = 1.39    ! z = 2.86 m 
+    if (time_in .lt. 10) then
+       a_tskin          = th00
+       a_qskin          = sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+
+       a_phiw(:,:,1)    = phiwav(1)
+       a_phiw(:,:,2)    = phiwav(2)
+       a_phiw(:,:,3)    = phiwav(3)
+       a_phiw(:,:,4)    = phiwav(4)
+
+       a_tsoil(:,:,1)   = tsoilav(1)
+       a_tsoil(:,:,2)   = tsoilav(2)
+       a_tsoil(:,:,3)   = tsoilav(3)
+       a_tsoil(:,:,4)   = tsoilav(4)
+
+       a_Wl             = Wlav
+
+       first_init       = .false.
+    end if 
+
+    z0m       = z0mav
+    z0h       = z0hav
+    
+    dzsoil(1) = 0.07    !z = 0.07 m COSMO config from Linda
+    dzsoil(2) = 0.27    !z = 0.34 m
+    dzsoil(3) = 1.13    !z = 1.47 m
+    dzsoil(4) = 1.39    !z = 2.86 m 
 
     !dzsoil(1) = 0.07   ! ECMWF config from Chiel
     !dzsoil(2) = 0.21
@@ -325,64 +330,41 @@ module lsmdata
 
     ! Set evaporation related properties
     ! Set water content of soil - constant in this scheme
-    phiw(:,:,1) = phiwav(1)
-    phiw(:,:,2) = phiwav(2)
-    phiw(:,:,3) = phiwav(3)
-    phiw(:,:,4) = phiwav(4)
-    
-    phiwm(:,:,1) = phiwav(1)
-    phiwm(:,:,2) = phiwav(2)
-    phiwm(:,:,3) = phiwav(3)
-    phiwm(:,:,4) = phiwav(4)    
-
     phitot = 0.0
     do k = 1, ksoilmax
-      phitot(:,:) = phitot(:,:) + phiw(:,:,k) * dzsoil(k)
+       phitot(:,:) = phitot(:,:) + a_phiw(:,:,k) * dzsoil(k)
     end do
-    phitot(:,:) = phitot(:,:) / zsoil(ksoilmax)
+    phitot(:,:)    = phitot(:,:) / zsoil(ksoilmax)
+
     do k = 1, ksoilmax
-      phifrac(:,:,k) = phiw(:,:,k) * dzsoil(k) / zsoil(ksoilmax) / phitot(:,:)
+      phifrac(:,:,k) = a_phiw(:,:,k) * dzsoil(k) / zsoil(ksoilmax) / phitot(:,:)
     end do
 
-    ! Set root fraction per layer for short grass
+    ! Set root fraction per layer for short grass (not used for now!!!)
     rootf(:,:,1) = rootfav(1)
     rootf(:,:,2) = rootfav(2)
     rootf(:,:,3) = rootfav(3)
     rootf(:,:,4) = rootfav(4)
 
-    tsoil(:,:,1)   = tsoilav(1)
-    tsoil(:,:,2)   = tsoilav(2)
-    tsoil(:,:,3)   = tsoilav(3)
-    tsoil(:,:,4)   = tsoilav(4)
-    tsoilm(:,:,1)   = tsoilav(1)
-    tsoilm(:,:,2)   = tsoilav(2)
-    tsoilm(:,:,3)   = tsoilav(3)
-    tsoilm(:,:,4)   = tsoilav(4)
     tsoildeep(:,:) = tsoildeepav
 
     ! Calculate conductivity saturated soil
-    lambdasat = lambdasm ** (1. - phi) * lambdaw ** (phi)
+    lambdasat  = lambdasm ** (1. - phi) * lambdaw ** (phi)
 
-    Qnet       = Qnetav
-    Qnetm      = Qnetav
-    Qnetn      = Qnetav
     Cskin      = Cskinav
     lambdaskin = lambdaskinav
     rsmin      = rsminav
     rssoilmin  = rssoilminav
     LAI        = LAIav
-    LAIG       = 999.
     gD         = gDav
     cveg       = cvegav
-    cliq       = 0.
-    Wl         = Wlav
-    !sfc_albedo = albedoav
+    albedo     = sfc_albedo
 
     ! --------------------------------------------------------
     ! Static Heterogeneity of Vegetation
     ! 
     ! std:    LAI=4. albedo=0.20 z0mav=0.035 z0hav=0.035
-    ! gras:   LAI=2. albedo=0.25 z0mav=0.035 z0hav=0.035
+    ! grass:  LAI=2. albedo=0.25 z0mav=0.035 z0hav=0.035
     ! forest: LAI=6. albedo=0.15 z0mav=0.500 z0hav=0.500
     
     if (hetero) then
@@ -396,23 +378,22 @@ module lsmdata
     end if 
     
     if (hetper==2) then
-       LAIG(3:((nxpg-2)/4)                ,:) = 2.
+       LAIG(3              :((nxpg-2)/4)   ,:) = 2.
        LAIG(((nxpg-2)/4)   :((nxpg-2)/2)   ,:) = 6.
        LAIG(((nxpg-2)/2)   :((nxpg-2)*3/4) ,:) = 2.
        LAIG(((nxpg-2)*3/4) :(nxpg-2)       ,:) = 6.
     end if
     
-    print*,"CHECK INPUT:::",LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
-                            3+yoffset(wryid):nyp+yoffset(wryid)-2 )
-
-    print*,"myid:",myid,"xoffset:",xoffset(wrxid)
-    print*,"myid:",myid,"yoffset:",yoffset(wrxid)
+    !print*,"CHECK INPUT:::",LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
+    !                        3+yoffset(wryid):nyp+yoffset(wryid)-2 )
+    !print*,"myid:",myid,"xoffset:",xoffset(wrxid)
+    !print*,"myid:",myid,"yoffset:",yoffset(wrxid)
 
     LAI(3:(nxp-2),3:(nyp-2)) = LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
                                3+yoffset(wryid):nyp+yoffset(wryid)-2 )
 
-    print*,"myid:",myid,"LAIG:",LAIG(:,3)
-    print*,"myid:",myid,"LAI:",LAI(:,3)
+    !print*,"myid:",myid,"LAIG:",LAIG(:,3)
+    !print*,"myid:",myid,"LAI:",LAI(:,3)
     deallocate(LAIG)
 
     end if 

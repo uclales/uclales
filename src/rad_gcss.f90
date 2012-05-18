@@ -164,7 +164,7 @@ mu = zenith(alat,time)
 !   (1980, contr. atmos. phys.).                                                               c
 !ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
-   use grid, only: nxp, nyp, nzp 
+   use grid, only: nxp, nyp, nzp, sfc_albedo
 
   real, intent(inout), dimension (nzp) :: tau
   real, intent(out), dimension (nzp,nxp,nyp) :: swn
@@ -179,7 +179,7 @@ mu = zenith(alat,time)
 
   real :: sw0        = 1100.0 !direct component at top of the cloud (W/m^2), diffuse not possible
   real :: gc         = 0.85   !asymmetry factor of droplet scattering angle distribution
-  real :: sfc_albedo = 0.05   !ground surface albedo
+  !real :: sfc_albedo = 0.05   !ground surface albedo
 
   allocate(taude(nzp))
 
