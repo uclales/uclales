@@ -99,7 +99,7 @@ contains
     use modnudge, only : lnudge,tnudgefac
     use modtimedep, only : ltimedep
     use mcrp, only : microseq,lrandommicro,timenuc,nin_set,cloud_type
-    use modparticles, only : lpartic, lpartsgs, lpartstat, frqpartstat, avpartstat, lpartdump, lpartdumpui, lpartdumpsgs, frqpartdump
+    use modparticles, only : lpartic, lpartsgs, lpartstat, frqpartstat, avpartstat, lpartdump, lpartdumpui, frqpartdump
 
     implicit none
 
@@ -138,7 +138,7 @@ contains
          lwaterbudget, &                 ! axel: flag for liquid water budget diagnostics (only level=3)
          lcouvreux , tau , &                    ! The Couvreux 'radioactive' scalar
          deflate_level , &                         !Compression of the crosssections
-         lpartic,lpartsgs,lpartstat,frqpartstat,avpartstat,lpartdump,lpartdumpui,lpartdumpsgs,frqpartdump           ! Particles
+         lpartic,lpartsgs,lpartstat,frqpartstat,avpartstat,lpartdump,lpartdumpui,frqpartdump           ! Particles
 
     deflev = deflate_level
     ps       = 0.

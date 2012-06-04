@@ -65,7 +65,7 @@ contains
     use modcross, only : triggercross, exitcross, lcross
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
-    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, lpartstat, exitparticlestat
+    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, lpartstat, exitparticlestat, write_particle_hist
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
@@ -107,12 +107,17 @@ contains
        if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) &
        call write_ps(nzp,dn0,u0,v0,zm,zt,time)
 
-       if ((mod(tplsdt,frqhis) < dt .or. time >= timmax) .and. outflg)   &
-            call write_hist(2, time)
+       if ((mod(tplsdt,frqhis) < dt .or. time >= timmax) .and. outflg) then
+         call write_hist(2, time)
+         call write_particle_hist(2,time)
+       end if
+
        !irina     
        !if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time>=timrsm .or. time==dt)   &
-       if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt)   &
-            call write_hist(1, time)
+       if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) then   
+         call write_hist(1, time)
+         call write_particle_hist(1,time)
+       end if
 
 !irina more frequent outputs for certain hours in astex
 
@@ -161,15 +166,16 @@ contains
         
     enddo
 
+    call write_hist(1, time)
+    call write_particle_hist(1, time)
+
+    iret = close_anal()
+
     if (lpartic) then
       call exit_particles
       if(lpartdump) call exitparticledump
       if(lpartstat) call exitparticlestat
     end if
-
-    call write_hist(1, time)
-
-    iret = close_anal()
 
     if (lcross) call exitcross
 

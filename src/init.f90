@@ -47,7 +47,7 @@ contains
     use thrm, only : thermo
     use mcrp, only : initmcrp
     use modcross, only : initcross, triggercross
-    use modparticles, only: init_particles, lpartic, lpartdump, lpartstat, initparticledump, initparticlestat
+    use modparticles, only: init_particles, lpartic, lpartdump, lpartstat, initparticledump, initparticlestat, write_particle_hist
 
     implicit none
 
@@ -76,7 +76,11 @@ contains
     !    
 
     if (lpartic) then
-      call init_particles
+      if(runtype == 'INITIAL') then
+        call init_particles(.false.)
+      else
+        call init_particles(.true.,hfilin)
+      end if
       if(lpartdump) call initparticledump(time)
       if(lpartstat) call initparticlestat(time)
     end if
@@ -86,6 +90,7 @@ contains
     if (outflg) then
        if (runtype == 'INITIAL') then
           call write_hist(1, time)
+          call write_particle_hist(1,time)
           call init_anal(time)
           call thermo(level)
           call write_anal(time)
@@ -97,6 +102,7 @@ contains
           call thermo(level)
           call triggercross(time)
           call write_hist(0, time)
+          call write_particle_hist(0,time)
        end if
     end if
 

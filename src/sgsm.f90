@@ -273,11 +273,11 @@ contains
              !
              
              ! Original:
-             !km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) &
-             !     *0.5*(dn0(k)+dn0(k+1))/(1./(delta*csx)**2+1./(zm(k)*vonk)**2)
+             km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) &
+                  *0.5*(dn0(k)+dn0(k+1))/(1./(delta*csx)**2+1./(zm(k)*vonk)**2)
 
              ! Hack BvS: remove damping
-             km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) * 0.5 * (dn0(k)+dn0(k+1)) * (csx * delta)**2. 
+             !km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) * 0.5 * (dn0(k)+dn0(k+1)) * (csx * delta)**2. 
 
              !
              ! after kh is multiplied with the factor (1-ri/pr), the product of kh 
@@ -292,6 +292,8 @@ contains
           km(n1-1,i,j) = km(n1-2,i,j)    
        enddo
     enddo
+
+    !print*,sum(km(1,:,:))/1024.,sum(km(2,:,:))/1024.,sum(km(3,:,:))/1024.,sum(km(4,:,:))/1024.,sum(km(5,:,:))/1024.,sum(km(6,:,:))/1024.,sum(km(7,:,:))/1024.,sum(km(8,:,:))/1024.,sum(km(9,:,:))/1024.,sum(km(10,:,:))/1024.
 
     call cyclics(n1,n2,n3,km,req)
     call cyclicc(n1,n2,n3,km,req)
