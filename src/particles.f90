@@ -51,16 +51,16 @@ module modparticles
   type :: particle_record
     real             :: unique, tstart
     integer          :: partstep
-    real             :: x, xstart, x_prev, ures, ures_prev
-    real             :: y, ystart, y_prev, vres, vres_prev
-    real             :: z, zstart, z_prev, wres, wres_prev
+    real             :: x, xstart, ures, ures_prev
+    real             :: y, ystart, vres, vres_prev
+    real             :: z, zstart, wres, wres_prev
     type (particle_record), pointer :: next,prev
   end type
 
   integer            :: nplisted
   type (particle_record), pointer :: head, tail
 
-  integer            :: ipunique, ipx, ipy, ipz, ipxstart, ipystart, ipzstart, iptsart, ipxprev, ipyprev, ipzprev
+  integer            :: ipunique, ipx, ipy, ipz, ipxstart, ipystart, ipzstart, iptsart
   integer            :: ipures, ipvres, ipwres, ipures_prev, ipvres_prev, ipwres_prev, ipartstep, nrpartvar
 
   ! Statistics and particle dump
@@ -90,18 +90,17 @@ contains
     real, intent(in)               :: time
     type (particle_record), pointer:: particle
 
-    if ( np < 1 ) return   ! Just to be sure..
+    if ( np < 1 .or. nplisted < 1 ) return   ! Just to be sure..
 
     ! Randomize particles lowest grid level
-    !if (lpartsgs .and. nstep==1) then
-    !  call randomize()
-    !end if
+    if (lpartsgs .and. nstep==1) then
+      call randomize()
+    end if
 
     particle => head
     do while( associated(particle) )
       if ( time - particle%tstart >= 0 ) then
         particle%partstep = particle%partstep + 1
-
         ! Interpolation of the velocity field
         particle%ures = velocity_ures(particle%x,particle%y,particle%z) * dxi
         particle%vres = velocity_vres(particle%x,particle%y,particle%z) * dyi
@@ -278,7 +277,7 @@ contains
     &                (  deltaz) * (1-deltay) * (  deltax) *  a_wp(zbottom + 1, xbottom + 1, ybottom    ) + &    ! x+1, z+1
     &                (  deltaz) * (  deltay) * (1-deltax) *  a_wp(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
     &                (  deltaz) * (  deltay) * (  deltax) *  a_wp(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
-   
+  
   end function velocity_wres
 
   !
@@ -397,7 +396,6 @@ contains
       do while( associated(particle) )
         if( particle%y >= nyloc + 3 ) then
           particle%y      = particle%y      - nyloc
-          particle%y_prev = particle%y_prev - nyloc
 
           call partbuffer(particle, buffsend(ii+1:ii+nrpartvar),ii,.true.)
           ptr => particle
@@ -436,7 +434,6 @@ contains
       do while( associated(particle) )
         if( particle%y < 3 ) then
           particle%y      = particle%y      + nyloc
-          particle%y_prev = particle%y_prev + nyloc
 
           call partbuffer(particle, buffsend(ii+1:ii+nrpartvar),ii,.true.)
 
@@ -497,7 +494,6 @@ contains
       do while( associated(particle) )
         if( particle%x >= nxloc + 3 ) then
           particle%x      = particle%x      - nxloc
-          particle%x_prev = particle%x_prev - nxloc
 
           call partbuffer(particle, buffsend(ii+1:ii+nrpartvar),ii,.true.)
           ptr => particle
@@ -536,7 +532,6 @@ contains
       do while( associated(particle) )
         if( particle%x < 3 ) then
           particle%x      = particle%x      + nxloc
-          particle%x_prev = particle%x_prev + nxloc
 
           call partbuffer(particle, buffsend(ii+1:ii+nrpartvar),ii,.true.)
 
@@ -600,9 +595,6 @@ contains
       buffer(n+ipzstart)        = particle%zstart
       buffer(n+iptsart)         = particle%tstart
       buffer(n+ipartstep)       = particle%partstep
-      buffer(n+ipxprev)         = particle%x_prev
-      buffer(n+ipyprev)         = particle%y_prev
-      buffer(n+ipzprev)         = particle%z_prev
     else
       particle%unique           = buffer(n+ipunique)
       particle%x                = buffer(n+ipx)
@@ -619,9 +611,6 @@ contains
       particle%zstart           = buffer(n+ipzstart)
       particle%tstart           = buffer(n+iptsart)
       particle%partstep         = buffer(n+ipartstep)
-      particle%x_prev           = buffer(n+ipxprev)
-      particle%y_prev           = buffer(n+ipyprev)
-      particle%z_prev           = buffer(n+ipzprev)
     end if
 
   end subroutine partbuffer
@@ -979,10 +968,10 @@ contains
     character (len=80), intent(in), optional :: hfilin
     integer  :: k, n, kmax, io
     real     :: tstart, xstart, ystart, zstart, ysizelocal, xsizelocal, firststart
-    real     :: pu,pts,px,py,pz,pxs,pys,pzs,pxp,pyp,pzp,pur,pvr,pwr,purp,pvrp,pwrp
-    integer  :: pstp
+    real     :: pu,pts,px,py,pz,pxs,pys,pzs,pur,pvr,pwr,purp,pvrp,pwrp
+    integer  :: pstp,idot
     type (particle_record), pointer:: particle
-    character (len=80) :: hname
+    character (len=80) :: hname,prefix,suffix
 
     xsizelocal = (nxg / nxprocs) * deltax
     ysizelocal = (nyg / nyprocs) * deltay
@@ -998,12 +987,17 @@ contains
     if(hot) then
     ! ------------------------------------------------------
     ! Warm start -> load restart file
+      np = 0
       write(hname,'(i4.4,a1,i4.4)') wrxid,'_',wryid
-      hname = trim(hname)//'.'//trim(hfilin)
+      idot = scan(hfilin,'.',.false.)
+      prefix = hfilin(:idot-1)
+      suffix = hfilin(idot+1:)
+      hname = trim(hname)//'.'//trim(prefix)//'.particles.'//trim(suffix)
       open (666,file=hname,status='old',form='unformatted')
       do
-        read (666,iostat=io) pu,pts,pstp,px,pxs,pxp,pur,purp,py,pys,pyp,pvr,pvrp,pz,pzs,pzp,pwr,pwrp
+        read (666,iostat=io) pu,pts,pstp,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs,pwr,pwrp
         if(io .ne. 0) exit
+        np = np + 1
         call add_particle(particle)
         particle%unique         = pu
         particle%x              = px
@@ -1019,9 +1013,6 @@ contains
         particle%ures_prev      = purp
         particle%vres_prev      = pvrp
         particle%wres_prev      = pwrp
-        particle%x_prev         = pxp
-        particle%y_prev         = pyp
-        particle%z_prev         = pzp
         particle%partstep       = pstp
         if(pts < firststart) firststart = pts
       end do
@@ -1059,9 +1050,6 @@ contains
             particle%ures_prev      = 0.
             particle%vres_prev      = 0.
             particle%wres_prev      = 0.
-            particle%x_prev         = particle%x
-            particle%y_prev         = particle%y
-            particle%z_prev         = particle%z
             particle%partstep       = 0
 
             if(tstart < firststart) firststart = tstart
@@ -1086,10 +1074,7 @@ contains
     ipvres_prev     = 13
     ipwres_prev     = 14
     ipartstep       = 15
-    ipxprev         = 16
-    ipyprev         = 17
-    ipzprev         = 18
-    nrpartvar       = ipzprev
+    nrpartvar       = ipartstep
 
     ! Initialize particle dump to NetCDF
     !if(lpartdump) call initparticledump
@@ -1134,6 +1119,7 @@ contains
     real, intent (in)    :: time
     character (len=80)   :: hname
     type (particle_record), pointer:: particle
+    integer              :: iblank
 
     write(hname,'(i4.4,a1,i4.4)') wrxid,'_',wryid
     hname = trim(hname)//'.'//trim(filprf)//'.particles'
@@ -1145,6 +1131,9 @@ contains
        hname = trim(hname)//'.R'
     case(1) 
        hname = trim(hname)//'.rst'
+    case(2) 
+       iblank=index(hname,' ')
+       write (hname(iblank:iblank+7),'(a1,i6.6,a1)') '.', int(time), 's'
     end select
 
     open(666,file=trim(hname), form='unformatted')
@@ -1152,9 +1141,9 @@ contains
     particle => head
     do while(associated(particle))
       write(666) particle%unique, particle%tstart, particle%partstep, & 
-        particle%x, particle%xstart, particle%x_prev, particle%ures, particle%ures_prev, & 
-        particle%y, particle%ystart, particle%y_prev, particle%vres, particle%vres_prev, & 
-        particle%z, particle%zstart, particle%z_prev, particle%wres, particle%wres_prev
+        particle%x, particle%xstart, particle%ures, particle%ures_prev, & 
+        particle%y, particle%ystart, particle%vres, particle%vres_prev, & 
+        particle%z, particle%zstart, particle%wres, particle%wres_prev
       particle => particle%next
     end do 
 

@@ -90,7 +90,7 @@ contains
     if (outflg) then
        if (runtype == 'INITIAL') then
           call write_hist(1, time)
-          call write_particle_hist(1,time)
+          if(lpartic) call write_particle_hist(1,time)
           call init_anal(time)
           call thermo(level)
           call write_anal(time)
@@ -102,7 +102,7 @@ contains
           call thermo(level)
           call triggercross(time)
           call write_hist(0, time)
-          call write_particle_hist(0,time)
+          if(lpartic) call write_particle_hist(0,time)
        end if
     end if
 

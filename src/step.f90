@@ -109,14 +109,14 @@ contains
 
        if ((mod(tplsdt,frqhis) < dt .or. time >= timmax) .and. outflg) then
          call write_hist(2, time)
-         call write_particle_hist(2,time)
+         if(lpartic) call write_particle_hist(2,time)
        end if
 
        !irina     
        !if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time>=timrsm .or. time==dt)   &
        if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) then   
          call write_hist(1, time)
-         call write_particle_hist(1,time)
+         if(lpartic) call write_particle_hist(1,time)
        end if
 
 !irina more frequent outputs for certain hours in astex
@@ -167,11 +167,11 @@ contains
     enddo
 
     call write_hist(1, time)
-    call write_particle_hist(1, time)
 
     iret = close_anal()
 
     if (lpartic) then
+      call write_particle_hist(1, time)
       call exit_particles
       if(lpartdump) call exitparticledump
       if(lpartstat) call exitparticlestat
