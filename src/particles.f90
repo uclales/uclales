@@ -92,10 +92,15 @@ contains
 
     if ( np < 1 .or. nplisted < 1 ) return   ! Just to be sure..
 
+    print*,'********* 1'
+
     ! Randomize particles lowest grid level
     if (lpartsgs .and. nstep==1) then
       call randomize()
     end if
+
+
+    print*,'********* 2'
 
     particle => head
     do while( associated(particle) )
@@ -109,6 +114,8 @@ contains
     particle => particle%next
     end do
  
+    print*,'********* 3'
+
     ! Time integration
     particle => head
     do while( associated(particle) )
@@ -118,20 +125,28 @@ contains
     particle => particle%next
     end do
 
+    print*,'********* 4'
+
     ! Statistics
     if (nstep==3) then
       !call checkdiv
       
+    print*,'********* 5'
+
       ! Particle dump
       if((time + dt > tnextdump) .and. lpartdump) then
         call particledump(time)
         tnextdump = tnextdump + frqpartdump
       end if
 
+    print*,'********* 6'
+
       ! Average statistics
       if((time + dt > tnextstat - avpartstat) .and. lpartstat) then
         call particlestat(.false.,time)
       end if
+
+    print*,'********* 7'
 
       ! Write statistics
       if((time + dt > tnextstat) .and. lpartstat) then
@@ -140,22 +155,25 @@ contains
       end if
     end if
 
+    print*,'********* 8'
+
     !Exchange particle to other processors
     call partcomm
+
+    print*,'********* 9'
 
   end subroutine particles
 
   !
   !--------------------------------------------------------------------------
   ! subroutine randomize lowest xx m, for now only local..
-  ! 
   !--------------------------------------------------------------------------
   !
   subroutine randomize()
     use mpi_interface, only : nxg, nyg, nyprocs, nxprocs
     implicit none
   
-    real      :: zmax = 2.    ! Max height in grid coordinates
+    real      :: zmax = 0.5     ! Max height in grid coordinates
     integer   :: nyloc, nxloc 
     type (particle_record), pointer:: particle
 
@@ -164,10 +182,10 @@ contains
  
     particle => head
     do while(associated(particle) )
-      if( particle%z <= zmax ) then
+      if( particle%z <= (1. + zmax) ) then
         particle%x = (random(idum) * nyloc) + 3 
         particle%y = (random(idum) * nxloc) + 3
-        particle%z =  random(idum)          + 1 
+        particle%z = zmax * random(idum)    + 1 
       end if
       particle => particle%next
     end do 
@@ -960,13 +978,14 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine init_particles(hot,hfilin)
-    use mpi_interface, only : wrxid, wryid, nxg, nyg, myid, nxprocs, nyprocs
+    use mpi_interface, only : wrxid, wryid, nxg, nyg, myid, nxprocs, nyprocs, appl_abort
     use grid, only : zm, deltax, deltay, zt,dzi_t, nzp, nxp, nyp
     use grid, only : a_up, a_vp, a_wp
 
     logical, intent(in) :: hot
     character (len=80), intent(in), optional :: hfilin
     integer  :: k, n, kmax, io
+    logical  :: exans
     real     :: tstart, xstart, ystart, zstart, ysizelocal, xsizelocal, firststart
     real     :: pu,pts,px,py,pz,pxs,pys,pzs,pur,pvr,pwr,purp,pvrp,pwrp
     integer  :: pstp,idot
@@ -987,13 +1006,19 @@ contains
     if(hot) then
     ! ------------------------------------------------------
     ! Warm start -> load restart file
-      np = 0
       write(hname,'(i4.4,a1,i4.4)') wrxid,'_',wryid
       idot = scan(hfilin,'.',.false.)
       prefix = hfilin(:idot-1)
       suffix = hfilin(idot+1:)
       hname = trim(hname)//'.'//trim(prefix)//'.particles.'//trim(suffix)
+      inquire(file=trim(hname),exist=exans)
+      if (.not.exans) then
+         print *,'ABORTING: History file', trim(hname),' not found'
+         call appl_abort(0)
+      end if
       open (666,file=hname,status='old',form='unformatted')
+      read (666,iostat=io) tnextdump
+      np = 0
       do
         read (666,iostat=io) pu,pts,pstp,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs,pwr,pwrp
         if(io .ne. 0) exit
@@ -1057,6 +1082,10 @@ contains
           end if
         end if
       end do
+      ! Set first dump times
+      tnextdump = firststart
+      tnextstat = 0
+      nstatsamp = 0
     end if
 
     ipunique        = 1
@@ -1075,14 +1104,6 @@ contains
     ipwres_prev     = 14
     ipartstep       = 15
     nrpartvar       = ipartstep
-
-    ! Initialize particle dump to NetCDF
-    !if(lpartdump) call initparticledump
-
-    ! Set first dump times
-    tnextdump = firststart
-    tnextstat = 0
-    nstatsamp = 0
  
     if(lpartstat) allocate(npartprof(nzp),npartprofl(nzp),uprof(nzp),uprofl(nzp),vprof(nzp),vprofl(nzp),wprof(nzp),wprofl(nzp))
     
@@ -1137,7 +1158,9 @@ contains
     end select
 
     open(666,file=trim(hname), form='unformatted')
-
+    
+    write(666) tnextdump
+    
     particle => head
     do while(associated(particle))
       write(666) particle%unique, particle%tstart, particle%partstep, & 
@@ -1188,7 +1211,7 @@ contains
     dimsize(2)     = 0
  
     if(myid == 0) then
-      call open_nc(trim(filprf)//'.particles.nc', ncpartid, ncpartrec, time, .true.)
+      call open_nc(trim(filprf)//'.particles.nc', ncpartid, ncpartrec, time, .false.)
       call addvar_nc(ncpartid,'x','x-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
       call addvar_nc(ncpartid,'y','y-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
       call addvar_nc(ncpartid,'z','z-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
