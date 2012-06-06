@@ -92,15 +92,10 @@ contains
 
     if ( np < 1 .or. nplisted < 1 ) return   ! Just to be sure..
 
-    print*,'********* 1'
-
     ! Randomize particles lowest grid level
     if (lpartsgs .and. nstep==1) then
       call randomize()
     end if
-
-
-    print*,'********* 2'
 
     particle => head
     do while( associated(particle) )
@@ -114,8 +109,6 @@ contains
     particle => particle%next
     end do
  
-    print*,'********* 3'
-
     ! Time integration
     particle => head
     do while( associated(particle) )
@@ -125,28 +118,20 @@ contains
     particle => particle%next
     end do
 
-    print*,'********* 4'
-
     ! Statistics
     if (nstep==3) then
       !call checkdiv
       
-    print*,'********* 5'
-
       ! Particle dump
       if((time + dt > tnextdump) .and. lpartdump) then
         call particledump(time)
         tnextdump = tnextdump + frqpartdump
       end if
 
-    print*,'********* 6'
-
       ! Average statistics
       if((time + dt > tnextstat - avpartstat) .and. lpartstat) then
         call particlestat(.false.,time)
       end if
-
-    print*,'********* 7'
 
       ! Write statistics
       if((time + dt > tnextstat) .and. lpartstat) then
@@ -155,12 +140,8 @@ contains
       end if
     end if
 
-    print*,'********* 8'
-
     !Exchange particle to other processors
     call partcomm
-
-    print*,'********* 9'
 
   end subroutine particles
 
@@ -1017,12 +998,10 @@ contains
          call appl_abort(0)
       end if
       open (666,file=hname,status='old',form='unformatted')
-      read (666,iostat=io) tnextdump
-      np = 0
+      read (666,iostat=io) np,tnextdump
       do
         read (666,iostat=io) pu,pts,pstp,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs,pwr,pwrp
         if(io .ne. 0) exit
-        np = np + 1
         call add_particle(particle)
         particle%unique         = pu
         particle%x              = px
@@ -1129,7 +1108,8 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine write_hist
+  ! subroutine write_hist; writes history files for warm restart particles
+  !   called from: init.f90, step.f90
   !--------------------------------------------------------------------------
   !
   subroutine write_particle_hist(htype, time)
@@ -1159,7 +1139,7 @@ contains
 
     open(666,file=trim(hname), form='unformatted')
     
-    write(666) tnextdump
+    write(666) np,tnextdump
     
     particle => head
     do while(associated(particle))
