@@ -65,7 +65,7 @@ contains
     use modcross, only : triggercross, exitcross, lcross
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
-    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, lpartstat, exitparticlestat, write_particle_hist
+    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, lpartstat, exitparticlestat, write_particle_hist, particlestat
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
@@ -104,8 +104,10 @@ contains
        !
        ! output control
        !
-       if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) &
-       call write_ps(nzp,dn0,u0,v0,zm,zt,time)
+       if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) then
+         call write_ps(nzp,dn0,u0,v0,zm,zt,time)
+         if(lpartic .and. lpartstat) call particlestat(.true.,time)
+       end if
 
        if ((mod(tplsdt,frqhis) < dt .or. time >= timmax) .and. outflg) then
          call write_hist(2, time)
@@ -208,7 +210,7 @@ contains
     use lsvar, only : varlscale
     use util, only : velset,get_avg
     use modtimedep, only : timedep
-    use modparticles, only : particles, lpartic
+    use modparticles, only : particles, lpartic, particlestat,lpartstat
 
     logical, parameter :: debug = .false.
 !     integer :: k
@@ -266,6 +268,7 @@ contains
        call thermo (level)
        if (debug) WRITE (0,*) 't_step statflg statistics, myid=',myid
        call statistics (time+dt)
+       if(lpartic .and. lpartstat) call particlestat(.false.,time+dt)
        sflg = .False.
     end if
   end subroutine t_step
