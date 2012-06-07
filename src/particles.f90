@@ -17,7 +17,7 @@
 ! Copyright 1999-2008, Bjorn B. Stevens, Dep't Atmos and Ocean Sci, UCLA
 !----------------------------------------------------------------------------
 ! Doxygen:
-!> Lagrangian Particle Tracking Module (LPTM) 
+!> Lagrangian Particle Tracking Module (LPTM). 
 !! Tracks massless particles driven by the interpolated velocities from the 
 !! Eulerian LES grid.
 !>
@@ -98,7 +98,7 @@ contains
     use step, only : timmax
     use mpi_interface, only : myid 
     implicit none
-    real, intent(in)               :: time
+    real, intent(in)               :: time          !< time of simulation, determines the timing of particle dumps to NetCDF
     type (particle_record), pointer:: particle
 
     if ( np < 1 .or. nplisted < 1 ) return   ! Just to be sure..
@@ -178,7 +178,6 @@ contains
   
   end subroutine randomize
 
-
   !
   !--------------------------------------------------------------------------
   ! Function velocity_ures
@@ -189,7 +188,7 @@ contains
   function velocity_ures(x,y,z)
     use grid, only : a_up, dzi_m, dzi_t, zt, zm
     implicit none
-    real, intent(in) :: x, y, z
+    real, intent(in) :: x, y, z                               !< local x,y,z position in grid coordinates
     integer          :: xbottom, ybottom, zbottom
     real             :: velocity_ures, deltax, deltay, deltaz, sign
 
@@ -229,7 +228,7 @@ contains
   function velocity_vres(x,y,z)
     use grid, only : a_vp, dzi_m, dzi_t, zt, zm
     implicit none
-    real, intent(in) :: x, y, z
+    real, intent(in) :: x, y, z                               !< local x,y,z position in grid coordinates
     integer          :: xbottom, ybottom, zbottom
     real             :: velocity_vres, deltax, deltay, deltaz, sign
 
@@ -269,7 +268,7 @@ contains
   function velocity_wres(x,y,z)
     use grid, only : a_wp, dzi_m, dzi_t, zt, zm
     implicit none
-    real, intent(in) :: x, y, z
+    real, intent(in) :: x, y, z                               !< local x,y,z position in grid coordinates
     integer          :: xbottom, ybottom, zbottom
     real             :: velocity_wres, deltax, deltay, deltaz
 
@@ -300,9 +299,9 @@ contains
   !
   function sca2part(x,y,z,input)
     implicit none
-    real, intent(in)                    :: x, y, z
-    real, dimension(:,:,:), intent(in)  :: input
-
+    real, intent(in)                    :: x, y, z                               !< local x,y,z position in grid coordinates
+    real, dimension(:,:,:), intent(in)  :: input                                 !< scalar field used to interpolate from
+ 
     integer  :: xbottom, ybottom, zbottom
     real     :: sca2part, deltax, deltay, deltaz
 
