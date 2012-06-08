@@ -16,35 +16,35 @@
 !
 ! Copyright 1999-2008, Bjorn B. Stevens, Dep't Atmos and Ocean Sci, UCLA
 !----------------------------------------------------------------------------
-! 
+! Doxygen:
+!> Lagrangian Particle Tracking Module (LPTM). 
+!! Tracks massless particles driven by the interpolated velocities from the 
+!! Eulerian LES grid.
+!>
+!! \author Bart van Stratum
+!! \todo bla 
 
-!----------------------------------------------------------------------------
-! To-do:
-!   - merge interpolation functions -> are all pretty similar
-!   - put lpartsgs switch in particle communication
-!   - fix statistics -> possible error when particles move from proc2proc
-!----------------------------------------------------------------------------
 
 module modparticles
   !--------------------------------------------------------------------------
   ! module modparticles: Langrangian particle tracking, ad(o/a)pted from DALES
   !--------------------------------------------------------------------------
   implicit none
-  PUBLIC :: init_particles, particles, exit_particles, initparticledump, initparticlestat, write_particle_hist
+  PUBLIC :: init_particles, particles, exit_particles, initparticledump, initparticlestat, write_particle_hist, particlestat
 
   ! For/from namelist  
-  logical            :: lpartic      = .false.        ! Switch for particles
-  logical            :: lpartsgs     = .false.        ! Switch for particle subgrid scheme
-  logical            :: lpartstat    = .false.        ! Switch for particle statistics
-  real               :: frqpartstat  =  3600.         ! Time interval for statistics writing
-  real               :: avpartstat   =  60.           ! Averaging time before writing stats
-  logical            :: lpartdump    = .false.        ! Switch for particle dump
-  logical            :: lpartdumpui  = .false.        ! Switch for writing velocities to dump
-  real               :: frqpartdump  =  3600          ! Time interval for particle dump
+  logical            :: lpartic      = .false.        !< Switch for enabling particles
+  logical            :: lpartsgs     = .false.        !< Switch for enabling particle subgrid scheme
+  logical            :: lpartstat    = .false.        !< Switch for enabling particle statistics
+  real               :: frqpartstat  =  3600.         !< Time interval for statistics writing
+  real               :: avpartstat   =  60.           !< Averaging time before writing stats
+  logical            :: lpartdump    = .false.        !< Switch for particle dump
+  logical            :: lpartdumpui  = .false.        !< Switch for writing velocities to dump
+  real               :: frqpartdump  =  3600          !< Time interval for particle dump
 
   character(30)      :: startfile
   integer            :: ifinput     = 1
-  integer            :: np
+  integer            :: np      
   integer            :: tnextdump, tnextstat
 
   ! Particle structure
@@ -69,25 +69,36 @@ module modparticles
   integer            :: nstatsamp
   
   ! Arrays for local and domain averaged values
-  real, allocatable, dimension(:)     :: npartprof,npartprofl, &
-                                         uprof, uprofl, &
-                                         vprof, vprofl, &
-                                         wprof, wprofl
+  real, allocatable, dimension(:)     :: npartprof,    npartprofl, &
+                                         uprof,        uprofl,   &
+                                         vprof,        vprofl,   &
+                                         wprof,        wprofl,   &
+                                         u2prof,       u2profl,  &
+                                         v2prof,       v2profl,  &
+                                         w2prof,       w2profl,  &
+                                         tkeprof,      tkeprofl, &
+                                         tprof,        tprofl,   &
+                                         rtprof,       rtprofl
 
   integer (KIND=selected_int_kind(10)):: idum = -12345
 
 contains
   !
   !--------------------------------------------------------------------------
-  ! subroutine particles: Main routine, called every RK3-step
+  ! Subroutine particles 
+  !> Main driver of the LPTM, calls both the velocity 
+  !> interpolation from the Eulerian grid and RK3 integration scheme. 
+  !> called from: step.f90
   !--------------------------------------------------------------------------
   !
-  subroutine particles(time)
+  subroutine particles(time) 
+
     use grid, only : dxi, dyi, nstep, dzi_t, dt, nzp, zm, a_km, nxp, nyp
     use defs, only : pi
+    use step, only : timmax
     use mpi_interface, only : myid 
     implicit none
-    real, intent(in)               :: time
+    real, intent(in)               :: time          !< time of simulation, determines the timing of particle dumps to NetCDF
     type (particle_record), pointer:: particle
 
     if ( np < 1 .or. nplisted < 1 ) return   ! Just to be sure..
@@ -114,6 +125,7 @@ contains
     do while( associated(particle) )
       if ( time - particle%tstart >= 0 ) then
         call rk3(particle)
+        call checkbound(particle)
       end if
     particle => particle%next
     end do
@@ -121,40 +133,33 @@ contains
     ! Statistics
     if (nstep==3) then
       !call checkdiv
-      
+     
       ! Particle dump
-      if((time + dt > tnextdump) .and. lpartdump) then
-        call particledump(time)
+      if((time + (0.5*dt) >= tnextdump .or. time + dt >= timmax) .and. lpartdump) then
+        call particledump(real(time))
         tnextdump = tnextdump + frqpartdump
       end if
 
-      ! Average statistics
-      if((time + dt > tnextstat - avpartstat) .and. lpartstat) then
-        call particlestat(.false.,time)
-      end if
-
-      ! Write statistics
-      if((time + dt > tnextstat) .and. lpartstat) then
-        call particlestat(.false.,time)
-        call particlestat(.true.,time)
-      end if
+      ! Particle statistics (sampling/averaging) is called from step.f90 
+      ! synchronized with other profile statistics
     end if
 
-    !Exchange particle to other processors
     call partcomm
 
   end subroutine particles
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine randomize lowest xx m, for now only local..
+  ! Subroutine randomize 
+  !> Randomizes the X,Y,Z positions of all particles in 
+  !> the lowest grid level every RK3 cycle. Called from: particles()
   !--------------------------------------------------------------------------
   !
   subroutine randomize()
     use mpi_interface, only : nxg, nyg, nyprocs, nxprocs
     implicit none
   
-    real      :: zmax = 0.5     ! Max height in grid coordinates
+    real      :: zmax = 1.     ! Max height in grid coordinates
     integer   :: nyloc, nxloc 
     type (particle_record), pointer:: particle
 
@@ -175,13 +180,15 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine velocity_ures : trilinear interpolation of u-component
+  ! Function velocity_ures
+  !> Performs a trilinear interpolation from the Eulerian grid to the 
+  !> particle position.
   !--------------------------------------------------------------------------
   !
   function velocity_ures(x,y,z)
     use grid, only : a_up, dzi_m, dzi_t, zt, zm
     implicit none
-    real, intent(in) :: x, y, z
+    real, intent(in) :: x, y, z                               !< local x,y,z position in grid coordinates
     integer          :: xbottom, ybottom, zbottom
     real             :: velocity_ures, deltax, deltay, deltaz, sign
 
@@ -213,13 +220,15 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine velocity_vres : trilinear interpolation of v-component
+  ! Function velocity_vres
+  !> Performs a trilinear interpolation from the Eulerian grid to the 
+  !> particle position.
   !--------------------------------------------------------------------------
   !
   function velocity_vres(x,y,z)
     use grid, only : a_vp, dzi_m, dzi_t, zt, zm
     implicit none
-    real, intent(in) :: x, y, z
+    real, intent(in) :: x, y, z                               !< local x,y,z position in grid coordinates
     integer          :: xbottom, ybottom, zbottom
     real             :: velocity_vres, deltax, deltay, deltaz, sign
 
@@ -251,13 +260,15 @@ contains
   
   !
   !--------------------------------------------------------------------------
-  ! subroutine velocity_wres : trilinear interpolation of w-component
+  ! Function velocity_wres
+  !> Performs a trilinear interpolation from the Eulerian grid to the 
+  !> particle position.
   !--------------------------------------------------------------------------
   !
   function velocity_wres(x,y,z)
     use grid, only : a_wp, dzi_m, dzi_t, zt, zm
     implicit none
-    real, intent(in) :: x, y, z
+    real, intent(in) :: x, y, z                               !< local x,y,z position in grid coordinates
     integer          :: xbottom, ybottom, zbottom
     real             :: velocity_wres, deltax, deltay, deltaz
 
@@ -281,15 +292,16 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! functions sca2part : trilinear interpolation of properties at scalar
-  !   point (center of grid cell: T,q,tke,eps,...) to particle
+  ! Function sca2part
+  !> trilinear interpolation of scalars (center of grid cell) to particle
+  !> Requires a 3D field as fourth argument
   !--------------------------------------------------------------------------
   !
   function sca2part(x,y,z,input)
     implicit none
-    real, intent(in)                    :: x, y, z
-    real, dimension(:,:,:), intent(in)  :: input
-
+    real, intent(in)                    :: x, y, z                               !< local x,y,z position in grid coordinates
+    real, dimension(:,:,:), intent(in)  :: input                                 !< scalar field used to interpolate from
+ 
     integer  :: xbottom, ybottom, zbottom
     real     :: sca2part, deltax, deltay, deltaz
 
@@ -313,7 +325,8 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine rk3 : Third order Runge-Kutta scheme for spatial integration
+  ! Subroutine rk3 
+  !> Third-order Runge-Kutta scheme for spatial integration of the particles.
   !--------------------------------------------------------------------------
   !
   subroutine rk3(particle)
@@ -329,7 +342,7 @@ contains
     particle%vres_prev = particle%vres
     particle%wres_prev = particle%wres
 
-    call checkbound(particle)
+
    
    if ( nstep==3 ) then
       particle%ures_prev   = 0.
@@ -341,8 +354,9 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine partcomm : send and receives particles between different
-  !   processes and handles cyclic boundaries
+  ! Subroutine partcomm 
+  !> Handles the cyclic boundary conditions (through MPI) and sends
+  !> particles from processor to processor
   !--------------------------------------------------------------------------
   !
   subroutine partcomm
@@ -566,8 +580,8 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine partbuffer : used to create send/receive buffer for 
-  !   routine partcomm()
+  ! Subroutine partbuffer 
+  !> Packs/receives particle records to/from an array, sendable over MPI 
   !--------------------------------------------------------------------------
   !
   subroutine partbuffer(particle, buffer, n, send)
@@ -616,14 +630,15 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine particlestat : Time averages slab-averaged statistics and
-  !   writes them to NetCDF
+  ! Subroutine particlestat 
+  !> Performs the sampling and saving of binned and slab averaged particle
+  !> statistics. Output written to *.particlestat.nc  
   !--------------------------------------------------------------------------
   !
   subroutine particlestat(dowrite,time)
     use mpi_interface, only : mpi_comm_world, myid, mpi_double_precision, mpi_sum, ierror, nxprocs, nyprocs, nxg, nyg
     use modnetcdf,     only : writevar_nc, fillvalue_double
-    use grid,          only : tname,nzp,dxi,dyi,dzi_t,nxp,nyp, umean, vmean
+    use grid,          only : tname,nzp,dxi,dyi,dzi_t,nxp,nyp,umean,vmean, a_tp, a_rp
     implicit none
 
     logical, intent(in)     :: dowrite
@@ -640,6 +655,13 @@ contains
         uprofl(k)       = uprofl(k)     + (particle%ures / dxi)
         vprofl(k)       = vprofl(k)     + (particle%vres / dyi)
         wprofl(k)       = wprofl(k)     + (particle%wres / dzi_t(floor(particle%z)))
+        u2profl(k)      = u2profl(k)    + (particle%ures / dxi)**2.
+        v2profl(k)      = v2profl(k)    + (particle%vres / dyi)**2.
+        w2profl(k)      = w2profl(k)    + (particle%wres / dzi_t(floor(particle%z)))**2.
+        ! scalars
+        tprofl(k)       = tprofl(k)     + sca2part(particle%x,particle%y,particle%z,a_tp)
+        rtprofl(k)      = rtprofl(k)    + sca2part(particle%x,particle%y,particle%z,a_rp)
+
         particle => particle%next
       end do 
 
@@ -648,28 +670,34 @@ contains
 
     ! Write to NetCDF
     if(dowrite) then
-      do k = 1,nzp
-        if(npartprofl(k) > 0) then 
-          npartprofl(k) = npartprofl(k) /  nstatsamp
-          uprofl(k)     = uprofl(k)     / (nstatsamp * npartprofl(k))
-          vprofl(k)     = vprofl(k)     / (nstatsamp * npartprofl(k))
-          wprofl(k)     = wprofl(k)     / (nstatsamp * npartprofl(k))
-        else
-          npartprofl(k) = 0.
-          uprofl(k)     = 0.
-          vprofl(k)     = 0.
-          wprofl(k)     = 0.
-        end if
-      end do       
-
       call mpi_allreduce(npartprofl,npartprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
       call mpi_allreduce(uprofl,uprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
       call mpi_allreduce(vprofl,vprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
       call mpi_allreduce(wprofl,wprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-      
-      ! Correct for Galilean transformation
-      uprof = uprof + umean
-      vprof = vprof + vmean
+      call mpi_allreduce(u2profl,u2prof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      call mpi_allreduce(v2profl,v2prof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      call mpi_allreduce(w2profl,w2prof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      ! scalars
+      call mpi_allreduce(tprofl,tprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      call mpi_allreduce(rtprofl,rtprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+    
+      ! Divide summed values by ntime and nparticle samples and
+      ! correct for Galilean transformation 
+      do k = 1,nzp
+        if(npartprofl(k) > 0) then 
+          npartprof(k) = npartprof(k) / (nstatsamp)
+          uprof(k)     = uprof(k)     / (nstatsamp * npartprof(k)) + umean
+          vprof(k)     = vprof(k)     / (nstatsamp * npartprof(k)) + vmean
+          wprof(k)     = wprof(k)     / (nstatsamp * npartprof(k))
+          u2prof(k)    = u2prof(k)    / (nstatsamp * npartprof(k)) - (uprof(k)-umean)**2.
+          v2prof(k)    = v2prof(k)    / (nstatsamp * npartprof(k)) - (vprof(k)-vmean)**2.
+          w2prof(k)    = w2prof(k)    / (nstatsamp * npartprof(k)) - wprof(k)**2. 
+          tkeprof(k)   = 0.5 * (u2prof(k) + v2prof(k) + w2prof(k))
+          ! scalars
+          tprof(k)     = tprof(k)     / (nstatsamp * npartprof(k))
+          rtprof(k)    = rtprof(k)    / (nstatsamp * npartprof(k))
+        end if
+      end do      
 
       if(myid == 0) then
         call writevar_nc(ncpartstatid,tname,time,ncpartstatrec)
@@ -677,6 +705,12 @@ contains
         call writevar_nc(ncpartstatid,'u',uprof,ncpartstatrec)
         call writevar_nc(ncpartstatid,'v',vprof,ncpartstatrec)
         call writevar_nc(ncpartstatid,'w',wprof,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'u_2',u2prof,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'v_2',v2prof,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'w_2',w2prof,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'tke',tkeprof,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'t',tprof,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'rt',rtprof,ncpartstatrec)
       end if
 
       npartprof  = 0
@@ -687,8 +721,19 @@ contains
       vprofl     = 0
       wprof      = 0
       wprofl     = 0
+      u2prof     = 0
+      u2profl    = 0
+      v2prof     = 0
+      v2profl    = 0
+      w2prof     = 0
+      w2profl    = 0
+      tkeprof    = 0
+      tkeprofl   = 0
+      tprof      = 0
+      tprofl     = 0
+      rtprof     = 0
+      rtprofl    = 0
       nstatsamp  = 0
-      tnextstat  = tnextstat + frqpartstat
     end if
 
   end subroutine particlestat
@@ -1084,8 +1129,19 @@ contains
     ipartstep       = 15
     nrpartvar       = ipartstep
  
-    if(lpartstat) allocate(npartprof(nzp),npartprofl(nzp),uprof(nzp),uprofl(nzp),vprof(nzp),vprofl(nzp),wprof(nzp),wprofl(nzp))
-    
+    if(lpartstat) then
+      allocate(npartprof(nzp),npartprofl(nzp),     &
+                   uprof(nzp),    uprofl(nzp),     &
+                   vprof(nzp),    vprofl(nzp),     &
+                   wprof(nzp),    wprofl(nzp),     &
+                   u2prof(nzp),   u2profl(nzp),    &
+                   v2prof(nzp),   v2profl(nzp),    &
+                   w2prof(nzp),   w2profl(nzp),    &
+                   tkeprof(nzp),  tkeprofl(nzp),   &
+                   tprof(nzp),    tprofl(nzp),     &
+                   rtprof(nzp),   rtprofl(nzp))
+    end if   
+ 
     close(ifinput)
 
   end subroutine init_particles
@@ -1238,9 +1294,15 @@ contains
     if(myid == 0) then
       call open_nc(trim(filprf)//'.particlestat.nc', ncpartstatid, ncpartstatrec, time, .true.)
       call addvar_nc(ncpartstatid,'np','Number of particles','-',dimname,dimlongname,dimunit,dimsize,dimvalues)
-      call addvar_nc(ncpartstatid,'u','resolved u-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
-      call addvar_nc(ncpartstatid,'v','resolved v-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
-      call addvar_nc(ncpartstatid,'w','resolved w-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'u','resolved u-velocity of particle','m s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'v','resolved v-velocity of particle','m s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'w','resolved w-velocity of particle','m s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'u_2','resolved u-velocity variance of particle','m2 s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'v_2','resolved v-velocity variance of particle','m2 s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'w_2','resolved w-velocity variance of particle','m2 s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'tke','resolved TKE of particle','m s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'t','liquid water potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'rt','total water mixing ratio','kg kg-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
     end if 
  
   end subroutine initparticlestat
