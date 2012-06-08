@@ -258,7 +258,7 @@ contains
        call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
 
        if (lpartic) then
-         call particles(time)
+         call particles(time,timmax)
        end if
 
     end do
