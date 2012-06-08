@@ -22,7 +22,7 @@
 !! Eulerian LES grid.
 !>
 !! \author Bart van Stratum
-!! \todo bla 
+!! \todo 
 
 
 module modparticles
@@ -36,8 +36,6 @@ module modparticles
   logical            :: lpartic      = .false.        !< Switch for enabling particles
   logical            :: lpartsgs     = .false.        !< Switch for enabling particle subgrid scheme
   logical            :: lpartstat    = .false.        !< Switch for enabling particle statistics
-  real               :: frqpartstat  =  3600.         !< Time interval for statistics writing
-  real               :: avpartstat   =  60.           !< Averaging time before writing stats
   logical            :: lpartdump    = .false.        !< Switch for particle dump
   logical            :: lpartdumpui  = .false.        !< Switch for writing velocities to dump
   real               :: frqpartdump  =  3600          !< Time interval for particle dump
@@ -78,7 +76,10 @@ module modparticles
                                          w2prof,       w2profl,  &
                                          tkeprof,      tkeprofl, &
                                          tprof,        tprofl,   &
-                                         rtprof,       rtprofl
+                                         tvprof,       tvprofl,  &
+                                         rtprof,       rtprofl,  &
+                                         rlprof,       rlprofl,  &
+                                         ccprof,       ccprofl
 
   integer (KIND=selected_int_kind(10)):: idum = -12345
 
@@ -91,14 +92,14 @@ contains
   !> called from: step.f90
   !--------------------------------------------------------------------------
   !
-  subroutine particles(time) 
+  subroutine particles(time,timmax) 
 
     use grid, only : dxi, dyi, nstep, dzi_t, dt, nzp, zm, a_km, nxp, nyp
     use defs, only : pi
-    use step, only : timmax
     use mpi_interface, only : myid 
     implicit none
     real, intent(in)               :: time          !< time of simulation, determines the timing of particle dumps to NetCDF
+    real, intent(in)               :: timmax        !< end of simulation, required to write particle dump at last timestep
     type (particle_record), pointer:: particle
 
     if ( np < 1 .or. nplisted < 1 ) return   ! Just to be sure..
@@ -292,18 +293,18 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! Function sca2part
-  !> trilinear interpolation of scalars (center of grid cell) to particle
+  ! Function i3d
+  !> trilinear interpolation from grid center to particle position
   !> Requires a 3D field as fourth argument
   !--------------------------------------------------------------------------
   !
-  function sca2part(x,y,z,input)
+  function i3d(x,y,z,input)
     implicit none
     real, intent(in)                    :: x, y, z                               !< local x,y,z position in grid coordinates
     real, dimension(:,:,:), intent(in)  :: input                                 !< scalar field used to interpolate from
  
     integer  :: xbottom, ybottom, zbottom
-    real     :: sca2part, deltax, deltay, deltaz
+    real     :: i3d, deltax, deltay, deltaz
 
     xbottom = floor(x - 0.5)
     ybottom = floor(y - 0.5)
@@ -312,7 +313,7 @@ contains
     deltay = y - 0.5 - ybottom
     deltaz = z + 0.5 - zbottom
     
-    sca2part      =  (1-deltaz) * (1-deltay) * (1-deltax) *  input(zbottom    , xbottom    , ybottom    ) + &    !
+    i3d           =  (1-deltaz) * (1-deltay) * (1-deltax) *  input(zbottom    , xbottom    , ybottom    ) + &    !
     &                (1-deltaz) * (1-deltay) * (  deltax) *  input(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
     &                (1-deltaz) * (  deltay) * (1-deltax) *  input(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
     &                (1-deltaz) * (  deltay) * (  deltax) *  input(zbottom    , xbottom + 1, ybottom + 1) + &    ! x+1,y+1
@@ -321,7 +322,30 @@ contains
     &                (  deltaz) * (  deltay) * (1-deltax) *  input(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
     &                (  deltaz) * (  deltay) * (  deltax) *  input(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
 
-  end function sca2part
+  end function i3d
+
+  !
+  !--------------------------------------------------------------------------
+  ! Function i1d
+  !> linear interpolation of grid center to particle position
+  !> Requires a 1D profile as second argument
+  !--------------------------------------------------------------------------
+  !
+  function i1d(z,input)
+    implicit none
+    real, intent(in)                    :: z                                     !< local z position in grid coordinates
+    real, dimension(:), intent(in)      :: input                                 !< profile used to interpolate from
+ 
+    integer  :: zbottom
+    real     :: i1d, deltaz
+
+    zbottom = floor(z + 0.5)
+    deltaz = z + 0.5 - zbottom
+
+    i1d    =  (1-deltaz) * input(zbottom) + deltaz * input(zbottom+1)
+    i1d    =  (1-deltaz) * input(zbottom) + deltaz * input(zbottom+1)
+
+  end function i1d
 
   !
   !--------------------------------------------------------------------------
@@ -587,7 +611,7 @@ contains
   subroutine partbuffer(particle, buffer, n, send)
     implicit none
 
-    logical,intent(in)                :: send
+    logical,intent(in)                :: send                               !< 
     integer,intent(in)                :: n
     real,dimension(n+1:n+nrpartvar)   :: buffer
     TYPE (particle_record), POINTER:: particle
@@ -638,12 +662,17 @@ contains
   subroutine particlestat(dowrite,time)
     use mpi_interface, only : mpi_comm_world, myid, mpi_double_precision, mpi_sum, ierror, nxprocs, nyprocs, nxg, nyg
     use modnetcdf,     only : writevar_nc, fillvalue_double
-    use grid,          only : tname,nzp,dxi,dyi,dzi_t,nxp,nyp,umean,vmean, a_tp, a_rp
+    use grid,          only : tname,nzp,dxi,dyi,dzi_t,nxp,nyp,umean,vmean, a_tp, a_rp, press, th00, a_pexnr, a_theta,pi0,pi1
+    use defs,          only : p00,cp,R,Rm,tmelt,alvl,cpr,ep2,ep
+    use thrm,          only : rslf
     implicit none
 
     logical, intent(in)     :: dowrite
     real, intent(in)        :: time
-    integer                 :: k
+    integer                 :: k, iterate
+    real                    :: thlloc,tlloc,rtloc,ploc,exnloc,rsloc,rslloc,bloc,rlloc,tvloc
+    real                    :: px,py,pz,exner,dtx,txi,tx1,tx
+    real, parameter         :: epsln = 1.e-4
     type (particle_record), pointer:: particle
 
     ! Time averaging step
@@ -658,10 +687,51 @@ contains
         u2profl(k)      = u2profl(k)    + (particle%ures / dxi)**2.
         v2profl(k)      = v2profl(k)    + (particle%vres / dyi)**2.
         w2profl(k)      = w2profl(k)    + (particle%wres / dzi_t(floor(particle%z)))**2.
-        ! scalars
-        tprofl(k)       = tprofl(k)     + sca2part(particle%x,particle%y,particle%z,a_tp)
-        rtprofl(k)      = rtprofl(k)    + sca2part(particle%x,particle%y,particle%z,a_rp)
 
+        px              = particle%x
+        py              = particle%y
+        pz              = particle%z
+
+        ! scalar interpolations and calculations
+        exner           = (i1d(pz,pi0)+i1d(pz,pi1)+i3d(px,py,pz,a_pexnr)) / cp
+        ploc            = p00 * exner**cpr               ! Pressure
+        thlloc          = i3d(px,py,pz,a_tp) + th00      ! Liquid water potential T 
+        tlloc           = thlloc * exner                 ! Liquid water T 
+        rsloc           = rslf(ploc,tlloc)               ! Saturation vapor mixing ratio
+        rtloc           = i3d(px,py,pz,a_rp)             ! Total water mixing ratio
+        rlloc           = max(rtloc-rsloc,0.)            ! Liquid water mixing ratio
+
+        if(rlloc > 0.) then
+          dtx           = 2. * epsln
+          iterate       = 1
+          tx            = tlloc
+          do while(dtx > epsln .and. iterate < 20)
+            txi     = alvl / (cp * tx)
+            tx1     = tx - (tx - tlloc * (1. + txi  * rlloc)) / &
+                        (1. + txi * tlloc * (rlloc / tx + (1. + rsloc * ep) * rsloc * alvl / (Rm * tx * tx)))
+            dtx     = abs(tx1 - tx)
+            tx      = tx1
+            iterate = iterate + 1
+            rsloc   = rslf(ploc,tx)
+            !if (level>3) then
+            !  rix=rsif(p(k,i,j),tx)
+            !end if
+            rlloc   = max(rtloc-rsloc,0.)
+            !print*,'piter',iterate,txi,tx1,dtx,tx,rsloc,rsloc
+          end do
+        end if
+
+        !print*,'particle:',ploc,thlloc,tlloc,rsloc,rtloc,rlloc
+
+        tvloc           = i3d(px,py,pz,a_theta)* &
+                            (1.+ep2*(rtloc-rlloc))               ! Virtual potential T
+
+        ! scalar profiles
+        tprofl(k)       = tprofl(k)     + thlloc
+        tvprofl(k)      = tvprofl(k)    + tvloc
+        rtprofl(k)      = rtprofl(k)    + rtloc
+        rlprofl(k)      = rlprofl(k)    + rlloc
+        if(rlloc > 0.)  ccprofl(k)    = ccprofl(k)    + 1
         particle => particle%next
       end do 
 
@@ -679,8 +749,11 @@ contains
       call mpi_allreduce(w2profl,w2prof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
       ! scalars
       call mpi_allreduce(tprofl,tprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      call mpi_allreduce(tvprofl,tvprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
       call mpi_allreduce(rtprofl,rtprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-    
+      call mpi_allreduce(rlprofl,rlprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      call mpi_allreduce(ccprofl,ccprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+ 
       ! Divide summed values by ntime and nparticle samples and
       ! correct for Galilean transformation 
       do k = 1,nzp
@@ -695,7 +768,10 @@ contains
           tkeprof(k)   = 0.5 * (u2prof(k) + v2prof(k) + w2prof(k))
           ! scalars
           tprof(k)     = tprof(k)     / (nstatsamp * npartprof(k))
+          tvprof(k)    = tvprof(k)    / (nstatsamp * npartprof(k))
           rtprof(k)    = rtprof(k)    / (nstatsamp * npartprof(k))
+          rlprof(k)    = rlprof(k)    / (nstatsamp * npartprof(k))
+          ccprof(k)    = ccprof(k)    / (nstatsamp * npartprof(k))
         end if
       end do      
 
@@ -710,7 +786,10 @@ contains
         call writevar_nc(ncpartstatid,'w_2',w2prof,ncpartstatrec)
         call writevar_nc(ncpartstatid,'tke',tkeprof,ncpartstatrec)
         call writevar_nc(ncpartstatid,'t',tprof,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'tv',tprof,ncpartstatrec)
         call writevar_nc(ncpartstatid,'rt',rtprof,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'rl',rlprof,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'cc',ccprof,ncpartstatrec)
       end if
 
       npartprof  = 0
@@ -731,8 +810,14 @@ contains
       tkeprofl   = 0
       tprof      = 0
       tprofl     = 0
+      tvprof     = 0
+      tvprofl    = 0
       rtprof     = 0
       rtprofl    = 0
+      rlprof     = 0
+      rlprofl    = 0
+      ccprof     = 0
+      ccprofl    = 0
       nstatsamp  = 0
     end if
 
@@ -1139,7 +1224,10 @@ contains
                    w2prof(nzp),   w2profl(nzp),    &
                    tkeprof(nzp),  tkeprofl(nzp),   &
                    tprof(nzp),    tprofl(nzp),     &
-                   rtprof(nzp),   rtprofl(nzp))
+                   tvprof(nzp),   tvprofl(nzp),    &
+                   rtprof(nzp),   rtprofl(nzp),    &
+                   rlprof(nzp),   rlprofl(nzp),    &
+                   ccprof(nzp),   ccprofl(nzp))
     end if   
  
     close(ifinput)
@@ -1292,7 +1380,7 @@ contains
     dimsize(2)     = 0
  
     if(myid == 0) then
-      call open_nc(trim(filprf)//'.particlestat.nc', ncpartstatid, ncpartstatrec, time, .true.)
+      call open_nc(trim(filprf)//'.particlestat.nc', ncpartstatid, ncpartstatrec, time, .false.)
       call addvar_nc(ncpartstatid,'np','Number of particles','-',dimname,dimlongname,dimunit,dimsize,dimvalues)
       call addvar_nc(ncpartstatid,'u','resolved u-velocity of particle','m s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
       call addvar_nc(ncpartstatid,'v','resolved v-velocity of particle','m s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
@@ -1302,7 +1390,10 @@ contains
       call addvar_nc(ncpartstatid,'w_2','resolved w-velocity variance of particle','m2 s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
       call addvar_nc(ncpartstatid,'tke','resolved TKE of particle','m s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
       call addvar_nc(ncpartstatid,'t','liquid water potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'tv','virtual potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues)
       call addvar_nc(ncpartstatid,'rt','total water mixing ratio','kg kg-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'rl','liquid water mixing ratio','kg kg-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'cc','cloud fraction','-',dimname,dimlongname,dimunit,dimsize,dimvalues)
     end if 
  
   end subroutine initparticlestat
@@ -1337,7 +1428,8 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine add_particle(ptr)
-    implicit none
+    implicit none                                         
+                                   
     TYPE (particle_record), POINTER:: ptr
     TYPE (particle_record), POINTER:: new_p
 
