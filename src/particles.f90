@@ -33,15 +33,17 @@ module modparticles
   PUBLIC :: init_particles, particles, exit_particles, initparticledump, initparticlestat, write_particle_hist, particlestat
 
   ! For/from namelist  
-  logical            :: lpartic      = .false.        !< Switch for enabling particles
-  logical            :: lpartsgs     = .false.        !< Switch for enabling particle subgrid scheme
-  logical            :: lpartstat    = .false.        !< Switch for enabling particle statistics
-  logical            :: lpartdump    = .false.        !< Switch for particle dump
-  logical            :: lpartdumpui  = .false.        !< Switch for writing velocities to dump
-  real               :: frqpartdump  =  3600          !< Time interval for particle dump
+  logical            :: lpartic        = .false.        !< Switch for enabling particles
+  logical            :: lpartsgs       = .false.        !< Switch for enabling particle subgrid scheme
+  logical            :: lpartstat      = .false.        !< Switch for enabling particle statistics
+  logical            :: lpartdump      = .false.        !< Switch for particle dump
+  logical            :: lpartdumpui    = .false.        !< Switch for writing velocities to dump
+  logical            :: lpartdumpth    = .false.        !< Switch for writing temperatures (liquid water / virtual potential T) to dump
+  logical            :: lpartdumpmr    = .false.        !< Switch for writing moisture (total / liquid (+rain if level==3) water mixing ratio) to dump
+  real               :: frqpartdump    =  3600          !< Time interval for particle dump
 
   character(30)      :: startfile
-  integer            :: ifinput     = 1
+  integer            :: ifinput        = 1
   integer            :: np      
   integer            :: tnextdump, tnextstat
 
@@ -105,9 +107,9 @@ contains
     if ( np < 1 .or. nplisted < 1 ) return   ! Just to be sure..
 
     ! Randomize particles lowest grid level
-    if (lpartsgs .and. nstep==1) then
-      call randomize()
-    end if
+    !if (lpartsgs .and. nstep==1) then
+    !  call randomize()
+    !end if
 
     particle => head
     do while( associated(particle) )
@@ -122,14 +124,14 @@ contains
     end do
  
     ! Time integration
-    particle => head
-    do while( associated(particle) )
-      if ( time - particle%tstart >= 0 ) then
-        call rk3(particle)
-        call checkbound(particle)
-      end if
-    particle => particle%next
-    end do
+    !particle => head
+    !do while( associated(particle) )
+    !  if ( time - particle%tstart >= 0 ) then
+    !    call rk3(particle)
+    !    call checkbound(particle)
+    !  end if
+    !particle => particle%next
+    !end do
 
     ! Statistics
     if (nstep==3) then
@@ -654,6 +656,57 @@ contains
 
   !
   !--------------------------------------------------------------------------
+  ! Subroutine thermo 
+  !> Calculates thermodynamic variables at particle position (thl, thv,
+  !> qt, qs)  
+  !--------------------------------------------------------------------------
+  !
+  subroutine thermo(px,py,pz,thl,thv,rt,rl)
+    use thrm,         only : rslf
+    use grid,         only : a_pexnr, a_rp, a_theta, a_tp, pi0, pi1,th00
+    !use grid,         only : tname,nzp,dxi,dyi,dzi_t,nxp,nyp,umean,vmean, a_tp, a_rp, press, th00, a_pexnr, a_theta,pi0,pi1
+    
+    use defs,         only : p00,cp,R,Rm,tmelt,alvl,cpr,ep2,ep
+    use thrm,         only : rslf
+    implicit none
+   
+    real, intent(in)  :: px,py,pz
+    real, intent(out) :: thl,thv,rt,rl 
+    real, parameter   :: epsln = 1.e-4
+    real              :: exner,ploc,tlloc,rsloc,dtx,tx,txi,tx1
+    integer           :: iterate
+
+    ! scalar interpolations and calculations
+    exner   = (i1d(pz,pi0)+i1d(pz,pi1)+i3d(px,py,pz,a_pexnr)) / cp
+    ploc    = p00 * exner**cpr               ! Pressure
+    thl     = i3d(px,py,pz,a_tp) + th00      ! Liquid water potential T 
+    tlloc   = thl * exner                    ! Liquid water T 
+    rsloc   = rslf(ploc,tlloc)               ! Saturation vapor mixing ratio
+    rt      = i3d(px,py,pz,a_rp)             ! Total water mixing ratio
+    rl      = max(rt-rsloc,0.)               ! Liquid water mixing ratio
+
+    if(rl > 0.) then
+      dtx          = 2. * epsln
+      iterate      = 1
+      tx           = tlloc
+      do while(dtx > epsln .and. iterate < 20)
+        txi        = alvl / (cp * tx)
+        tx1        = tx - (tx - tlloc * (1. + txi  * rl)) / &
+                       (1. + txi * tlloc * (rl / tx + (1. + rsloc * ep) * rsloc * alvl / (Rm * tx * tx)))
+        dtx        = abs(tx1 - tx)
+        tx         = tx1
+        iterate    = iterate + 1
+        rsloc      = rslf(ploc,tx)
+        rl         = max(rt-rsloc,0.)
+      end do
+    end if
+
+    thv = i3d(px,py,pz,a_theta) * (1.+ep2*(rt-rl))  
+
+  end subroutine thermo
+
+  !
+  !--------------------------------------------------------------------------
   ! Subroutine particlestat 
   !> Performs the sampling and saving of binned and slab averaged particle
   !> statistics. Output written to *.particlestat.nc  
@@ -662,17 +715,13 @@ contains
   subroutine particlestat(dowrite,time)
     use mpi_interface, only : mpi_comm_world, myid, mpi_double_precision, mpi_sum, ierror, nxprocs, nyprocs, nxg, nyg
     use modnetcdf,     only : writevar_nc, fillvalue_double
-    use grid,          only : tname,nzp,dxi,dyi,dzi_t,nxp,nyp,umean,vmean, a_tp, a_rp, press, th00, a_pexnr, a_theta,pi0,pi1
-    use defs,          only : p00,cp,R,Rm,tmelt,alvl,cpr,ep2,ep
-    use thrm,          only : rslf
+    use grid,          only : tname,dxi,dyi,dzi_t,nzp,umean,vmean
     implicit none
 
     logical, intent(in)     :: dowrite
     real, intent(in)        :: time
-    integer                 :: k, iterate
-    real                    :: thlloc,tlloc,rtloc,ploc,exnloc,rsloc,rslloc,bloc,rlloc,tvloc
-    real                    :: px,py,pz,exner,dtx,txi,tx1,tx
-    real, parameter         :: epsln = 1.e-4
+    integer                 :: k
+    real                    :: thv,thl,rt,rl           ! From subroutine thermo
     type (particle_record), pointer:: particle
 
     ! Time averaging step
@@ -688,50 +737,14 @@ contains
         v2profl(k)      = v2profl(k)    + (particle%vres / dyi)**2.
         w2profl(k)      = w2profl(k)    + (particle%wres / dzi_t(floor(particle%z)))**2.
 
-        px              = particle%x
-        py              = particle%y
-        pz              = particle%z
-
-        ! scalar interpolations and calculations
-        exner           = (i1d(pz,pi0)+i1d(pz,pi1)+i3d(px,py,pz,a_pexnr)) / cp
-        ploc            = p00 * exner**cpr               ! Pressure
-        thlloc          = i3d(px,py,pz,a_tp) + th00      ! Liquid water potential T 
-        tlloc           = thlloc * exner                 ! Liquid water T 
-        rsloc           = rslf(ploc,tlloc)               ! Saturation vapor mixing ratio
-        rtloc           = i3d(px,py,pz,a_rp)             ! Total water mixing ratio
-        rlloc           = max(rtloc-rsloc,0.)            ! Liquid water mixing ratio
-
-        if(rlloc > 0.) then
-          dtx           = 2. * epsln
-          iterate       = 1
-          tx            = tlloc
-          do while(dtx > epsln .and. iterate < 20)
-            txi     = alvl / (cp * tx)
-            tx1     = tx - (tx - tlloc * (1. + txi  * rlloc)) / &
-                        (1. + txi * tlloc * (rlloc / tx + (1. + rsloc * ep) * rsloc * alvl / (Rm * tx * tx)))
-            dtx     = abs(tx1 - tx)
-            tx      = tx1
-            iterate = iterate + 1
-            rsloc   = rslf(ploc,tx)
-            !if (level>3) then
-            !  rix=rsif(p(k,i,j),tx)
-            !end if
-            rlloc   = max(rtloc-rsloc,0.)
-            !print*,'piter',iterate,txi,tx1,dtx,tx,rsloc,rsloc
-          end do
-        end if
-
-        !print*,'particle:',ploc,thlloc,tlloc,rsloc,rtloc,rlloc
-
-        tvloc           = i3d(px,py,pz,a_theta)* &
-                            (1.+ep2*(rtloc-rlloc))               ! Virtual potential T
+        call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
 
         ! scalar profiles
-        tprofl(k)       = tprofl(k)     + thlloc
-        tvprofl(k)      = tvprofl(k)    + tvloc
-        rtprofl(k)      = rtprofl(k)    + rtloc
-        rlprofl(k)      = rlprofl(k)    + rlloc
-        if(rlloc > 0.)  ccprofl(k)    = ccprofl(k)    + 1
+        tprofl(k)       = tprofl(k)     + thl
+        tvprofl(k)      = tvprofl(k)    + thv
+        rtprofl(k)      = rtprofl(k)    + rt
+        rlprofl(k)      = rlprofl(k)    + rt
+        if(rl > 0.)     ccprofl(k)      = ccprofl(k)    + 1
         particle => particle%next
       end do 
 
@@ -840,12 +853,15 @@ contains
     integer                              :: nlocal, ii, i, pid, partid
     integer, allocatable, dimension(:)   :: nremote
     integer                              :: status(mpi_status_size)
-    integer                              :: nvar
+    integer                              :: nvar,nvl
     real, allocatable, dimension(:)      :: sendbuff, recvbuff
     real, allocatable, dimension(:,:)    :: particles_merged
+    real                                 :: thl,thv,rt,rl
 
     nvar = 4                            ! id,x,y,z
     if(lpartdumpui)  nvar = nvar + 3    ! u,v,w
+    if(lpartdumpth)  nvar = nvar + 2    ! thl,tvh
+    if(lpartdumpmr)  nvar = nvar + 2    ! rt,rl
 
     ! Count local particles
     nlocal = 0
@@ -864,14 +880,27 @@ contains
     ii = 1
     particle => head
     do while( associated(particle) )
+      if(lpartdumpth .or. lpartdumpmr) call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
+
       sendbuff(ii)   = particle%unique
       sendbuff(ii+1) = (wrxid * (nxg / nxprocs) + particle%x - 3) * deltax
       sendbuff(ii+2) = (wryid * (nyg / nyprocs) + particle%y - 3) * deltay
       sendbuff(ii+3) = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
+      nvl = 3
       if(lpartdumpui) then
-        sendbuff(ii+4) = particle%ures * deltax
-        sendbuff(ii+5) = particle%vres * deltay
-        sendbuff(ii+6) = particle%wres / dzi_t(floor(particle%z))
+        sendbuff(ii+nvl+1) = particle%ures * deltax
+        sendbuff(ii+nvl+2) = particle%vres * deltay
+        sendbuff(ii+nvl+3) = particle%wres / dzi_t(floor(particle%z))
+        nvl = nvl + 3
+      end if
+      if(lpartdumpth) then
+        sendbuff(ii+nvl+1) = thl
+        sendbuff(ii+nvl+2) = thv
+        nvl = nvl + 2
+      end if
+      if(lpartdumpmr) then
+        sendbuff(ii+nvl+1) = rt
+        sendbuff(ii+nvl+2) = rl
       end if
       ii = ii + nvar
       particle => particle%next
@@ -890,10 +919,21 @@ contains
         particles_merged(partid,1) = sendbuff(ii+1)
         particles_merged(partid,2) = sendbuff(ii+2)
         particles_merged(partid,3) = sendbuff(ii+3)
+        nvl = 3
         if(lpartdumpui) then
-          particles_merged(partid,4) = sendbuff(ii+4)
-          particles_merged(partid,5) = sendbuff(ii+5)
-          particles_merged(partid,6) = sendbuff(ii+6)
+          particles_merged(partid,nvl+1) = sendbuff(ii+nvl+1)
+          particles_merged(partid,nvl+2) = sendbuff(ii+nvl+2)
+          particles_merged(partid,nvl+3) = sendbuff(ii+nvl+3)
+          nvl = nvl + 3
+        end if
+        if(lpartdumpth) then
+          particles_merged(partid,nvl+1) = thl
+          particles_merged(partid,nvl+2) = thv
+          nvl = nvl + 2
+        end if
+        if(lpartdumpmr) then
+          particles_merged(partid,nvl+1) = rt
+          particles_merged(partid,nvl+2) = rl
         end if
         ii = ii + nvar 
       end do 
@@ -908,10 +948,21 @@ contains
           particles_merged(partid,1) = recvbuff(ii+1)
           particles_merged(partid,2) = recvbuff(ii+2)
           particles_merged(partid,3) = recvbuff(ii+3)
+          nvl = 3
           if(lpartdumpui) then
-            particles_merged(partid,4) = recvbuff(ii+4)
-            particles_merged(partid,5) = recvbuff(ii+5)
-            particles_merged(partid,6) = recvbuff(ii+6)
+            particles_merged(partid,nvl+1) = recvbuff(ii+nvl+1)
+            particles_merged(partid,nvl+2) = recvbuff(ii+nvl+2)
+            particles_merged(partid,nvl+3) = recvbuff(ii+nvl+3)
+            nvl = nvl + 3
+          end if
+          if(lpartdumpth) then
+            particles_merged(partid,nvl+1) = recvbuff(ii+nvl+1)
+            particles_merged(partid,nvl+2) = recvbuff(ii+nvl+2)
+            nvl = nvl + 2
+          end if
+          if(lpartdumpmr) then
+            particles_merged(partid,nvl+1) = recvbuff(ii+nvl+1)
+            particles_merged(partid,nvl+2) = recvbuff(ii+nvl+2)
           end if
           ii = ii + nvar 
         end do 
@@ -929,10 +980,21 @@ contains
       call writevar_nc(ncpartid,'x',particles_merged(:,1),ncpartrec)
       call writevar_nc(ncpartid,'y',particles_merged(:,2),ncpartrec)
       call writevar_nc(ncpartid,'z',particles_merged(:,3),ncpartrec)
+      nvl = 3
       if(lpartdumpui) then
-        call writevar_nc(ncpartid,'u',particles_merged(:,4),ncpartrec)
-        call writevar_nc(ncpartid,'v',particles_merged(:,5),ncpartrec)
-        call writevar_nc(ncpartid,'w',particles_merged(:,6),ncpartrec)
+        call writevar_nc(ncpartid,'u',particles_merged(:,nvl+1),ncpartrec)
+        call writevar_nc(ncpartid,'v',particles_merged(:,nvl+2),ncpartrec)
+        call writevar_nc(ncpartid,'w',particles_merged(:,nvl+3),ncpartrec)
+        nvl = nvl + 3
+      end if
+      if(lpartdumpth) then
+        call writevar_nc(ncpartid,'t', particles_merged(:,nvl+1),ncpartrec)
+        call writevar_nc(ncpartid,'tv',particles_merged(:,nvl+2),ncpartrec)
+        nvl = nvl + 2
+      end if
+      if(lpartdumpmr) then
+        call writevar_nc(ncpartid,'rt',particles_merged(:,nvl+1),ncpartrec)
+        call writevar_nc(ncpartid,'rl',particles_merged(:,nvl+2),ncpartrec)
       end if
     end if
     
@@ -943,7 +1005,7 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! Quick and dirty (Eulerian) divergence check, only for CPU #0
+  ! Quick and dirty local divergence check
   !--------------------------------------------------------------------------
   !
   subroutine checkdiv
@@ -1117,6 +1179,7 @@ contains
     if(hot) then
     ! ------------------------------------------------------
     ! Warm start -> load restart file
+
       write(hname,'(i4.4,a1,i4.4)') wrxid,'_',wryid
       idot = scan(hfilin,'.',.false.)
       prefix = hfilin(:idot-1)
@@ -1282,9 +1345,7 @@ contains
     end select
 
     open(666,file=trim(hname), form='unformatted')
-    
     write(666) np,tnextdump
-    
     particle => head
     do while(associated(particle))
       write(666) particle%unique, particle%tstart, particle%partstep, & 
@@ -1343,6 +1404,14 @@ contains
         call addvar_nc(ncpartid,'u','resolved u-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
         call addvar_nc(ncpartid,'v','resolved v-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
         call addvar_nc(ncpartid,'w','resolved w-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      end if
+      if(lpartdumpth) then
+        call addvar_nc(ncpartid,'t','liquid water potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+        call addvar_nc(ncpartid,'tv','virtual potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      end if
+      if(lpartdumpmr) then
+        call addvar_nc(ncpartid,'rt','total water mixing ratio','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+        call addvar_nc(ncpartid,'rl','liquid water mixing ratio','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
       end if
     end if 
  
