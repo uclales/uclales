@@ -254,38 +254,6 @@ contains
           !
           ! calculate the ratio of slopes
           !
-       select case (lmtr)
-       case (1) ! minmod
-          do k = 2, n1-1 
-             do i = 2,n2-2
-                C(i,k) = max(0., min(1., r(i,k)))
-             enddo
-          enddo
-       case(2)  ! superbee
-          do k = 2, n1-1 
-             do i = 2,n2-2
-                C(i,k) = max(0., min(1., 2.*r(i,k)), min(2., r(i,k)))
-             enddo
-          enddo
-       case(3)  ! mc
-          do k = 2, n1-1 
-             do i = 2,n2-2
-                C(i,k) = max(0., min(2.*r(i,k),(1.+r(i,k))/2., 2.))
-             enddo
-          enddo
-       case(4)  ! van Leer
-          do k = 2, n1-1 
-             do i = 2,n2-2
-                C(i,k) = (r(i,k) + abs(r(i,k)))/(1. + abs(r(i,k)))
-             enddo
-          enddo
-       case default ! no limiter
-          do k = 2, n1-1 
-             do i = 2,n2-2
-                C(i,k) = 1.0
-             enddo
-          enddo
-       end select
        do k = 2, n1-1 
           do i = 2,n2-2
              gamma = int(-sign(1.,cfl(i,k)))
@@ -296,6 +264,19 @@ contains
              else
                 r(i,k) = 0.
              endif
+
+             select case (lmtr)
+             case (1) ! minmod
+                C(i,k) = max(0., min(1., r(i,k)))
+             case(2)  ! superbee
+                C(i,k) = max(0., min(1., 2.*r(i,k)), min(2., r(i,k)))
+             case(3)  ! mc
+                C(i,k) = max(0., min(2.*r(i,k),(1.+r(i,k))/2., 2.))
+             case(4)  ! van Leer
+                C(i,k) = (r(i,k) + abs(r(i,k)))/(1. + abs(r(i,k)))
+             case default ! no limiter
+                C(i,k) = 1.0
+             end select
 
              scr(i,k) = 0.5 * u(k,i,j) * (scr(i,k)+scp0(k,i,j)) -      &
                   0.5 * (scr(i,k)-scp0(k,i,j)) *                        &
@@ -352,39 +333,6 @@ contains
           !
           ! calculate the ratio of slopes
           !
-       select case (lmtr)
-       case (1) ! minmod
-          do k = 2, n1-1 
-             do j = 2,n3-2
-                C(j,k) = max(0., min(1., r(j,k)))
-             enddo
-          enddo
-       case(2)  ! superbee
-          do k = 2, n1-1 
-             do j = 2,n3-2
-                C(j,k) = max(0., min(1., 2.*r(j,k)), min(2., r(j,k)))
-             enddo
-          enddo
-       case(3)  ! mc
-          do k = 2, n1-1 
-             do j = 2,n3-2
-                C(j,k) = max(0., min(2.*r(j,k),(1.+r(j,k))/2., 2.))
-             enddo
-          enddo
-       case(4)  ! van Leer
-          do k = 2, n1-1 
-             do j = 2,n3-2
-                C(j,k) = (r(j,k) + abs(r(j,k)))/(1. + abs(r(j,k)))
-             enddo
-          enddo
-       case default ! no limiter
-          do k = 2, n1-1 
-             do j = 2,n3-2
-                C(j,k) = 1.0
-             enddo
-          enddo
-       end select
-
        do k = 2, n1-1 
           do j = 2,n3-2
              gamma = int(-sign(1.,cfl(j,k)))
@@ -395,6 +343,19 @@ contains
              else
                 r(j,k) = 0.
              endif
+
+             select case (lmtr)
+             case (1) ! minmod
+                C(j,k) = max(0., min(1., r(j,k)))
+             case(2)  ! superbee
+                C(j,k) = max(0., min(1., 2.*r(j,k)), min(2., r(j,k)))
+             case(3)  ! mc
+                C(j,k) = max(0., min(2.*r(j,k),(1.+r(j,k))/2., 2.))
+             case(4)  ! van Leer
+                C(j,k) = (r(j,k) + abs(r(j,k)))/(1. + abs(r(j,k)))
+             case default ! no limiter
+                C(j,k) = 1.0
+             end select
 
              scr(j,k) = 0.5 * v(k,i,j) * (scr(j,k)+scp0(k,i,j)) -      &
                   0.5 * (scr(j,k)-scp0(k,i,j)) *                        &
