@@ -107,9 +107,9 @@ contains
     if ( np < 1 .or. nplisted < 1 ) return   ! Just to be sure..
 
     ! Randomize particles lowest grid level
-    !if (lpartsgs .and. nstep==1) then
-    !  call randomize()
-    !end if
+    if (lpartsgs .and. nstep==1) then
+      call randomize()
+    end if
 
     particle => head
     do while( associated(particle) )
@@ -124,14 +124,14 @@ contains
     end do
  
     ! Time integration
-    !particle => head
-    !do while( associated(particle) )
-    !  if ( time - particle%tstart >= 0 ) then
-    !    call rk3(particle)
-    !    call checkbound(particle)
-    !  end if
-    !particle => particle%next
-    !end do
+    particle => head
+    do while( associated(particle) )
+      if ( time - particle%tstart >= 0 ) then
+        call rk3(particle)
+        call checkbound(particle)
+      end if
+    particle => particle%next
+    end do
 
     ! Statistics
     if (nstep==3) then
@@ -743,7 +743,7 @@ contains
         tprofl(k)       = tprofl(k)     + thl
         tvprofl(k)      = tvprofl(k)    + thv
         rtprofl(k)      = rtprofl(k)    + rt
-        rlprofl(k)      = rlprofl(k)    + rt
+        rlprofl(k)      = rlprofl(k)    + rl
         if(rl > 0.)     ccprofl(k)      = ccprofl(k)    + 1
         particle => particle%next
       end do 
