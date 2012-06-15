@@ -487,7 +487,7 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('time')
        if (itype==0) ncinfo = 'Time'
-       if (itype==1) ncinfo = 's'
+       if (itype==1) ncinfo = 'seconds since 2000-00-00 0000'
        if (itype==2) ncinfo = 'time'
     case('zt')
        if (itype==0) ncinfo = 'Vertical displacement of cell centers'
@@ -538,7 +538,7 @@ contains
        if (itype==1) ncinfo = 'm/s'
        if (itype==2) ncinfo = 'mttt'
     case('t')
-       if (itype==0) ncinfo = 'Liquid Water Potential temperature'
+       if (itype==0) ncinfo = 'Potential temperature'
        if (itype==1) ncinfo = 'K'
        if (itype==2) ncinfo = 'tttt'
     case('p')
