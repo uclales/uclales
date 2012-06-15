@@ -253,14 +253,14 @@ contains
     use mpi_interface, only :myid
 
 !irina
-    integer, parameter :: nnames = 31
+    integer, parameter :: nnames = 30
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,&
          'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,&  
          'w      ','t      ','p      ','q      ','l      ','r      '   ,'n      ',&
          'rice   ','nice   ','rsnow  ','rgrp   ',&
          'nsnow  ','ngrp   ','rhail  ','nhail  ',          &
-         'stke   ','rflx   ','lflxu  ','lflxd  '/)
+         'rflx   ','lflxu  ','lflxd  '/)
 
     real, intent (in) :: time
     integer           :: nbeg, nend
@@ -322,11 +322,11 @@ contains
     end if
     if (iradtyp > 1) then
        nvar0 = nvar0+1
+       sanal(nvar0) = sbase(28)
+       nvar0 = nvar0+1
        sanal(nvar0) = sbase(29)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(30)
-       nvar0 = nvar0+1
-       sanal(nvar0) = sbase(31)
     end if
 
 
@@ -426,30 +426,49 @@ contains
             count=icnt)
     end if
     nn = nbase+2
-!     if (level >=3) then
-      do n = nbase+2, nvar0-1
+    if (level >=3) then
+       do n = nbase+2, 18
+        nn = nn+1
+       call newvar(nn-12)
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
+            count=icnt)
+      end do
+    endif
+    if (level >=4) then
+      do n = 20, 23
        nn = nn+1
        call newvar(nn-12)
        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
             count=icnt)
       end do
-! 
-!     if (iradtyp > 1)  then
-!        nn = nn+1
-!        iret = nf90_inq_varid(ncid0, 'rflx', VarID)
-!        iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
-!             count=icnt)
-!   !irina          
-!        nn = nn+1
-!        iret = nf90_inq_varid(ncid0, 'lflxu', VarID)
-!        iret = nf90_put_var(ncid0, VarID, a_lflxu(:,i1:i2,j1:j2), start=ibeg, &
-!             count=icnt)
-!        nn = nn+1
-!        iret = nf90_inq_varid(ncid0, 'lflxd', VarID)
-!        iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
-!             count=icnt)
-!     end if
+    endif  
+
+    if (level >=5) then
+      do n = 24, 27
+       nn = nn+1
+       call newvar(nn-12)
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
+            count=icnt)
+      end do
+    endif  
+
+    if (iradtyp > 1)  then
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)  
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_lflxu(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+    end if
 
 !     if (nn /= nvar0) then
 !        if (myid == 0) print *, 'ABORTING:  Anal write error'
@@ -457,7 +476,7 @@ contains
 !     end if
 
     if (myid==0) print "(//' ',12('-'),'   Record ',I3,' to: ',A60)",    &
-         nrec0,fname 
+         nrec0,fname
 
     iret  = nf90_sync(ncid0)
     nrec0 = nrec0+1
@@ -605,10 +624,6 @@ contains
        if (itype==0) ncinfo = 'Rain-drop number mixing ratio'
        if (itype==1) ncinfo = '#/kg'
        if (itype==2) ncinfo = 'tttt'
-    case('stke')
-       if (itype==0) ncinfo = 'Sub-filter scale TKE'
-       if (itype==1) ncinfo = 'J/kg'
-       if (itype==2) ncinfo = 'mttt'
     case('cfl')
        if (itype==0) ncinfo = 'Courant number'
        if (itype==1) ncinfo = '-'
@@ -908,59 +923,59 @@ contains
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
     case('rflx')
-       if (itype==0) ncinfo =  'Total Radiative flux'
+       if (itype==0) ncinfo = 'Total Radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
        !irina
     case('lflxu')
-       if (itype==0) ncinfo =  'Longwave Radiative flux UP'
+       if (itype==0) ncinfo = 'Longwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('lflxd')
-       if (itype==0) ncinfo =  'Longwave Radiative flux DW'
+       if (itype==0) ncinfo = 'Longwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('lwuca')
-       if (itype==0) ncinfo =  'Clear Air Longwave Radiative flux UP'
+       if (itype==0) ncinfo = 'Clear Air Longwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('lwdca')
-       if (itype==0) ncinfo =  'Clear Air Longwave Radiative flux DW'
+       if (itype==0) ncinfo = 'Clear Air Longwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('lflxut')
-       if (itype==0) ncinfo =  'Top of Atmosphere Longwave Radiative flux UP'
+       if (itype==0) ncinfo = 'Top of Atmosphere Longwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
     case('lflxdt')
-       if (itype==0) ncinfo =  'Top of Atmosphere Longwave Radiative flux DW'
+       if (itype==0) ncinfo = 'Top of Atmosphere Longwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
     case('rflx2')
        if (itype==0) ncinfo = 'Variance of total radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('sflx')
        if (itype==0) ncinfo = 'Shortwave radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     !irina
     case('sflxu')
        if (itype==0) ncinfo = 'Shortwave radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('sflxd')
        if (itype==0) ncinfo = 'Shortwave radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('swuca')
-       if (itype==0) ncinfo =  'Clear Air Shortwave Radiative flux UP'
+       if (itype==0) ncinfo = 'Clear Air Shortwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('swdca')
-       if (itype==0) ncinfo =  'Clear Air Shortwave Radiative flux DW'
+       if (itype==0) ncinfo = 'Clear Air Shortwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
    case('sflxut')
        if (itype==0) ncinfo = 'Top of Atmosphere Shortwave radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
@@ -972,7 +987,7 @@ contains
     case('sflx2')
        if (itype==0) ncinfo = 'Variance of shortwave radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('l_2')
        if (itype==0) ncinfo = 'Variance of liquid'
        if (itype==1) ncinfo = 'kg^2/kg^2'
