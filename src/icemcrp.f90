@@ -2036,9 +2036,9 @@ contains
        alfq(metnr) = meteor%a_vel * gfct((meteor%nu+meteor%b_vel+2.0)/meteor%mu)&
             &                / gfct((meteor%nu+2.0)/meteor%mu)
        c_lam(metnr) = gfct((meteor%nu+1.0)/meteor%mu)/gfct((meteor%nu+2.0)/meteor%mu)
-       WRITE(0,'(a,i5,3a,e9.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  alfn = ',alfn(metnr)
-       WRITE(0,'(a,i5,3a,e9.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  alfq = ',alfq(metnr)
-       WRITE(0,'(a,i5,3a,e9.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  clam = ',c_lam(metnr)
+       WRITE(0,'(a,i5,3a,e11.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  alfn = ',alfn(metnr)
+       WRITE(0,'(a,i5,3a,e11.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  alfq = ',alfq(metnr)
+       WRITE(0,'(a,i5,3a,e11.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  clam = ',c_lam(metnr)
        firsttime(metnr) =.false.
     end if
 
