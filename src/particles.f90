@@ -46,6 +46,8 @@ module modparticles
   integer            :: ifinput        = 1
   integer            :: np      
   integer            :: tnextdump, tnextstat
+  real               :: randint   = 60.
+  real               :: tnextrand = 6e6
 
   ! Particle structure
   type :: particle_record
@@ -95,7 +97,6 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine particles(time,timmax) 
-
     use grid, only : dxi, dyi, nstep, dzi_t, dt, nzp, zm, a_km, nxp, nyp
     use defs, only : pi
     use mpi_interface, only : myid 
@@ -104,11 +105,12 @@ contains
     real, intent(in)               :: timmax        !< end of simulation, required to write particle dump at last timestep
     type (particle_record), pointer:: particle
 
-    if ( np < 1 .or. nplisted < 1 ) return   ! Just to be sure..
+    if ( np < 1 .or. nplisted < 1 ) return          ! Just to be sure..
 
     ! Randomize particles lowest grid level
-    if (lpartsgs .and. nstep==1) then
+    if (lpartsgs .and. nstep==1 .and. time > tnextrand) then
       call randomize()
+      tnextrand = tnextrand + randint
     end if
 
     particle => head
@@ -116,9 +118,9 @@ contains
       if ( time - particle%tstart >= 0 ) then
         particle%partstep = particle%partstep + 1
         ! Interpolation of the velocity field
-        particle%ures = velocity_ures(particle%x,particle%y,particle%z) * dxi
-        particle%vres = velocity_vres(particle%x,particle%y,particle%z) * dyi
-        particle%wres = velocity_wres(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
+        particle%ures = ui3d(particle%x,particle%y,particle%z) * dxi
+        particle%vres = vi3d(particle%x,particle%y,particle%z) * dyi
+        particle%wres = wi3d(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
       end if
     particle => particle%next
     end do
@@ -183,17 +185,17 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! Function velocity_ures
+  ! Function ui3d
   !> Performs a trilinear interpolation from the Eulerian grid to the 
   !> particle position.
   !--------------------------------------------------------------------------
   !
-  function velocity_ures(x,y,z)
+  function ui3d(x,y,z)
     use grid, only : a_up, dzi_m, dzi_t, zt, zm
     implicit none
     real, intent(in) :: x, y, z                               !< local x,y,z position in grid coordinates
     integer          :: xbottom, ybottom, zbottom
-    real             :: velocity_ures, deltax, deltay, deltaz, sign
+    real             :: ui3d, deltax, deltay, deltaz, sign
 
     xbottom = floor(x) - 1
     ybottom = floor(y - 0.5)
@@ -210,7 +212,7 @@ contains
     end if      
 
     deltaz = ((zm(floor(z)) + (z - floor(z)) / dzi_t(floor(z))) - zt(zbottom)) * dzi_m(zbottom)
-    velocity_ures =  (1-deltaz) * (1-deltay) * (1-deltax) * sign * a_up(zbottom    , xbottom    , ybottom    ) + &    !
+    ui3d          =  (1-deltaz) * (1-deltay) * (1-deltax) * sign * a_up(zbottom    , xbottom    , ybottom    ) + &    !
     &                (1-deltaz) * (1-deltay) * (  deltax) * sign * a_up(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
     &                (1-deltaz) * (  deltay) * (1-deltax) * sign * a_up(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
     &                (1-deltaz) * (  deltay) * (  deltax) * sign * a_up(zbottom    , xbottom + 1, ybottom + 1) + &    ! x+1,y+1
@@ -219,21 +221,21 @@ contains
     &                (  deltaz) * (  deltay) * (1-deltax) *        a_up(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
     &                (  deltaz) * (  deltay) * (  deltax) *        a_up(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
 
-  end function velocity_ures
+  end function ui3d
 
   !
   !--------------------------------------------------------------------------
-  ! Function velocity_vres
+  ! Function vi3d
   !> Performs a trilinear interpolation from the Eulerian grid to the 
   !> particle position.
   !--------------------------------------------------------------------------
   !
-  function velocity_vres(x,y,z)
+  function vi3d(x,y,z)
     use grid, only : a_vp, dzi_m, dzi_t, zt, zm
     implicit none
     real, intent(in) :: x, y, z                               !< local x,y,z position in grid coordinates
     integer          :: xbottom, ybottom, zbottom
-    real             :: velocity_vres, deltax, deltay, deltaz, sign
+    real             :: vi3d, deltax, deltay, deltaz, sign
 
     xbottom = floor(x - 0.5)
     ybottom = floor(y) - 1
@@ -250,7 +252,7 @@ contains
     end if      
 
     deltaz = ((zm(floor(z)) + (z - floor(z)) / dzi_t(floor(z))) - zt(zbottom)) * dzi_m(zbottom)
-    velocity_vres =  (1-deltaz) * (1-deltay) * (1-deltax) * sign * a_vp(zbottom    , xbottom    , ybottom    ) + &    !
+    vi3d          =  (1-deltaz) * (1-deltay) * (1-deltax) * sign * a_vp(zbottom    , xbottom    , ybottom    ) + &    !
     &                (1-deltaz) * (1-deltay) * (  deltax) * sign * a_vp(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
     &                (1-deltaz) * (  deltay) * (1-deltax) * sign * a_vp(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
     &                (1-deltaz) * (  deltay) * (  deltax) * sign * a_vp(zbottom    , xbottom + 1, ybottom + 1) + &    ! x+1,y+1
@@ -259,21 +261,21 @@ contains
     &                (  deltaz) * (  deltay) * (1-deltax) *        a_vp(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
     &                (  deltaz) * (  deltay) * (  deltax) *        a_vp(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
 
-  end function velocity_vres
+  end function vi3d
   
   !
   !--------------------------------------------------------------------------
-  ! Function velocity_wres
+  ! Function wi3d
   !> Performs a trilinear interpolation from the Eulerian grid to the 
   !> particle position.
   !--------------------------------------------------------------------------
   !
-  function velocity_wres(x,y,z)
+  function wi3d(x,y,z)
     use grid, only : a_wp, dzi_m, dzi_t, zt, zm
     implicit none
     real, intent(in) :: x, y, z                               !< local x,y,z position in grid coordinates
     integer          :: xbottom, ybottom, zbottom
-    real             :: velocity_wres, deltax, deltay, deltaz
+    real             :: wi3d, deltax, deltay, deltaz
 
     xbottom = floor(x - 0.5)
     ybottom = floor(y - 0.5)
@@ -282,7 +284,7 @@ contains
     deltay = y - 0.5 - ybottom
     deltaz = z - zbottom
 
-    velocity_wres =  (1-deltaz) * (1-deltay) * (1-deltax) *  a_wp(zbottom    , xbottom    , ybottom    ) + &    !
+    wi3d          =  (1-deltaz) * (1-deltay) * (1-deltax) *  a_wp(zbottom    , xbottom    , ybottom    ) + &    !
     &                (1-deltaz) * (1-deltay) * (  deltax) *  a_wp(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
     &                (1-deltaz) * (  deltay) * (1-deltax) *  a_wp(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
     &                (1-deltaz) * (  deltay) * (  deltax) *  a_wp(zbottom    , xbottom + 1, ybottom + 1) + &    ! x+1,y+1
@@ -291,7 +293,7 @@ contains
     &                (  deltaz) * (  deltay) * (1-deltax) *  a_wp(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
     &                (  deltaz) * (  deltay) * (  deltax) *  a_wp(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
   
-  end function velocity_wres
+  end function wi3d
 
   !
   !--------------------------------------------------------------------------
@@ -367,8 +369,6 @@ contains
     particle%ures_prev = particle%ures
     particle%vres_prev = particle%vres
     particle%wres_prev = particle%wres
-
-
    
    if ( nstep==3 ) then
       particle%ures_prev   = 0.
@@ -787,6 +787,8 @@ contains
           ccprof(k)    = ccprof(k)    / (nstatsamp * npartprof(k))
         end if
       end do      
+
+      if(myid==0) print*,'particles 1-2-3-4:',npartprof(2),npartprof(3),npartprof(4),npartprof(5)
 
       if(myid == 0) then
         call writevar_nc(ncpartstatid,tname,time,ncpartstatrec)
@@ -1215,6 +1217,8 @@ contains
       end do
       close(666)
 
+      tnextrand = tnextdump
+
     else                 
     ! ------------------------------------------------------
     ! Cold start -> load particle startpositions from txt
@@ -1256,6 +1260,7 @@ contains
       end do
       ! Set first dump times
       tnextdump = firststart
+      tnextrand = firststart
       tnextstat = 0
       nstatsamp = 0
     end if
