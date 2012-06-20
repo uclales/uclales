@@ -110,6 +110,7 @@ contains
     ! Randomize particles lowest grid level
     if (lpartsgs .and. nstep==1 .and. time > tnextrand) then
       call randomize()
+      call globalrandomize()
       tnextrand = tnextrand + randint
     end if
 
@@ -182,6 +183,35 @@ contains
     end do 
   
   end subroutine randomize
+
+  !
+  !--------------------------------------------------------------------------
+  ! Subroutine globalrandomize 
+  !> Randomizes the X,Y,Z positions of all particles in 
+  !> the lowest grid level every RK3 cycle. Called from: particles()
+  !--------------------------------------------------------------------------
+  !
+  subroutine globalrandomize()
+    use mpi_interface, only : nxg, nyg, nyprocs, nxprocs, mpi_integer, mpi_sum, mpi_comm_world, ierror
+    implicit none
+  
+    real      :: zmax = 1.          ! Max height in grid coordinates
+    integer   :: nyloc, nxloc 
+    type (particle_record), pointer:: particle
+    integer   :: npartl=0,npart=0   ! Local and global particles below zmax
+
+    ! Count number of local particles
+    particle => head
+    do while(associated(particle) )
+      if( particle%z <= (1. + zmax) ) npartl = npartl + 1
+      particle => particle%next
+    end do 
+
+    ! Communicate total number of particles
+    call mpi_allreduce(npartl,npart,1,mpi_integer,mpi_sum,mpi_comm_world,ierror)
+
+  
+  end subroutine globalrandomize
 
   !
   !--------------------------------------------------------------------------
