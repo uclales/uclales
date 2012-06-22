@@ -110,7 +110,6 @@ contains
     ! Randomize particles lowest grid level
     if (lpartsgs .and. nstep==1 .and. time > tnextrand) then
       call randomize()
-      call globalrandomize()
       tnextrand = tnextrand + randint
     end if
 
@@ -168,6 +167,7 @@ contains
     real      :: zmax = 1.     ! Max height in grid coordinates
     integer   :: nyloc, nxloc 
     type (particle_record), pointer:: particle
+    real      :: randnr(3)
 
     nyloc = nyg / nyprocs
     nxloc = nxg / nxprocs
@@ -175,43 +175,15 @@ contains
     particle => head
     do while(associated(particle) )
       if( particle%z <= (1. + zmax) ) then
-        particle%x = (random(idum) * nyloc) + 3 
-        particle%y = (random(idum) * nxloc) + 3
-        particle%z = zmax * random(idum)    + 1 
+        call random_number(randnr)
+        particle%x = (randnr(1) * nyloc) + 3 
+        particle%y = (randnr(2) * nxloc) + 3
+        particle%z = zmax * randnr(3)    + 1 
       end if
       particle => particle%next
     end do 
   
   end subroutine randomize
-
-  !
-  !--------------------------------------------------------------------------
-  ! Subroutine globalrandomize 
-  !> Randomizes the X,Y,Z positions of all particles in 
-  !> the lowest grid level every RK3 cycle. Called from: particles()
-  !--------------------------------------------------------------------------
-  !
-  subroutine globalrandomize()
-    use mpi_interface, only : nxg, nyg, nyprocs, nxprocs, mpi_integer, mpi_sum, mpi_comm_world, ierror
-    implicit none
-  
-    real      :: zmax = 1.          ! Max height in grid coordinates
-    integer   :: nyloc, nxloc 
-    type (particle_record), pointer:: particle
-    integer   :: npartl=0,npart=0   ! Local and global particles below zmax
-
-    ! Count number of local particles
-    particle => head
-    do while(associated(particle) )
-      if( particle%z <= (1. + zmax) ) npartl = npartl + 1
-      particle => particle%next
-    end do 
-
-    ! Communicate total number of particles
-    call mpi_allreduce(npartl,npart,1,mpi_integer,mpi_sum,mpi_comm_world,ierror)
-
-  
-  end subroutine globalrandomize
 
   !
   !--------------------------------------------------------------------------
@@ -1330,6 +1302,8 @@ contains
  
     close(ifinput)
 
+    call init_random_seed()
+
   end subroutine init_particles
   
   !
@@ -1552,7 +1526,7 @@ contains
     nullify(tail%next)
     ptr => tail
 
-  end SUBROUTINE add_particle
+  end subroutine add_particle
 
   !
   !--------------------------------------------------------------------------
@@ -1603,5 +1577,18 @@ contains
     end if
 
   end subroutine delete_particle
+
+  subroutine init_random_seed()
+    integer :: i, n, clock
+    integer, dimension(:), allocatable :: seed
+ 
+    call random_seed(size = n)
+    allocate(seed(n))
+    call system_clock(count=clock)
+    seed = clock + 37 * (/ (i - 1, i = 1, n) /)
+    call random_seed(put = seed)
+ 
+    deallocate(seed)
+  end subroutine init_random_seed
 
 end module modparticles
