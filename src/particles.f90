@@ -109,7 +109,7 @@ contains
 
     ! Randomize particles lowest grid level
     if (lpartsgs .and. nstep==1 .and. time > tnextrand) then
-      call randomize()
+      !call randomize()
       call globalrandomize()
       tnextrand = tnextrand + randint
     end if
@@ -192,25 +192,97 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine globalrandomize()
-    use mpi_interface, only : nxg, nyg, nyprocs, nxprocs, mpi_integer, mpi_sum, mpi_comm_world, ierror
+    use mpi_interface, only : nxg, nyg, nyprocs, nxprocs, mpi_integer, mpi_double_precision, mpi_sum, mpi_comm_world, ierror, wrxid, wryid, ranktable, mpi_status_size, myid
+    use grid, only : deltax, deltay
     implicit none
   
-    real      :: zmax = 1.          ! Max height in grid coordinates
-    integer   :: nyloc, nxloc 
-    type (particle_record), pointer:: particle
-    integer   :: npartl=0,npart=0   ! Local and global particles below zmax
+    type (particle_record), pointer:: particle,ptr,test
+    real      :: zmax = 1.                  ! Max height in grid coordinates
+    integer   :: status(mpi_status_size)
+    real, allocatable, dimension(:) :: buffsend,buffrecv
+    integer, allocatable, dimension(:) :: recvcount,displacements
+    integer   :: nglobal, nlocal, ii, i, k
 
-    ! Count number of local particles
+    character (len=80)   :: hname
+    logical   :: dump = .true.
+    real      :: randnr(3)
+
+    ! Count number of local particles < zmax
     particle => head
     do while(associated(particle) )
-      if( particle%z <= (1. + zmax) ) npartl = npartl + 1
+      if( particle%z <= (1. + zmax) ) nlocal = nlocal + 1
       particle => particle%next
     end do 
 
-    ! Communicate total number of particles
-    call mpi_allreduce(npartl,npart,1,mpi_integer,mpi_sum,mpi_comm_world,ierror)
+    call mpi_allreduce(nlocal,nglobal,1,mpi_integer,mpi_sum,mpi_comm_world,ierror)
 
-  
+    if(nlocal > 0) then            
+      ! Give them a random location and place in send buffer
+      allocate(buffsend(nrpartvar * nlocal))
+      ii = 0
+      particle => head
+      do while(associated(particle) )
+        if( particle%z <= (1. + zmax) ) then
+          call random_number(randnr)          ! Random seed has been called from init_particles...
+          particle%x = randnr(1) * float(nxg) 
+          particle%y = randnr(2) * float(nyg)
+          particle%z = zmax * randnr(3) 
+
+          call partbuffer(particle, buffsend(ii+1:ii+nrpartvar),ii,.true.)
+          
+          ptr => particle
+          particle => particle%next
+          call delete_particle(ptr)
+          ii=ii+nrpartvar
+        else
+          particle => particle%next
+        end if
+      end do 
+    end if
+
+    !ii = 0
+    !write(hname,'(i4.4,a3)') myid,'loc'
+    !open(999,file=hname,position='append',action='write')
+    !do k=1,nlocal
+    !  write(999,'(4F8.2)') buffsend(ii+1),buffsend(ii+2),buffsend(ii+3),buffsend(ii+4)
+    !  ii = ii + nrpartvar
+    !end do
+    !close(999)
+
+    ! Communicate number of local particles to each proc
+    allocate(recvcount(nxprocs*nyprocs))
+    call mpi_allgather(nlocal*nrpartvar,1,mpi_integer,recvcount,1,mpi_integer,mpi_comm_world,ierror)
+
+    ! Create array to receive particles from other procs
+    allocate(displacements(nxprocs*nyprocs))
+    displacements(1) = 0
+    do i = 2,nxprocs*nyprocs
+      displacements(i) = displacements(i-1) + recvcount(i-1) 
+    end do
+    allocate(buffrecv(sum(recvcount)))
+
+    ! Send all particles to all procs
+    call mpi_allgatherv(buffsend,nlocal*nrpartvar,mpi_double_precision,buffrecv,recvcount,displacements,mpi_double_precision,mpi_comm_world,ierror)
+
+    !ii = 0
+    !write(hname,'(i4.4,a4)') myid,'glob'
+    !open(998,file=hname,position='append',action='write')
+    !do k=1,nglobal
+    !  write(998,'(4F8.2)') buffrecv(ii+1),buffrecv(ii+2),buffrecv(ii+3),buffrecv(ii+4)
+    !  ii = ii + nrpartvar
+    !end do
+    !close(998)
+
+    ! Loop through particles, check if on this proc
+
+    ! Add particle
+
+    ! Cleanup
+    deallocate(buffsend,buffrecv)
+    deallocate(recvcount,displacements)
+    nlocal  = 0
+    nglobal = 0
+
   end subroutine globalrandomize
 
   !
@@ -1202,6 +1274,7 @@ contains
     kmax = size(zm)
 
     firststart = 1e9
+    call init_random_seed()
 
     ! clear pointers to head and tail
     nullify(head)
@@ -1326,7 +1399,8 @@ contains
                    rtprof(nzp),   rtprofl(nzp),    &
                    rlprof(nzp),   rlprofl(nzp),    &
                    ccprof(nzp),   ccprofl(nzp))
-    end if   
+    end if  
+
  
     close(ifinput)
 
@@ -1603,5 +1677,18 @@ contains
     end if
 
   end subroutine delete_particle
+
+  subroutine init_random_seed()
+    integer :: i, n, clock
+    integer, dimension(:), allocatable :: seed
+  
+    call random_seed(size = n)
+    allocate(seed(n))
+    call system_clock(count=clock)
+    seed = clock + 37 * (/ (i - 1, i = 1, n) /)
+    call random_seed(put = seed)
+  
+    deallocate(seed)
+  end subroutine init_random_seed
 
 end module modparticles
