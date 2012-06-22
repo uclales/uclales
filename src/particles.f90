@@ -168,6 +168,7 @@ contains
     real      :: zmax = 1.     ! Max height in grid coordinates
     integer   :: nyloc, nxloc 
     type (particle_record), pointer:: particle
+    real      :: randnr(3)
 
     nyloc = nyg / nyprocs
     nxloc = nxg / nxprocs
@@ -175,9 +176,10 @@ contains
     particle => head
     do while(associated(particle) )
       if( particle%z <= (1. + zmax) ) then
-        particle%x = (random(idum) * nyloc) + 3 
-        particle%y = (random(idum) * nxloc) + 3
-        particle%z = zmax * random(idum)    + 1 
+        call random_number(randnr)
+        particle%x = (randnr(1) * nyloc) + 3 
+        particle%y = (randnr(2) * nxloc) + 3
+        particle%z = zmax * randnr(3)    + 1 
       end if
       particle => particle%next
     end do 
@@ -1421,6 +1423,8 @@ contains
  
     close(ifinput)
 
+    call init_random_seed()
+
   end subroutine init_particles
   
   !
@@ -1643,7 +1647,7 @@ contains
     nullify(tail%next)
     ptr => tail
 
-  end SUBROUTINE add_particle
+  end subroutine add_particle
 
   !
   !--------------------------------------------------------------------------
@@ -1696,17 +1700,15 @@ contains
   end subroutine delete_particle
 
   subroutine init_random_seed()
-    use mpi_interface,   only : myid
-
     integer :: i, n, clock
     integer, dimension(:), allocatable :: seed
-  
+ 
     call random_seed(size = n)
     allocate(seed(n))
     call system_clock(count=clock)
     seed = clock + 37 * (/ (i - 1, i = 1, n) /)
     call random_seed(put = seed)
-  
+ 
     deallocate(seed)
   end subroutine init_random_seed
 
