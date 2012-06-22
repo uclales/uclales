@@ -196,12 +196,13 @@ contains
     use grid, only : deltax, deltay
     implicit none
   
-    type (particle_record), pointer:: particle,ptr,test
+    type (particle_record), pointer:: particle,ptr
     real      :: zmax = 1.                  ! Max height in grid coordinates
     integer   :: status(mpi_status_size)
     real, allocatable, dimension(:) :: buffsend,buffrecv
     integer, allocatable, dimension(:) :: recvcount,displacements
-    integer   :: nglobal, nlocal, ii, i, k
+    integer   :: nglobal, nlocal=0, ii, i, k
+    real      :: xsizelocal,ysizelocal,tempx,tempy,tempz
 
     character (len=80)   :: hname
     logical   :: dump = .true.
@@ -240,15 +241,6 @@ contains
       end do 
     end if
 
-    !ii = 0
-    !write(hname,'(i4.4,a3)') myid,'loc'
-    !open(999,file=hname,position='append',action='write')
-    !do k=1,nlocal
-    !  write(999,'(4F8.2)') buffsend(ii+1),buffsend(ii+2),buffsend(ii+3),buffsend(ii+4)
-    !  ii = ii + nrpartvar
-    !end do
-    !close(999)
-
     ! Communicate number of local particles to each proc
     allocate(recvcount(nxprocs*nyprocs))
     call mpi_allgather(nlocal*nrpartvar,1,mpi_integer,recvcount,1,mpi_integer,mpi_comm_world,ierror)
@@ -264,6 +256,41 @@ contains
     ! Send all particles to all procs
     call mpi_allgatherv(buffsend,nlocal*nrpartvar,mpi_double_precision,buffrecv,recvcount,displacements,mpi_double_precision,mpi_comm_world,ierror)
 
+    ! Loop through particles, check if on this proc
+    xsizelocal = nxg / nxprocs
+    ysizelocal = nyg / nyprocs
+    ii = 0
+    do i=1,nglobal   
+      tempx = buffrecv(ii+2)
+      tempy = buffrecv(ii+3)
+      ! If on proc: add particle
+      if(floor(tempx/xsizelocal) == wrxid) then
+        if(floor(tempy/ysizelocal) == wryid) then
+          call add_particle(particle)
+          call partbuffer(particle,buffrecv(ii+1:ii+nrpartvar),ii,.false.)
+          particle%x = particle%x - (floor(wrxid * xsizelocal)) + 3
+          particle%y = particle%y - (floor(wryid * ysizelocal)) + 3
+          particle%z = particle%z + 1
+        end if
+      end if
+      ii = ii + nrpartvar
+    end do
+
+    ! Cleanup
+    deallocate(buffsend,buffrecv)
+    deallocate(recvcount,displacements)
+    nlocal  = 0
+    nglobal = 0
+
+    !ii = 0
+    !write(hname,'(i4.4,a3)') myid,'loc'
+    !open(999,file=hname,position='append',action='write')
+    !do k=1,nlocal
+    !  write(999,'(4F8.2)') buffsend(ii+1),buffsend(ii+2),buffsend(ii+3),buffsend(ii+4)
+    !  ii = ii + nrpartvar
+    !end do
+    !close(999)
+    
     !ii = 0
     !write(hname,'(i4.4,a4)') myid,'glob'
     !open(998,file=hname,position='append',action='write')
@@ -272,16 +299,6 @@ contains
     !  ii = ii + nrpartvar
     !end do
     !close(998)
-
-    ! Loop through particles, check if on this proc
-
-    ! Add particle
-
-    ! Cleanup
-    deallocate(buffsend,buffrecv)
-    deallocate(recvcount,displacements)
-    nlocal  = 0
-    nglobal = 0
 
   end subroutine globalrandomize
 
@@ -1679,6 +1696,8 @@ contains
   end subroutine delete_particle
 
   subroutine init_random_seed()
+    use mpi_interface,   only : myid
+
     integer :: i, n, clock
     integer, dimension(:), allocatable :: seed
   
