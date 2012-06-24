@@ -443,7 +443,7 @@ contains
     iret = nf90_put_var(ncid0, VarID, a_wp(:,i1:i2,j1:j2), start=ibeg,    &
          count=icnt)
     iret = nf90_inq_varid(ncid0, sanal(14), VarID)
-    iret = nf90_put_var(ncid0, VarID, a_theta(:,i1:i2,j1:j2), start=ibeg, &
+    iret = nf90_put_var(ncid0, VarID, a_tp(:,i1:i2,j1:j2)+th00, start=ibeg, &
          count=icnt)
     iret = nf90_inq_varid(ncid0, sanal(15), VarID)
     iret = nf90_put_var(ncid0, VarID, press(:,i1:i2,j1:j2), start=ibeg, &
