@@ -105,8 +105,6 @@ contains
     real, intent(in)               :: timmax        !< end of simulation, required to write particle dump at last timestep
     type (particle_record), pointer:: particle
 
-    if ( np < 1 .or. nplisted < 1 ) return          ! Just to be sure..
-
     ! Randomize particles lowest grid level
     if (lpartsgs .and. nstep==1 .and. time > tnextrand) then
       !call randomize()
@@ -114,42 +112,40 @@ contains
       tnextrand = tnextrand + randint
     end if
 
-    particle => head
-    do while( associated(particle) )
-      if ( time - particle%tstart >= 0 ) then
-        particle%partstep = particle%partstep + 1
-        ! Interpolation of the velocity field
-        particle%ures = ui3d(particle%x,particle%y,particle%z) * dxi
-        particle%vres = vi3d(particle%x,particle%y,particle%z) * dyi
-        particle%wres = wi3d(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
-      end if
-    particle => particle%next
-    end do
+    if(np > 0 .and. nplisted > 0) then
+      particle => head
+      do while( associated(particle) )
+        if ( time - particle%tstart >= 0 ) then
+          particle%partstep = particle%partstep + 1
+          ! Interpolation of the velocity field
+          particle%ures = ui3d(particle%x,particle%y,particle%z) * dxi
+          particle%vres = vi3d(particle%x,particle%y,particle%z) * dyi
+          particle%wres = wi3d(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
+        end if
+      particle => particle%next
+      end do
  
-    ! Time integration
-    particle => head
-    do while( associated(particle) )
-      if ( time - particle%tstart >= 0 ) then
-        call rk3(particle)
-        call checkbound(particle)
-      end if
-    particle => particle%next
-    end do
+      ! Time integration
+      particle => head
+      do while( associated(particle) )
+        if ( time - particle%tstart >= 0 ) then
+          call rk3(particle)
+          call checkbound(particle)
+        end if
+      particle => particle%next
+      end do
+    end if
 
     ! Statistics
     if (nstep==3) then
-      !call checkdiv
-     
       ! Particle dump
       if((time + (0.5*dt) >= tnextdump .or. time + dt >= timmax) .and. lpartdump) then
-        call particledump(real(time))
         tnextdump = tnextdump + frqpartdump
       end if
 
-      ! Particle statistics (sampling/averaging) is called from step.f90 
-      ! synchronized with other profile statistics
+      !call checkdiv
     end if
-
+   
     call partcomm
 
   end subroutine particles
@@ -258,6 +254,15 @@ contains
     ! Send all particles to all procs
     call mpi_allgatherv(buffsend,nlocal*nrpartvar,mpi_double_precision,buffrecv,recvcount,displacements,mpi_double_precision,mpi_comm_world,ierror)
 
+    !ii = 0
+    !write(hname,'(i4.4,a4)') myid,'glob'
+    !open(998,file=hname,position='append',action='write')
+    !do k=1,nglobal
+    !  write(998,'(4F8.2)') buffrecv(ii+1),buffrecv(ii+2),buffrecv(ii+3),buffrecv(ii+4)
+    !  ii = ii + nrpartvar
+    !end do
+    !close(998)
+    
     ! Loop through particles, check if on this proc
     xsizelocal = nxg / nxprocs
     ysizelocal = nyg / nyprocs
@@ -279,7 +284,7 @@ contains
     end do
 
     ! Cleanup
-    deallocate(buffsend,buffrecv)
+    if(nlocal>0) deallocate(buffsend,buffrecv)
     deallocate(recvcount,displacements)
     nlocal  = 0
     nglobal = 0
@@ -293,15 +298,6 @@ contains
     !end do
     !close(999)
     
-    !ii = 0
-    !write(hname,'(i4.4,a4)') myid,'glob'
-    !open(998,file=hname,position='append',action='write')
-    !do k=1,nglobal
-    !  write(998,'(4F8.2)') buffrecv(ii+1),buffrecv(ii+2),buffrecv(ii+3),buffrecv(ii+4)
-    !  ii = ii + nrpartvar
-    !end do
-    !close(998)
-
   end subroutine globalrandomize
 
   !
@@ -507,7 +503,7 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine partcomm
-    use mpi_interface, only : wrxid, wryid, ranktable, nxg, nyg, xcomm, ycomm, ierror, mpi_status_size, mpi_integer, mpi_double_precision, mpi_comm_world, nyprocs, nxprocs
+    use mpi_interface, only : wrxid, wryid, ranktable, nxg, nyg, xcomm, ycomm, ierror, mpi_status_size, mpi_integer, mpi_double_precision, mpi_comm_world, nyprocs, nxprocs,myid
     implicit none
 
     type (particle_record), pointer:: particle,ptr
@@ -544,13 +540,11 @@ contains
     call mpi_sendrecv(ntos,1,mpi_integer,ranktable(wrxid,wryid-1),5, &
                       nfrn,1,mpi_integer,ranktable(wrxid,wryid+1),5, &
                       mpi_comm_world,status,ierror) 
-
-    !if( nton > 0 ) allocate(buffsend(nrpartvar * nton))
-    !if( ntos > 0 ) allocate(buffsend(nrpartvar * ntos))
-    allocate(buffsend(nrpartvar * nton))
-    allocate(buffrecv(nrpartvar * nfrs))
-
+    
+    ! ---------------------------
     if( nton > 0 ) then
+      allocate(buffsend(nrpartvar * nton))
+
       particle => head
       ii = 0
       do while( associated(particle) )
@@ -566,29 +560,29 @@ contains
           particle => particle%next
         end if
       end do
+
+      call mpi_send(buffsend,nrpartvar*nton,mpi_double_precision,ranktable(wrxid,wryid+1),6,mpi_comm_world,ierror)
+      deallocate(buffsend)
+    end if
+   
+    if(nfrs > 0) then
+      allocate(buffrecv(nrpartvar * nfrs))
+      call mpi_recv(buffrecv,nrpartvar*nfrs,mpi_double_precision,ranktable(wrxid,wryid-1),6,mpi_comm_world,status,ierror)
+ 
+      ii = 0
+      do n = 1,nfrs
+        call add_particle(particle)
+        call partbuffer(particle, buffrecv(ii+1:ii+nrpartvar),ii,.false.)
+        ii=ii+nrpartvar
+      end do
+
+      deallocate(buffrecv)
     end if
 
-    call mpi_sendrecv(buffsend,nrpartvar*nton,mpi_double_precision,ranktable(wrxid,wryid+1),6, &
-                      buffrecv,nrpartvar*nfrs,mpi_double_precision,ranktable(wrxid,wryid-1),6, &
-                      mpi_comm_world, status, ierror)
-
-    ii = 0
-    do n = 1,nfrs
-      call add_particle(particle)
-      call partbuffer(particle, buffrecv(ii+1:ii+nrpartvar),ii,.false.)
-      ii=ii+nrpartvar
-    end do
-
-    !if( nton > 0 ) deallocate(buffsend)
-    !if( nfrs > 0 ) deallocate(buffrecv)
-    !if( ntos > 0 ) allocate(buffsend(nrpartvar*ntos))
-    !if( nfrn > 0 ) allocate(buffrecv(nrpartvar*nfrn))
-    deallocate(buffsend)
-    deallocate(buffrecv)
-    allocate(buffsend(nrpartvar*ntos))
-    allocate(buffrecv(nrpartvar*nfrn))
-
+    ! ---------------------------
     if( ntos > 0 ) then
+      allocate(buffsend(nrpartvar * ntos))
+
       particle => head
       ii = 0
       do while( associated(particle) )
@@ -606,24 +600,24 @@ contains
         end if
       end do
 
+      call mpi_send(buffsend,nrpartvar*ntos,mpi_double_precision,ranktable(wrxid,wryid-1),7,mpi_comm_world,ierror)
+      deallocate(buffsend)
     end if
 
-    call mpi_sendrecv(buffsend,nrpartvar*ntos,mpi_double_precision,ranktable(wrxid,wryid-1),7, &
-                      buffrecv,nrpartvar*nfrn,mpi_double_precision,ranktable(wrxid,wryid+1),7, &
-                      mpi_comm_world, status, ierror)
+    if(nfrn > 0) then
+      allocate(buffrecv(nrpartvar * nfrn))
+      call mpi_recv(buffrecv,nrpartvar*nfrn,mpi_double_precision,ranktable(wrxid,wryid+1),7,mpi_comm_world,status,ierror)
 
-    ii = 0
-    do n = 1,nfrn
-      particle => head
-      call add_particle(particle)
-      call partbuffer(particle, buffrecv(ii+1:ii+nrpartvar),ii,.false.)
-      ii=ii+nrpartvar
-    end do
+      ii = 0
+      do n = 1,nfrn
+        particle => head
+        call add_particle(particle)
+        call partbuffer(particle, buffrecv(ii+1:ii+nrpartvar),ii,.false.)
+        ii=ii+nrpartvar
+      end do
 
-    !if( ntos > 0 ) deallocate(buffsend)
-    !if( nfrn > 0 ) deallocate(buffrecv)
-    deallocate(buffsend)
-    deallocate(buffrecv)
+      deallocate(buffrecv)
+    end if
 
     ! --------------------------------------------
     ! Second: all east to west (i) and vice versa
@@ -643,12 +637,10 @@ contains
                       nfre,1,mpi_integer,ranktable(wrxid+1,wryid),9, &
                       mpi_comm_world,status,ierror) 
 
-    !if(ntoe > 0) allocate(buffsend(nrpartvar * ntoe))
-    !if(ntow > 0) allocate(buffsend(nrpartvar * ntow))
-    allocate(buffsend(nrpartvar * ntoe))
-    allocate(buffrecv(nrpartvar * nfrw))
-
+    ! ---------------------------
     if( ntoe > 0 ) then
+      allocate(buffsend(nrpartvar * ntoe))
+
       particle => head
       ii = 0
       do while( associated(particle) )
@@ -664,29 +656,29 @@ contains
           particle => particle%next
         end if
       end do
+
+      call mpi_send(buffsend,nrpartvar*ntoe,mpi_double_precision,ranktable(wrxid+1,wryid),10,mpi_comm_world,ierror)
+      deallocate(buffsend)
     end if
 
-    call mpi_sendrecv(buffsend,nrpartvar*ntoe,mpi_double_precision,ranktable(wrxid+1,wryid),10, &
-                      buffrecv,nrpartvar*nfrw,mpi_double_precision,ranktable(wrxid-1,wryid),10, &
-                      mpi_comm_world, status, ierror)
+    if(nfrw > 0) then
+      allocate(buffrecv(nrpartvar * nfrw))
+      call mpi_recv(buffrecv,nrpartvar*nfrw,mpi_double_precision,ranktable(wrxid-1,wryid),10,mpi_comm_world,status,ierror)
+      
+      ii = 0
+      do n = 1,nfrw
+        call add_particle(particle)
+        call partbuffer(particle, buffrecv(ii+1:ii+nrpartvar),ii,.false.)
+        ii=ii+nrpartvar
+      end do
 
-    ii = 0
-    do n = 1,nfrw
-      call add_particle(particle)
-      call partbuffer(particle, buffrecv(ii+1:ii+nrpartvar),ii,.false.)
-      ii=ii+nrpartvar
-    end do
+      deallocate(buffrecv)
+    end if
 
-    !if( ntoe > 0 ) deallocate(buffsend)
-    !if( nfrw > 0 ) deallocate(buffrecv)
-    !if( ntow > 0 ) allocate(buffsend(nrpartvar*ntow))
-    !if( nfre > 0 ) allocate(buffrecv(nrpartvar*nfre))
-    deallocate(buffsend)
-    deallocate(buffrecv)
-    allocate(buffsend(nrpartvar*ntow))
-    allocate(buffrecv(nrpartvar*nfre))
-
+    ! ---------------------------
     if( ntow > 0 ) then
+      allocate(buffsend(nrpartvar * ntow))
+
       particle => head
       ii = 0
       do while( associated(particle) )
@@ -704,24 +696,24 @@ contains
         end if
       end do
 
+      call mpi_send(buffsend,nrpartvar*ntow,mpi_double_precision,ranktable(wrxid-1,wryid),11,mpi_comm_world,ierror)
+      deallocate(buffsend)
     end if
 
-    call mpi_sendrecv(buffsend,nrpartvar*ntow,mpi_double_precision,ranktable(wrxid-1,wryid),11, &
-                      buffrecv,nrpartvar*nfre,mpi_double_precision,ranktable(wrxid+1,wryid),11, &
-                      mpi_comm_world, status, ierror)
+    if(nfre > 0) then
+      allocate(buffrecv(nrpartvar * nfre))
+      call mpi_recv(buffrecv,nrpartvar*nfre,mpi_double_precision,ranktable(wrxid+1,wryid),11,mpi_comm_world,status,ierror)
+      
+      ii = 0
+      do n = 1,nfre
+        particle => head
+        call add_particle(particle)
+        call partbuffer(particle, buffrecv(ii+1:ii+nrpartvar),ii,.false.)
+        ii=ii+nrpartvar
+      end do
 
-    ii = 0
-    do n = 1,nfre
-      particle => head
-      call add_particle(particle)
-      call partbuffer(particle, buffrecv(ii+1:ii+nrpartvar),ii,.false.)
-      ii=ii+nrpartvar
-    end do
-
-    !if( ntow > 0 ) deallocate(buffsend)
-    !if( nfre > 0 ) deallocate(buffrecv)
-    deallocate(buffsend)
-    deallocate(buffrecv)
+      deallocate(buffrecv)
+    end if
 
   end subroutine partcomm
 
@@ -996,9 +988,10 @@ contains
 
     ! Communicate number of local particles to main proces (0)
     allocate(nremote(0:(nxprocs*nyprocs)-1))
+    nremote = 0
     call mpi_gather(nlocal,1,mpi_integer,nremote,1,mpi_integer,0,mpi_comm_world,ierror)
 
-    ! Create buffer
+    !! Create buffer
     allocate(sendbuff(nvar * nlocal))
     ii = 1
     particle => head
@@ -1159,7 +1152,7 @@ contains
     end do
   end do
  
-  !if(myid==0) print*,'   divergence; max=',divmax, ', total=',divtot 
+  if(myid==0) print*,'   divergence; max=',divmax, ', total=',divtot 
 
   end subroutine checkdiv
 
@@ -1274,7 +1267,7 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine init_particles(hot,hfilin)
-    use mpi_interface, only : wrxid, wryid, nxg, nyg, myid, nxprocs, nyprocs, appl_abort
+    use mpi_interface, only : wrxid, wryid, nxg, nyg, myid, nxprocs, nyprocs, appl_abort, ierror,mpi_double_precision,mpi_comm_world,mpi_min
     use grid, only : zm, deltax, deltay, zt,dzi_t, nzp, nxp, nyp
     use grid, only : a_up, a_vp, a_wp
 
@@ -1282,7 +1275,7 @@ contains
     character (len=80), intent(in), optional :: hfilin
     integer  :: k, n, kmax, io
     logical  :: exans
-    real     :: tstart, xstart, ystart, zstart, ysizelocal, xsizelocal, firststart
+    real     :: tstart, xstart, ystart, zstart, ysizelocal, xsizelocal, firststartl, firststart
     real     :: pu,pts,px,py,pz,pxs,pys,pzs,pur,pvr,pwr,purp,pvrp,pwrp
     integer  :: pstp,idot
     type (particle_record), pointer:: particle
@@ -1292,7 +1285,7 @@ contains
     ysizelocal = (nyg / nyprocs) * deltay
     kmax = size(zm)
 
-    firststart = 1e9
+    firststartl = 1e9
     call init_random_seed()
 
     ! clear pointers to head and tail
@@ -1335,7 +1328,7 @@ contains
         particle%vres_prev      = pvrp
         particle%wres_prev      = pwrp
         particle%partstep       = pstp
-        if(pts < firststart) firststart = pts
+        if(pts < firststartl) firststartl = pts
       end do
       close(666)
 
@@ -1375,11 +1368,15 @@ contains
             particle%wres_prev      = 0.
             particle%partstep       = 0
 
-            if(tstart < firststart) firststart = tstart
+            if(tstart < firststartl) firststartl = tstart
 
           end if
         end if
       end do
+
+      ! Collect first start from other procs
+      call mpi_allreduce(firststartl,firststart,1,mpi_double_precision,mpi_min,mpi_comm_world,ierror)
+
       ! Set first dump times
       tnextdump = firststart
       tnextrand = firststart
