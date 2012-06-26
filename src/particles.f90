@@ -107,7 +107,7 @@ contains
 
     ! Randomize particles lowest grid level
     if (lpartsgs .and. nstep==1 .and. time > tnextrand) then
-      call globalrandomize()
+      !call globalrandomize()
       tnextrand = tnextrand + randint
     end if
 
@@ -532,18 +532,24 @@ contains
     implicit none
 
     type (particle_record), pointer:: particle,ptr
-    real, allocatable, dimension(:) :: buffsend, buffrecv
+    real, allocatable, dimension(:) :: buffsend, buffrecv,buffsend2, buffrecv2
     integer :: status(mpi_status_size)
+    integer :: request
     integer :: ii, n
     ! Number of particles to ('to') and from ('fr') N,E,S,W
     integer :: nton,ntos,ntoe,ntow
     integer :: nfrn,nfrs,nfre,nfrw
-    integer :: nyloc, nxloc 
+    integer :: nyloc, nxloc
+    logical :: free 
 
-    nton = 0
-    ntos = 0
-    ntoe = 0
-    ntow = 0
+    nton  = 0
+    ntos  = 0
+    ntoe  = 0
+    ntow  = 0
+    nfrn  = 0
+    nfrs  = 0
+    nfre  = 0
+    nfrw  = 0
 
     nyloc = nyg / nyprocs
     nxloc = nxg / nxprocs
@@ -565,7 +571,7 @@ contains
     call mpi_sendrecv(ntos,1,mpi_integer,ranktable(wrxid,wryid-1),5, &
                       nfrn,1,mpi_integer,ranktable(wrxid,wryid+1),5, &
                       mpi_comm_world,status,ierror) 
-    
+   
     ! ---------------------------
     if( nton > 0 ) then
       allocate(buffsend(nrpartvar * nton))
@@ -575,7 +581,6 @@ contains
       do while( associated(particle) )
         if( particle%y >= nyloc + 3 ) then
           particle%y      = particle%y      - nyloc
-
           call partbuffer(particle, buffsend(ii+1:ii+nrpartvar),ii,.true.)
           ptr => particle
           particle => particle%next
@@ -585,37 +590,36 @@ contains
           particle => particle%next
         end if
       end do
-
-      call mpi_send(buffsend,nrpartvar*nton,mpi_double_precision,ranktable(wrxid,wryid+1),6,mpi_comm_world,ierror)
-      deallocate(buffsend)
+      call mpi_isend(buffsend,nrpartvar*nton,mpi_double_precision,ranktable(wrxid,wryid+1),6,mpi_comm_world,request,ierror)
     end if
    
     if(nfrs > 0) then
       allocate(buffrecv(nrpartvar * nfrs))
       call mpi_recv(buffrecv,nrpartvar*nfrs,mpi_double_precision,ranktable(wrxid,wryid-1),6,mpi_comm_world,status,ierror)
- 
       ii = 0
       do n = 1,nfrs
         call add_particle(particle)
         call partbuffer(particle, buffrecv(ii+1:ii+nrpartvar),ii,.false.)
         ii=ii+nrpartvar
       end do
-
-      deallocate(buffrecv)
     end if
+
+    ! Wait for comm to finish
+    if(nton>0) then 
+      call mpi_wait(request,status,ierror)
+      deallocate(buffsend)
+    end if
+    if(nfrs>0) deallocate(buffrecv)
 
     ! ---------------------------
     if( ntos > 0 ) then
       allocate(buffsend(nrpartvar * ntos))
-
       particle => head
       ii = 0
       do while( associated(particle) )
         if( particle%y < 3 ) then
           particle%y      = particle%y      + nyloc
-
           call partbuffer(particle, buffsend(ii+1:ii+nrpartvar),ii,.true.)
-
           ptr => particle
           particle => particle%next
           call delete_particle(ptr)
@@ -624,15 +628,13 @@ contains
           particle => particle%next
         end if
       end do
-
-      call mpi_send(buffsend,nrpartvar*ntos,mpi_double_precision,ranktable(wrxid,wryid-1),7,mpi_comm_world,ierror)
+      call mpi_isend(buffsend,nrpartvar*ntos,mpi_double_precision,ranktable(wrxid,wryid-1),7,mpi_comm_world,request,ierror)
       deallocate(buffsend)
     end if
 
     if(nfrn > 0) then
       allocate(buffrecv(nrpartvar * nfrn))
       call mpi_recv(buffrecv,nrpartvar*nfrn,mpi_double_precision,ranktable(wrxid,wryid+1),7,mpi_comm_world,status,ierror)
-
       ii = 0
       do n = 1,nfrn
         particle => head
@@ -640,9 +642,14 @@ contains
         call partbuffer(particle, buffrecv(ii+1:ii+nrpartvar),ii,.false.)
         ii=ii+nrpartvar
       end do
-
-      deallocate(buffrecv)
     end if
+
+    ! Wait for comm to finish
+    if(ntos>0) then 
+      call mpi_wait(request,status,ierror)
+      deallocate(buffsend)
+    end if
+    if(nfrn>0) deallocate(buffrecv)
 
     ! --------------------------------------------
     ! Second: all east to west (i) and vice versa
@@ -665,13 +672,11 @@ contains
     ! ---------------------------
     if( ntoe > 0 ) then
       allocate(buffsend(nrpartvar * ntoe))
-
       particle => head
       ii = 0
       do while( associated(particle) )
         if( particle%x >= nxloc + 3 ) then
           particle%x      = particle%x      - nxloc
-
           call partbuffer(particle, buffsend(ii+1:ii+nrpartvar),ii,.true.)
           ptr => particle
           particle => particle%next
@@ -682,36 +687,36 @@ contains
         end if
       end do
 
-      call mpi_send(buffsend,nrpartvar*ntoe,mpi_double_precision,ranktable(wrxid+1,wryid),10,mpi_comm_world,ierror)
-      deallocate(buffsend)
+      call mpi_isend(buffsend,nrpartvar*ntoe,mpi_double_precision,ranktable(wrxid+1,wryid),10,mpi_comm_world,request,ierror)
     end if
 
     if(nfrw > 0) then
       allocate(buffrecv(nrpartvar * nfrw))
       call mpi_recv(buffrecv,nrpartvar*nfrw,mpi_double_precision,ranktable(wrxid-1,wryid),10,mpi_comm_world,status,ierror)
-      
       ii = 0
       do n = 1,nfrw
         call add_particle(particle)
         call partbuffer(particle, buffrecv(ii+1:ii+nrpartvar),ii,.false.)
         ii=ii+nrpartvar
       end do
-
-      deallocate(buffrecv)
     end if
+
+    ! Wait for comm to finish
+    if(ntoe>0) then 
+      call mpi_wait(request,status,ierror)
+      deallocate(buffsend)
+    end if
+    if(nfrw>0) deallocate(buffrecv)
 
     ! ---------------------------
     if( ntow > 0 ) then
       allocate(buffsend(nrpartvar * ntow))
-
       particle => head
       ii = 0
       do while( associated(particle) )
         if( particle%x < 3 ) then
           particle%x      = particle%x      + nxloc
-
           call partbuffer(particle, buffsend(ii+1:ii+nrpartvar),ii,.true.)
-
           ptr => particle
           particle => particle%next
           call delete_particle(ptr)
@@ -720,15 +725,12 @@ contains
           particle => particle%next
         end if
       end do
-
-      call mpi_send(buffsend,nrpartvar*ntow,mpi_double_precision,ranktable(wrxid-1,wryid),11,mpi_comm_world,ierror)
-      deallocate(buffsend)
+      call mpi_isend(buffsend,nrpartvar*ntow,mpi_double_precision,ranktable(wrxid-1,wryid),11,mpi_comm_world,request,ierror)
     end if
 
-    if(nfre > 0) then
+    if( nfre > 0) then
       allocate(buffrecv(nrpartvar * nfre))
       call mpi_recv(buffrecv,nrpartvar*nfre,mpi_double_precision,ranktable(wrxid+1,wryid),11,mpi_comm_world,status,ierror)
-      
       ii = 0
       do n = 1,nfre
         particle => head
@@ -736,9 +738,14 @@ contains
         call partbuffer(particle, buffrecv(ii+1:ii+nrpartvar),ii,.false.)
         ii=ii+nrpartvar
       end do
-
-      deallocate(buffrecv)
     end if
+
+    ! Wait for comm to finish
+    if(ntow>0) then 
+      call mpi_wait(request,status,ierror)
+      deallocate(buffsend)
+    end if
+    if(nfre>0) deallocate(buffrecv)
 
   end subroutine partcomm
 
