@@ -46,23 +46,23 @@ module modparticles
   integer            :: ifinput        = 1
   integer            :: np      
   integer            :: tnextdump, tnextstat
-  real               :: randint   = 60.
+  real               :: randint   = 10.
   real               :: tnextrand = 6e6
 
   ! Particle structure
   type :: particle_record
     real             :: unique, tstart
     integer          :: partstep
-    real             :: x, xstart, ures, ures_prev
-    real             :: y, ystart, vres, vres_prev
-    real             :: z, zstart, wres, wres_prev
+    real             :: x, xstart,        ures, ures_prev
+    real             :: y, ystart,        vres, vres_prev
+    real             :: z, zstart, zprev, wres, wres_prev
     type (particle_record), pointer :: next,prev
   end type
 
   integer            :: nplisted
   type (particle_record), pointer :: head, tail
 
-  integer            :: ipunique, ipx, ipy, ipz, ipxstart, ipystart, ipzstart, iptsart
+  integer            :: ipunique, ipx, ipy, ipz, ipzprev, ipxstart, ipystart, ipzstart, iptsart
   integer            :: ipures, ipvres, ipwres, ipures_prev, ipvres_prev, ipwres_prev, ipartstep, nrpartvar
 
   ! Statistics and particle dump
@@ -107,7 +107,6 @@ contains
 
     ! Randomize particles lowest grid level
     if (lpartsgs .and. nstep==1 .and. time > tnextrand) then
-      !call randomize()
       call globalrandomize()
       tnextrand = tnextrand + randint
     end if
@@ -136,10 +135,16 @@ contains
       end do
     end if
 
+    ! Randomize particles lowest grid level
+    !if (lpartsgs) then
+    !  call randomize(.true.)
+    !end if
+
     ! Statistics
     if (nstep==3) then
       ! Particle dump
       if((time + (0.5*dt) >= tnextdump .or. time + dt >= timmax) .and. lpartdump) then
+        call particledump(time)
         tnextdump = tnextdump + frqpartdump
       end if
 
@@ -157,29 +162,46 @@ contains
   !> the lowest grid level every RK3 cycle. Called from: particles()
   !--------------------------------------------------------------------------
   !
-  subroutine randomize()
+  subroutine randomize(once)
     use mpi_interface, only : nxg, nyg, nyprocs, nxprocs
     implicit none
-  
-    real      :: zmax = 1.     ! Max height in grid coordinates
-    integer   :: nyloc, nxloc 
-    type (particle_record), pointer:: particle
-    real      :: randnr(3)
 
-    nyloc = nyg / nyprocs
-    nxloc = nxg / nxprocs
+    logical, intent(in) :: once            !> flag: randomize all particles (false) or only the onces which sink into the surface layer (true)?  
+    real                :: zmax = 1.       ! Max height in grid coordinates
+    integer             :: nyloc, nxloc 
+    type (particle_record), pointer:: particle
+    real                :: randnr(3)
+
+    nyloc   = nyg / nyprocs
+    nxloc   = nxg / nxprocs
+
+    if(once) then 
+      particle => head
+      do while(associated(particle) )
+        if( particle%z <= (1. + zmax) .and. particle%zprev > (1. + zmax) ) then
+          call random_number(randnr)
+          particle%x = (randnr(1) * nyloc) + 3 
+          particle%y = (randnr(2) * nxloc) + 3
+          !particle%z = zmax * randnr(3)    + 1
+          particle%ures_prev = 0.
+          particle%vres_prev = 0.
+          particle%wres_prev = 0.
+        end if
+        particle => particle%next
+      end do 
+    else
+      particle => head
+      do while(associated(particle) )
+        if( particle%z <= (1. + zmax) ) then
+          call random_number(randnr)
+          particle%x = (randnr(1) * nyloc) + 3 
+          particle%y = (randnr(2) * nxloc) + 3
+          particle%z = 1.1 !zmax * randnr(3)    + 1 
+        end if
+        particle => particle%next
+      end do 
+    end if 
  
-    particle => head
-    do while(associated(particle) )
-      if( particle%z <= (1. + zmax) ) then
-        call random_number(randnr)
-        particle%x = (randnr(1) * nyloc) + 3 
-        particle%y = (randnr(2) * nxloc) + 3
-        particle%z = zmax * randnr(3)    + 1 
-      end if
-      particle => particle%next
-    end do 
-  
   end subroutine randomize
 
   !
@@ -195,21 +217,22 @@ contains
     implicit none
   
     type (particle_record), pointer:: particle,ptr
-    real      :: zmax = 1.                  ! Max height in grid coordinates
-    integer   :: status(mpi_status_size)
-    real, allocatable, dimension(:) :: buffsend,buffrecv
+    real               :: zmax = 1.                  ! Max height in grid coordinates
+    integer            :: status(mpi_status_size)
+    real, allocatable, dimension(:)    :: buffsend,buffrecv
     integer, allocatable, dimension(:) :: recvcount,displacements
-    integer   :: nglobal, nlocal=0, ii, i, k
-    real      :: xsizelocal,ysizelocal,tempx,tempy,tempz
+    integer            :: nglobal, nlocal=0, ii, i, k
+    real               :: xsizelocal,ysizelocal,tempx,tempy,tempz
 
-    character (len=80)   :: hname
-    logical   :: dump = .true.
-    real      :: randnr(3)
+    character (len=80) :: hname
+    logical            :: dump = .true.
+    real               :: randnr(3)
 
     ! Count number of local particles < zmax
     particle => head
     do while(associated(particle) )
-      if( particle%z <= (1. + zmax) ) nlocal = nlocal + 1
+      if( particle%z <= (1. + zmax) .and. particle%wres < 0. ) nlocal = nlocal + 1
+      !if( particle%z <= (1. + zmax) ) nlocal = nlocal + 1
       particle => particle%next
     end do 
 
@@ -221,7 +244,8 @@ contains
       ii = 0
       particle => head
       do while(associated(particle) )
-        if( particle%z <= (1. + zmax) ) then
+        if( particle%z <= (1. + zmax) .and. particle%wres < 0. ) then
+        !if( particle%z <= (1. + zmax) ) then
           call random_number(randnr)          ! Random seed has been called from init_particles...
           particle%x = randnr(1) * float(nxg) 
           particle%y = randnr(2) * float(nyg)
@@ -254,15 +278,6 @@ contains
     ! Send all particles to all procs
     call mpi_allgatherv(buffsend,nlocal*nrpartvar,mpi_double_precision,buffrecv,recvcount,displacements,mpi_double_precision,mpi_comm_world,ierror)
 
-    !ii = 0
-    !write(hname,'(i4.4,a4)') myid,'glob'
-    !open(998,file=hname,position='append',action='write')
-    !do k=1,nglobal
-    !  write(998,'(4F8.2)') buffrecv(ii+1),buffrecv(ii+2),buffrecv(ii+3),buffrecv(ii+4)
-    !  ii = ii + nrpartvar
-    !end do
-    !close(998)
-    
     ! Loop through particles, check if on this proc
     xsizelocal = nxg / nxprocs
     ysizelocal = nyg / nyprocs
@@ -289,6 +304,14 @@ contains
     nlocal  = 0
     nglobal = 0
 
+    !ii = 0
+    !write(hname,'(i4.4,a4)') myid,'glob'
+    !open(998,file=hname,position='append',action='write')
+    !do k=1,nglobal
+    !  write(998,'(4F8.2)') buffrecv(ii+1),buffrecv(ii+2),buffrecv(ii+3),buffrecv(ii+4)
+    !  ii = ii + nrpartvar
+    !end do
+    !close(998)
     !ii = 0
     !write(hname,'(i4.4,a3)') myid,'loc'
     !open(999,file=hname,position='append',action='write')
@@ -478,10 +501,12 @@ contains
     use grid, only : rkalpha, rkbeta, nstep, dt, dxi, dyi, dzi_t
     implicit none
     TYPE (particle_record), POINTER:: particle
+      
+    particle%zprev = particle%z
 
-    particle%x   = particle%x + rkalpha(nstep) * particle%ures * dt + rkbeta(nstep) * particle%ures_prev * dt
-    particle%y   = particle%y + rkalpha(nstep) * particle%vres * dt + rkbeta(nstep) * particle%vres_prev * dt
-    particle%z   = particle%z + rkalpha(nstep) * particle%wres * dt + rkbeta(nstep) * particle%wres_prev * dt
+    particle%x     = particle%x + rkalpha(nstep) * particle%ures * dt + rkbeta(nstep) * particle%ures_prev * dt
+    particle%y     = particle%y + rkalpha(nstep) * particle%vres * dt + rkbeta(nstep) * particle%vres_prev * dt
+    particle%z     = particle%z + rkalpha(nstep) * particle%wres * dt + rkbeta(nstep) * particle%wres_prev * dt
 
     particle%ures_prev = particle%ures
     particle%vres_prev = particle%vres
@@ -736,6 +761,7 @@ contains
       buffer(n+ipx)             = particle%x
       buffer(n+ipy)             = particle%y
       buffer(n+ipz)             = particle%z
+      buffer(n+ipzprev)         = particle%zprev
       buffer(n+ipures)          = particle%ures
       buffer(n+ipvres)          = particle%vres
       buffer(n+ipwres)          = particle%wres
@@ -752,6 +778,7 @@ contains
       particle%x                = buffer(n+ipx)
       particle%y                = buffer(n+ipy)
       particle%z                = buffer(n+ipz)
+      particle%zprev            = buffer(n+ipzprev)
       particle%ures             = buffer(n+ipures)
       particle%vres             = buffer(n+ipvres)
       particle%wres             = buffer(n+ipwres)
@@ -1276,7 +1303,7 @@ contains
     integer  :: k, n, kmax, io
     logical  :: exans
     real     :: tstart, xstart, ystart, zstart, ysizelocal, xsizelocal, firststartl, firststart
-    real     :: pu,pts,px,py,pz,pxs,pys,pzs,pur,pvr,pwr,purp,pvrp,pwrp
+    real     :: pu,pts,px,py,pz,pzp,pxs,pys,pzs,pur,pvr,pwr,purp,pvrp,pwrp
     integer  :: pstp,idot
     type (particle_record), pointer:: particle
     character (len=80) :: hname,prefix,suffix
@@ -1317,6 +1344,7 @@ contains
         particle%x              = px
         particle%y              = py
         particle%z              = pz
+        particle%zprev          = pzp
         particle%xstart         = pxs
         particle%ystart         = pys
         particle%zstart         = pzs
@@ -1332,7 +1360,8 @@ contains
       end do
       close(666)
 
-      tnextrand = tnextdump
+      call mpi_allreduce(firststartl,firststart,1,mpi_double_precision,mpi_min,mpi_comm_world,ierror)
+      tnextrand = firststart
 
     else                 
     ! ------------------------------------------------------
@@ -1356,6 +1385,7 @@ contains
               if ( zm(k)<zstart ) exit
             end do
             particle%z              = k + (zstart-zm(k))*dzi_t(k)
+            particle%zprev          = particle%z
             particle%xstart         = xstart
             particle%ystart         = ystart
             particle%zstart         = zstart
@@ -1388,17 +1418,18 @@ contains
     ipx             = 2
     ipy             = 3
     ipz             = 4
-    ipxstart        = 5
-    ipystart        = 6
-    ipzstart        = 7
-    iptsart         = 8
-    ipures          = 9
-    ipvres          = 10
-    ipwres          = 11
-    ipures_prev     = 12
-    ipvres_prev     = 13
-    ipwres_prev     = 14
-    ipartstep       = 15
+    ipzprev         = 5
+    ipxstart        = 6
+    ipystart        = 7
+    ipzstart        = 8
+    iptsart         = 9
+    ipures          = 10
+    ipvres          = 11
+    ipwres          = 12
+    ipures_prev     = 13
+    ipvres_prev     = 14
+    ipwres_prev     = 15
+    ipartstep       = 16
     nrpartvar       = ipartstep
  
     if(lpartstat) then
@@ -1417,7 +1448,6 @@ contains
                    ccprof(nzp),   ccprofl(nzp))
     end if  
 
- 
     close(ifinput)
 
     call init_random_seed()
