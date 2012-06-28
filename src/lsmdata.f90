@@ -12,7 +12,6 @@ module lsmdata
   ! Flags
   ! ----------------------------------------------------------
   logical          :: init_lsm   = .true.   !<  Flag for initializing LSM
-  logical          :: first_init = .true.   !<  Flag for first initalization of LSM
   logical          :: local      = .true.   !<  Switch to MOST locally to get local Obukhov length
   logical          :: smoothflux = .false.  !<  Create uniform sensible & latent heat over domain
   logical          :: neutral    = .false.  !<  Disable stability corrections
@@ -97,7 +96,7 @@ module lsmdata
   real, allocatable :: z0h        (:,:) !<  Roughness length for heat [m]
   real              :: z0hav    = 0.025
 
-  real, allocatable :: albedo     (:,:) !<  Surface albedo [-]
+  !real, allocatable :: albedo     (:,:) !<  Surface albedo [-]
 
   real, allocatable :: LAI        (:,:) !<  Leaf area index vegetation [-]
   real, allocatable :: LAIG       (:,:) !<  Global leaf area index vegetation [-]
@@ -175,12 +174,13 @@ module lsmdata
   subroutine initlsm(time_in)
     
     use grid, only : nzp, nxp, nyp, th00, vapor, iradtyp, sfc_albedo, &
-                   a_tskin, a_qskin, a_phiw, a_tsoil, a_Wl
+                     a_tskin, a_qskin, a_phiw, a_tsoil, a_Wl, dt
 
     use mpi_interface, only: myid, xoffset, yoffset, wrxid, wryid, nxpg, nypg
 
     integer :: k,ierr
-    real, optional, intent (in) :: time_in
+
+    real, intent(in) :: time_in
 
     ! --------------------------------------------------------
     ! Read LSM-specific NAMELIST (SURFNAMELIST)
@@ -191,10 +191,12 @@ module lsmdata
     !< Soil related variables
     tsoilav, tsoildeepav, phiwav, rootfav, &
     !< Land surface related variables
-    z0mav, z0hav, Cskinav, &
+    z0mav, z0hav, Cskinav, albedoav, &
     lambdaskinav, Qnetav, cvegav, Wlav, &
     !< Jarvis-Steward related variables
-    rsminav, rssoilminav, LAIav, gDav
+    rsminav, rssoilminav, LAIav, gDav, &
+    !< Heterogeneity related variables
+    hetper
 
     open(17,file='SURFNAMELIST',status='old',iostat=ierr)
     read (17,SURFNAMELIST,iostat=ierr)
@@ -218,7 +220,7 @@ module lsmdata
     allocate(z0h(nxp,nyp))
     allocate(cm(nxp,nyp))
     allocate(cs(nxp,nyp))
-    allocate(albedo(nxp,nyp))
+    !allocate(albedo(nxp,nyp))
 
     ! Allocate LSM arrays
     allocate(zsoil(ksoilmax))
@@ -285,7 +287,8 @@ module lsmdata
     ! Initialize arrays
     ! 
 
-    if (time_in .lt. 10) then
+    if ((time_in*86400.) .le. dt) then
+      
        a_tskin          = th00
        a_qskin          = sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
 
@@ -300,8 +303,6 @@ module lsmdata
        a_tsoil(:,:,4)   = tsoilav(4)
 
        a_Wl             = Wlav
-
-       first_init       = .false.
     end if 
 
     z0m       = z0mav
@@ -358,7 +359,7 @@ module lsmdata
     LAI        = LAIav
     gD         = gDav
     cveg       = cvegav
-    albedo     = sfc_albedo
+
 
     ! --------------------------------------------------------
     ! Static Heterogeneity of Vegetation
@@ -369,34 +370,31 @@ module lsmdata
     
     if (hetero) then
      
-    !Set number of heterogeneity periods in the domain
-    hetper = 1
-     
+    !Set number of heterogeneity periods in the domain (hetper)
     if (hetper==1) then
        LAIG(3:((nxpg-2)/2),:) = 2.
        LAIG(((nxpg-2)/2):(nxpg-2),:) = 6.
-    end if 
-    
-    if (hetper==2) then
+    else if (hetper==2) then
        LAIG(3              :((nxpg-2)/4)   ,:) = 2.
        LAIG(((nxpg-2)/4)   :((nxpg-2)/2)   ,:) = 6.
        LAIG(((nxpg-2)/2)   :((nxpg-2)*3/4) ,:) = 2.
        LAIG(((nxpg-2)*3/4) :(nxpg-2)       ,:) = 6.
-    end if
     
-    !print*,"CHECK INPUT:::",LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
-    !                        3+yoffset(wryid):nyp+yoffset(wryid)-2 )
-    !print*,"myid:",myid,"xoffset:",xoffset(wrxid)
-    !print*,"myid:",myid,"yoffset:",yoffset(wrxid)
+       !print*,"CHECK INPUT:::",LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
+       !                        3+yoffset(wryid):nyp+yoffset(wryid)-2 )
+       !print*,"myid:",myid,"xoffset:",xoffset(wrxid)
+       !print*,"myid:",myid,"yoffset:",yoffset(wrxid)
 
-    LAI(3:(nxp-2),3:(nyp-2)) = LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
+       LAI(3:(nxp-2),3:(nyp-2)) = LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
                                3+yoffset(wryid):nyp+yoffset(wryid)-2 )
 
-    !print*,"myid:",myid,"LAIG:",LAIG(:,3)
-    !print*,"myid:",myid,"LAI:",LAI(:,3)
-    deallocate(LAIG)
+       !print*,"myid:",myid,"LAIG:",LAIG(:,3)
+       !print*,"myid:",myid,"LAI:",LAI(:,3)
 
+    end if
     end if 
+
+    deallocate(LAIG)
 
   end subroutine initlsm
 

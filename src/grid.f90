@@ -587,6 +587,7 @@ contains
        write(10) a_tsoil
        write(10) a_phiw
        write(10) a_tskin
+       write(10) a_qskin
        write(10) a_Wl
        write(10) a_sflxd_avn
        write(10) a_sflxu_avn
@@ -653,6 +654,7 @@ contains
           read(10) a_tsoil
           read(10) a_phiw
           read(10) a_tskin
+          read(10) a_qskin
           read(10) a_Wl
           read(10) a_sflxd_avn
           read(10) a_sflxu_avn

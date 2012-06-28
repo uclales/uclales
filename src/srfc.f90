@@ -45,7 +45,7 @@ contains
     use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, zt, psrf,   &
          th00, umean, vmean, dn0, level, a_ustar, a_tstar, a_rstar,        &
          uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, nstep, shls, lhls, usls,  &
-         timels, a_tskin, a_qskin, isfctyp
+         timels, a_tskin, a_qskin, isfctyp, a_phiw, a_tsoil, a_Wl
     use thrm, only: rslf
     use stat, only: sfc_stat, sflg
     use mpi_interface, only : nypg, nxpg, double_array_par_sum
@@ -192,27 +192,21 @@ contains
 
        !Initialize Land Surface 
        if (init_lsm) then
-          call initlsm
-          print*,myid,": Land surface (case 5) initialized..."
+          call initlsm(time_in)
           init_lsm = .false.
        end if
 
        !Local or filtered variables for flux calculation
        if (local) then
-       u0bar(:,:,:) = a_up(:,:,:)
-       v0bar(:,:,:) = a_vp(:,:,:)
-       thetaav(:,:) = a_theta(2,:,:)
-       vaporav(:,:) = vapor(2,:,:)
-       tskinav(:,:) = a_tskin(:,:)
-       qskinav(:,:) = a_qskin(:,:)
+          !Here we are assuming that MO theory is also valid locally
+          u0bar(:,:,:) = a_up(:,:,:)
+          v0bar(:,:,:) = a_vp(:,:,:)
+          thetaav(:,:) = a_theta(2,:,:)
+          vaporav(:,:) = vapor(2,:,:)
+          tskinav(:,:) = a_tskin(:,:)
+          qskinav(:,:) = a_qskin(:,:)
        else
-       !Insert filter method here:
-       u0av         = sum(a_up(2,3:nxp-2,3:nxp-2))/(nxp-4)/(nyp-4) + umean
-       v0av         = sum(a_vp(2,3:nxp-2,3:nxp-2))/(nxp-4)/(nyp-4) + vmean
-       thetaav(:,:) = sum(a_theta(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-       vaporav(:,:) = sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-       tskinav(:,:) = sum(a_tskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-       qskinav(:,:) = sum(a_qskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+          !Insert filter method here (untested)
        end if
 
        !Calculate surface wind for flux calculation
@@ -248,14 +242,12 @@ contains
        !Get skin temperature and humidity from land surface model(van Heerwarden)
        call lsm
 
-      !Update tskin and qskin (local or filtered) for flux calculation
+       !Update tskin and qskin (local or filtered) for flux calculation
        if (local) then
          tskinav(:,:) = a_tskin(:,:)
          qskinav(:,:) = a_qskin(:,:)
          else
-         !Insert filter method here:
-         tskinav(:,:) = sum(a_tskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-         qskinav(:,:) = sum(a_qskin(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+         !Insert filter method here
        end if
 
        !Calculate the surface fluxes with bulk law (Fairall, 2003)
@@ -271,9 +263,6 @@ contains
              vw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j)                  &
                               *(a_vp(2,i,j)+vmean)/wspd(i,j)
              ww_sfc(i,j)  = 0.
-
-             !uw_sfc(i,j)  = - 0.04
-             !vw_sfc(i,j)  = - 0.005
 
              a_rstar(i,j) = - wq_sfc(i,j)/a_ustar(i,j)
              a_tstar(i,j) = - wt_sfc(i,j)/a_ustar(i,j)
