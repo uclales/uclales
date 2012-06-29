@@ -47,7 +47,7 @@ module modparticles
   integer            :: ifinput        = 1
   integer            :: np      
   integer            :: tnextdump, tnextstat
-  real               :: randint   = 300.
+  real               :: randint   = 20.
   real               :: tnextrand = 6e6
 
   ! Particle structure

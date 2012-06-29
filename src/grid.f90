@@ -589,8 +589,6 @@ contains
     ! open input file.
     !
 
-    print*,hfilin,'  ************************************'
-
     write(hname,'(i4.4,a1,i4.4)') wrxid,'_',wryid
     hname = trim(hname)//'.'//trim(hfilin)
 
