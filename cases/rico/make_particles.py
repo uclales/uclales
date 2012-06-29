@@ -2,7 +2,7 @@
 
 # Input:
 # ---------------
-tstart = 20
+tstart = 100
 nx     = 32
 ny     = 32
 nz     = 98

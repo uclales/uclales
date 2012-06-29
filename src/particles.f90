@@ -35,6 +35,7 @@ module modparticles
   ! For/from namelist  
   logical            :: lpartic        = .false.        !< Switch for enabling particles
   logical            :: lpartsgs       = .false.        !< Switch for enabling particle subgrid scheme
+  logical            :: lrandsurf      = .false.        !< Switch for randomizing lowest grid level(s)
   logical            :: lpartstat      = .false.        !< Switch for enabling particle statistics
   logical            :: lpartdump      = .false.        !< Switch for particle dump
   logical            :: lpartdumpui    = .false.        !< Switch for writing velocities to dump
@@ -46,7 +47,7 @@ module modparticles
   integer            :: ifinput        = 1
   integer            :: np      
   integer            :: tnextdump, tnextstat
-  real               :: randint   = 10.
+  real               :: randint   = 300.
   real               :: tnextrand = 6e6
 
   ! Particle structure
@@ -106,11 +107,12 @@ contains
     type (particle_record), pointer:: particle
 
     ! Randomize particles lowest grid level
-    if (lpartsgs .and. nstep==1 .and. time > tnextrand) then
-      !call globalrandomize()
+    if (lrandsurf .and. nstep==1 .and. time > tnextrand) then
+      call globalrandomize()
       tnextrand = tnextrand + randint
     end if
 
+    ! Interpolation
     if(np > 0 .and. nplisted > 0) then
       particle => head
       do while( associated(particle) )
@@ -124,7 +126,7 @@ contains
       particle => particle%next
       end do
  
-      ! Time integration
+      ! Integration
       particle => head
       do while( associated(particle) )
         if ( time - particle%tstart >= 0 ) then
@@ -135,11 +137,6 @@ contains
       end do
     end if
 
-    ! Randomize particles lowest grid level
-    !if (lpartsgs) then
-    !  call randomize(.true.)
-    !end if
-
     ! Statistics
     if (nstep==3) then
       ! Particle dump
@@ -147,62 +144,13 @@ contains
         call particledump(time)
         tnextdump = tnextdump + frqpartdump
       end if
-
       !call checkdiv
     end if
-   
+  
+    ! Communicate particles to other procs 
     call partcomm
 
   end subroutine particles
-
-  !
-  !--------------------------------------------------------------------------
-  ! Subroutine randomize 
-  !> Randomizes the X,Y,Z positions of all particles in 
-  !> the lowest grid level every RK3 cycle. Called from: particles()
-  !--------------------------------------------------------------------------
-  !
-  subroutine randomize(once)
-    use mpi_interface, only : nxg, nyg, nyprocs, nxprocs
-    implicit none
-
-    logical, intent(in) :: once            !> flag: randomize all particles (false) or only the onces which sink into the surface layer (true)?  
-    real                :: zmax = 1.       ! Max height in grid coordinates
-    integer             :: nyloc, nxloc 
-    type (particle_record), pointer:: particle
-    real                :: randnr(3)
-
-    nyloc   = nyg / nyprocs
-    nxloc   = nxg / nxprocs
-
-    if(once) then 
-      particle => head
-      do while(associated(particle) )
-        if( particle%z <= (1. + zmax) .and. particle%zprev > (1. + zmax) ) then
-          call random_number(randnr)
-          particle%x = (randnr(1) * nyloc) + 3 
-          particle%y = (randnr(2) * nxloc) + 3
-          !particle%z = zmax * randnr(3)    + 1
-          particle%ures_prev = 0.
-          particle%vres_prev = 0.
-          particle%wres_prev = 0.
-        end if
-        particle => particle%next
-      end do 
-    else
-      particle => head
-      do while(associated(particle) )
-        if( particle%z <= (1. + zmax) ) then
-          call random_number(randnr)
-          particle%x = (randnr(1) * nyloc) + 3 
-          particle%y = (randnr(2) * nxloc) + 3
-          particle%z = 1.1 !zmax * randnr(3)    + 1 
-        end if
-        particle => particle%next
-      end do 
-    end if 
- 
-  end subroutine randomize
 
   !
   !--------------------------------------------------------------------------
@@ -231,8 +179,8 @@ contains
     ! Count number of local particles < zmax
     particle => head
     do while(associated(particle) )
-      if( particle%z <= (1. + zmax) .and. particle%wres < 0. ) nlocal = nlocal + 1
-      !if( particle%z <= (1. + zmax) ) nlocal = nlocal + 1
+      !if( particle%z <= (1. + zmax) .and. particle%wres < 0. ) nlocal = nlocal + 1
+      if( particle%z <= (1. + zmax) ) nlocal = nlocal + 1
       particle => particle%next
     end do 
 
@@ -244,8 +192,8 @@ contains
       ii = 0
       particle => head
       do while(associated(particle) )
-        if( particle%z <= (1. + zmax) .and. particle%wres < 0. ) then
-        !if( particle%z <= (1. + zmax) ) then
+        !if( particle%z <= (1. + zmax) .and. particle%wres < 0. ) then
+        if( particle%z <= (1. + zmax) ) then
           call random_number(randnr)          ! Random seed has been called from init_particles...
           particle%x = randnr(1) * float(nxg) 
           particle%y = randnr(2) * float(nyg)
@@ -629,7 +577,6 @@ contains
         end if
       end do
       call mpi_isend(buffsend,nrpartvar*ntos,mpi_double_precision,ranktable(wrxid,wryid-1),7,mpi_comm_world,request,ierror)
-      deallocate(buffsend)
     end if
 
     if(nfrn > 0) then
@@ -1745,5 +1692,60 @@ contains
  
     deallocate(seed)
   end subroutine init_random_seed
+
+
+  !-------- ARCHIVE ---------------------
+
+  !
+  !--------------------------------------------------------------------------
+  ! Subroutine randomize 
+  !
+  !> !!!! DEPRECATED !!!!!
+  !
+  !> Randomizes the X,Y,Z positions of all particles in 
+  !> the lowest grid level every RK3 cycle. Called from: particles()
+  !--------------------------------------------------------------------------
+  !
+  subroutine randomize(once)
+    use mpi_interface, only : nxg, nyg, nyprocs, nxprocs
+    implicit none
+
+    logical, intent(in) :: once            !> flag: randomize all particles (false) or only the onces which sink into the surface layer (true)?  
+    real                :: zmax = 1.       ! Max height in grid coordinates
+    integer             :: nyloc, nxloc 
+    type (particle_record), pointer:: particle
+    real                :: randnr(3)
+
+    nyloc   = nyg / nyprocs
+    nxloc   = nxg / nxprocs
+
+    if(once) then 
+      particle => head
+      do while(associated(particle) )
+        if( particle%z <= (1. + zmax) .and. particle%zprev > (1. + zmax) ) then
+          call random_number(randnr)
+          particle%x = (randnr(1) * nyloc) + 3 
+          particle%y = (randnr(2) * nxloc) + 3
+          !particle%z = zmax * randnr(3)    + 1
+          particle%ures_prev = 0.
+          particle%vres_prev = 0.
+          particle%wres_prev = 0.
+        end if
+        particle => particle%next
+      end do 
+    else
+      particle => head
+      do while(associated(particle) )
+        if( particle%z <= (1. + zmax) ) then
+          call random_number(randnr)
+          particle%x = (randnr(1) * nyloc) + 3 
+          particle%y = (randnr(2) * nxloc) + 3
+          !particle%z = zmax * randnr(3)    + 1 
+        end if
+        particle => particle%next
+      end do 
+    end if 
+ 
+  end subroutine randomize
 
 end module modparticles
