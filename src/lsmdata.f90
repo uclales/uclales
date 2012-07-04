@@ -227,19 +227,19 @@ module lsmdata
     allocate(zsoilc(ksoilmax))
     allocate(dzsoil(ksoilmax))
     allocate(dzsoilh(ksoilmax))
-    allocate(lambda(nxp,nyp,ksoilmax))
-    allocate(lambdah(nxp,nyp,ksoilmax))
-    allocate(lambdas(nxp,nyp,ksoilmax))
-    allocate(lambdash(nxp,nyp,ksoilmax))
-    allocate(gammas(nxp,nyp,ksoilmax))
-    allocate(gammash(nxp,nyp,ksoilmax))
-    allocate(Dh(nxp,nyp,ksoilmax))
+    allocate(lambda(ksoilmax,nxp,nyp))
+    allocate(lambdah(ksoilmax,nxp,nyp))
+    allocate(lambdas(ksoilmax,nxp,nyp))
+    allocate(lambdash(ksoilmax,nxp,nyp))
+    allocate(gammas(ksoilmax,nxp,nyp))
+    allocate(gammash(ksoilmax,nxp,nyp))
+    allocate(Dh(ksoilmax,nxp,nyp))
     allocate(phitot(nxp,nyp))
-    allocate(phiwm(nxp,nyp,ksoilmax))
-    allocate(phifrac(nxp,nyp,ksoilmax))
-    allocate(pCs(nxp,nyp,ksoilmax))
-    allocate(rootf(nxp,nyp,ksoilmax))
-    allocate(tsoilm(nxp,nyp,ksoilmax))
+    allocate(phiwm(ksoilmax,nxp,nyp))
+    allocate(phifrac(ksoilmax,nxp,nyp))
+    allocate(pCs(ksoilmax,nxp,nyp))
+    allocate(rootf(ksoilmax,nxp,nyp))
+    allocate(tsoilm(ksoilmax,nxp,nyp))
     allocate(tsoildeep(nxp,nyp))
 
     allocate(Qnet(nxp,nyp))
@@ -280,8 +280,8 @@ module lsmdata
     !allocate(Wl(nxp,nyp))
     !allocate(tskin(nxp,nyp))
     !allocate(qskin(nxp,nyp))
-    !allocate(phiw(nxp,nyp,ksoilmax))
-    !allocate(tsoil(nxp,nyp,ksoilmax))
+    !allocate(phiw(ksoilmax,nxp,nyp))
+    !allocate(tsoil(ksoilmax,nxp,nyp))
 
     ! --------------------------------------------------------
     ! Initialize arrays
@@ -292,15 +292,15 @@ module lsmdata
        a_tskin          = th00
        a_qskin          = sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
 
-       a_phiw(:,:,1)    = phiwav(1)
-       a_phiw(:,:,2)    = phiwav(2)
-       a_phiw(:,:,3)    = phiwav(3)
-       a_phiw(:,:,4)    = phiwav(4)
+       a_phiw(1,:,:)    = phiwav(1)
+       a_phiw(2,:,:)    = phiwav(2)
+       a_phiw(3,:,:)    = phiwav(3)
+       a_phiw(4,:,:)    = phiwav(4)
 
-       a_tsoil(:,:,1)   = tsoilav(1)
-       a_tsoil(:,:,2)   = tsoilav(2)
-       a_tsoil(:,:,3)   = tsoilav(3)
-       a_tsoil(:,:,4)   = tsoilav(4)
+       a_tsoil(1,:,:)   = tsoilav(1)
+       a_tsoil(2,:,:)   = tsoilav(2)
+       a_tsoil(3,:,:)   = tsoilav(3)
+       a_tsoil(4,:,:)   = tsoilav(4)
 
        a_Wl             = Wlav
     end if 
@@ -333,19 +333,19 @@ module lsmdata
     ! Set water content of soil - constant in this scheme
     phitot = 0.0
     do k = 1, ksoilmax
-       phitot(:,:) = phitot(:,:) + a_phiw(:,:,k) * dzsoil(k)
+       phitot(:,:) = phitot(:,:) + a_phiw(k,:,:) * dzsoil(k)
     end do
     phitot(:,:)    = phitot(:,:) / zsoil(ksoilmax)
 
     do k = 1, ksoilmax
-      phifrac(:,:,k) = a_phiw(:,:,k) * dzsoil(k) / zsoil(ksoilmax) / phitot(:,:)
+      phifrac(k,:,:) = a_phiw(k,:,:) * dzsoil(k) / zsoil(ksoilmax) / phitot(:,:)
     end do
 
     ! Set root fraction per layer for short grass (not used for now!!!)
-    rootf(:,:,1) = rootfav(1)
-    rootf(:,:,2) = rootfav(2)
-    rootf(:,:,3) = rootfav(3)
-    rootf(:,:,4) = rootfav(4)
+    rootf(1,:,:) = rootfav(1)
+    rootf(2,:,:) = rootfav(2)
+    rootf(3,:,:) = rootfav(3)
+    rootf(4,:,:) = rootfav(4)
 
     tsoildeep(:,:) = tsoildeepav
 

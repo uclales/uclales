@@ -291,8 +291,8 @@ contains
 
     !Malte: allocate Land surface variables for restart
     if (isfctyp == 5) then
-       allocate (a_tsoil(nxp,nyp,4))
-       allocate (a_phiw (nxp,nyp,4))
+       allocate (a_tsoil(4,nxp,nyp))
+       allocate (a_phiw (4,nxp,nyp))
        allocate (a_tskin (nxp,nyp))
        allocate (a_qskin (nxp,nyp))
        allocate (a_Wl    (nxp,nyp))
