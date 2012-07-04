@@ -74,7 +74,6 @@ contains
        call lsvar_init
        end if
 
-    !print*,"just before reading surface fluxes"
     !Malte: prescribe homogeneous surface fluxes
     if (isfctyp==0) then
         call homo_surf

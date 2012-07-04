@@ -89,8 +89,9 @@ contains
     character (len=7), intent (in) :: sx(nVar)   ! table with var names
 
     integer, save :: timeID=0, ztID=0, zmID=0, xtID=0, xmID=0, ytID=0, ymID=0,&
-         dim_mttt(4) = 0, dim_tmtt(4) = 0, dim_ttmt(4) = 0, dim_tttt(4) = 0  ,&
-         dim_tt(2)  = 0, dim_mt(2)  = 0
+         zsrfcID=0, zsoilID=0, dim_mttt(4)=0, dim_tmtt(4) = 0, dim_ttmt(4) = 0,&
+         dim_tttt(4) = 0, dim_tt(2)  = 0, dim_mt(2)  = 0, dim_srfcmmt(3) = 0,&
+         dim_soilmmt(4) = 0
 
     character (len=7) :: xnm
     integer :: iret, n, VarID
@@ -100,6 +101,8 @@ contains
        if (present(n1)) then
           iret = nf90_def_dim(ncID, 'zt', n1, ztID)
           iret = nf90_def_dim(ncID, 'zm', n1, zmID)
+          iret = nf90_def_dim(ncID, 'zsrfc', n1, zsrfcID)
+          iret = nf90_def_dim(ncID, 'zsoil', n1, zsoilID)
        end if
        if (present(n2)) then
           iret = nf90_def_dim(ncID, 'xt', n2, xtID)
@@ -111,10 +114,12 @@ contains
        end if
        dim_tt = (/ztId,timeId/)
        dim_mt = (/zmId,timeId/)
-       dim_tttt= (/ztID,xtID,ytID,timeId/)  ! thermo point
-       dim_mttt= (/zmID,xtID,ytID,timeId/)  ! wpoint
-       dim_tmtt= (/ztID,xmID,ytID,timeId/)  ! upoint
-       dim_ttmt= (/ztId,xtID,ymID,timeId/)  ! vpoint
+       dim_tttt= (/ztID,xtID,ytID,timeId/)       ! thermo point
+       dim_mttt= (/zmID,xtID,ytID,timeId/)       ! wpoint
+       dim_tmtt= (/ztID,xmID,ytID,timeId/)       ! upoint
+       dim_ttmt= (/ztId,xtID,ymID,timeId/)       ! vpoint
+       dim_srfcmmt= (/xmID,ymID,timeId/) ! srfc point
+       dim_soilmmt= (/zsoilID,xmID,ymID,timeId/) ! soil point
 
        do n=1,nVar
           select case(trim(ncinfo(2,sx(n))))
@@ -216,6 +221,10 @@ contains
              else
                 iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_mt,VarID)
              end if
+          case ('srfcttt')
+             iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_srfcmmt,VarID)
+          case ('soilttt') 
+             iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_soilmmt,VarID)
           case default
              if (myid == 0) print *, '  ABORTING: Bad dimensional information'
              call appl_abort(0)
@@ -253,14 +262,15 @@ contains
     use mpi_interface, only :myid
 
 !irina
-    integer, parameter :: nnames = 31
+    integer, parameter :: nnames = 40
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,&
          'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,&  
-         'w      ','t      ','p      ','q      ','l      ','r      '   ,'n      ',&
-         'rice   ','nice   ','rsnow  ','rgrp   ',&
-         'nsnow  ','ngrp   ','rhail  ','nhail  ',          &
-         'stke   ','rflx   ','lflxu  ','lflxd  '/)
+         'w      ','t      ','p      ','q      ','l      ','r      '   ,&
+         'n      ','rice   ','nice   ','rsnow  ','rgrp   ','nsnow  '   ,&
+         'ngrp   ','rhail  ','nhail  ','stke   ','rflx   ','lflxu  '   ,&
+         'lflxd  ','shf    ','lhf    ','Qnets  ','G0s    ','ustars '   ,&
+         'tskin  ','qskin  ','tsoil  ','phiw   '/)
 
     real, intent (in) :: time
     integer           :: nbeg, nend
@@ -329,6 +339,26 @@ contains
        sanal(nvar0) = sbase(31)
     end if
 
+    if (isfctyp == 5) then
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(32)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(33)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(34)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(35)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(36)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(37)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(38)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(39)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(40)
+    end if
 
     nbeg = nvar0+1
     nend = nvar0+naddsc
@@ -365,14 +395,12 @@ contains
     use netcdf
     use mpi_interface, only : myid, appl_abort
     use defs, only : cp, alvl
+    use lsmdata, only: Qnet,G0
 
     real, intent (in) :: time
 
     integer :: iret, VarID, nn, n
     integer :: ibeg(4), icnt(4), i1, i2, j1, j2
-    
-    real :: press1(nzp,nxp,nyp)
-    real :: a_rp1 (nzp,nxp,nyp)
 
     !return 
     icnt = (/nzp,nxp-4,nyp-4,1   /)
@@ -415,18 +443,11 @@ contains
     iret = nf90_inq_varid(ncid0, sanal(14), VarID)
     iret = nf90_put_var(ncid0, VarID, a_theta(:,i1:i2,j1:j2), start=ibeg, &
          count=icnt)
-
-    !Malte: dump fluxes in wrong arrays for now
-    press1 = press
-    press1(1,i1:i2,j1:j2) = wt_sfc(i1:i2,j1:j2)*cp*(dn0(1)+dn0(2))*0.5
-    a_rp1  = a_rp
-    a_rp1(1,i1:i2,j1:j2)  = wq_sfc(i1:i2,j1:j2)*alvl*(dn0(1)+dn0(2))*0.5
-
     iret = nf90_inq_varid(ncid0, sanal(15), VarID)
-    iret = nf90_put_var(ncid0, VarID, press1(:,i1:i2,j1:j2), start=ibeg, &
+    iret = nf90_put_var(ncid0, VarID, press(:,i1:i2,j1:j2), start=ibeg, &
          count=icnt)
     iret = nf90_inq_varid(ncid0, sanal(16), VarID)
-    iret = nf90_put_var(ncid0, VarID, a_rp1(:,i1:i2,j1:j2), start=ibeg, &
+    iret = nf90_put_var(ncid0, VarID, a_rp(:,i1:i2,j1:j2), start=ibeg, &
          count=icnt)
 
     if (level >= 2)  then
@@ -465,6 +486,37 @@ contains
 !        if (myid == 0) print *, 'ABORTING:  Anal write error'
 !        call appl_abort(0)
 !     end if
+
+    !Malte
+    if (isfctyp == 5) then
+       iret = nf90_inq_varid(ncid0, sanal(32), VarID)
+       iret = nf90_put_var(ncid0, VarID, wt_sfc(i1:i2,j1:j2)*cp*(dn0(1)+dn0(2))*0.5, &
+              start=ibeg, count=icnt)
+       iret = nf90_inq_varid(ncid0, sanal(33), VarID)
+       iret = nf90_put_var(ncid0, VarID, wq_sfc(i1:i2,j1:j2)*alvl*(dn0(1)+dn0(2))*0.5, &
+              start=ibeg, count=icnt)
+       iret = nf90_inq_varid(ncid0, sanal(34), VarID)
+       iret = nf90_put_var(ncid0, VarID, Qnet(i1:i2,j1:j2), &
+              start=ibeg, count=icnt)
+       iret = nf90_inq_varid(ncid0, sanal(35), VarID)
+       iret = nf90_put_var(ncid0, VarID, G0(i1:i2,j1:j2), &
+              start=ibeg, count=icnt)
+       iret = nf90_inq_varid(ncid0, sanal(36), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_ustar(i1:i2,j1:j2), &
+              start=ibeg, count=icnt)
+       iret = nf90_inq_varid(ncid0, sanal(37), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_tskin(i1:i2,j1:j2), &
+              start=ibeg, count=icnt)
+       iret = nf90_inq_varid(ncid0, sanal(38), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_qskin(i1:i2,j1:j2), &
+              start=ibeg, count=icnt)
+       iret = nf90_inq_varid(ncid0, sanal(39), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_tsoil(:,i1:i2,j1:j2), &
+              start=ibeg, count=icnt)
+       iret = nf90_inq_varid(ncid0, sanal(40), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_phiw(:,i1:i2,j1:j2), &
+              start=ibeg, count=icnt)
+    end if 
 
     if (myid==0) print "(//' ',12('-'),'   Record ',I3,' to: ',A60)",    &
          nrec0,fname 
@@ -1275,11 +1327,11 @@ contains
        if (itype==0) ncinfo = 'Soil resistance'
        if (itype==1) ncinfo = 's/m'
        if (itype==2) ncinfo = 'time'
-    case('tskinav')    
+    case('a_tskin')    
        if (itype==0) ncinfo = 'Skin potential temperature'
        if (itype==1) ncinfo = 'K'
        if (itype==2) ncinfo = 'time'
-    case('qskinav')    
+    case('a_qskin')    
        if (itype==0) ncinfo = 'Skin specific humidity'
        if (itype==1) ncinfo = 'kg/kg'
        if (itype==2) ncinfo = 'time'
@@ -1295,6 +1347,42 @@ contains
        if (itype==0) ncinfo = 'Liquid water reservoir'
        if (itype==1) ncinfo = '-'
        if (itype==2) ncinfo = 'time'
+    case('shf')    
+       if (itype==0) ncinfo = 'Surface Sensible Heat Flux'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'srfcmmt'
+    case('lhf')    
+       if (itype==0) ncinfo = 'Surface Latent Heat Flux'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'srfcmmt'
+    case('Qnets')    
+       if (itype==0) ncinfo = 'Surface Net Radiation Heat Flux'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'srfcmmt'
+    case('G0s')    
+       if (itype==0) ncinfo = 'Surface Ground Heat Flux'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'srfcmmt'
+    case('ustars')    
+       if (itype==0) ncinfo = 'Surface Friction Velocity'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'srfcmmt'
+    case('tskin')    
+       if (itype==0) ncinfo = 'Surface Skin Temperature'
+       if (itype==1) ncinfo = 'K'
+       if (itype==2) ncinfo = 'srfcmmt'
+    case('qskin')    
+       if (itype==0) ncinfo = 'Surface Skin Specific Humidity'
+       if (itype==1) ncinfo = 'kg/kg'
+       if (itype==2) ncinfo = 'srfcmmt'
+    case('tsoil')    
+       if (itype==0) ncinfo = 'Soil Temperature'
+       if (itype==1) ncinfo = 'K'
+       if (itype==2) ncinfo = 'soilmmt'
+    case('phiw')    
+       if (itype==0) ncinfo = 'Soil Moisture'
+       if (itype==1) ncinfo = '-'
+       if (itype==2) ncinfo = 'soilmmt'
     case default
        if (myid==0) print *, 'ABORTING: variable not found in ncinfo, ',trim(short_name)
        call appl_abort(0)
