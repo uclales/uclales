@@ -89,8 +89,8 @@ contains
     character (len=7), intent (in) :: sx(nVar)   ! table with var names
 
     integer, save :: timeID=0, ztID=0, zmID=0, xtID=0, xmID=0, ytID=0, ymID=0,&
-         zsrfcID=0, zsoilID=0, dim_mttt(4)=0, dim_tmtt(4) = 0, dim_ttmt(4) = 0,&
-         dim_tttt(4) = 0, dim_tt(2)  = 0, dim_mt(2)  = 0, dim_srfcmmt(3) = 0,&
+         zsoilID=0, dim_mttt(4)=0, dim_tmtt(4) = 0, dim_ttmt(4) = 0,          &
+         dim_tttt(4) = 0, dim_tt(2)  = 0, dim_mt(2)  = 0, dim_mmt(3) = 0, &
          dim_soilmmt(4) = 0
 
     character (len=7) :: xnm
@@ -101,7 +101,6 @@ contains
        if (present(n1)) then
           iret = nf90_def_dim(ncID, 'zt', n1, ztID)
           iret = nf90_def_dim(ncID, 'zm', n1, zmID)
-          iret = nf90_def_dim(ncID, 'zsrfc', n1, zsrfcID)
           iret = nf90_def_dim(ncID, 'zsoil', n1, zsoilID)
        end if
        if (present(n2)) then
@@ -118,7 +117,7 @@ contains
        dim_mttt= (/zmID,xtID,ytID,timeId/)       ! wpoint
        dim_tmtt= (/ztID,xmID,ytID,timeId/)       ! upoint
        dim_ttmt= (/ztId,xtID,ymID,timeId/)       ! vpoint
-       dim_srfcmmt= (/xmID,ymID,timeId/) ! srfc point
+       dim_mmt= (/xmID,ymID,timeId/)             ! srfc point
        dim_soilmmt= (/zsoilID,xmID,ymID,timeId/) ! soil point
 
        do n=1,nVar
@@ -221,8 +220,8 @@ contains
              else
                 iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_mt,VarID)
              end if
-          case ('srfcttt')
-             iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_srfcmmt,VarID)
+          case ('mmt')
+             iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_mmt,VarID)
           case ('soilttt') 
              iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_soilmmt,VarID)
           case default
@@ -1350,31 +1349,31 @@ contains
     case('shf')    
        if (itype==0) ncinfo = 'Surface Sensible Heat Flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'srfcmmt'
+       if (itype==2) ncinfo = 'mmt'
     case('lhf')    
        if (itype==0) ncinfo = 'Surface Latent Heat Flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'srfcmmt'
+       if (itype==2) ncinfo = 'mmt'
     case('Qnets')    
-       if (itype==0) ncinfo = 'Surface Net Radiation Heat Flux'
+       if (itype==0) ncinfo = 'Surface Net Radiation'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'srfcmmt'
+       if (itype==2) ncinfo = 'mmt'
     case('G0s')    
        if (itype==0) ncinfo = 'Surface Ground Heat Flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'srfcmmt'
+       if (itype==2) ncinfo = 'mmt'
     case('ustars')    
        if (itype==0) ncinfo = 'Surface Friction Velocity'
        if (itype==1) ncinfo = 'm/s'
-       if (itype==2) ncinfo = 'srfcmmt'
+       if (itype==2) ncinfo = 'mmt'
     case('tskin')    
        if (itype==0) ncinfo = 'Surface Skin Temperature'
        if (itype==1) ncinfo = 'K'
-       if (itype==2) ncinfo = 'srfcmmt'
+       if (itype==2) ncinfo = 'mmt'
     case('qskin')    
        if (itype==0) ncinfo = 'Surface Skin Specific Humidity'
        if (itype==1) ncinfo = 'kg/kg'
-       if (itype==2) ncinfo = 'srfcmmt'
+       if (itype==2) ncinfo = 'mmt'
     case('tsoil')    
        if (itype==0) ncinfo = 'Soil Temperature'
        if (itype==1) ncinfo = 'K'
