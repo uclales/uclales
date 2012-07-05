@@ -47,7 +47,7 @@ module modparticles
   integer            :: ifinput        = 1
   integer            :: np      
   integer            :: tnextdump, tnextstat
-  real               :: randint   = 20.
+  real               :: randint   = 120.
   real               :: tnextrand = 6e6
 
   ! Particle structure
@@ -197,7 +197,7 @@ contains
           call random_number(randnr)          ! Random seed has been called from init_particles...
           particle%x = randnr(1) * float(nxg) 
           particle%y = randnr(2) * float(nyg)
-          particle%z = zmax * randnr(3) 
+          particle%z = 1. + (zmax * randnr(3)) 
 
           call partbuffer(particle, buffsend(ii+1:ii+nrpartvar),ii,.true.)
           
