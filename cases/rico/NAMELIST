@@ -47,5 +47,5 @@
   lpartdumpui  = .true.
   lpartdumpth  = .true.
   lpartdumpmr  = .true.
-  frqpartdump  = 5.
+  frqpartdump  = 30.
  /
