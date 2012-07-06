@@ -14,8 +14,8 @@
   runtype      = 'INITIAL'
   filprf       = 'rico'
   hfilin       = 'rico.rst'
-  savg_intvl   = 900.
-  ssam_intvl   = 60.
+  savg_intvl   = 20.
+  ssam_intvl   = 10.
   frqhis       = 100.
   frqanl       = 3600.
   level        = 3

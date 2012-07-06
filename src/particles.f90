@@ -119,7 +119,7 @@ contains
 
     if (lpartsgs .and. nstep == 1) then
       call calc_sgstke      ! Estimates SGS-TKE
-      call fsubgrid         ! Calculates fraction SGS-TKE / TOTAL-TKE
+      call fsubgrid(time)         ! Calculates fraction SGS-TKE / TOTAL-TKE
     end if
 
     ! Randomize particles lowest grid level
@@ -139,16 +139,10 @@ contains
           particle%vres = vi3d(particle%x,particle%y,particle%z) * dyi
           particle%wres = wi3d(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
           if (lpartsgs .and. nstep == 1) then
-            if( particle%z > 2.) then
-              call prep_sgs(particle)
-              particle%usgs   = usgs(particle) * dxi 
-              particle%vsgs   = vsgs(particle) * dyi
-              particle%wsgs   = wsgs(particle) * dzi_t(floor(particle%z))
-            else
-              particle%usgs   = 0.
-              particle%vsgs   = 0.
-              particle%wsgs   = 0.
-            end if
+            call prep_sgs(particle)
+            particle%usgs   = usgs(particle) * dxi 
+            particle%vsgs   = vsgs(particle) * dyi
+            particle%wsgs   = wsgs(particle) * dzi_t(floor(particle%z))
           end if
         end if
       particle => particle%next
@@ -179,12 +173,6 @@ contains
     call partcomm
 
   end subroutine particles
-
-  !***********************************************
-  !***********************************************
-  !** BEGIN prognostic SGS-TKE-based velocities **
-  !***********************************************
-  !***********************************************
 
   !
   !--------------------------------------------------------------------------
@@ -297,9 +285,79 @@ contains
   !> Calculates fs (contribution sgs turbulence to total turbulence)
   !--------------------------------------------------------------------------
   !
-  subroutine fsubgrid()
+  subroutine fsubgrid(time)
+    use grid, only : a_up, a_vp, a_wp, nzp, nxp, nyp, dt, nstep, zt
+    use mpi_interface, only : ierror, mpi_double_precision, mpi_sum, mpi_comm_world, nxg, nyg
     implicit none
-    fs = 1.  ! fixed at one for testing..    
+  
+    real, intent(in)               :: time
+    integer    :: k
+    real, allocatable, dimension(:)   :: &
+       u_avl, v_avl, u2_avl, v2_avl, w2_avl, sgse_avl,     &
+       u_av,  v_av,  u2_av,  v2_av,  w2_av,  sgse_av, e_res
+    integer :: ifoutput = 1
+
+    ! Hardcoded switch to fix fs at one
+    logical :: fixedfs = .false.
+
+    if(fixedfs) then
+      fs = 1.
+    else
+      allocate(u_avl(nzp), v_avl(nzp), u2_avl(nzp), v2_avl(nzp), w2_avl(nzp), sgse_avl(nzp),   &
+               u_av(nzp),  v_av(nzp),  u2_av(nzp),  v2_av(nzp),  w2_av(nzp),  sgse_av(nzp),    &
+               e_res(nzp))
+
+      do k=1,nzp
+        u_avl(k)    = sum(a_up(k,3:nxp-2,3:nyp-2))
+        v_avl(k)    = sum(a_vp(k,3:nxp-2,3:nyp-2))
+        w2_avl(k)   = sum(a_wp(k,3:nxp-2,3:nyp-2)**2.)
+        sgse_avl(k) = sum(sgse(k,3:nxp-2,3:nyp-2))
+      end do 
+
+      call mpi_allreduce(u_avl,u_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      call mpi_allreduce(v_avl,v_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      call mpi_allreduce(w2_avl,w2_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      call mpi_allreduce(sgse_avl,sgse_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+  
+      u_av        = u_av    / (nxg * nyg)  
+      v_av        = v_av    / (nxg * nyg)     
+ 
+      do k=1,nzp
+        u2_avl(k) = sum((a_up(k,3:nxp-2,3:nyp-2) - u_av(k))**2.)
+        v2_avl(k) = sum((a_vp(k,3:nxp-2,3:nyp-2) - v_av(k))**2.)
+      end do 
+
+      call mpi_allreduce(u2_avl,u2_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      call mpi_allreduce(v2_avl,v2_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+
+      u2_av       = u2_av   / (nxg * nyg)    
+      v2_av       = v2_av   / (nxg * nyg)    
+      w2_av       = w2_av   / (nxg * nyg)    
+      sgse_av     = sgse_av / (nxg * nyg) 
+ 
+      do k=2, nzp
+        e_res(k)  = 0.5 * (u2_av(k) + v2_av(k) + 0.5*(w2_av(k) + w2_av(k-1)))
+        fs(k)     = sgse_av(k) / (sgse_av(k) + e_res(k))
+      end do
+
+      e_res(1)    = -e_res(2)         ! e_res -> 0 at surface
+      fs(1)       = 1. + (1.-fs(2))   ! fs    -> 1 at surface
+
+      !Raw statistics dump
+      if((time + dt > tnextstat) .and. lpartstat .and. nstep==1) then
+        open(ifoutput,file='rawstat',position='append',action='write')
+        write(ifoutput,'(A2,F10.2)') '# ',time
+      
+        do k=1, nzp
+          write(ifoutput,'(I10,9E15.6)') k,zt(k),u_av(k),u2_av(k),v_av(k),v2_av(k),w2_av(k),e_res(k),sgse_av(k),fs(k)
+        end do
+
+        close(ifoutput) 
+      end if
+
+      deallocate(u_avl,v_avl,u2_avl,v2_avl,w2_avl,sgse_avl,u_av,v_av,u2_av,v2_av,w2_av,sgse_av,e_res)
+    end if
+
   end subroutine fsubgrid
 
   !
@@ -426,13 +484,6 @@ contains
     wsgs = (particle%wsgs / dzi) + (t1 + t2 + t3) 
 
   end function wsgs
-
-
-  !*********************************************
-  !*********************************************
-  !** END prognostic SGS-TKE-based velocities **
-  !*********************************************
-  !*********************************************
 
   !
   !--------------------------------------------------------------------------
