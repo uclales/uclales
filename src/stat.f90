@@ -163,7 +163,7 @@ contains
          , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa &
          , a_ricep, a_rsnowp, a_rgrp, a_rhailp, a_nicep, a_nsnowp, a_ngrp, a_nhailp &
          , vapor, a_Wl, isfctyp 
-    use lsmdata, only: Qnet,G0,tndskin,ra,rsurf,rsveg,rssoil,tskinav,qskinav,  &
+    use lsmdata, only: Qnet,G0,tndskin,ra,rsurf,rsveg,rssoil,a_tskin,a_qskin,  &
                        obl, cliq, Cskinav
 
     real, intent (in) :: time
@@ -218,7 +218,7 @@ contains
     if (level >=2) call ts_lvl2(nzp, nxp, nyp, a_rp, a_scr2, zt)
 
     if (isfctyp==5) call accum_lsm(nxp,nyp,Qnet,G0,tndskin,ra,rsurf,rsveg, &
-                                   rssoil,tskinav,qskinav,obl,cliq,a_Wl,Cskinav)
+                                   rssoil,a_tskin,a_qskin,obl,cliq,a_Wl,Cskinav)
 
     if (debug) WRITE (0,*) 'statistics: set_ts ok,  myid=',myid
 
@@ -1526,7 +1526,7 @@ contains
   ! for land surface variables (if isfctyp=5) 
   !
   subroutine accum_lsm(nxp, nyp, Qnet, G0, tndskin, ra, rsurf, rsveg, &
-                       rsoil, tskinav,qskinav, obl, cliq, a_Wl, Cskinav)
+                       rsoil, a_tskin,a_qskin, obl, cliq, a_Wl, Cskinav)
 
     integer, intent (in)  :: nxp,nyp
     real, intent (in)     :: Qnet(nxp,nyp)
@@ -1536,8 +1536,8 @@ contains
     real, intent (in)     :: rsurf(nxp,nyp)
     real, intent (in)     :: rsveg(nxp,nyp)
     real, intent (in)     :: rsoil(nxp,nyp)
-    real, intent (in)     :: tskinav(nxp,nyp)
-    real, intent (in)     :: qskinav(nxp,nyp)
+    real, intent (in)     :: a_tskin(nxp,nyp)
+    real, intent (in)     :: a_qskin(nxp,nyp)
     real, intent (in)     :: obl(nxp,nyp)
     real, intent (in)     :: cliq(nxp,nyp)
     real, intent (in)     :: a_Wl(nxp,nyp)
@@ -1550,8 +1550,8 @@ contains
     ssclr(50) = sum(rsurf(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
     ssclr(51) = sum(rsveg(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
     ssclr(52) = sum(rsoil(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
-    ssclr(53) = sum(tskinav(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
-    ssclr(54) = sum(qskinav(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(53) = sum(a_tskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(54) = sum(a_qskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
     ssclr(55) = sum(obl(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
     ssclr(56) = sum(cliq(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
     ssclr(57) = sum(a_Wl(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)

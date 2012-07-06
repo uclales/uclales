@@ -269,7 +269,7 @@ contains
          'n      ','rice   ','nice   ','rsnow  ','rgrp   ','nsnow  '   ,&
          'ngrp   ','rhail  ','nhail  ','stke   ','rflx   ','lflxu  '   ,&
          'lflxd  ','shf    ','lhf    ','Qnets  ','G0s    ','ustars '   ,&
-         'tskin  ','qskin  ','tsoil  ','phiw   '/)
+         'a_tskin','a_qskin','tsoil  ','phiw   '/)
 
     real, intent (in) :: time
     integer           :: nbeg, nend
@@ -1326,12 +1326,12 @@ contains
        if (itype==0) ncinfo = 'Soil resistance'
        if (itype==1) ncinfo = 's/m'
        if (itype==2) ncinfo = 'time'
-    case('a_tskin')    
-       if (itype==0) ncinfo = 'Skin potential temperature'
+    case('tskinav')    
+       if (itype==0) ncinfo = 'Average skin potential temperature'
        if (itype==1) ncinfo = 'K'
        if (itype==2) ncinfo = 'time'
-    case('a_qskin')    
-       if (itype==0) ncinfo = 'Skin specific humidity'
+    case('qskinav')    
+       if (itype==0) ncinfo = 'Average skin specific humidity'
        if (itype==1) ncinfo = 'kg/kg'
        if (itype==2) ncinfo = 'time'
     case('obl')    
@@ -1366,11 +1366,11 @@ contains
        if (itype==0) ncinfo = 'Surface Friction Velocity'
        if (itype==1) ncinfo = 'm/s'
        if (itype==2) ncinfo = 'mmt'
-    case('tskin')    
+    case('a_tskin')    
        if (itype==0) ncinfo = 'Surface Skin Temperature'
        if (itype==1) ncinfo = 'K'
        if (itype==2) ncinfo = 'mmt'
-    case('qskin')    
+    case('a_qskin')    
        if (itype==0) ncinfo = 'Surface Skin Specific Humidity'
        if (itype==1) ncinfo = 'kg/kg'
        if (itype==2) ncinfo = 'mmt'
