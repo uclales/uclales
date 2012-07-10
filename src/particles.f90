@@ -46,7 +46,7 @@ module modparticles
   character(30)      :: startfile
   integer            :: ifinput        = 1
   integer            :: np      
-  integer            :: tnextdump, tnextstat
+  real               :: tnextdump !, tnextstat
   real               :: randint   = 20.
   real               :: tnextrand = 6e6
 
@@ -121,7 +121,7 @@ contains
 
     if (lpartsgs .and. nstep == 1) then
       call calc_sgstke            ! Estimates SGS-TKE
-      call fsubgrid(time)         ! Calculates fraction SGS-TKE / TOTAL-TKE
+      call fsubgrid               ! Calculates fraction SGS-TKE / TOTAL-TKE
     end if
 
     ! Randomize particles lowest grid level
@@ -200,12 +200,7 @@ contains
     real, parameter            :: alpha = 1.6
     real, parameter            :: gamma = 1.34
     real, parameter            :: ric   = 0.23
-    real, parameter            :: ris   = 0.06
-    integer                    :: na,nb,nc
-
-    na = 0
-    nb = 0
-    nc = 0
+    !real, parameter            :: ris   = 0.06
 
     ! Uncorrected parameters 
     cl    = (2./3.)**0.5
@@ -293,17 +288,15 @@ contains
   !> Calculates fs (contribution sgs turbulence to total turbulence)
   !--------------------------------------------------------------------------
   !
-  subroutine fsubgrid(time)
+  subroutine fsubgrid
     use grid, only : a_up, a_vp, a_wp, nzp, nxp, nyp, dt, nstep, zt
     use mpi_interface, only : ierror, mpi_double_precision, mpi_sum, mpi_comm_world, nxg, nyg
     implicit none
   
-    real, intent(in)               :: time
     integer    :: k
     real, allocatable, dimension(:)   :: &
        u_avl, v_avl, u2_avl, v2_avl, w2_avl, sgse_avl,     &
        u_av,  v_av,  u2_av,  v2_av,  w2_av,  sgse_av, e_res
-    integer :: ifoutput = 1
 
     ! Hardcoded switch to fix fs at one
     logical :: fixedfs = .false.
@@ -352,6 +345,7 @@ contains
       fs(1)       = 1. + (1.-fs(2))   ! fs    -> 1 at surface
 
       !Raw statistics dump
+      !CAUTION:	NEEDS TO BE FIXED, STAT TIMEKEEPING NO LONGER IN PARTICLES.F90
       !if((time + dt > tnextstat) .and. lpartstat .and. nstep==1) then
       !  open(ifoutput,file='rawstat',position='append',action='write')
       !  write(ifoutput,'(A2,F10.2)') '# ',time
@@ -507,14 +501,11 @@ contains
   
     type (particle_record), pointer:: particle,ptr
     real               :: zmax = 1.                  ! Max height in grid coordinates
-    integer            :: status(mpi_status_size)
+    !integer            :: status(mpi_status_size)
     real, allocatable, dimension(:)    :: buffsend,buffrecv
     integer, allocatable, dimension(:) :: recvcount,displacements
-    integer            :: nglobal, nlocal=0, ii, i, k
-    real               :: xsizelocal,ysizelocal,tempx,tempy,tempz
-
-    character (len=80) :: hname
-    logical            :: dump = .true.
+    integer            :: nglobal, nlocal=0, ii, i
+    real               :: xsizelocal,ysizelocal,tempx,tempy
     real               :: randnr(3),temp
 
     ! Count number of local particles < zmax
@@ -834,7 +825,7 @@ contains
     implicit none
 
     type (particle_record), pointer:: particle,ptr
-    real, allocatable, dimension(:) :: buffsend, buffrecv,buffsend2, buffrecv2
+    real, allocatable, dimension(:) :: buffsend, buffrecv
     integer :: status(mpi_status_size)
     integer :: request
     integer :: ii, n
@@ -842,7 +833,6 @@ contains
     integer :: nton,ntos,ntoe,ntow
     integer :: nfrn,nfrs,nfre,nfrw
     integer :: nyloc, nxloc
-    logical :: free 
 
     nton  = 0
     ntos  = 0
@@ -1111,7 +1101,7 @@ contains
       particle%ystart           = buffer(n+ipystart)
       particle%zstart           = buffer(n+ipzstart)
       particle%tstart           = buffer(n+iptsart)
-      particle%partstep         = buffer(n+ipartstep)
+      particle%partstep         = int(buffer(n+ipartstep))
     end if
 
   end subroutine partbuffer
@@ -1637,7 +1627,6 @@ contains
     return
   end function random
 
-
   !--------------------------------------------------------------------------
   !
   ! BELOW: ONLY INIT / EXIT PARTICLES
@@ -1780,7 +1769,7 @@ contains
       ! Set first dump times
       tnextdump = firststart
       tnextrand = firststart
-      tnextstat = 0
+      !tnextstat = 0
       nstatsamp = 0
     end if
 
