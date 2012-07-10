@@ -74,19 +74,21 @@ module modparticles
   integer            :: nstatsamp
   
   ! Arrays for local and domain averaged values
-  real, allocatable, dimension(:)     :: npartprof,    npartprofl, &
-                                         uprof,        uprofl,     &
-                                         vprof,        vprofl,     &
-                                         wprof,        wprofl,     &
-                                         u2prof,       u2profl,    &
-                                         v2prof,       v2profl,    &
-                                         w2prof,       w2profl,    &
-                                         tkeprof,      tkeprofl,   &
-                                         tprof,        tprofl,     &
-                                         tvprof,       tvprofl,    &
-                                         rtprof,       rtprofl,    &
-                                         rlprof,       rlprofl,    &
-                                         ccprof,       ccprofl
+  real, allocatable, dimension(:)     :: npartprof,    npartprofl,  &
+                                         uprof,        uprofl,      &
+                                         vprof,        vprofl,      &
+                                         wprof,        wprofl,      &
+                                         u2prof,       u2profl,     &
+                                         v2prof,       v2profl,     &
+                                         w2prof,       w2profl,     &
+                                         tkeprof,      tkeprofl,    &
+                                         tprof,        tprofl,      &
+                                         tvprof,       tvprofl,     &
+                                         rtprof,       rtprofl,     &
+                                         rlprof,       rlprofl,     &
+                                         ccprof,       ccprofl,     &
+                                         sigma2prof,   sigma2profl, &
+                                         fsprof,       fsprofl
 
   integer (KIND=selected_int_kind(10)):: idum = -12345
 
@@ -109,7 +111,7 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine particles(time,timmax) 
-    use grid, only : dxi, dyi, nstep, dzi_t, dt, nzp, zm, a_km, nxp, nyp
+    use grid, only : dxi, dyi, nstep, dzi_t, dt, nzp, zm, a_km, nxp, nyp, nfpt
     use defs, only : pi
     use mpi_interface, only : myid 
     implicit none
@@ -118,7 +120,7 @@ contains
     type (particle_record), pointer:: particle
 
     if (lpartsgs .and. nstep == 1) then
-      call calc_sgstke      ! Estimates SGS-TKE
+      call calc_sgstke            ! Estimates SGS-TKE
       call fsubgrid(time)         ! Calculates fraction SGS-TKE / TOTAL-TKE
     end if
 
@@ -139,10 +141,16 @@ contains
           particle%vres = vi3d(particle%x,particle%y,particle%z) * dyi
           particle%wres = wi3d(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
           if (lpartsgs .and. nstep == 1) then
-            call prep_sgs(particle)
-            particle%usgs   = usgs(particle) * dxi 
-            particle%vsgs   = vsgs(particle) * dyi
-            particle%wsgs   = wsgs(particle) * dzi_t(floor(particle%z))
+            if(particle%z < (nzp - nfpt)) then ! Exclude sponge layer
+              call prep_sgs(particle)
+              particle%usgs   = usgs(particle) * dxi 
+              particle%vsgs   = vsgs(particle) * dyi
+              particle%wsgs   = wsgs(particle) * dzi_t(floor(particle%z))
+            else
+              particle%usgs   = 0.
+              particle%vsgs   = 0.
+              particle%wsgs   = 0.
+            end if
           end if
         end if
       particle => particle%next
@@ -344,16 +352,16 @@ contains
       fs(1)       = 1. + (1.-fs(2))   ! fs    -> 1 at surface
 
       !Raw statistics dump
-      if((time + dt > tnextstat) .and. lpartstat .and. nstep==1) then
-        open(ifoutput,file='rawstat',position='append',action='write')
-        write(ifoutput,'(A2,F10.2)') '# ',time
-      
-        do k=1, nzp
-          write(ifoutput,'(I10,9E15.6)') k,zt(k),u_av(k),u2_av(k),v_av(k),v2_av(k),w2_av(k),e_res(k),sgse_av(k),fs(k)
-        end do
+      !if((time + dt > tnextstat) .and. lpartstat .and. nstep==1) then
+      !  open(ifoutput,file='rawstat',position='append',action='write')
+      !  write(ifoutput,'(A2,F10.2)') '# ',time
+      !
+      !  do k=1, nzp
+      !    write(ifoutput,'(I10,9E15.6)') k,zt(k),u_av(k),u2_av(k),v_av(k),v2_av(k),w2_av(k),e_res(k),sgse_av(k),fs(k)
+      !  end do
 
-        close(ifoutput) 
-      end if
+      !  close(ifoutput) 
+      !end if
 
       deallocate(u_avl,v_avl,u2_avl,v2_avl,w2_avl,sgse_avl,u_av,v_av,u2_av,v2_av,w2_av,sgse_av,e_res)
     end if
@@ -507,7 +515,7 @@ contains
 
     character (len=80) :: hname
     logical            :: dump = .true.
-    real               :: randnr(3)
+    real               :: randnr(3),temp
 
     ! Count number of local particles < zmax
     particle => head
@@ -528,9 +536,15 @@ contains
         !if( particle%z <= (1. + zmax) .and. particle%wres < 0. ) then
         if( particle%z <= (1. + zmax) ) then
           call random_number(randnr)          ! Random seed has been called from init_particles...
-          particle%x = randnr(1) * float(nxg) 
-          particle%y = randnr(2) * float(nyg)
-          particle%z = 1. + (zmax * randnr(3)) 
+          particle%x    = randnr(1) * float(nxg) 
+          particle%y    = randnr(2) * float(nyg)
+          particle%z    = 1. + (zmax * randnr(3))
+          particle%ures = 0. 
+          particle%vres = 0. 
+          particle%wres = 0. 
+          particle%usgs = 0. 
+          particle%vsgs = 0. 
+          particle%wsgs = 0. 
 
           call partbuffer(particle, buffsend(ii+1:ii+nrpartvar),ii,.true.)
           
@@ -573,7 +587,7 @@ contains
           call partbuffer(particle,buffrecv(ii+1:ii+nrpartvar),ii,.false.)
           particle%x = particle%x - (floor(wrxid * xsizelocal)) + 3
           particle%y = particle%y - (floor(wryid * ysizelocal)) + 3
-          particle%z = particle%z + 1
+          particle%z = particle%z !+ 1
         end if
       end if
       ii = ii + nrpartvar
@@ -1192,7 +1206,8 @@ contains
         tvprofl(k)      = tvprofl(k)    + thv
         rtprofl(k)      = rtprofl(k)    + rt
         rlprofl(k)      = rlprofl(k)    + rl
-        if(rl > 0.)     ccprofl(k)      = ccprofl(k)    + 1
+        if(rl > 0.)     ccprofl(k)      = ccprofl(k)     + 1
+        if(lpartsgs)    sigma2profl(k)  = sigma2profl(k) + particle%sigma2_sgs
         particle => particle%next
       end do 
 
@@ -1214,6 +1229,7 @@ contains
       call mpi_allreduce(rtprofl,rtprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
       call mpi_allreduce(rlprofl,rlprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
       call mpi_allreduce(ccprofl,ccprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      if(lpartsgs) call mpi_allreduce(sigma2profl,sigma2prof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
  
       ! Divide summed values by ntime and nparticle samples and
       ! correct for Galilean transformation 
@@ -1233,6 +1249,7 @@ contains
           rtprof(k)    = rtprof(k)    / (nstatsamp * npartprof(k))
           rlprof(k)    = rlprof(k)    / (nstatsamp * npartprof(k))
           ccprof(k)    = ccprof(k)    / (nstatsamp * npartprof(k))
+          if(lpartsgs) sigma2prof(k)  = 1.5 * sigma2prof(k)  / (nstatsamp * npartprof(k))
         end if
       end do      
 
@@ -1253,6 +1270,10 @@ contains
         call writevar_nc(ncpartstatid,'rt',rtprof,ncpartstatrec)
         call writevar_nc(ncpartstatid,'rl',rlprof,ncpartstatrec)
         call writevar_nc(ncpartstatid,'cc',ccprof,ncpartstatrec)
+        if(lpartsgs) then
+          call writevar_nc(ncpartstatid,'fs',fs,ncpartstatrec)
+          call writevar_nc(ncpartstatid,'sgstke',sigma2prof,ncpartstatrec)
+        end if
       end if
 
       npartprof  = 0
@@ -1309,7 +1330,8 @@ contains
     real                                 :: thl,thv,rt,rl
 
     nvar = 4                            ! id,x,y,z
-    if(lpartdumpui)  nvar = nvar + 6    ! u,v,w,us,vs,ws
+    if(lpartdumpui)  nvar = nvar + 3    ! u,v,w
+    if(lpartsgs)     nvar = nvar + 3    ! us,vs,ws
     if(lpartdumpth)  nvar = nvar + 2    ! thl,tvh
     if(lpartdumpmr)  nvar = nvar + 2    ! rt,rl
 
@@ -1342,10 +1364,13 @@ contains
         sendbuff(ii+nvl+1) = particle%ures * deltax
         sendbuff(ii+nvl+2) = particle%vres * deltay
         sendbuff(ii+nvl+3) = particle%wres / dzi_t(floor(particle%z))
-        sendbuff(ii+nvl+4) = particle%usgs * deltax
-        sendbuff(ii+nvl+5) = particle%vsgs * deltay
-        sendbuff(ii+nvl+6) = particle%wsgs / dzi_t(floor(particle%z))
-        nvl = nvl + 6
+        nvl = nvl + 3
+        if(lpartsgs) then
+          sendbuff(ii+nvl+1) = particle%usgs * deltax
+          sendbuff(ii+nvl+2) = particle%vsgs * deltay
+          sendbuff(ii+nvl+3) = particle%wsgs / dzi_t(floor(particle%z))
+          nvl = nvl + 3
+        end if
       end if
       if(lpartdumpth) then
         sendbuff(ii+nvl+1) = thl
@@ -1378,10 +1403,13 @@ contains
           particles_merged(partid,nvl+1) = sendbuff(ii+nvl+1)
           particles_merged(partid,nvl+2) = sendbuff(ii+nvl+2)
           particles_merged(partid,nvl+3) = sendbuff(ii+nvl+3)
-          particles_merged(partid,nvl+4) = sendbuff(ii+nvl+4)
-          particles_merged(partid,nvl+5) = sendbuff(ii+nvl+5)
-          particles_merged(partid,nvl+6) = sendbuff(ii+nvl+6)
-          nvl = nvl + 6
+          nvl = nvl + 3
+          if(lpartsgs) then
+            particles_merged(partid,nvl+1) = sendbuff(ii+nvl+1)
+            particles_merged(partid,nvl+2) = sendbuff(ii+nvl+2)
+            particles_merged(partid,nvl+3) = sendbuff(ii+nvl+3)
+            nvl = nvl + 3
+          end if
         end if
         if(lpartdumpth) then
           particles_merged(partid,nvl+1) = thl
@@ -1410,10 +1438,13 @@ contains
             particles_merged(partid,nvl+1) = recvbuff(ii+nvl+1)
             particles_merged(partid,nvl+2) = recvbuff(ii+nvl+2)
             particles_merged(partid,nvl+3) = recvbuff(ii+nvl+3)
-            particles_merged(partid,nvl+6) = recvbuff(ii+nvl+6)
-            particles_merged(partid,nvl+7) = recvbuff(ii+nvl+7)
-            particles_merged(partid,nvl+8) = recvbuff(ii+nvl+8)
-            nvl = nvl + 6
+            nvl = nvl + 3
+            if(lpartsgs) then
+              particles_merged(partid,nvl+1) = recvbuff(ii+nvl+1)
+              particles_merged(partid,nvl+2) = recvbuff(ii+nvl+2)
+              particles_merged(partid,nvl+3) = recvbuff(ii+nvl+3)
+              nvl = nvl + 3
+            end if
           end if
           if(lpartdumpth) then
             particles_merged(partid,nvl+1) = recvbuff(ii+nvl+1)
@@ -1446,10 +1477,13 @@ contains
         call writevar_nc(ncpartid,'u',particles_merged(:,nvl+1),ncpartrec)
         call writevar_nc(ncpartid,'v',particles_merged(:,nvl+2),ncpartrec)
         call writevar_nc(ncpartid,'w',particles_merged(:,nvl+3),ncpartrec)
-        call writevar_nc(ncpartid,'us',particles_merged(:,nvl+4),ncpartrec)
-        call writevar_nc(ncpartid,'vs',particles_merged(:,nvl+5),ncpartrec)
-        call writevar_nc(ncpartid,'ws',particles_merged(:,nvl+6),ncpartrec)
-        nvl = nvl + 6
+        nvl = nvl + 3
+        if(lpartsgs) then
+          call writevar_nc(ncpartid,'us',particles_merged(:,nvl+1),ncpartrec)
+          call writevar_nc(ncpartid,'vs',particles_merged(:,nvl+2),ncpartrec)
+          call writevar_nc(ncpartid,'ws',particles_merged(:,nvl+3),ncpartrec)
+          nvl = nvl + 3
+        end if
       end if
       if(lpartdumpth) then
         call writevar_nc(ncpartid,'t', particles_merged(:,nvl+1),ncpartrec)
@@ -1790,6 +1824,10 @@ contains
                    rtprof(nzp),   rtprofl(nzp),    &
                    rlprof(nzp),   rlprofl(nzp),    &
                    ccprof(nzp),   ccprofl(nzp))
+      if(lpartsgs) then
+        allocate(sigma2prof(nzp),sigma2profl(nzp), &
+                 fsprof(nzp),    fsprofl(nzp))
+      end if
     end if  
     close(ifinput)
 
@@ -1972,6 +2010,10 @@ contains
       call addvar_nc(ncpartstatid,'rt','total water mixing ratio','kg kg-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
       call addvar_nc(ncpartstatid,'rl','liquid water mixing ratio','kg kg-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
       call addvar_nc(ncpartstatid,'cc','cloud fraction','-',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      if(lpartsgs) then
+        call addvar_nc(ncpartstatid,'fs','fraction subgrid TKE','-',dimname,dimlongname,dimunit,dimsize,dimvalues)
+        call addvar_nc(ncpartstatid,'sgstke','subgrid TKE of particle','m s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      end if
     end if 
  
   end subroutine initparticlestat

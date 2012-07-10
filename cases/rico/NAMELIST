@@ -8,8 +8,8 @@
   deltaz       = 25.
   dzmax        = 10.
   dzrat        = 1.0
-  dtlong       = 4.
-  timmax       = 200.
+  dtlong       = 5.
+  timmax       = 100.
   wctime       = 99960. 
   runtype      = 'INITIAL'
   filprf       = 'rico'
@@ -47,5 +47,5 @@
   lpartdumpui  = .true.
   lpartdumpth  = .true.
   lpartdumpmr  = .true.
-  frqpartdump  = 30.
+  frqpartdump  = 5.
  /
