@@ -46,7 +46,7 @@ module modparticles
   character(30)      :: startfile
   integer            :: ifinput        = 1
   integer            :: np      
-  real               :: tnextdump !, tnextstat
+  real               :: tnextdump
   real               :: randint   = 20.
   real               :: tnextrand = 6e6
 
@@ -94,12 +94,17 @@ module modparticles
 
   ! Prognostic sgs-velocity-related variables
   real, allocatable, dimension(:,:,:) :: sgse
+  real, allocatable, dimension(:,:,:) :: rese
   real, allocatable, dimension(:)     :: fs
+  real, allocatable, dimension(:,:,:) :: fs_local
   real, parameter                     :: minsgse = 5e-5
   real, parameter                     :: C0      = 6.
   real                                :: dsigma2dx = 0, dsigma2dy = 0, dsigma2dz = 0, &
                                          dsigma2dt = 0, sigma2l = 0,   epsl = 0, fsl = 0
   real                                :: ceps, labda
+
+  ! Local or global calculated fs()
+  logical                             :: lfsloc = .true.
 
 contains
   !
@@ -120,8 +125,10 @@ contains
     type (particle_record), pointer:: particle
 
     if (lpartsgs .and. nstep == 1) then
-      call calc_sgstke            ! Estimates SGS-TKE
-      call fsubgrid               ! Calculates fraction SGS-TKE / TOTAL-TKE
+      call calc_sgstke                ! Estimates SGS-TKE
+      call calc_restke                ! Calculated Resolved TKE
+      call fsubgrid                   ! Calculates bulk fraction SGS-TKE / TOTAL-TKE
+      call fsubgrid_local             ! Calculated local   "     "     "      "
     end if
 
     ! Randomize particles lowest grid level
@@ -284,6 +291,82 @@ contains
 
   !
   !--------------------------------------------------------------------------
+  ! subroutine calc_restke
+  !> calculates resolved tke at cell center
+  !--------------------------------------------------------------------------
+  !
+  subroutine calc_restke
+    use grid, only              : nzp, a_up, a_vp, a_wp, nxp, nyp
+    use mpi_interface, only     : ierror, mpi_double_precision, mpi_sum, mpi_comm_world, nxg, nyg
+    implicit none
+    
+    integer                           :: i,j,k,ip,im,jp,jm,kp,km
+    real, allocatable, dimension(:)   :: u_avl, v_avl, u_av, v_av
+   
+    allocate(u_avl(nzp),v_avl(nzp),u_av(nzp),v_av(nzp))
+
+    do k=1,nzp
+      u_avl(k)    = sum(a_up(k,3:nxp-2,3:nyp-2))
+      v_avl(k)    = sum(a_vp(k,3:nxp-2,3:nyp-2))
+    end do 
+
+    call mpi_allreduce(u_avl,u_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+    call mpi_allreduce(v_avl,v_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+
+    u_av        = u_av    / (nxg * nyg)  
+    v_av        = v_av    / (nxg * nyg)     
+
+    do j=2,nyp-1
+       jp = j+1
+       jm = j-1
+       do i=2,nxp-1
+          ip = i+1
+          im = i-1
+          do k=2,nzp-1
+            kp = k+1
+            km = k-1            
+            rese(k,i,j) = ((0.5 * (a_up(k,i,j) + a_up(k,im,j)) - u_av(k))**2.  + &
+                           (0.5 * (a_vp(k,i,j) + a_vp(k,i,jm)) - v_av(k))**2.  + &
+                           (0.5 * (a_wp(k,i,j) + a_wp(km,i,j))          )**2.) / 2. 
+          end do
+       end do
+    end do
+
+    deallocate(u_avl,v_avl,u_av,v_av)
+
+  end subroutine calc_restke
+
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine fsubgrid_local : 
+  !> Calculates fs (contribution sgs turbulence to total turbulence)
+  !> at grid center
+  !--------------------------------------------------------------------------
+  !
+  subroutine fsubgrid_local
+    use grid, only    : nzp, nxp, nyp
+    implicit none
+
+    integer :: i,j,k,im,ip,jm,jp,km,kp   
+ 
+    do j=2,nyp-1
+      jp = j+1
+      jm = j-1
+      do i=2,nxp-1
+        ip = i+1
+        im = i-1
+        do k=2,nzp-1
+          kp = k+1
+          km = k-1            
+          fs_local(k,i,j)  = sgse(k,i,j) / (sgse(k,i,j) + rese(k,i,j))
+          end do
+       end do
+    end do
+
+  end subroutine fsubgrid_local
+
+  !
+  !--------------------------------------------------------------------------
   ! subroutine fsubgrid : 
   !> Calculates fs (contribution sgs turbulence to total turbulence)
   !--------------------------------------------------------------------------
@@ -298,9 +381,11 @@ contains
        u_avl, v_avl, u2_avl, v2_avl, w2_avl, sgse_avl,     &
        u_av,  v_av,  u2_av,  v2_av,  w2_av,  sgse_av, e_res
 
-    ! Hardcoded switch to fix fs at one
+  ! ******************************************
+  ! Hardcoded switch to fix fs at one
     logical :: fixedfs = .false.
-
+  ! ******************************************
+    
     if(fixedfs) then
       fs = 1.
     else
@@ -378,8 +463,14 @@ contains
 
     zbottom      = floor(particle%z + 0.5)
     deltaz       = ((zm(floor(particle%z)) + (particle%z - floor(particle%z)) / dzi_t(floor(particle%z))) - zt(zbottom)) * dzi_m(zbottom)
-    fsl          = (1-deltaz) * fs(zbottom) + deltaz * fs(zbottom+1)
-    
+    if(lfsloc) then
+      fsl        = i3d(particle%x,particle%y,particle%z,fs_local)
+    else
+      fsl        = (1-deltaz) * fs(zbottom) + deltaz * fs(zbottom+1)
+    end if    
+
+    !print*,i3d(particle%x,particle%y,particle%z,fs_local),((1-deltaz) * fs(zbottom) + deltaz * fs(zbottom+1))
+
     sigma2l      = i3d(particle%x,particle%y,particle%z,sgse) * (2./3.)
     
     dsigma2dx    = (2./3.) * (i3d(particle%x+0.5,particle%y,particle%z,sgse) - &
@@ -1197,7 +1288,10 @@ contains
         rtprofl(k)      = rtprofl(k)    + rt
         rlprofl(k)      = rlprofl(k)    + rl
         if(rl > 0.)     ccprofl(k)      = ccprofl(k)     + 1
-        if(lpartsgs)    sigma2profl(k)  = sigma2profl(k) + particle%sigma2_sgs
+        if(lpartsgs) then
+          sigma2profl(k)        = sigma2profl(k) + particle%sigma2_sgs
+          if(lfsloc) fsprofl(k) = fsprofl(k) + i3d(particle%x,particle%y,particle%z,fs_local)
+        end if
         particle => particle%next
       end do 
 
@@ -1219,8 +1313,11 @@ contains
       call mpi_allreduce(rtprofl,rtprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
       call mpi_allreduce(rlprofl,rlprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
       call mpi_allreduce(ccprofl,ccprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-      if(lpartsgs) call mpi_allreduce(sigma2profl,sigma2prof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
- 
+      if(lpartsgs) then
+        call mpi_allreduce(sigma2profl,sigma2prof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+        if(lfsloc) call mpi_allreduce(fsprofl,fsprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      end if 
+
       ! Divide summed values by ntime and nparticle samples and
       ! correct for Galilean transformation 
       do k = 1,nzp
@@ -1239,7 +1336,10 @@ contains
           rtprof(k)    = rtprof(k)    / (nstatsamp * npartprof(k))
           rlprof(k)    = rlprof(k)    / (nstatsamp * npartprof(k))
           ccprof(k)    = ccprof(k)    / (nstatsamp * npartprof(k))
-          if(lpartsgs) sigma2prof(k)  = 1.5 * sigma2prof(k)  / (nstatsamp * npartprof(k))
+          if(lpartsgs) then
+            sigma2prof(k)  = 1.5 * sigma2prof(k)  / (nstatsamp * npartprof(k))
+            if(lfsloc) fsprof(k) = fsprof(k)   / (nstatsamp * npartprof(k))
+          end if
         end if
       end do      
 
@@ -1261,7 +1361,11 @@ contains
         call writevar_nc(ncpartstatid,'rl',rlprof,ncpartstatrec)
         call writevar_nc(ncpartstatid,'cc',ccprof,ncpartstatrec)
         if(lpartsgs) then
-          call writevar_nc(ncpartstatid,'fs',fs,ncpartstatrec)
+          if(lfsloc) then
+            call writevar_nc(ncpartstatid,'fs',fsprof,ncpartstatrec)
+          else
+            call writevar_nc(ncpartstatid,'fs',fs,ncpartstatrec)
+          end if
           call writevar_nc(ncpartstatid,'sgstke',sigma2prof,ncpartstatrec)
         end if
       end if
@@ -1292,6 +1396,8 @@ contains
       rlprofl    = 0
       ccprof     = 0
       ccprofl    = 0
+      fsprof     = 0
+      fsprofl    = 0
       nstatsamp  = 0
     end if
 
@@ -1820,7 +1926,7 @@ contains
     end if  
     close(ifinput)
 
-    if(lpartsgs)  allocate(sgse(nzp,nxp,nyp),fs(nzp))
+    if(lpartsgs)  allocate(sgse(nzp,nxp,nyp),rese(nzp,nxp,nyp),fs_local(nzp,nxp,nyp),fs(nzp))
     call init_random_seed()
 
   end subroutine init_particles

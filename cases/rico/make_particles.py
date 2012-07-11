@@ -8,7 +8,7 @@ from pylab import *
   # ----------------------------------------------
 if(True):
   # INPUT:
-  tstart      = 0.
+  tstart      = 300.
   nxy         = 32**2.       # Goal # per level
   nz          = 118          # Number of vertical levels
   dz          = 25.          # Vertical grid spacing
