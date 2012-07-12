@@ -98,13 +98,14 @@ module modparticles
   real, allocatable, dimension(:)     :: fs
   real, allocatable, dimension(:,:,:) :: fs_local
   real, parameter                     :: minsgse = 5e-5
-  real, parameter                     :: C0      = 6.
+  real, parameter                     :: C0      = 4.
   real                                :: dsigma2dx = 0, dsigma2dy = 0, dsigma2dz = 0, &
                                          dsigma2dt = 0, sigma2l = 0,   epsl = 0, fsl = 0
-  real                                :: ceps, labda
+  real                                :: ceps, labda, spngl  
 
-  ! Local or global calculated fs()
-  logical                             :: lfsloc = .true.
+  ! Test switches...
+  logical                             :: lfsloc = .true.  ! Local or global calculated fs()
+  logical                             :: fixedfs = .false.  ! Fix fs at 1.
 
 contains
   !
@@ -148,16 +149,10 @@ contains
           particle%vres = vi3d(particle%x,particle%y,particle%z) * dyi
           particle%wres = wi3d(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
           if (lpartsgs .and. nstep == 1) then
-            if(particle%z < (nzp - nfpt)) then ! Exclude sponge layer
-              call prep_sgs(particle)
-              particle%usgs   = usgs(particle) * dxi 
-              particle%vsgs   = vsgs(particle) * dyi
-              particle%wsgs   = wsgs(particle) * dzi_t(floor(particle%z))
-            else
-              particle%usgs   = 0.
-              particle%vsgs   = 0.
-              particle%wsgs   = 0.
-            end if
+            call prep_sgs(particle)
+            particle%usgs   = usgs(particle) * dxi 
+            particle%vsgs   = vsgs(particle) * dyi
+            particle%wsgs   = wsgs(particle) * dzi_t(floor(particle%z))
           end if
         end if
       particle => particle%next
@@ -329,6 +324,8 @@ contains
                            (0.5 * (a_vp(k,i,j) + a_vp(k,i,jm)) - v_av(k))**2.  + &
                            (0.5 * (a_wp(k,i,j) + a_wp(km,i,j))          )**2.) / 2. 
           end do
+          rese(1,i,j)   = rese(2,i,j)
+          rese(nzp,i,j) = rese(nzp-1,i,j)
        end do
     end do
 
@@ -344,10 +341,11 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine fsubgrid_local
-    use grid, only    : nzp, nxp, nyp
+    use grid, only    : nzp, nxp, nyp, dzi_m, nfpt
     implicit none
 
-    integer :: i,j,k,im,ip,jm,jp,km,kp   
+    integer :: i,j,k,im,ip,jm,jp,km,kp  
+    real    :: dfsdz 
  
     do j=2,nyp-1
       jp = j+1
@@ -355,12 +353,19 @@ contains
       do i=2,nxp-1
         ip = i+1
         im = i-1
-        do k=2,nzp-1
+        do k=2,nzp
           kp = k+1
-          km = k-1            
-          fs_local(k,i,j)  = sgse(k,i,j) / (sgse(k,i,j) + rese(k,i,j))
-          end do
-       end do
+          km = k-1
+          if(k > nzp-nfpt) then       ! fix fs in ghost cells & sponge layer
+            fs_local(k,i,j) = fs_local(k-1,i,j)
+          else                        ! calculate fs
+            fs_local(k,i,j)  = sgse(k,i,j) / (sgse(k,i,j) + rese(k,i,j))
+          end if
+        end do
+        ! Extrapolate for lowest half level
+        dfsdz = (fs_local(3,i,j) - fs_local(2,i,j)) * dzi_m(2)       
+        fs_local(1,i,j) = fs_local(2,i,j) - (dfsdz / dzi_m(1))
+      end do
     end do
 
   end subroutine fsubgrid_local
@@ -372,7 +377,7 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine fsubgrid
-    use grid, only : a_up, a_vp, a_wp, nzp, nxp, nyp, dt, nstep, zt
+    use grid, only : a_up, a_vp, a_wp, nzp, nxp, nyp, dt, nstep, zt, nfpt
     use mpi_interface, only : ierror, mpi_double_precision, mpi_sum, mpi_comm_world, nxg, nyg
     implicit none
   
@@ -381,11 +386,6 @@ contains
        u_avl, v_avl, u2_avl, v2_avl, w2_avl, sgse_avl,     &
        u_av,  v_av,  u2_av,  v2_av,  w2_av,  sgse_av, e_res
 
-  ! ******************************************
-  ! Hardcoded switch to fix fs at one
-    logical :: fixedfs = .false.
-  ! ******************************************
-    
     if(fixedfs) then
       fs = 1.
     else
@@ -423,11 +423,16 @@ contains
  
       do k=2, nzp
         e_res(k)  = 0.5 * (u2_av(k) + v2_av(k) + 0.5*(w2_av(k) + w2_av(k-1)))
-        fs(k)     = sgse_av(k) / (sgse_av(k) + e_res(k))
+        if(k > nzp-nfpt) then       ! fix fs in ghost cells & sponge layer
+          fs(k) = fs(k-1)
+        else
+          fs(k)     = sgse_av(k) / (sgse_av(k) + e_res(k))
+        end if
       end do
 
-      e_res(1)    = -e_res(2)         ! e_res -> 0 at surface
-      fs(1)       = 1. + (1.-fs(2))   ! fs    -> 1 at surface
+      e_res(1)    = -e_res(2)                   ! e_res -> 0 at surface
+      fs(1)       = fs(2) - (fs(3) - fs(2))     ! fs    -> extrapolate to surface 
+      !fs(1)       = 1. + (1.-fs(2))            ! fs    -> 1 at surface
 
       !Raw statistics dump
       !CAUTION:	NEEDS TO BE FIXED, STAT TIMEKEEPING NO LONGER IN PARTICLES.F90
@@ -453,11 +458,11 @@ contains
   !--------------------------------------------------------------------------
   ! 
   subroutine prep_sgs(particle)
-    use grid, only : dxi, dyi, dt, a_scr7, zm, zt, dzi_t, dzi_m, a_tp, a_rp, nxp,nyp, th00
+    use grid, only : dxi, dyi, dt, a_scr7, zm, zt, dzi_t, dzi_m, a_tp, a_rp, nxp, nyp, nzp, th00, nfpt, distim
     use defs, only : g,pi
     implicit none
 
-    real     :: deltaz
+    real     :: deltaz, zparticle
     integer  :: zbottom
     TYPE (particle_record), POINTER:: particle
 
@@ -469,8 +474,6 @@ contains
       fsl        = (1-deltaz) * fs(zbottom) + deltaz * fs(zbottom+1)
     end if    
 
-    !print*,i3d(particle%x,particle%y,particle%z,fs_local),((1-deltaz) * fs(zbottom) + deltaz * fs(zbottom+1))
-
     sigma2l      = i3d(particle%x,particle%y,particle%z,sgse) * (2./3.)
     
     dsigma2dx    = (2./3.) * (i3d(particle%x+0.5,particle%y,particle%z,sgse) - &
@@ -481,6 +484,16 @@ contains
                               i3d(particle%x,particle%y,particle%z-0.5,sgse)) * dzi_t(floor(particle%z))
     dsigma2dt    = (sigma2l - particle%sigma2_sgs) / dt
     particle%sigma2_sgs = sigma2l
+
+    ! Damping subgrid velocities in sponge layer
+    ! spngl = damping time scale at particle height.
+    !if(particle%z > (nzp - nfpt)) then
+    !  zparticle = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
+    !  spngl = max(0.,(zm(nzp) - zparticle) / ((zm(nzp) - zm(nzp-nfpt)) * distim))
+    !  spngl = max(0.,(1. / distim - spngl))
+    !else
+    !  spngl = 0.
+    !end if
 
   end subroutine prep_sgs
 
@@ -494,12 +507,13 @@ contains
     use grid, only : dxi, dt
     implicit none
 
-    real :: t1, t2, t3, usgs
+    real :: t1, t2, t3, ts, usgs
     TYPE (particle_record), POINTER:: particle
 
     t1        = (-0.75 * fsl * C0 * (particle%usgs / dxi) * (ceps/labda) * (1.5 * sigma2l)**0.5) * dt
     t2        = ( 0.5 * ((1. / sigma2l) * dsigma2dt * (particle%usgs / dxi) + dsigma2dx)) * dt
     t3        = ((fsl * C0 * (ceps/labda) * (1.5*sigma2l)**(1.5))**0.5 * xi(idum))
+    !ts        = -spngl * (particle%usgs / dxi)
 
     ! 1. dissipation subgrid velocity cannot exceed subgrid velocity itself 
     if(sign(1.,t1 + particle%usgs / dxi) .ne. sign(1.,particle%usgs / dxi)) t1 = - particle%usgs / dxi
@@ -510,7 +524,7 @@ contains
       t1 = -0.5 * particle%usgs / dxi
       t2 = -0.5 * particle%usgs / dxi
     end if
-   
+     
     usgs = (particle%usgs / dxi) + (t1 + t2 + t3)  
 
   end function usgs
@@ -525,12 +539,13 @@ contains
     use grid, only : dyi, dt
     implicit none
 
-    real :: t1, t2, t3, vsgs
+    real :: t1, t2, t3, ts, vsgs
     TYPE (particle_record), POINTER:: particle
 
     t1        = (-0.75 * fsl * C0 * (particle%vsgs / dyi) * (ceps/labda) * (1.5 * sigma2l)**0.5) * dt
     t2        = ( 0.5 * ((1. / sigma2l) * dsigma2dt * (particle%vsgs / dyi) + dsigma2dy)) * dt
     t3        = ((fsl * C0 * (ceps/labda) * (1.5*sigma2l)**(1.5))**0.5 * xi(idum))
+    !ts        = -spngl * (particle%vsgs / dyi)
 
     ! 1. dissipation subgrid velocity cannot exceed subgrid velocity itself 
     if(sign(1.,t1 + particle%vsgs / dyi) .ne. sign(1.,particle%vsgs / dyi)) t1 = - particle%vsgs / dyi
@@ -556,13 +571,14 @@ contains
     use grid, only : dzi_t, dt
     implicit none
 
-    real :: t1, t2, t3, wsgs, dzi
+    real :: t1, t2, t3, ts, wsgs, dzi
     TYPE (particle_record), POINTER:: particle
 
     dzi        = dzi_t(floor(particle%z))
     t1        = (-0.75 * fsl * C0 * (particle%wsgs / dzi) * (ceps/labda) * (1.5 * sigma2l)**0.5) * dt
     t2        = ( 0.5 * ((1. / sigma2l) * dsigma2dt * (particle%wsgs / dzi) + dsigma2dz)) * dt
     t3        = ((fsl * C0 * (ceps/labda) * (1.5*sigma2l)**(1.5))**0.5 * xi(idum))
+    !ts        = -spngl * (particle%wsgs / dzi)
 
     ! 1. dissipation subgrid velocity cannot exceed subgrid velocity itself 
     if(sign(1.,t1 + particle%wsgs / dzi) .ne. sign(1.,particle%wsgs / dzi)) t1 = - particle%wsgs / dzi
@@ -863,7 +879,6 @@ contains
     zbottom = floor(z + 0.5)
     deltaz = z + 0.5 - zbottom
 
-    i1d    =  (1-deltaz) * input(zbottom) + deltaz * input(zbottom+1)
     i1d    =  (1-deltaz) * input(zbottom) + deltaz * input(zbottom+1)
 
   end function i1d
@@ -1819,7 +1834,11 @@ contains
       close(666)
 
       call mpi_allreduce(firststartl,firststart,1,mpi_double_precision,mpi_min,mpi_comm_world,ierror)
-      tnextrand = firststart
+      if(lrandsurf) then
+        tnextrand = firststart
+      else
+        tnextrand = 9e9
+      end if
 
     else                 
     ! ------------------------------------------------------

@@ -1,7 +1,7 @@
  &model
   nxp          = 36
   nyp          = 36
-  nzp          = 120
+  nzp          = 130
   nxpart       = .true.
   deltax       = 25.
   deltay       = 25.
@@ -9,7 +9,7 @@
   dzmax        = 10.
   dzrat        = 1.0
   dtlong       = 5.
-  timmax       = 1000.
+  timmax       = 200.
   wctime       = 99960. 
   runtype      = 'INITIAL'
   filprf       = 'rico'
@@ -47,5 +47,5 @@
   lpartdumpui  = .true.
   lpartdumpth  = .true.
   lpartdumpmr  = .true.
-  frqpartdump  = 3600.
+  frqpartdump  = 10.
  /
