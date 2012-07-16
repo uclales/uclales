@@ -295,8 +295,8 @@ module lsmdata
 
     if ((time_in*86400.) .le. dt) then
 
-       !Qnet             = 0
-       !G0               = 0
+       Qnet             = 0
+       G0               = 0
 
        a_tskin          = th00
        a_qskin          = sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)

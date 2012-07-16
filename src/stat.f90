@@ -162,9 +162,8 @@ contains
          , vmean, dn0, prc_c,prc_g,prc_i,prc_r,prc_s, prc_h, a_rpp, a_npp, albedo, CCN, iradtyp, a_rflx    &
          , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa &
          , a_ricep, a_rsnowp, a_rgrp, a_rhailp, a_nicep, a_nsnowp, a_ngrp, a_nhailp &
-         , vapor, a_Wl, isfctyp 
-    use lsmdata, only: Qnet,G0,tndskin,ra,rsurf,rsveg,rssoil,a_tskin,a_qskin,  &
-                       obl, cliq, Cskinav
+         , vapor, a_Wl, isfctyp, a_tskin, a_qskin
+    use lsmdata, only: Qnet,G0,tndskin,ra,rsurf,rsveg,rssoil,obl,cliq,Cskinav
 
     real, intent (in) :: time
 
