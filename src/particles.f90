@@ -173,7 +173,8 @@ contains
     if (nstep==3) then
       ! Particle dump
       if((time + (0.5*dt) >= tnextdump .or. time + dt >= timmax) .and. lpartdump) then
-        call particledump(time)
+        !call particledump(time)
+        call rawparticledump(time)
         tnextdump = tnextdump + frqpartdump
       end if
       !call checkdiv
@@ -1417,6 +1418,52 @@ contains
     end if
 
   end subroutine particlestat
+
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine rawparticledump : Quick'n'dirty binary particle dump 
+  !   to test performance versus NetCDF
+  !--------------------------------------------------------------------------
+  !
+  subroutine rawparticledump(time)
+    use grid, only   : tname, deltax, deltay, dzi_t, zm
+    use mpi_interface, only : nxprocs, nyprocs, wrxid, wryid, nxg, nyg
+
+    implicit none
+
+    real, intent(in)                     :: time
+    real                                 :: px,py,pz,pu,pv,pw
+    real                                 :: thl,thv,rt,rl
+    integer                              :: ploc
+    character (len=80)                   :: hname
+    type (particle_record), pointer:: particle
+
+
+    write(hname,'(i4.4,a1,i4.4)') wrxid,'_',wryid
+    hname = 'rawparticles.'//trim(hname)
+
+    open(123,file=hname,form='unformatted',position = 'append',action='write')
+    write(123) time
+
+    ! Loop through particles
+    particle => head
+    do while( associated(particle) )
+      call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
+      ploc = particle%unique
+      px = (wrxid * (nxg / nxprocs) + particle%x - 3) * deltax
+      py = (wryid * (nyg / nyprocs) + particle%y - 3) * deltay
+      pz = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
+      pu = particle%ures * deltax
+      pv = particle%vres * deltay
+      pw = particle%wres / dzi_t(floor(particle%z))
+
+      write(123) ploc,px,py,pz,pu,pv,pw,thl,thv,rt,rl
+      particle => particle%next
+    end do
+
+    close(123)
+
+  end subroutine rawparticledump
 
   !
   !--------------------------------------------------------------------------
