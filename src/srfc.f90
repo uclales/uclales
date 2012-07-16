@@ -1014,7 +1014,7 @@ contains
         lambdash(ksoilmax,i,j) = lambdas(ksoilmax,i,j)
 
         !" Solve the diffusion equation for the heat transport
-        a_tsoil(1,i,j) = tsoilm(1,i,j) + rk3coef * ( lambdah(1,i,j) * (a_tsoil(2,i,j) - a_tsoil(1,i,j)) / dzsoilh(1) + G0(i,j) ) / dzsoil(1) / pCs(i,j,1)
+        a_tsoil(1,i,j) = tsoilm(1,i,j) + rk3coef * ( lambdah(1,i,j) * (a_tsoil(2,i,j) - a_tsoil(1,i,j)) / dzsoilh(1) + G0(i,j) ) / dzsoil(1) / pCs(1,i,j)
 
         do k = 2, ksoilmax-1
           a_tsoil(k,i,j) = tsoilm(k,i,j) + rk3coef / pCs(k,i,j) * ( lambdah(k,i,j) * (a_tsoil(k+1,i,j) - a_tsoil(k,i,j)) / dzsoilh(k) - lambdah(k-1,i,j) * (a_tsoil(k,i,j) - a_tsoil(k-1,i,j)) / dzsoilh(k-1) ) / dzsoil(k)

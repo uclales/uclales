@@ -4,6 +4,7 @@
   use grid
   use mpi_interface, only : appl_abort, myid, pecount, wrxid, wryid
   use mcrp, only : cldw,rain,ice,snow,graupel,hail
+  use lsmdata, only : Qnet, G0
 
   implicit none
   private
@@ -54,7 +55,7 @@ contains
        iret = nf90_put_att(ncid,NF90_GLOBAL,'history','Created on '//date)
        iret = nf90_put_att(ncid, NF90_GLOBAL, 'Source','UCLA-LES Version 2.0')
        iret = nf90_put_att(ncid, NF90_GLOBAL, 'Author','Bjorn Stevens')
- !      iret = nf90_put_att(ncid, NF90_GLOBAL, '_FillValue',-999.)
+      !iret = nf90_put_att(ncid, NF90_GLOBAL, '_FillValue',-999.)
        iret = nf90_put_att(ncid, NF90_GLOBAL, 'NPTS',npts)
        iret = nf90_put_att(ncid, NF90_GLOBAL, 'NPROCS',pecount)
        iret = nf90_put_att(ncid, NF90_GLOBAL, 'PROCID',myid)
@@ -101,7 +102,7 @@ contains
        if (present(n1)) then
           iret = nf90_def_dim(ncID, 'zt', n1, ztID)
           iret = nf90_def_dim(ncID, 'zm', n1, zmID)
-          iret = nf90_def_dim(ncID, 'zsoil', n1, zsoilID)
+          iret = nf90_def_dim(ncID, 'zsoil', 4, zsoilID)
        end if
        if (present(n2)) then
           iret = nf90_def_dim(ncID, 'xt', n2, xtID)
@@ -222,7 +223,7 @@ contains
              end if
           case ('mmt')
              iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_mmt,VarID)
-          case ('soilttt') 
+          case ('soilmmt') 
              iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_soilmmt,VarID)
           case default
              if (myid == 0) print *, '  ABORTING: Bad dimensional information'
@@ -260,16 +261,16 @@ contains
 
     use mpi_interface, only :myid
 
-!irina
-    integer, parameter :: nnames = 40
+    integer, parameter :: nnames = 37
     character (len=7), save :: sbase(nnames) =  (/ &
-         'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,&
-         'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,&  
-         'w      ','t      ','p      ','q      ','l      ','r      '   ,&
-         'n      ','rice   ','nice   ','rsnow  ','rgrp   ','nsnow  '   ,&
-         'ngrp   ','rhail  ','nhail  ','stke   ','rflx   ','lflxu  '   ,&
-         'lflxd  ','shf    ','lhf    ','Qnets  ','G0s    ','ustars '   ,&
-         'a_tskin','a_qskin','tsoil  ','phiw   '/)
+         'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,& !1
+         'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,& !7 
+         'w      ','t      ','p      ','q      ','l      ','r      '   ,& !13
+         'n      ','rice   ','nice   ','rsnow  ','rgrp   ','nsnow  '   ,& !19
+         'ngrp   ','rhail  ','nhail  ','rflx   ','lflxu  ','lflxd  '   ,& !25
+         'shf    ','lhf    ','ustars ','a_tskin','a_qskin','tsoil  '   ,& !31
+         'phiw   '/)                                                      !37
+
 
     real, intent (in) :: time
     integer           :: nbeg, nend
@@ -281,6 +282,7 @@ contains
     if (level  >= 4) nvar0 = nvar0+4
     if (level  >= 5) nvar0 = nvar0+4
     if (iradtyp > 1) nvar0 = nvar0+3
+    if (isfctyp == 5) nvar0 = nvar0+7
 
     allocate (sanal(nvar0))
     sanal(1:nbase) = sbase(1:nbase)
@@ -331,14 +333,16 @@ contains
     end if
     if (iradtyp > 1) then
        nvar0 = nvar0+1
+       sanal(nvar0) = sbase(28)
+       nvar0 = nvar0+1
        sanal(nvar0) = sbase(29)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(30)
-       nvar0 = nvar0+1
-       sanal(nvar0) = sbase(31)
     end if
 
     if (isfctyp == 5) then
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(31)
        nvar0 = nvar0+1
        sanal(nvar0)=sbase(32)
        nvar0 = nvar0+1
@@ -351,12 +355,10 @@ contains
        sanal(nvar0)=sbase(36)
        nvar0 = nvar0+1
        sanal(nvar0)=sbase(37)
-       nvar0 = nvar0+1
-       sanal(nvar0)=sbase(38)
-       nvar0 = nvar0+1
-       sanal(nvar0)=sbase(39)
-       nvar0 = nvar0+1
-       sanal(nvar0)=sbase(40)
+    !  nvar0 = nvar0+1
+    !  sanal(nvar0)=sbase(38)
+    !  nvar0 = nvar0+1
+    !  sanal(nvar0)=sbase(39)
     end if
 
     nbeg = nvar0+1
@@ -394,16 +396,19 @@ contains
     use netcdf
     use mpi_interface, only : myid, appl_abort
     use defs, only : cp, alvl
-    use lsmdata, only: Qnet,G0
 
     real, intent (in) :: time
 
     integer :: iret, VarID, nn, n
     integer :: ibeg(4), icnt(4), i1, i2, j1, j2
+    integer :: icntsfc(3),icntsoil(4),ibegsfc(3)
 
     !return 
-    icnt = (/nzp,nxp-4,nyp-4,1   /)
+    icnt = (/nzp,nxp-4,nyp-4,1/)
+    icntsfc = (/nxp-4,nyp-4,1/)
+    icntsoil = (/4,nxp-4,nyp-4,1/)
     ibeg = (/1  ,1  ,1  ,nrec0/)
+    ibegsfc = (/1,1,nrec0/)
     i1 = 3
     i2 = nxp-2
     j1 = 3
@@ -450,72 +455,112 @@ contains
          count=icnt)
 
     if (level >= 2)  then
-!        nn = nn+1
        iret = nf90_inq_varid(ncid0, sanal(17), VarID)
        iret = nf90_put_var(ncid0, VarID, liquid(:,i1:i2,j1:j2), start=ibeg, &
             count=icnt)
     end if
     nn = nbase+2
-!     if (level >=3) then
-      do n = nbase+2, nvar0-1
-       nn = nn+1
-       call newvar(nn-12)
-       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
-       iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
-            count=icnt)
+
+    if (level >=3) then
+       do n = nbase+2, 18
+        nn = nn+1
+        call newvar(nn-12)
+        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
+               count=icnt)
+         !if (myid==0) print*,"sanal(nn):",sanal(nn),nn
+       end do
+    endif
+
+    if (level >=4) then
+      do n = 20, 23
+        nn = nn+1
+        call newvar(nn-12)
+        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
+               count=icnt)
+        !if (myid==0) print*,"sanal(nn):",sanal(nn),nn
       end do
-! 
-!     if (iradtyp > 1)  then
-!        nn = nn+1
-!        iret = nf90_inq_varid(ncid0, 'rflx', VarID)
-!        iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
-!             count=icnt)
-!   !irina          
-!        nn = nn+1
-!        iret = nf90_inq_varid(ncid0, 'lflxu', VarID)
-!        iret = nf90_put_var(ncid0, VarID, a_lflxu(:,i1:i2,j1:j2), start=ibeg, &
-!             count=icnt)
-!        nn = nn+1
-!        iret = nf90_inq_varid(ncid0, 'lflxd', VarID)
-!        iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
-!             count=icnt)
-!     end if
+    endif  
+
+    if (level >=5) then
+      do n = 24, 27
+        nn = nn+1
+        call newvar(nn-12)
+        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
+             count=icnt)
+        !if (myid==0) print*,"sanal(nn):",sanal(nn),nn
+      end do
+    endif  
+
+    if (iradtyp > 1)  then
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)  
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_lflxu(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+    end if
+
+
+    !if (myid==0) print*,"*******"
+    !if (myid==0) print*,"size shf:",size(wt_sfc(i1:i2,j1:j2))
+    !if (myid==0) print*,"*******"
+    !if (myid==0) print*,"size a_ustar:",size(a_ustar(i1:i2,j1:j2))
+    !if (myid==0) print*,"*******"
+    !if (myid==0) print*,"wtsfc(all):",wt_sfc
+    !if (myid==0) print*,"*******"
+
+    !Malte: Land Surface Output for isfctyp=5
+    if (isfctyp == 5) then 
+       iret = nf90_inq_varid(ncid0, sanal(nn+1), VarID)
+       iret = nf90_put_var(ncid0, VarID, wt_sfc(i1:i2,j1:j2), &
+              start=ibegsfc, count=icntsfc)
+       iret = nf90_inq_varid(ncid0, sanal(nn+2), VarID)
+       iret = nf90_put_var(ncid0, VarID, wq_sfc(i1:i2,j1:j2), &
+              start=ibegsfc, count=icntsfc)
+       iret = nf90_inq_varid(ncid0, sanal(nn+3), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_ustar(i1:i2,j1:j2), &
+              start=ibegsfc, count=icntsfc)
+       iret = nf90_inq_varid(ncid0, sanal(nn+4), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_tskin(i1:i2,j1:j2), &
+              start=ibegsfc, count=icntsfc)
+       iret = nf90_inq_varid(ncid0, sanal(nn+5), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_qskin(i1:i2,j1:j2), &
+              start=ibegsfc, count=icntsfc)
+       iret = nf90_inq_varid(ncid0, sanal(nn+6), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_tsoil(:,i1:i2,j1:j2), &
+              start=ibeg, count=icntsoil)
+       iret = nf90_inq_varid(ncid0, sanal(nn+7), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_phiw(:,i1:i2,j1:j2), &
+              start=ibeg, count=icntsoil)!
+
+       !print*,"*",myid,sanal(nn+2),nn+2
+       !if (iret.ne.nf90_noerr) print*,myid,nf90_strerror(iret),nn+2
+
+       !iret = nf90_inq_varid(ncid0, sanal(nn+3), VarID)
+       !iret = nf90_put_var(ncid0, VarID, Qnet(i1:i2,j1:j2), &
+       !       start=ibegsfc, count=icntsfc)
+       !iret = nf90_inq_varid(ncid0, sanal(nn+4), VarID)
+       !iret = nf90_put_var(ncid0, VarID, G0(i1:i2,j1:j2), &
+       !       start=ibegsfc, count=icntsfc)
+
+       !print*,myid,sanal(nn+4),nn+4
+       !if (iret.ne.nf90_noerr) print*,myid,nf90_strerror(iret),nn+4
+
+    end if 
 
 !     if (nn /= nvar0) then
 !        if (myid == 0) print *, 'ABORTING:  Anal write error'
 !        call appl_abort(0)
 !     end if
-
-    !Malte
-    if (isfctyp == 5) then
-       iret = nf90_inq_varid(ncid0, sanal(32), VarID)
-       iret = nf90_put_var(ncid0, VarID, wt_sfc(i1:i2,j1:j2)*cp*(dn0(1)+dn0(2))*0.5, &
-              start=ibeg, count=icnt)
-       iret = nf90_inq_varid(ncid0, sanal(33), VarID)
-       iret = nf90_put_var(ncid0, VarID, wq_sfc(i1:i2,j1:j2)*alvl*(dn0(1)+dn0(2))*0.5, &
-              start=ibeg, count=icnt)
-       iret = nf90_inq_varid(ncid0, sanal(34), VarID)
-       iret = nf90_put_var(ncid0, VarID, Qnet(i1:i2,j1:j2), &
-              start=ibeg, count=icnt)
-       iret = nf90_inq_varid(ncid0, sanal(35), VarID)
-       iret = nf90_put_var(ncid0, VarID, G0(i1:i2,j1:j2), &
-              start=ibeg, count=icnt)
-       iret = nf90_inq_varid(ncid0, sanal(36), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_ustar(i1:i2,j1:j2), &
-              start=ibeg, count=icnt)
-       iret = nf90_inq_varid(ncid0, sanal(37), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_tskin(i1:i2,j1:j2), &
-              start=ibeg, count=icnt)
-       iret = nf90_inq_varid(ncid0, sanal(38), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_qskin(i1:i2,j1:j2), &
-              start=ibeg, count=icnt)
-       iret = nf90_inq_varid(ncid0, sanal(39), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_tsoil(:,i1:i2,j1:j2), &
-              start=ibeg, count=icnt)
-       iret = nf90_inq_varid(ncid0, sanal(40), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_phiw(:,i1:i2,j1:j2), &
-              start=ibeg, count=icnt)
-    end if 
 
     if (myid==0) print "(//' ',12('-'),'   Record ',I3,' to: ',A60)",    &
          nrec0,fname 
@@ -1354,14 +1399,6 @@ contains
        if (itype==0) ncinfo = 'Surface Latent Heat Flux'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'mmt'
-    case('Qnets')    
-       if (itype==0) ncinfo = 'Surface Net Radiation'
-       if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'mmt'
-    case('G0s')    
-       if (itype==0) ncinfo = 'Surface Ground Heat Flux'
-       if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'mmt'
     case('ustars')    
        if (itype==0) ncinfo = 'Surface Friction Velocity'
        if (itype==1) ncinfo = 'm/s'
@@ -1382,6 +1419,14 @@ contains
        if (itype==0) ncinfo = 'Soil Moisture'
        if (itype==1) ncinfo = '-'
        if (itype==2) ncinfo = 'soilmmt'
+    !case('Qnets')    
+    !   if (itype==0) ncinfo = 'Surface Net Radiation'
+    !   if (itype==1) ncinfo = 'W/m^2'
+    !   if (itype==2) ncinfo = 'mmt'
+    !case('G0s')    
+    !   if (itype==0) ncinfo = 'Surface Ground Heat Flux'
+    !   if (itype==1) ncinfo = 'W/m^2'
+    !   if (itype==2) ncinfo = 'mmt'
     case default
        if (myid==0) print *, 'ABORTING: variable not found in ncinfo, ',trim(short_name)
        call appl_abort(0)

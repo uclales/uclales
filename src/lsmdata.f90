@@ -1,5 +1,11 @@
 ! Module to define and initialize all land surface variables
 ! Adopted from DALES (vanHeerwarden)
+!
+! Output is written in both ts and analysis files.
+! For correct 3D output level=5 is required (see ncio.f90).
+!
+! Malte Rieck, June 2012
+!
 !----------------------------------------------------------------------------
 !
 
@@ -173,7 +179,7 @@ module lsmdata
   !
   subroutine initlsm(time_in)
     
-    use grid, only : nzp, nxp, nyp, th00, vapor, iradtyp, sfc_albedo, &
+    use grid, only : nzp, nxp, nyp, th00, vapor, iradtyp, &
                      a_tskin, a_qskin, a_phiw, a_tsoil, a_Wl, dt
 
     use mpi_interface, only: myid, xoffset, yoffset, wrxid, wryid, nxpg, nypg
@@ -288,7 +294,10 @@ module lsmdata
     ! 
 
     if ((time_in*86400.) .le. dt) then
-      
+
+       !Qnet             = 0
+       !G0               = 0
+
        a_tskin          = th00
        a_qskin          = sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
 
