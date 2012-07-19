@@ -740,10 +740,11 @@ contains
              rc(k) = rc(k) - ac
              tl(k) = tl(k) + convliq(k)*ac
 
+
+             sc = k_rr * np(k) * rp(k) * sqrt(rho_0*dn0(k))
+             sc = min(sc, np(k))
+             np(k) = np(k) - sc
           end if
-          sc = k_rr * np(k) * rp(k) * sqrt(rho_0*dn0(k)) * sc
-          sc = min(sc, np(k))
-          np(k) = np(k) - sc
        end if
     end do
 
@@ -783,30 +784,38 @@ contains
 
     nfl(n1) = 0.
     rfl(n1) = 0.
+    vn = 0.
+    vr = 0.
     do k=n1-1,2,-1
+      if (rp(k) > rthres) then
+        Xp = rp(k) / np(k)
+        xp = MIN(MAX(xp,rain%x_min),rain%x_max)
+     
+        !
+        ! Adjust Dm and mu-Dm and Dp=1/lambda following Milbrandt & Yau
+        !
+        Dm = ( 6. / (rowt*pi) * Xp )**(1./3.)
+        mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))
+        Dp = (Dm**3/((mu+3.)*(mu+2.)*(mu+1.)))**(1./3.)
 
-       Xp = rp(k) / (np(k)+eps0)
-       !
-       ! Adjust Dm and mu-Dm and Dp=1/lambda following Milbrandt & Yau
-       !
-       Dm = ( 6. / (rowt*pi) * Xp )**(1./3.)
-       mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))
-       Dp = (Dm**3/((mu+3.)*(mu+2.)*(mu+1.)))**(1./3.)
+        vn(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
+        vr(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
+        !
+        ! Set fall speeds following Khairoutdinov and Kogan
 
-       vn(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
-       vr(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
-       !
-       ! Set fall speeds following Khairoutdinov and Kogan
-
-       !              if (khairoutdinov) then
-       !                 vn(k) = max(0.,an * Dp + bn)
-       !                 vr(k) = max(0.,aq * Dp + bq)
-       !              end if
-       !irina-olivier
-       if (khairoutdinov) then
-          vn(k) = max(0.,an * Dp + bn)
-          vr(k) = max(0.,aq * Dp + bq)
-       end if
+        !              if (khairoutdinov) then
+        !                 vn(k) = max(0.,an * Dp + bn)
+        !                 vr(k) = max(0.,aq * Dp + bq)
+        !              end if
+        !irina-olivier
+        if (khairoutdinov) then
+            vn(k) = max(0.,an * Dp + bn)
+            vr(k) = max(0.,aq * Dp + bq)
+        end if
+        vn(k) = min(max(vn(k),0.1),20.)
+        vr(k) = min(max(vr(k),0.1),20.)
+      end if
+      
     end do
 
     do k=2,n1-1
@@ -845,8 +854,8 @@ contains
             &                                     2.*(maxi-rp(k)))
     enddo
 
-    rfl(n1-1) = 0.
-    nfl(n1-1) = 0.
+    rfl = 0.
+    nfl = 0.
     do k=n1-2,2,-1
 
        kk = k
@@ -859,6 +868,7 @@ contains
           kk  = kk + 1
           cc  = min(1.,cn(kk) - zz*dzi_t(kk))
        enddo
+       tot = min(tot,dn0(k)/dzi_t(k) * np(k) - nfl(k+1) * dt - rthres)  
        nfl(k) = -tot /dt
 
        kk = k
@@ -871,6 +881,7 @@ contains
           kk  = kk + 1
           cc  = min(1.,cr(kk) - zz*dzi_t(kk))
        enddo
+       tot = min(tot,dn0(k)/dzi_t(k) * rp(k) - rfl(k+1) * dt - rthres)
        rfl(k) = -tot /dt
 
        kp1=k+1
@@ -909,19 +920,21 @@ contains
     !
     ! calculate the precipitation flux and its effect on r_t and theta_l
     !
-    rfl(n1) = 0.
+    rfl = 0.
     do k=n1-1,2,-1
-       Xc = rc(k) / (cldw%nr+eps0)
-       Dc = ( Xc / prw )**(1./3.)
-       vc = min(c*(Dc*0.5)**2 * exp(4.5*(log(sgg))**2),1./(dzi_t(k)*dt))
-       !               vc = min(c*(Dc*0.5)**2 * exp(5*(log(1.3))**2),1./(dzi_t(k)*dt))
-       rfl(k) = - rc(k) * vc
-       !
-       kp1=k+1
-       flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)
-       rc(k) = rc(k)-flxdiv*dt
-       tl(k) = tl(k)+flxdiv*convliq(k)*dt
-       rrate(k)    = -rfl(k)
+      if (rc(k) > 0.) then
+        Xc = rc(k) / cldw%nr
+        Dc = ( Xc / prw )**(1./3.)
+        vc = min(c*(Dc*0.5)**2 * exp(4.5*(log(sgg))**2),1./(dzi_t(k)*dt))
+        !               vc = min(c*(Dc*0.5)**2 * exp(5*(log(1.3))**2),1./(dzi_t(k)*dt))
+        rfl(k) = - rc(k) * vc
+        !
+      end if
+      kp1=k+1
+      flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)
+      rc(k) = rc(k)-flxdiv*dt
+      tl(k) = tl(k)+flxdiv*convliq(k)*dt
+      rrate(k)    = -rfl(k)
     end do
 
   end subroutine sedim_cd
@@ -2023,15 +2036,16 @@ contains
        alfq(metnr) = meteor%a_vel * gfct((meteor%nu+meteor%b_vel+2.0)/meteor%mu)&
             &                / gfct((meteor%nu+2.0)/meteor%mu)
        c_lam(metnr) = gfct((meteor%nu+1.0)/meteor%mu)/gfct((meteor%nu+2.0)/meteor%mu)
-       WRITE(0,'(a,i5,3a,e9.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  alfn = ',alfn(metnr)
-       WRITE(0,'(a,i5,3a,e9.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  alfq = ',alfq(metnr)
-       WRITE(0,'(a,i5,3a,e9.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  clam = ',c_lam(metnr)
+       WRITE(0,'(a,i5,3a,e11.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  alfn = ',alfn(metnr)
+       WRITE(0,'(a,i5,3a,e11.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  alfq = ',alfq(metnr)
+       WRITE(0,'(a,i5,3a,e11.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  clam = ',c_lam(metnr)
        firsttime(metnr) =.false.
     end if
 
     do k=n1-1,2,-1
-
-       Xp = rp(k) / (np(k)+eps0)
+      if (rp(k) > rthres) then
+       Xp = rp(k) / np(k)
+       xp = MIN(MAX(xp,meteor%x_min),meteor%x_max)
        lam = ( c_lam(metnr) * xp )**(meteor%b_vel)
        vr(k) = alfq(metnr) * lam
        vr(k) = max(vr(k),vmin)
@@ -2042,6 +2056,10 @@ contains
        vn(k) = max(vn(k),vmin)
        vn(k) = min(vn(k),vlimit)
        !      vn(k) = -vn(k)
+      else
+        vr(k) = 0.
+        vn(k) = 0.
+      end if
     end do
     do k=2,n1-1
        kp1 = min(k+1,n1-1)
@@ -2098,6 +2116,7 @@ contains
           kk  = kk + 1
           cc  = min(1.,cn(kk) - zz*dzi_t(kk))
        enddo
+       tot = min(tot,dn0(k)/dzi_t(k) * np(k) - nfl(k+1) * dtsedi - rthres)  
        nfl(k) = -tot /dtsedi
 
        kk = k
@@ -2111,6 +2130,7 @@ contains
           kk  = kk + 1
           cc  = min(1.,cr(kk) - zz*dzi_t(kk))
        enddo
+       tot = min(tot,dn0(k)/dzi_t(k) * rp(k) - rfl(k+1) * dtsedi - rthres)
        rfl(k) = -tot /dtsedi
 
        kp1=k+1
@@ -2589,7 +2609,7 @@ contains
     real, dimension(:), intent(inout), optional :: num
 
     if (any(mass < 0.)) then
-      print *, trim(meteor%name), 'below zero', mass
+      print *, trim(meteor%name), 'below zero'!, mass
     end if
     where (mass < rthres)
        mass = 0.
@@ -3060,7 +3080,7 @@ contains
           jj = jlm(i)
           kk = klm(i)
            
-          hlp = R_l * (1.0 +  (R_l/R_d-1.0) * qv(kk,jj,ii)) 
+          hlp = R_l * (1.0 +  (R_d/R_l-1.0) * qv(kk,jj,ii)) 
 
           ! ... dynamics
           T_0(i,j,k)      = tk(kk,jj,ii)
@@ -3384,7 +3404,7 @@ contains
       DO i=3,ie-2
         IF (ANY(qh(1:ke,j,i).gt.0.0)) THEN
           DO ii=1,ntsedi
-            call sedimentation (ke,phail,qh(1:ke,j,i),qnh(1:ke,j,i),rrate = prec_g(1:ke,j,i),dtopt=dt/ntsedi)
+            call sedimentation (ke,phail,qh(1:ke,j,i),qnh(1:ke,j,i),rrate = prec_h(1:ke,j,i),dtopt=dt/ntsedi)
           end do
         ENDIF
       end do
