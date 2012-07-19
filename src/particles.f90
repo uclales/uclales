@@ -174,7 +174,8 @@ contains
       ! Particle dump
       if((time + (0.5*dt) >= tnextdump .or. time + dt >= timmax) .and. lpartdump) then
         !call particledump(time)
-        call rawparticledump(time)
+        call balanced_particledump(time)
+        !call rawparticledump(time)
         tnextdump = tnextdump + frqpartdump
       end if
       !call checkdiv
@@ -1421,7 +1422,7 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine rawparticledump : Quick'n'dirty binary particle dump 
+  ! subroutine rawparticledump : Quick'n'dirty binary particle dump per core 
   !   to test performance versus NetCDF
   !--------------------------------------------------------------------------
   !
@@ -1464,6 +1465,132 @@ contains
     close(123)
 
   end subroutine rawparticledump
+
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine balanced_particledump : More balanced communication, sends particles
+  !   back to home processor before writing. Should decrease load on proc #0
+  !--------------------------------------------------------------------------
+  !
+  subroutine balanced_particledump(time)
+    use mpi_interface, only : mpi_comm_world, myid, mpi_integer, mpi_double_precision, ierror, nxprocs, nyprocs, mpi_status_size, wrxid, wryid, nxg, nyg, mpi_sum
+    use grid,          only : tname, deltax, deltay, dzi_t, zm, umean, vmean
+    use modnetcdf,     only : writevar_nc, fillvalue_double
+    implicit none
+
+    real, intent(in)                     :: time
+    type (particle_record),       pointer:: particle
+    integer                              :: status(mpi_status_size)
+    integer                              :: nlocal,nplocal,nmax,nprocs,p,pp,nvar,basep,start,end,nsr,isr
+    integer, allocatable, dimension(:)   :: tosend,toreceive,base,sendbase,receivebase
+    real, allocatable, dimension(:)      :: sendbuff,recvbuff
+    integer, allocatable, dimension(:,:) :: status_array
+    integer, allocatable, dimension(:)   :: req
+
+    nvar = 4                             ! id,x,y,z
+    if(lpartdumpui)  nvar = nvar + 3     ! u,v,w
+    if(lpartsgs)     nvar = nvar + 3     ! us,vs,ws
+    if(lpartdumpth)  nvar = nvar + 2     ! thl,tvh
+    if(lpartdumpmr)  nvar = nvar + 2     ! rt,rl
+
+    nprocs = nxprocs * nyprocs
+    allocate(tosend(0:nprocs-1),toreceive(0:nprocs-1),base(0:nprocs-1),sendbase(0:nprocs-1),receivebase(0:nprocs-1))
+
+    ! Find average number of particles per proc
+    nlocal = floor(real(np) / nprocs)
+
+    ! Determine how many particles to send to which proc
+    tosend = 0
+    particle => head
+    do while( associated(particle) )
+      p = floor((particle%unique-1) / nlocal)       ! Which proc to send to
+      if(p .gt. nprocs-1) p = nprocs - 1            ! Last proc gets remaining particles
+      tosend(p) = tosend(p) + 1
+      particle => particle%next
+    end do
+
+    ! 1. Communicate nparticles to send/receive to/from each proc
+    ! 2. Find start position for each proc in send/recv buff
+    do p=0,nprocs-1
+      call mpi_sendrecv(tosend(p),   1,mpi_integer,p,1, &
+                        toreceive(p),1,mpi_integer,p,1, &
+                        mpi_comm_world,status,ierror)
+      if(p .eq. 0) then
+        sendbase(p)    = 1
+        receivebase(p) = 1
+      else
+        sendbase(p)    = sendbase(p-1)    + (tosend(p-1)    * nvar)
+        receivebase(p) = receivebase(p-1) + (toreceive(p-1) * nvar)
+      end if
+    end do
+
+    base = sendbase  ! will be changed during filling send buffer
+
+    ! Allocate send/receive buffers
+    allocate(sendbuff(sum(tosend)*nvar),recvbuff(sum(toreceive)*nvar))
+
+    ! Fill send buffer
+    particle => head
+    do while( associated(particle) )
+      p = floor((particle%unique-1) / nlocal)       ! Which proc to send to
+      if(p .gt. nprocs-1) p = nprocs-1              ! Last proc gets remaining particles
+
+      sendbuff(base(p))   =  particle%unique
+      sendbuff(base(p)+1) = (wrxid * (nxg / nxprocs) + particle%x - 3) * deltax
+      sendbuff(base(p)+2) = (wryid * (nyg / nyprocs) + particle%y - 3) * deltay
+      sendbuff(base(p)+3) = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
+      base(p)             = base(p) + nvar
+
+      particle => particle%next
+    end do
+
+    ! Non=blocking send and receive from/to each other proc
+    ! Find total #send/recv's for non-blocking send/recv request checking 
+    nsr = 0
+    do p = 0, nprocs-1
+      if(tosend(p)    .gt. 0) nsr = nsr + 1
+      if(toreceive(p) .gt. 0) nsr = nsr + 1
+    end do
+    ! Allocate status & request arrays
+    allocate(status_array(mpi_status_size,nsr),req(nsr))
+  
+    isr = 1 
+    do p=0,nprocs-1
+      if(tosend(p) .gt. 0) then
+        start = sendbase(p)
+        if(p .eq. nprocs-1) then
+          end = size(sendbuff)
+        else
+          end = sendbase(p+1)-1
+        end if
+        call mpi_isend(sendbuff(start:end),tosend(p)*nvar,mpi_double_precision,p,(myid+1)*(p+nprocs),mpi_comm_world,req(isr),ierror)
+        isr = isr + 1
+      end if
+      if(toreceive(p) .gt. 0) then
+        start = receivebase(p)
+        if(p .eq. nprocs-1) then
+          end = size(recvbuff)
+        else 
+          end = receivebase(p+1)-1
+        end if       
+        call mpi_irecv(recvbuff(start:end),toreceive(p)*nvar,mpi_double_precision,p,(p+1)*(myid+nprocs),mpi_comm_world,req(isr),ierror)
+        isr = isr + 1
+      end if
+    end do
+
+    call mpi_waitall(nsr,req,status_array,ierror)
+
+    ! *****************
+    ! DO SOMETHING WITH RECVBUFFER -> NETCDF
+    ! *****************
+
+    ! Cleanup!
+    deallocate(tosend,toreceive,base,sendbase,receivebase)
+    deallocate(sendbuff,recvbuff)
+    stop 
+ 
+  end subroutine balanced_particledump
+
 
   !
   !--------------------------------------------------------------------------

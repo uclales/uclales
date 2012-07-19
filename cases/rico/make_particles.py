@@ -16,8 +16,8 @@ from math import floor
 
 # USER INPUT:
 tstart      = 000.       # 'release' time of particles
-nxy         = 32**2.     # Goal number of particles per level
-nz          = 128         # Number of vertical levels
+nxy         = 4**2.     # Goal number of particles per level
+nz          = 1         # Number of vertical levels
 dz          = 25.         # Vertical grid spacing
 xysize      = 800.       # Domain size LES
 
@@ -63,7 +63,8 @@ for k in range(nz):
   #print '%3i  %.2f  %.3f' % (k+1,z,nxyl)
   for i in range(int(nxyl)):
     for j in range(int(nxyl)):
-      partfile.write('%i  %.3e  %.3e  %.3e \n'%(tstart,x,y,z))
+      #partfile.write('%i  %.3e  %.3e  %.3e \n'%(tstart,x,y,z))
+      partfile.write('%i  %.5f  %.5f  %.5f \n'%(tstart,x,y,z))
       y += dxy
     y = dxy/2.
     x += dxy

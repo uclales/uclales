@@ -9,7 +9,7 @@
   dzmax        = 10.
   dzrat        = 1.0
   dtlong       = 5.
-  timmax       = 200.
+  timmax       = 10.
   wctime       = 99960. 
   runtype      = 'INITIAL'
   filprf       = 'rico'
@@ -40,12 +40,12 @@
   lsvarflg     = .false.
   div          = 0.00000000
   lpartic      = .true.
-  lpartsgs     = .true.
-  lrandsurf    = .false.
+  lpartsgs     = .false.
+  lrandsurf    = .true.
   lpartstat    = .true.
   lpartdump    = .true.
-  lpartdumpui  = .true.
-  lpartdumpth  = .true.
-  lpartdumpmr  = .true.
+  lpartdumpui  = .false.
+  lpartdumpth  = .false.
+  lpartdumpmr  = .false.
   frqpartdump  = 10.
  /
