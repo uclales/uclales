@@ -130,7 +130,7 @@ module lsmdata
   real              :: tskinavg = 0.    !<  Slab average of tskin used by srfcsclrs 
 
   ! Surface energy balance
-  real, allocatable :: Qnet     (:,:)   !<  Net radiation [W/m2]
+  !real, allocatable :: Qnet     (:,:)   !<  Net radiation [W/m2]
   real              :: Qnetav   = 300.
   real, allocatable :: Qnetm    (:,:)   !<  Net radiation previous timestep [W/m2]
   real, allocatable :: Qnetn    (:,:)   !<  Net radiation dummy [W/m2]
@@ -146,7 +146,7 @@ module lsmdata
 
   real, allocatable :: LE       (:,:)   !<  Latent heat flux [W/m2]
   real, allocatable :: H        (:,:)   !<  Sensible heat flux [W/m2]
-  real, allocatable :: G0       (:,:)   !<  Ground heat flux [W/m2]
+  !real, allocatable :: G0       (:,:)   !<  Ground heat flux [W/m2]
   real, allocatable :: ra       (:,:)   !<  Aerodynamic resistance [s/m]
   real, allocatable :: rsurf    (:,:)   !<  Composite resistance [s/m]
   real, allocatable :: rsveg    (:,:)   !<  Vegetation resistance [s/m]
@@ -179,7 +179,7 @@ module lsmdata
   !
   subroutine initlsm(time_in)
     
-    use grid, only : nzp, nxp, nyp, th00, vapor, iradtyp, &
+    use grid, only : nzp, nxp, nyp, th00, vapor, iradtyp, a_G0, a_Qnet, &
                      a_tskin, a_qskin, a_phiw, a_tsoil, a_Wl, dt
 
     use mpi_interface, only: myid, xoffset, yoffset, wrxid, wryid, nxpg, nypg
@@ -248,12 +248,12 @@ module lsmdata
     allocate(tsoilm(ksoilmax,nxp,nyp))
     allocate(tsoildeep(nxp,nyp))
 
-    allocate(Qnet(nxp,nyp))
+    !allocate(Qnet(nxp,nyp))
     allocate(Qnetm(nxp,nyp))
     allocate(Qnetn(nxp,nyp))
     allocate(LE(nxp,nyp))
     allocate(H(nxp,nyp))
-    allocate(G0(nxp,nyp))
+    !allocate(G0(nxp,nyp))
 
     allocate(rsveg(nxp,nyp))
     allocate(rsvegm(nxp,nyp))
@@ -294,9 +294,6 @@ module lsmdata
     ! 
 
     if ((time_in*86400.) .le. dt) then
-
-       Qnet             = 0
-       G0               = 0
 
        a_tskin          = th00
        a_qskin          = sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
@@ -396,15 +393,14 @@ module lsmdata
                    3+yoffset(wryid):nyp+yoffset(wryid)-2 )
        print*,"myid:",myid,"xoffset:",xoffset(wrxid)
        print*,"myid:",myid,"yoffset:",yoffset(wrxid)
-
-       LAI(3:(nxp-2),3:(nyp-2)) = LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
-                               3+yoffset(wryid):nyp+yoffset(wryid)-2 )
-
-       print*,"CHECK OUTPUT:::"
-       print*,"myid:",myid,"LAIG:",LAIG(3,:)
-       print*,"myid:",myid,"LAI:",LAI(3,:)
-
     end if
+
+    LAI(3:(nxp-2),3:(nyp-2)) = LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
+                               3+yoffset(wryid):nyp+yoffset(wryid)-2 )
+    !print*,"CHECK OUTPUT:::"
+    !print*,"myid:",myid,"LAIG:",LAIG(3,:)
+    !print*,"myid:",myid,"LAI:",LAI(3,:)
+
     end if 
 
     deallocate(LAIG)

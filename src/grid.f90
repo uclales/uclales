@@ -81,8 +81,8 @@ module grid
   !Malte: variables to restart the land surface
   real, dimension (:,:,:),  allocatable :: a_tsoil, a_phiw,                   &
                             a_sflxd_avn, a_sflxu_avn, a_lflxd_avn, a_lflxu_avn
-  real, dimension (:,:),    allocatable :: a_tskin, a_qskin, a_Wl
-   
+  real, dimension (:,:),    allocatable :: a_tskin, a_qskin, a_Wl, a_Qnet, a_G0
+
   !Malte: variables to read homogeneous fluxes from nc file
   real, dimension (:),      allocatable :: shls, lhls, usls, timels
  
@@ -296,11 +296,13 @@ contains
        allocate (a_tskin (nxp,nyp))
        allocate (a_qskin (nxp,nyp))
        allocate (a_Wl    (nxp,nyp))
+       allocate (a_Qnet  (nxp,nyp))
+       allocate (a_G0    (nxp,nyp))
        allocate (a_sflxd_avn(100,nxp,nyp))
        allocate (a_sflxu_avn(100,nxp,nyp))
        allocate (a_lflxd_avn(100,nxp,nyp))
        allocate (a_lflxu_avn(100,nxp,nyp))
-       memsize = memsize + 2*nxp*nyp*4 + 3*nxp*nyp + 4*nxp*nyp*100
+       memsize = memsize + 2*nxp*nyp*4 + 5*nxp*nyp + 4*nxp*nyp*100
     end if
 
     !Malte: allocate variables for homogeneous fluxes (no lsm used)

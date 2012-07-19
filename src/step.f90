@@ -151,18 +151,29 @@ contains
 
        if(myid == 0) then
           call cpu_time(t2)           !t1=timing()
-          if (mod(istp,istpfl) == 0 ) print "('   Timestep # ',i5," //     &
-              "'   Model time(sec)=',f10.2,3x,'CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2)",     &
-              istp, time, t2-t1, t2*(timmax/time-1)
+          if (mod(istp,istpfl) == 0 ) then
+              if (wctime.gt.1e9) then
+                print "('   Timestep # ',i5," //     &
+                       "'   Model time(sec)=',f10.2,3x,'CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2)",     &
+                       istp, time, t2-t1, t2*(timmax/time-1)
+              else
+                print "('   Timestep # ',i5," //     &
+                       "'   Model time(sec)=',f10.2,3x,'CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2,'  WC Time left(sec) = ',f10.2)",     &
+                       istp, time, t2-t1, t2*(timmax/time-1),wctime-t2
+              end if
+          end if
        endif
        call broadcast(t2, 0)
-        
+
     enddo
 
     call write_hist(1, time)
     iret = close_anal()
     call exitcross
     iret = close_stat()
+
+    if (t2 .ge. wctime .and. myid == 0) write(*,*) '  Wall clock limit wctime reached, stopped simulation for restart'
+    if (time.ge.timmax .and. myid == 0) write(*,*) '  Max simulation time timmax reached. Finished simulation successfully'
 
   end subroutine stepper
   ! 

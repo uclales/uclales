@@ -779,7 +779,7 @@ contains
                     psrf, th00, umean, vmean, dn0, iradtyp, dt, &
 		    a_lflxu, a_lflxd, a_sflxu, a_sflxd, nstep, press, &
                     a_lflxu_avn, a_lflxd_avn, a_sflxu_avn, a_sflxd_avn, &
-                    a_tsoil, a_phiw, a_tskin, a_Wl, a_qskin
+                    a_tsoil, a_phiw, a_tskin, a_Wl, a_qskin, a_Qnet, a_G0
     use mpi_interface, only: myid
 
     integer  :: i, j, k
@@ -847,12 +847,12 @@ contains
               Qnetn(i,j) = (sflxd_av - sflxu_av + lflxd_av - lflxu_av)
 
               !Switch between homogeneous and heterogeneous net radiation
-              !Qnet(:,:) = sum(Qnetm(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-              Qnet(i,j) = Qnetn(i,j)
+              !a_Qnet(:,:) = sum(Qnetm(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+              a_Qnet(i,j) = Qnetn(i,j)
 
         else
           !" Not using full radiation: use average radiation from Namelist
-          Qnet(i,j) = Qnetav
+          a_Qnet(i,j) = Qnetav
         end if
 
         !" 2.1 - Calculate the surface resistance with vegetation
@@ -906,7 +906,7 @@ contains
         dqsatdT = 0.622 * desatdT / psrf
 
         !" Remove LWup from Qnet calculation (if running without radiation)
-        Qnet(i,j) = Qnet(i,j) + stefan * (tskinm(i,j)*exner)**4.
+        a_Qnet(i,j) = a_Qnet(i,j) + stefan * (tskinm(i,j)*exner)**4.
 
         !" Allow for dew fall and calculate dew water on leaves
         if(qsat - vapor(2,i,j) < 0.) then
@@ -933,7 +933,7 @@ contains
         rk3coef = dt / (4 - dble(nstep))
 
         !" Compute skin temperature from linarized surface energy balance
-        Acoef   = Qnet(i,j) - stefan * (tskinm(i,j)*exner) **4. &
+        Acoef   = a_Qnet(i,j) - stefan * (tskinm(i,j)*exner) **4. &
                   + 4. * stefan * (tskinm(i,j)*exner)**4. + fH*Tatm &
                   + fLE * (dqsatdT* (tskinm(i,j)*exner) - qsat + vapor(2,i,j)) &
                   + lambdaskin(i,j) * a_tsoil(1,i,j)
@@ -947,11 +947,11 @@ contains
                        * ((tskinm(i,j)*exner) + rk3coef/Cskin(i,j) * Acoef) 
         end if
 
-        Qnet(i,j) = Qnet(i,j) - (stefan* (tskinm(i,j)*exner)**4.  &
+        a_Qnet(i,j) = a_Qnet(i,j) - (stefan* (tskinm(i,j)*exner)**4.  &
                     + 4.*stefan * (tskinm(i,j)*exner)**3. *(a_tskin(i,j)*exner - &
                     tskinm(i,j)*exner))
 
-        G0(i,j)   = lambdaskin(i,j) * ( a_tskin(i,j) * exner - a_tsoil(1,i,j) )
+        a_G0(i,j)   = lambdaskin(i,j) * ( a_tskin(i,j) * exner - a_tsoil(1,i,j) )
 
         qskinn    = (dqsatdT * (a_tskin(i,j)*exner - tskinm(i,j)*exner) + qsat)
 
@@ -1014,7 +1014,7 @@ contains
         lambdash(ksoilmax,i,j) = lambdas(ksoilmax,i,j)
 
         !" Solve the diffusion equation for the heat transport
-        a_tsoil(1,i,j) = tsoilm(1,i,j) + rk3coef * ( lambdah(1,i,j) * (a_tsoil(2,i,j) - a_tsoil(1,i,j)) / dzsoilh(1) + G0(i,j) ) / dzsoil(1) / pCs(1,i,j)
+        a_tsoil(1,i,j) = tsoilm(1,i,j) + rk3coef * ( lambdah(1,i,j) * (a_tsoil(2,i,j) - a_tsoil(1,i,j)) / dzsoilh(1) + a_G0(i,j) ) / dzsoil(1) / pCs(1,i,j)
 
         do k = 2, ksoilmax-1
           a_tsoil(k,i,j) = tsoilm(k,i,j) + rk3coef / pCs(k,i,j) * ( lambdah(k,i,j) * (a_tsoil(k+1,i,j) - a_tsoil(k,i,j)) / dzsoilh(k) - lambdah(k-1,i,j) * (a_tsoil(k,i,j) - a_tsoil(k-1,i,j)) / dzsoilh(k-1) ) / dzsoil(k)

@@ -162,8 +162,8 @@ contains
          , vmean, dn0, prc_c,prc_g,prc_i,prc_r,prc_s, prc_h, a_rpp, a_npp, albedo, CCN, iradtyp, a_rflx    &
          , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa &
          , a_ricep, a_rsnowp, a_rgrp, a_rhailp, a_nicep, a_nsnowp, a_ngrp, a_nhailp &
-         , vapor, a_Wl, isfctyp, a_tskin, a_qskin
-    use lsmdata, only: Qnet,G0,tndskin,ra,rsurf,rsveg,rssoil,obl,cliq,Cskinav
+         , vapor, a_Wl, isfctyp, a_tskin, a_qskin, a_Qnet, a_G0
+    use lsmdata, only: tndskin,ra,rsurf,rsveg,rssoil,obl,cliq,Cskinav
 
     real, intent (in) :: time
 
@@ -216,7 +216,7 @@ contains
     if (level >=1) call ts_lvl1(nzp, nxp, nyp, dn0, zt, dzi_m, a_rp)
     if (level >=2) call ts_lvl2(nzp, nxp, nyp, a_rp, a_scr2, zt)
 
-    if (isfctyp==5) call accum_lsm(nxp,nyp,Qnet,G0,tndskin,ra,rsurf,rsveg, &
+    if (isfctyp==5) call accum_lsm(nxp,nyp,a_Qnet,a_G0,tndskin,ra,rsurf,rsveg, &
                                    rssoil,a_tskin,a_qskin,obl,cliq,a_Wl,Cskinav)
 
     if (debug) WRITE (0,*) 'statistics: set_ts ok,  myid=',myid
@@ -1524,12 +1524,12 @@ contains
   ! SUBROUTINE ACCUM_LSM: Accumulates timeseries statistics  
   ! for land surface variables (if isfctyp=5) 
   !
-  subroutine accum_lsm(nxp, nyp, Qnet, G0, tndskin, ra, rsurf, rsveg, &
+  subroutine accum_lsm(nxp, nyp, a_Qnet, a_G0, tndskin, ra, rsurf, rsveg, &
                        rsoil, a_tskin,a_qskin, obl, cliq, a_Wl, Cskinav)
 
     integer, intent (in)  :: nxp,nyp
-    real, intent (in)     :: Qnet(nxp,nyp)
-    real, intent (in)     :: G0(nxp,nyp)
+    real, intent (in)     :: a_Qnet(nxp,nyp)
+    real, intent (in)     :: a_G0(nxp,nyp)
     real, intent (in)     :: tndskin(nxp,nyp)
     real, intent (in)     :: ra(nxp,nyp)
     real, intent (in)     :: rsurf(nxp,nyp)
@@ -1542,8 +1542,8 @@ contains
     real, intent (in)     :: a_Wl(nxp,nyp)
     real, intent (in)     :: Cskinav
 
-    ssclr(46) = sum(Qnet(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
-    ssclr(47) = sum(G0(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(46) = sum(a_Qnet(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(47) = sum(a_G0(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
     ssclr(48) = sum(tndskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
     ssclr(49) = sum(ra(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
     ssclr(50) = sum(rsurf(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)

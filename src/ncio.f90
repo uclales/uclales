@@ -4,7 +4,6 @@
   use grid
   use mpi_interface, only : appl_abort, myid, pecount, wrxid, wryid
   use mcrp, only : cldw,rain,ice,snow,graupel,hail
-  use lsmdata, only : Qnet, G0
 
   implicit none
   private
@@ -261,7 +260,7 @@ contains
 
     use mpi_interface, only :myid
 
-    integer, parameter :: nnames = 37
+    integer, parameter :: nnames = 39
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,& !1
          'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,& !7 
@@ -269,7 +268,7 @@ contains
          'n      ','rice   ','nice   ','rsnow  ','rgrp   ','nsnow  '   ,& !19
          'ngrp   ','rhail  ','nhail  ','rflx   ','lflxu  ','lflxd  '   ,& !25
          'shf    ','lhf    ','ustars ','a_tskin','a_qskin','tsoil  '   ,& !31
-         'phiw   '/)                                                      !37
+         'phiw   ','a_Qnet ','a_G0   '/)                                                      !37
 
 
     real, intent (in) :: time
@@ -282,7 +281,7 @@ contains
     if (level  >= 4) nvar0 = nvar0+4
     if (level  >= 5) nvar0 = nvar0+4
     if (iradtyp > 1) nvar0 = nvar0+3
-    if (isfctyp == 5) nvar0 = nvar0+7
+    if (isfctyp == 5) nvar0 = nvar0+9
 
     allocate (sanal(nvar0))
     sanal(1:nbase) = sbase(1:nbase)
@@ -354,10 +353,10 @@ contains
        sanal(nvar0)=sbase(36)
        nvar0 = nvar0+1
        sanal(nvar0)=sbase(37)
-    !  nvar0 = nvar0+1
-    !  sanal(nvar0)=sbase(38)
-    !  nvar0 = nvar0+1
-    !  sanal(nvar0)=sbase(39)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(38)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(39)
     end if
 
     nbeg = nvar0+1
@@ -531,12 +530,12 @@ contains
        iret = nf90_inq_varid(ncid0, sanal(nn+7), VarID)
        iret = nf90_put_var(ncid0, VarID, a_phiw(:,i1:i2,j1:j2), &
               start=ibeg, count=icntsoil)
-       !iret = nf90_inq_varid(ncid0, sanal(nn+8), VarID)
-       !iret = nf90_put_var(ncid0, VarID, Qnet(i1:i2,j1:j2), &
-       !       start=ibegsfc, count=icntsfc)
-       !iret = nf90_inq_varid(ncid0, sanal(nn+9), VarID)
-       !iret = nf90_put_var(ncid0, VarID, G0(i1:i2,j1:j2), &
-       !       start=ibegsfc, count=icntsfc)
+       iret = nf90_inq_varid(ncid0, sanal(nn+8), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_Qnet(i1:i2,j1:j2), &
+              start=ibegsfc, count=icntsfc)
+       iret = nf90_inq_varid(ncid0, sanal(nn+9), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_G0(i1:i2,j1:j2), &
+              start=ibegsfc, count=icntsfc)
        !print*,myid,sanal(nn+4),nn+9
        !if (iret.ne.nf90_noerr) print*,myid,nf90_strerror(iret),nn+9
 
@@ -1404,14 +1403,14 @@ contains
        if (itype==0) ncinfo = 'Soil Moisture'
        if (itype==1) ncinfo = '-'
        if (itype==2) ncinfo = 'soilmmt'
-    !case('Qnets')    
-    !   if (itype==0) ncinfo = 'Surface Net Radiation'
-    !   if (itype==1) ncinfo = 'W/m^2'
-    !   if (itype==2) ncinfo = 'mmt'
-    !case('G0s')    
-    !   if (itype==0) ncinfo = 'Surface Ground Heat Flux'
-    !   if (itype==1) ncinfo = 'W/m^2'
-    !   if (itype==2) ncinfo = 'mmt'
+    case('a_Qnet')    
+       if (itype==0) ncinfo = 'Surface Net Radiation'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'mmt'
+    case('a_G0')    
+       if (itype==0) ncinfo = 'Surface Ground Heat Flux'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'mmt'
     case default
        if (myid==0) print *, 'ABORTING: variable not found in ncinfo, ',trim(short_name)
        call appl_abort(0)
