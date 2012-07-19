@@ -44,8 +44,8 @@
   lrandsurf    = .true.
   lpartstat    = .true.
   lpartdump    = .true.
-  lpartdumpui  = .false.
-  lpartdumpth  = .false.
-  lpartdumpmr  = .false.
+  lpartdumpui  = .true.
+  lpartdumpth  = .true.
+  lpartdumpmr  = .true.
   frqpartdump  = 10.
  /

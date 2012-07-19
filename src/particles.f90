@@ -1481,11 +1481,12 @@ contains
     real, intent(in)                     :: time
     type (particle_record),       pointer:: particle
     integer                              :: status(mpi_status_size)
-    integer                              :: nlocal,nplocal,nmax,nprocs,p,pp,nvar,basep,start,end,nsr,isr
+    integer                              :: nlocal,nplocal,nmax,nprocs,p,pp,nvar,basep,start,end,nsr,isr,nvl
     integer, allocatable, dimension(:)   :: tosend,toreceive,base,sendbase,receivebase
     real, allocatable, dimension(:)      :: sendbuff,recvbuff
     integer, allocatable, dimension(:,:) :: status_array
     integer, allocatable, dimension(:)   :: req
+    real                                 :: thl,thv,rt,rl
 
     nvar = 4                             ! id,x,y,z
     if(lpartdumpui)  nvar = nvar + 3     ! u,v,w
@@ -1535,14 +1536,41 @@ contains
       p = floor((particle%unique-1) / nlocal)       ! Which proc to send to
       if(p .gt. nprocs-1) p = nprocs-1              ! Last proc gets remaining particles
 
-      sendbuff(base(p))   =  particle%unique
-      sendbuff(base(p)+1) = (wrxid * (nxg / nxprocs) + particle%x - 3) * deltax
-      sendbuff(base(p)+2) = (wryid * (nyg / nyprocs) + particle%y - 3) * deltay
-      sendbuff(base(p)+3) = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
+      if(lpartdumpth .or. lpartdumpmr) call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
+
+      sendbuff(base(p))           =  particle%unique
+      sendbuff(base(p)+1)         = (wrxid * (nxg / nxprocs) + particle%x - 3) * deltax
+      sendbuff(base(p)+2)         = (wryid * (nyg / nyprocs) + particle%y - 3) * deltay
+      sendbuff(base(p)+3)         = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
+      nvl = 3
+      if(lpartdumpui) then
+        sendbuff(base(p)+nvl+1)   = particle%ures * deltax
+        sendbuff(base(p)+nvl+2)   = particle%vres * deltay
+        sendbuff(base(p)+nvl+3)   = particle%wres / dzi_t(floor(particle%z))
+        nvl = nvl + 3
+        if(lpartsgs) then
+          sendbuff(base(p)+nvl+1) = particle%usgs * deltax
+          sendbuff(base(p)+nvl+2) = particle%vsgs * deltay
+          sendbuff(base(p)+nvl+3) = particle%wsgs / dzi_t(floor(particle%z))
+          nvl = nvl + 3
+        end if
+      end if
+      if(lpartdumpth) then
+        sendbuff(base(p)+nvl+1)   = thl
+        sendbuff(base(p)+nvl+2)   = thv
+        nvl = nvl + 2
+      end if
+      if(lpartdumpmr) then
+        sendbuff(base(p)+nvl+1)   = rt
+        sendbuff(base(p)+nvl+2)   = rl
+      end if
+
       base(p)             = base(p) + nvar
 
       particle => particle%next
     end do
+
+    if(myid==0) print*,sendbuff
 
     ! Non=blocking send and receive from/to each other proc
     ! Find total #send/recv's for non-blocking send/recv request checking 
@@ -1579,6 +1607,8 @@ contains
     end do
 
     call mpi_waitall(nsr,req,status_array,ierror)
+
+    if(myid==0) print*,recvbuff
 
     ! *****************
     ! DO SOMETHING WITH RECVBUFFER -> NETCDF
