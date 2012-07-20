@@ -1616,7 +1616,6 @@ contains
     bloc = myid * nlocal + 1
     ii = 1
     do p = 1, size(recvbuff)/nvar
-      print*,myid,recvbuff(ii)
 
       loc = recvbuff(ii)-bloc+1
       sb_sorted(loc,1) = recvbuff(ii+1)
