@@ -1413,8 +1413,10 @@ contains
       rlprofl    = 0
       ccprof     = 0
       ccprofl    = 0
-      fsprof     = 0
-      fsprofl    = 0
+      if(lpartsgs) then
+        fsprof     = 0
+        fsprofl    = 0
+      end if
       nstatsamp  = 0
     end if
 
@@ -1481,9 +1483,10 @@ contains
     real, intent(in)                     :: time
     type (particle_record),       pointer:: particle
     integer                              :: status(mpi_status_size)
-    integer                              :: nlocal,nprocs,p,nvar,start,end,nsr,isr,nvl
+    integer                              :: nlocal,nprocs,p,nvar,start,end,nsr,isr,nvl,loc,bloc,ii
     integer, allocatable, dimension(:)   :: tosend,toreceive,base,sendbase,receivebase
     real, allocatable, dimension(:)      :: sendbuff,recvbuff
+    real, allocatable, dimension(:,:)    :: sb_sorted
     integer, allocatable, dimension(:,:) :: status_array
     integer, allocatable, dimension(:)   :: req
     real                                 :: thl,thv,rt,rl
@@ -1570,8 +1573,6 @@ contains
       particle => particle%next
     end do
 
-    if(myid==0) print*,sendbuff
-
     ! Non=blocking send and receive from/to each other proc
     ! Find total #send/recv's for non-blocking send/recv request checking 
     nsr = 0
@@ -1581,7 +1582,8 @@ contains
     end do
     ! Allocate status & request arrays
     allocate(status_array(mpi_status_size,nsr),req(nsr))
-  
+ 
+    ! Do send/receives 
     isr = 1 
     do p=0,nprocs-1
       if(tosend(p) .gt. 0) then
@@ -1606,215 +1608,82 @@ contains
       end if
     end do
 
+    ! Wait for all communication to finish
     call mpi_waitall(nsr,req,status_array,ierror)
 
-    if(myid==0) print*,recvbuff
+    ! Sort particles
+    allocate(sb_sorted(size(recvbuff)/nvar,nvar-1))
+    bloc = myid * nlocal + 1
+    ii = 1
+    do p = 1, size(recvbuff)/nvar
+      print*,myid,recvbuff(ii)
 
-    ! *****************
-    ! DO SOMETHING WITH RECVBUFFER -> NETCDF
-    ! *****************
+      loc = recvbuff(ii)-bloc+1
+      sb_sorted(loc,1) = recvbuff(ii+1)
+      sb_sorted(loc,2) = recvbuff(ii+2)
+      sb_sorted(loc,3) = recvbuff(ii+3)
+      nvl = 3 
+      if(lpartdumpui) then
+        sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
+        sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
+        sb_sorted(loc,nvl+3) = recvbuff(ii+nvl+3)
+        nvl = nvl + 3
+        if(lpartsgs) then
+          sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
+          sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
+          sb_sorted(loc,nvl+3) = recvbuff(ii+nvl+3)
+          nvl = nvl + 3
+        end if
+      end if
+      if(lpartdumpth) then
+        sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
+        sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
+        nvl = nvl + 2
+      end if
+      if(lpartdumpmr) then
+        sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
+        sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
+      end if
+
+      ii = ii + nvar
+    end do
+
+    ! Write to NetCDF
+    call writevar_nc(ncpartid,tname,time,ncpartrec)
+    call writevar_nc(ncpartid,'x',sb_sorted(:,1),ncpartrec)
+    call writevar_nc(ncpartid,'y',sb_sorted(:,2),ncpartrec)
+    call writevar_nc(ncpartid,'z',sb_sorted(:,3),ncpartrec)
+    nvl = 3
+    if(lpartdumpui) then
+      call writevar_nc(ncpartid,'u',sb_sorted(:,nvl+1),ncpartrec)
+      call writevar_nc(ncpartid,'v',sb_sorted(:,nvl+2),ncpartrec)
+      call writevar_nc(ncpartid,'w',sb_sorted(:,nvl+3),ncpartrec)
+      nvl = nvl + 3
+      if(lpartsgs) then
+        call writevar_nc(ncpartid,'us',sb_sorted(:,nvl+1),ncpartrec)
+        call writevar_nc(ncpartid,'vs',sb_sorted(:,nvl+2),ncpartrec)
+        call writevar_nc(ncpartid,'ws',sb_sorted(:,nvl+3),ncpartrec)
+        nvl = nvl + 3
+      end if
+    end if
+    if(lpartdumpth) then
+      call writevar_nc(ncpartid,'t', sb_sorted(:,nvl+1),ncpartrec)
+      call writevar_nc(ncpartid,'tv',sb_sorted(:,nvl+2),ncpartrec)
+      nvl = nvl + 2
+    end if
+    if(lpartdumpmr) then
+      call writevar_nc(ncpartid,'rt',sb_sorted(:,nvl+1),ncpartrec)
+      call writevar_nc(ncpartid,'rl',sb_sorted(:,nvl+2),ncpartrec)
+    end if
 
     ! Cleanup!
     deallocate(tosend,toreceive,base,sendbase,receivebase)
     deallocate(sendbuff,recvbuff)
-    stop 
+    deallocate(sb_sorted)
+    deallocate(status_array,req)
  
   end subroutine balanced_particledump
 
-
-  !
-  !--------------------------------------------------------------------------
-  ! subroutine particledump : communicates all particles to process #0 and
-  !   writes it to NetCDF(4)
-  !--------------------------------------------------------------------------
-  !
-  subroutine particledump(time)
-    use mpi_interface, only : mpi_comm_world, myid, mpi_integer, mpi_double_precision, ierror, nxprocs, nyprocs, mpi_status_size, wrxid, wryid, nxg, nyg
-    use grid,          only : tname, deltax, deltay, dzi_t, zm, umean, vmean
-    use modnetcdf,     only : writevar_nc, fillvalue_double
-    implicit none
-
-    real, intent(in)                     :: time
-    type (particle_record), pointer:: particle
-    integer                              :: nlocal, ii, i, pid, partid
-    integer, allocatable, dimension(:)   :: nremote
-    integer                              :: status(mpi_status_size)
-    integer                              :: nvar,nvl
-    real, allocatable, dimension(:)      :: sendbuff, recvbuff
-    real, allocatable, dimension(:,:)    :: particles_merged
-    real                                 :: thl,thv,rt,rl
-
-    nvar = 4                            ! id,x,y,z
-    if(lpartdumpui)  nvar = nvar + 3    ! u,v,w
-    if(lpartsgs)     nvar = nvar + 3    ! us,vs,ws
-    if(lpartdumpth)  nvar = nvar + 2    ! thl,tvh
-    if(lpartdumpmr)  nvar = nvar + 2    ! rt,rl
-
-    ! Count local particles
-    nlocal = 0
-    particle => head
-    do while( associated(particle) )
-      nlocal = nlocal + 1
-      particle => particle%next
-    end do
-
-    ! Communicate number of local particles to main proces (0)
-    allocate(nremote(0:(nxprocs*nyprocs)-1))
-    nremote = 0
-    call mpi_gather(nlocal,1,mpi_integer,nremote,1,mpi_integer,0,mpi_comm_world,ierror)
-
-    !! Create buffer
-    allocate(sendbuff(nvar * nlocal))
-    ii = 1
-    particle => head
-    do while( associated(particle) )
-      if(lpartdumpth .or. lpartdumpmr) call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
-
-      sendbuff(ii)   = particle%unique
-      sendbuff(ii+1) = (wrxid * (nxg / nxprocs) + particle%x - 3) * deltax
-      sendbuff(ii+2) = (wryid * (nyg / nyprocs) + particle%y - 3) * deltay
-      sendbuff(ii+3) = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
-      nvl = 3
-      if(lpartdumpui) then
-        sendbuff(ii+nvl+1) = particle%ures * deltax
-        sendbuff(ii+nvl+2) = particle%vres * deltay
-        sendbuff(ii+nvl+3) = particle%wres / dzi_t(floor(particle%z))
-        nvl = nvl + 3
-        if(lpartsgs) then
-          sendbuff(ii+nvl+1) = particle%usgs * deltax
-          sendbuff(ii+nvl+2) = particle%vsgs * deltay
-          sendbuff(ii+nvl+3) = particle%wsgs / dzi_t(floor(particle%z))
-          nvl = nvl + 3
-        end if
-      end if
-      if(lpartdumpth) then
-        sendbuff(ii+nvl+1) = thl
-        sendbuff(ii+nvl+2) = thv
-        nvl = nvl + 2
-      end if
-      if(lpartdumpmr) then
-        sendbuff(ii+nvl+1) = rt
-        sendbuff(ii+nvl+2) = rl
-      end if
-      ii = ii + nvar
-      particle => particle%next
-    end do
-
-    ! Dont send when main process
-    if(myid .ne. 0) call mpi_send(sendbuff,nvar*nlocal,mpi_double_precision,0,myid,mpi_comm_world,ierror)
-
-    if(myid .eq. 0) then
-      allocate(particles_merged(np,nvar-1))
-
-      ! Add local particles
-      ii = 1
-      do i=1,nlocal
-        partid = int(sendbuff(ii))
-        particles_merged(partid,1) = sendbuff(ii+1)
-        particles_merged(partid,2) = sendbuff(ii+2)
-        particles_merged(partid,3) = sendbuff(ii+3)
-        nvl = 3
-        if(lpartdumpui) then
-          particles_merged(partid,nvl+1) = sendbuff(ii+nvl+1)
-          particles_merged(partid,nvl+2) = sendbuff(ii+nvl+2)
-          particles_merged(partid,nvl+3) = sendbuff(ii+nvl+3)
-          nvl = nvl + 3
-          if(lpartsgs) then
-            particles_merged(partid,nvl+1) = sendbuff(ii+nvl+1)
-            particles_merged(partid,nvl+2) = sendbuff(ii+nvl+2)
-            particles_merged(partid,nvl+3) = sendbuff(ii+nvl+3)
-            nvl = nvl + 3
-          end if
-        end if
-        if(lpartdumpth) then
-          particles_merged(partid,nvl+1) = thl
-          particles_merged(partid,nvl+2) = thv
-          nvl = nvl + 2
-        end if
-        if(lpartdumpmr) then
-          particles_merged(partid,nvl+1) = rt
-          particles_merged(partid,nvl+2) = rl
-        end if
-        ii = ii + nvar 
-      end do 
-
-      ! Add remote particles
-      do pid = 1,(nxprocs*nyprocs)-1
-        allocate(recvbuff(nremote(pid)*nvar))
-        call mpi_recv(recvbuff,nremote(pid)*nvar,mpi_double_precision,pid,pid,mpi_comm_world,status,ierror)   
-        ii = 1
-        do i=1,nremote(pid)
-          partid = int(recvbuff(ii))
-          particles_merged(partid,1) = recvbuff(ii+1)
-          particles_merged(partid,2) = recvbuff(ii+2)
-          particles_merged(partid,3) = recvbuff(ii+3)
-          nvl = 3
-          if(lpartdumpui) then
-            particles_merged(partid,nvl+1) = recvbuff(ii+nvl+1)
-            particles_merged(partid,nvl+2) = recvbuff(ii+nvl+2)
-            particles_merged(partid,nvl+3) = recvbuff(ii+nvl+3)
-            nvl = nvl + 3
-            if(lpartsgs) then
-              particles_merged(partid,nvl+1) = recvbuff(ii+nvl+1)
-              particles_merged(partid,nvl+2) = recvbuff(ii+nvl+2)
-              particles_merged(partid,nvl+3) = recvbuff(ii+nvl+3)
-              nvl = nvl + 3
-            end if
-          end if
-          if(lpartdumpth) then
-            particles_merged(partid,nvl+1) = recvbuff(ii+nvl+1)
-            particles_merged(partid,nvl+2) = recvbuff(ii+nvl+2)
-            nvl = nvl + 2
-          end if
-          if(lpartdumpmr) then
-            particles_merged(partid,nvl+1) = recvbuff(ii+nvl+1)
-            particles_merged(partid,nvl+2) = recvbuff(ii+nvl+2)
-          end if
-          ii = ii + nvar 
-        end do 
-        deallocate(recvbuff)
-      end do
-
-      ! Correct for Galilean transformation
-      ! Subgrid motion is assumed to be centered around the resolved velocity -> no galilean tranformation
-      if(lpartdumpui) then
-        particles_merged(:,4) = particles_merged(:,4) + umean
-        particles_merged(:,5) = particles_merged(:,5) + vmean
-      end if
-
-      ! Write to NetCDF
-      call writevar_nc(ncpartid,tname,time,ncpartrec)
-      call writevar_nc(ncpartid,'x',particles_merged(:,1),ncpartrec)
-      call writevar_nc(ncpartid,'y',particles_merged(:,2),ncpartrec)
-      call writevar_nc(ncpartid,'z',particles_merged(:,3),ncpartrec)
-      nvl = 3
-      if(lpartdumpui) then
-        call writevar_nc(ncpartid,'u',particles_merged(:,nvl+1),ncpartrec)
-        call writevar_nc(ncpartid,'v',particles_merged(:,nvl+2),ncpartrec)
-        call writevar_nc(ncpartid,'w',particles_merged(:,nvl+3),ncpartrec)
-        nvl = nvl + 3
-        if(lpartsgs) then
-          call writevar_nc(ncpartid,'us',particles_merged(:,nvl+1),ncpartrec)
-          call writevar_nc(ncpartid,'vs',particles_merged(:,nvl+2),ncpartrec)
-          call writevar_nc(ncpartid,'ws',particles_merged(:,nvl+3),ncpartrec)
-          nvl = nvl + 3
-        end if
-      end if
-      if(lpartdumpth) then
-        call writevar_nc(ncpartid,'t', particles_merged(:,nvl+1),ncpartrec)
-        call writevar_nc(ncpartid,'tv',particles_merged(:,nvl+2),ncpartrec)
-        nvl = nvl + 2
-      end if
-      if(lpartdumpmr) then
-        call writevar_nc(ncpartid,'rt',particles_merged(:,nvl+1),ncpartrec)
-        call writevar_nc(ncpartid,'rl',particles_merged(:,nvl+2),ncpartrec)
-      end if
-    end if
-    
-    if(myid==0) deallocate(particles_merged)
-    deallocate(nremote, sendbuff)
- 
-  end subroutine particledump
 
   !
   !--------------------------------------------------------------------------
@@ -2228,59 +2097,68 @@ contains
   subroutine initparticledump(time)
     use modnetcdf,       only : open_nc, addvar_nc
     use grid,            only : nzp, tname, tlongname, tunit, filprf
-    use mpi_interface,   only : myid
-    use grid,            only : tname, tlongname, tunit
+    use mpi_interface,   only : myid, nxprocs, nyprocs, wrxid, wryid
+    use grid,            only : tname, tlongname, tunit, filprf
     implicit none
 
     real, intent(in)                  :: time
     character (40), dimension(2)      :: dimname, dimlongname, dimunit
     real, allocatable, dimension(:,:) :: dimvalues
     integer, dimension(2)             :: dimsize
-    integer                           :: k
+    integer                           :: k,nlocal
     integer, parameter                :: precis = 0
+    character (len=80)                :: hname
 
-    allocate(dimvalues(np,2))
+    nlocal = floor(real(np) / (nxprocs*nyprocs))
+    if(myid .eq. nxprocs*nyprocs-1) then
+      nlocal = np - (nxprocs*nyprocs-1) * nlocal
+    end if 
+
+    allocate(dimvalues(nlocal,2))
 
     dimvalues      = 0
-    do k=1,np
+    do k=1,nlocal
       dimvalues(k,1) = k
     end do
 
     dimname(1)     = 'particles'
     dimlongname(1) = 'ID of particle'
     dimunit(1)     = '-'    
-    dimsize(1)     = np
+    dimsize(1)     = nlocal
     dimname(2)     = tname
     dimlongname(2) = tlongname
     dimunit(2)     = tunit
     dimsize(2)     = 0
+
+    write(hname,'(i4.4,i4.4)') wrxid,wryid
+    hname = trim(filprf)//'.particles.'//trim(hname)//'.nc'
  
-    if(myid == 0) then
-      call open_nc(trim(filprf)//'.particles.nc', ncpartid, ncpartrec, time, .false.)
-      call addvar_nc(ncpartid,'x','x-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-      call addvar_nc(ncpartid,'y','y-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-      call addvar_nc(ncpartid,'z','z-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-      if(lpartdumpui) then
-        call addvar_nc(ncpartid,'u','resolved u-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-        call addvar_nc(ncpartid,'v','resolved v-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-        call addvar_nc(ncpartid,'w','resolved w-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-        if(lpartsgs) then
-          call addvar_nc(ncpartid,'us','subgrid u-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-          call addvar_nc(ncpartid,'vs','subgrid v-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-          call addvar_nc(ncpartid,'ws','subgrid w-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-        end if
+    call open_nc(hname, ncpartid, ncpartrec, time, .false.)
+    call addvar_nc(ncpartid,'x','x-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+    call addvar_nc(ncpartid,'y','y-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+    call addvar_nc(ncpartid,'z','z-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+    if(lpartdumpui) then
+      call addvar_nc(ncpartid,'u','resolved u-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      call addvar_nc(ncpartid,'v','resolved v-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      call addvar_nc(ncpartid,'w','resolved w-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      if(lpartsgs) then
+        call addvar_nc(ncpartid,'us','subgrid u-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+        call addvar_nc(ncpartid,'vs','subgrid v-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+        call addvar_nc(ncpartid,'ws','subgrid w-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
       end if
-      if(lpartdumpth) then
-        call addvar_nc(ncpartid,'t','liquid water potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-        call addvar_nc(ncpartid,'tv','virtual potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-      end if
-      if(lpartdumpmr) then
-        call addvar_nc(ncpartid,'rt','total water mixing ratio','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-        call addvar_nc(ncpartid,'rl','liquid water mixing ratio','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-      end if
-    end if 
+    end if
+    if(lpartdumpth) then
+      call addvar_nc(ncpartid,'t','liquid water potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      call addvar_nc(ncpartid,'tv','virtual potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+    end if
+    if(lpartdumpmr) then
+      call addvar_nc(ncpartid,'rt','total water mixing ratio','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      call addvar_nc(ncpartid,'rl','liquid water mixing ratio','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+    end if
  
   end subroutine initparticledump
+
+
 
   !
   !--------------------------------------------------------------------------
@@ -2456,6 +2334,263 @@ contains
 
   !
   !--------------------------------------------------------------------------
+  ! subroutine initparticledump : creates NetCDF file for particle dump. 
+  !   Called from: init.f90
+  !--------------------------------------------------------------------------
+  !
+  !subroutine initparticledump(time)
+  !  use modnetcdf,       only : open_nc, addvar_nc
+  !  use grid,            only : nzp, tname, tlongname, tunit, filprf
+  !  use mpi_interface,   only : myid
+  !  use grid,            only : tname, tlongname, tunit
+  !  implicit none
+
+  !  real, intent(in)                  :: time
+  !  character (40), dimension(2)      :: dimname, dimlongname, dimunit
+  !  real, allocatable, dimension(:,:) :: dimvalues
+  !  integer, dimension(2)             :: dimsize
+  !  integer                           :: k
+  !  integer, parameter                :: precis = 0
+
+  !  allocate(dimvalues(np,2))
+
+  !  dimvalues      = 0
+  !  do k=1,np
+  !    dimvalues(k,1) = k
+  !  end do
+
+  !  dimname(1)     = 'particles'
+  !  dimlongname(1) = 'ID of particle'
+  !  dimunit(1)     = '-'    
+  !  dimsize(1)     = np
+  !  dimname(2)     = tname
+  !  dimlongname(2) = tlongname
+  !  dimunit(2)     = tunit
+  !  dimsize(2)     = 0
+ 
+  !  if(myid == 0) then
+  !    call open_nc(trim(filprf)//'.particles.nc', ncpartid, ncpartrec, time, .false.)
+  !    call addvar_nc(ncpartid,'x','x-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+  !    call addvar_nc(ncpartid,'y','y-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+  !    call addvar_nc(ncpartid,'z','z-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+  !    if(lpartdumpui) then
+  !      call addvar_nc(ncpartid,'u','resolved u-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+  !      call addvar_nc(ncpartid,'v','resolved v-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+  !      call addvar_nc(ncpartid,'w','resolved w-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+  !      if(lpartsgs) then
+  !        call addvar_nc(ncpartid,'us','subgrid u-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+  !        call addvar_nc(ncpartid,'vs','subgrid v-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+  !        call addvar_nc(ncpartid,'ws','subgrid w-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+  !      end if
+  !    end if
+  !    if(lpartdumpth) then
+  !      call addvar_nc(ncpartid,'t','liquid water potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+  !      call addvar_nc(ncpartid,'tv','virtual potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+  !    end if
+  !    if(lpartdumpmr) then
+  !      call addvar_nc(ncpartid,'rt','total water mixing ratio','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+  !      call addvar_nc(ncpartid,'rl','liquid water mixing ratio','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+  !    end if
+  !  end if 
+ 
+  !end subroutine initparticledump
+
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine particledump : communicates all particles to process #0 and
+  !   writes it to NetCDF(4)
+  !--------------------------------------------------------------------------
+  !
+  !subroutine particledump(time)
+  !  use mpi_interface, only : mpi_comm_world, myid, mpi_integer, mpi_double_precision, ierror, nxprocs, nyprocs, mpi_status_size, wrxid, wryid, nxg, nyg
+  !  use grid,          only : tname, deltax, deltay, dzi_t, zm, umean, vmean
+  !  use modnetcdf,     only : writevar_nc, fillvalue_double
+  !  implicit none
+
+  !  real, intent(in)                     :: time
+  !  type (particle_record), pointer:: particle
+  !  integer                              :: nlocal, ii, i, pid, partid
+  !  integer, allocatable, dimension(:)   :: nremote
+  !  integer                              :: status(mpi_status_size)
+  !  integer                              :: nvar,nvl
+  !  real, allocatable, dimension(:)      :: sendbuff, recvbuff
+  !  real, allocatable, dimension(:,:)    :: particles_merged
+  !  real                                 :: thl,thv,rt,rl
+
+  !  nvar = 4                            ! id,x,y,z
+  !  if(lpartdumpui)  nvar = nvar + 3    ! u,v,w
+  !  if(lpartsgs)     nvar = nvar + 3    ! us,vs,ws
+  !  if(lpartdumpth)  nvar = nvar + 2    ! thl,tvh
+  !  if(lpartdumpmr)  nvar = nvar + 2    ! rt,rl
+
+  !  ! Count local particles
+  !  nlocal = 0
+  !  particle => head
+  !  do while( associated(particle) )
+  !    nlocal = nlocal + 1
+  !    particle => particle%next
+  !  end do
+
+  !  ! Communicate number of local particles to main proces (0)
+  !  allocate(nremote(0:(nxprocs*nyprocs)-1))
+  !  nremote = 0
+  !  call mpi_gather(nlocal,1,mpi_integer,nremote,1,mpi_integer,0,mpi_comm_world,ierror)
+
+  !  !! Create buffer
+  !  allocate(sendbuff(nvar * nlocal))
+  !  ii = 1
+  !  particle => head
+  !  do while( associated(particle) )
+  !    if(lpartdumpth .or. lpartdumpmr) call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
+
+  !    sendbuff(ii)   = particle%unique
+  !    sendbuff(ii+1) = (wrxid * (nxg / nxprocs) + particle%x - 3) * deltax
+  !    sendbuff(ii+2) = (wryid * (nyg / nyprocs) + particle%y - 3) * deltay
+  !    sendbuff(ii+3) = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
+  !    nvl = 3
+  !    if(lpartdumpui) then
+  !      sendbuff(ii+nvl+1) = particle%ures * deltax
+  !      sendbuff(ii+nvl+2) = particle%vres * deltay
+  !      sendbuff(ii+nvl+3) = particle%wres / dzi_t(floor(particle%z))
+  !      nvl = nvl + 3
+  !      if(lpartsgs) then
+  !        sendbuff(ii+nvl+1) = particle%usgs * deltax
+  !        sendbuff(ii+nvl+2) = particle%vsgs * deltay
+  !        sendbuff(ii+nvl+3) = particle%wsgs / dzi_t(floor(particle%z))
+  !        nvl = nvl + 3
+  !      end if
+  !    end if
+  !    if(lpartdumpth) then
+  !      sendbuff(ii+nvl+1) = thl
+  !      sendbuff(ii+nvl+2) = thv
+  !      nvl = nvl + 2
+  !    end if
+  !    if(lpartdumpmr) then
+  !      sendbuff(ii+nvl+1) = rt
+  !      sendbuff(ii+nvl+2) = rl
+  !    end if
+  !    ii = ii + nvar
+  !    particle => particle%next
+  !  end do
+
+  !  ! Dont send when main process
+  !  if(myid .ne. 0) call mpi_send(sendbuff,nvar*nlocal,mpi_double_precision,0,myid,mpi_comm_world,ierror)
+
+  !  if(myid .eq. 0) then
+  !    allocate(particles_merged(np,nvar-1))
+
+  !    ! Add local particles
+  !    ii = 1
+  !    do i=1,nlocal
+  !      partid = int(sendbuff(ii))
+  !      particles_merged(partid,1) = sendbuff(ii+1)
+  !      particles_merged(partid,2) = sendbuff(ii+2)
+  !      particles_merged(partid,3) = sendbuff(ii+3)
+  !      nvl = 3
+  !      if(lpartdumpui) then
+  !        particles_merged(partid,nvl+1) = sendbuff(ii+nvl+1)
+  !        particles_merged(partid,nvl+2) = sendbuff(ii+nvl+2)
+  !        particles_merged(partid,nvl+3) = sendbuff(ii+nvl+3)
+  !        nvl = nvl + 3
+  !        if(lpartsgs) then
+  !          particles_merged(partid,nvl+1) = sendbuff(ii+nvl+1)
+  !          particles_merged(partid,nvl+2) = sendbuff(ii+nvl+2)
+  !          particles_merged(partid,nvl+3) = sendbuff(ii+nvl+3)
+  !          nvl = nvl + 3
+  !        end if
+  !      end if
+  !      if(lpartdumpth) then
+  !        particles_merged(partid,nvl+1) = thl
+  !        particles_merged(partid,nvl+2) = thv
+  !        nvl = nvl + 2
+  !      end if
+  !      if(lpartdumpmr) then
+  !        particles_merged(partid,nvl+1) = rt
+  !        particles_merged(partid,nvl+2) = rl
+  !      end if
+  !      ii = ii + nvar 
+  !    end do 
+
+  !    ! Add remote particles
+  !    do pid = 1,(nxprocs*nyprocs)-1
+  !      allocate(recvbuff(nremote(pid)*nvar))
+  !      call mpi_recv(recvbuff,nremote(pid)*nvar,mpi_double_precision,pid,pid,mpi_comm_world,status,ierror)   
+  !      ii = 1
+  !      do i=1,nremote(pid)
+  !        partid = int(recvbuff(ii))
+  !        particles_merged(partid,1) = recvbuff(ii+1)
+  !        particles_merged(partid,2) = recvbuff(ii+2)
+  !        particles_merged(partid,3) = recvbuff(ii+3)
+  !        nvl = 3
+  !        if(lpartdumpui) then
+  !          particles_merged(partid,nvl+1) = recvbuff(ii+nvl+1)
+  !          particles_merged(partid,nvl+2) = recvbuff(ii+nvl+2)
+  !          particles_merged(partid,nvl+3) = recvbuff(ii+nvl+3)
+  !          nvl = nvl + 3
+  !          if(lpartsgs) then
+  !            particles_merged(partid,nvl+1) = recvbuff(ii+nvl+1)
+  !            particles_merged(partid,nvl+2) = recvbuff(ii+nvl+2)
+  !            particles_merged(partid,nvl+3) = recvbuff(ii+nvl+3)
+  !            nvl = nvl + 3
+  !          end if
+  !        end if
+  !        if(lpartdumpth) then
+  !          particles_merged(partid,nvl+1) = recvbuff(ii+nvl+1)
+  !          particles_merged(partid,nvl+2) = recvbuff(ii+nvl+2)
+  !          nvl = nvl + 2
+  !        end if
+  !        if(lpartdumpmr) then
+  !          particles_merged(partid,nvl+1) = recvbuff(ii+nvl+1)
+  !          particles_merged(partid,nvl+2) = recvbuff(ii+nvl+2)
+  !        end if
+  !        ii = ii + nvar 
+  !      end do 
+  !      deallocate(recvbuff)
+  !    end do
+
+  !    ! Correct for Galilean transformation
+  !    ! Subgrid motion is assumed to be centered around the resolved velocity -> no galilean tranformation
+  !    if(lpartdumpui) then
+  !      particles_merged(:,4) = particles_merged(:,4) + umean
+  !      particles_merged(:,5) = particles_merged(:,5) + vmean
+  !    end if
+
+  !    ! Write to NetCDF
+  !    call writevar_nc(ncpartid,tname,time,ncpartrec)
+  !    call writevar_nc(ncpartid,'x',particles_merged(:,1),ncpartrec)
+  !    call writevar_nc(ncpartid,'y',particles_merged(:,2),ncpartrec)
+  !    call writevar_nc(ncpartid,'z',particles_merged(:,3),ncpartrec)
+  !    nvl = 3
+  !    if(lpartdumpui) then
+  !      call writevar_nc(ncpartid,'u',particles_merged(:,nvl+1),ncpartrec)
+  !      call writevar_nc(ncpartid,'v',particles_merged(:,nvl+2),ncpartrec)
+  !      call writevar_nc(ncpartid,'w',particles_merged(:,nvl+3),ncpartrec)
+  !      nvl = nvl + 3
+  !      if(lpartsgs) then
+  !        call writevar_nc(ncpartid,'us',particles_merged(:,nvl+1),ncpartrec)
+  !        call writevar_nc(ncpartid,'vs',particles_merged(:,nvl+2),ncpartrec)
+  !        call writevar_nc(ncpartid,'ws',particles_merged(:,nvl+3),ncpartrec)
+  !        nvl = nvl + 3
+  !      end if
+  !    end if
+  !    if(lpartdumpth) then
+  !      call writevar_nc(ncpartid,'t', particles_merged(:,nvl+1),ncpartrec)
+  !      call writevar_nc(ncpartid,'tv',particles_merged(:,nvl+2),ncpartrec)
+  !      nvl = nvl + 2
+  !    end if
+  !    if(lpartdumpmr) then
+  !      call writevar_nc(ncpartid,'rt',particles_merged(:,nvl+1),ncpartrec)
+  !      call writevar_nc(ncpartid,'rl',particles_merged(:,nvl+2),ncpartrec)
+  !    end if
+  !  end if
+  !  
+  !  if(myid==0) deallocate(particles_merged)
+  !  deallocate(nremote, sendbuff)
+ 
+  !end subroutine particledump
+
+  !
+  !--------------------------------------------------------------------------
   ! Subroutine randomize 
   !
   !> !!!! DEPRECATED !!!!!
@@ -2464,46 +2599,46 @@ contains
   !> the lowest grid level every RK3 cycle. Called from: particles()
   !--------------------------------------------------------------------------
   !
-  subroutine randomize(once)
-    use mpi_interface, only : nxg, nyg, nyprocs, nxprocs
-    implicit none
+  !subroutine randomize(once)
+  !  use mpi_interface, only : nxg, nyg, nyprocs, nxprocs
+  !  implicit none
 
-    logical, intent(in) :: once            !> flag: randomize all particles (false) or only the onces which sink into the surface layer (true)?  
-    real                :: zmax = 1.       ! Max height in grid coordinates
-    integer             :: nyloc, nxloc 
-    type (particle_record), pointer:: particle
-    real                :: randnr(3)
+  !  logical, intent(in) :: once            !> flag: randomize all particles (false) or only the onces which sink into the surface layer (true)?  
+  !  real                :: zmax = 1.       ! Max height in grid coordinates
+  !  integer             :: nyloc, nxloc 
+  !  type (particle_record), pointer:: particle
+  !  real                :: randnr(3)
 
-    nyloc   = nyg / nyprocs
-    nxloc   = nxg / nxprocs
+  !  nyloc   = nyg / nyprocs
+  !  nxloc   = nxg / nxprocs
 
-    if(once) then 
-      particle => head
-      do while(associated(particle) )
-        if( particle%z <= (1. + zmax) .and. particle%zprev > (1. + zmax) ) then
-          call random_number(randnr)
-          particle%x = (randnr(1) * nyloc) + 3 
-          particle%y = (randnr(2) * nxloc) + 3
-          !particle%z = zmax * randnr(3)    + 1
-          particle%ures_prev = 0.
-          particle%vres_prev = 0.
-          particle%wres_prev = 0.
-        end if
-        particle => particle%next
-      end do 
-    else
-      particle => head
-      do while(associated(particle) )
-        if( particle%z <= (1. + zmax) ) then
-          call random_number(randnr)
-          particle%x = (randnr(1) * nyloc) + 3 
-          particle%y = (randnr(2) * nxloc) + 3
-          !particle%z = zmax * randnr(3)    + 1 
-        end if
-        particle => particle%next
-      end do 
-    end if 
+  !  if(once) then 
+  !    particle => head
+  !    do while(associated(particle) )
+  !      if( particle%z <= (1. + zmax) .and. particle%zprev > (1. + zmax) ) then
+  !        call random_number(randnr)
+  !        particle%x = (randnr(1) * nyloc) + 3 
+  !        particle%y = (randnr(2) * nxloc) + 3
+  !        !particle%z = zmax * randnr(3)    + 1
+  !        particle%ures_prev = 0.
+  !        particle%vres_prev = 0.
+  !        particle%wres_prev = 0.
+  !      end if
+  !      particle => particle%next
+  !    end do 
+  !  else
+  !    particle => head
+  !    do while(associated(particle) )
+  !      if( particle%z <= (1. + zmax) ) then
+  !        call random_number(randnr)
+  !        particle%x = (randnr(1) * nyloc) + 3 
+  !        particle%y = (randnr(2) * nxloc) + 3
+  !        !particle%z = zmax * randnr(3)    + 1 
+  !      end if
+  !      particle => particle%next
+  !    end do 
+  !  end if 
  
-  end subroutine randomize
+  !end subroutine randomize
 
 end module modparticles
