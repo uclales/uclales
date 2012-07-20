@@ -464,7 +464,7 @@ contains
     use defs, only : g,pi
     implicit none
 
-    real     :: deltaz, zparticle
+    real     :: deltaz
     integer  :: zbottom
     TYPE (particle_record), POINTER:: particle
 
@@ -509,7 +509,7 @@ contains
     use grid, only : dxi, dt
     implicit none
 
-    real :: t1, t2, t3, ts, usgs
+    real :: t1, t2, t3, usgs
     TYPE (particle_record), POINTER:: particle
 
     t1        = (-0.75 * fsl * C0 * (particle%usgs / dxi) * (ceps/labda) * (1.5 * sigma2l)**0.5) * dt
@@ -541,7 +541,7 @@ contains
     use grid, only : dyi, dt
     implicit none
 
-    real :: t1, t2, t3, ts, vsgs
+    real :: t1, t2, t3, vsgs
     TYPE (particle_record), POINTER:: particle
 
     t1        = (-0.75 * fsl * C0 * (particle%vsgs / dyi) * (ceps/labda) * (1.5 * sigma2l)**0.5) * dt
@@ -573,7 +573,7 @@ contains
     use grid, only : dzi_t, dt
     implicit none
 
-    real :: t1, t2, t3, ts, wsgs, dzi
+    real :: t1, t2, t3, wsgs, dzi
     TYPE (particle_record), POINTER:: particle
 
     dzi        = dzi_t(floor(particle%z))
@@ -615,7 +615,7 @@ contains
     integer, allocatable, dimension(:) :: recvcount,displacements
     integer            :: nglobal, nlocal=0, ii, i
     real               :: xsizelocal,ysizelocal,tempx,tempy
-    real               :: randnr(3),temp
+    real               :: randnr(3)
 
     ! Count number of local particles < zmax
     particle => head
@@ -1481,7 +1481,7 @@ contains
     real, intent(in)                     :: time
     type (particle_record),       pointer:: particle
     integer                              :: status(mpi_status_size)
-    integer                              :: nlocal,nplocal,nmax,nprocs,p,pp,nvar,basep,start,end,nsr,isr,nvl
+    integer                              :: nlocal,nprocs,p,nvar,start,end,nsr,isr,nvl
     integer, allocatable, dimension(:)   :: tosend,toreceive,base,sendbase,receivebase
     real, allocatable, dimension(:)      :: sendbuff,recvbuff
     integer, allocatable, dimension(:,:) :: status_array
