@@ -16,8 +16,8 @@ from math import floor
 
 # USER INPUT:
 tstart      = 000.       # 'release' time of particles
-nxy         = 16**2.     # Goal number of particles per level
-nz          = 1         # Number of vertical levels
+nxy         = 32**2.     # Goal number of particles per level
+nz          = 128         # Number of vertical levels
 dz          = 25.         # Vertical grid spacing
 xysize      = 800.       # Domain size LES
 

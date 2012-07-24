@@ -169,6 +169,9 @@ contains
       end do
     end if
 
+    ! Communicate particles to other procs 
+    call partcomm
+
     ! Statistics
     if (nstep==3) then
       ! Particle dump
@@ -181,8 +184,6 @@ contains
       !call checkdiv
     end if
   
-    ! Communicate particles to other procs 
-    call partcomm
 
   end subroutine particles
 
@@ -1545,6 +1546,7 @@ contains
       sendbuff(base(p)+1)         = (wrxid * (nxg / nxprocs) + particle%x - 3) * deltax
       sendbuff(base(p)+2)         = (wryid * (nyg / nyprocs) + particle%y - 3) * deltay
       sendbuff(base(p)+3)         = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
+
       nvl = 3
       if(lpartdumpui) then
         sendbuff(base(p)+nvl+1)   = particle%ures * deltax
