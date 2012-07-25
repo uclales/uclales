@@ -1625,8 +1625,8 @@ contains
       sb_sorted(loc,3) = recvbuff(ii+3)
       nvl = 3 
       if(lpartdumpui) then
-        sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
-        sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
+        sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1) + umean
+        sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2) + vmean
         sb_sorted(loc,nvl+3) = recvbuff(ii+nvl+3)
         nvl = nvl + 3
         if(lpartsgs) then
