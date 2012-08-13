@@ -65,7 +65,7 @@ contains
     use modcross, only : triggercross, exitcross, lcross
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
-    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, lpartstat, exitparticlestat, write_particle_hist, particlestat
+    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, lpartstat, exitparticlestat, write_particle_hist, particlestat, balanced_particledump
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
@@ -107,6 +107,7 @@ contains
        if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) then
          call write_ps(nzp,dn0,u0,v0,zm,zt,time)
          if(lpartic .and. lpartstat) call particlestat(.true.,time)
+         if(lpartic .and. lpartdump) call balanced_particledump(time)
        end if
 
        if ((mod(tplsdt,frqhis) < dt .or. time >= timmax) .and. outflg) then

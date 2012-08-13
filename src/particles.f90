@@ -30,7 +30,7 @@ module modparticles
   ! module modparticles: Langrangian particle tracking, ad(o/a)pted from DALES
   !--------------------------------------------------------------------------
   implicit none
-  PUBLIC :: init_particles, particles, exit_particles, initparticledump, initparticlestat, write_particle_hist, particlestat
+  PUBLIC :: init_particles, particles, exit_particles, initparticledump, initparticlestat, write_particle_hist, particlestat, balanced_particledump
 
   ! For/from namelist  
   logical            :: lpartic        = .false.        !< Switch for enabling particles
@@ -104,8 +104,8 @@ module modparticles
   real                                :: ceps, labda, spngl  
 
   ! Test switches...
-  logical                             :: lfsloc = .true.  ! Local or global calculated fs()
-  logical                             :: fixedfs = .false.  ! Fix fs at 1.
+  logical                             :: lfsloc   = .true.   ! Local or global calculated fs()
+  logical                             :: fixedfs  = .false.  ! Fix fs at 1.
 
 contains
   !
@@ -172,17 +172,22 @@ contains
     ! Communicate particles to other procs 
     call partcomm
 
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! Temporary hack, sync particle dump with statistics
+    ! see also step.f90
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   
     ! Statistics
-    if (nstep==3) then
-      ! Particle dump
-      if((time + (0.5*dt) >= tnextdump .or. time + dt >= timmax) .and. lpartdump) then
-        !call particledump(time)
-        call balanced_particledump(time)
-        !call rawparticledump(time)
-        tnextdump = tnextdump + frqpartdump
-      end if
-      !call checkdiv
-    end if
+    !if (nstep==3) then
+    !  ! Particle dump
+    !  if((time + (0.5*dt) >= tnextdump .or. time + dt >= timmax) .and. lpartdump) then
+    !    !call particledump(time)
+    !    call balanced_particledump(time)
+    !    !call rawparticledump(time)
+    !    tnextdump = tnextdump + frqpartdump
+    !  end if
+    !  !call checkdiv
+    !end if
   
 
   end subroutine particles
@@ -1442,7 +1447,6 @@ contains
     character (len=80)                   :: hname
     type (particle_record), pointer:: particle
 
-
     write(hname,'(i4.4,a1,i4.4)') wrxid,'_',wryid
     hname = 'rawparticles.'//trim(hname)
 
@@ -1492,196 +1496,200 @@ contains
     integer, allocatable, dimension(:)   :: req
     real                                 :: thl,thv,rt,rl
 
-    nvar = 4                             ! id,x,y,z
-    if(lpartdumpui)  nvar = nvar + 3     ! u,v,w
-    if(lpartsgs)     nvar = nvar + 3     ! us,vs,ws
-    if(lpartdumpth)  nvar = nvar + 2     ! thl,tvh
-    if(lpartdumpmr)  nvar = nvar + 2     ! rt,rl
+    if(time > tnextdump) then
 
-    nprocs = nxprocs * nyprocs
-    allocate(tosend(0:nprocs-1),toreceive(0:nprocs-1),base(0:nprocs-1),sendbase(0:nprocs-1),receivebase(0:nprocs-1))
+      nvar = 4                             ! id,x,y,z
+      if(lpartdumpui)  nvar = nvar + 3     ! u,v,w
+      if(lpartsgs)     nvar = nvar + 3     ! us,vs,ws
+      if(lpartdumpth)  nvar = nvar + 2     ! thl,tvh
+      if(lpartdumpmr)  nvar = nvar + 2     ! rt,rl
 
-    ! Find average number of particles per proc
-    nlocal = floor(real(np) / nprocs)
+      nprocs = nxprocs * nyprocs
+      allocate(tosend(0:nprocs-1),toreceive(0:nprocs-1),base(0:nprocs-1),sendbase(0:nprocs-1),receivebase(0:nprocs-1))
 
-    ! Determine how many particles to send to which proc
-    tosend = 0
-    particle => head
-    do while( associated(particle) )
-      p = floor((particle%unique-1) / nlocal)       ! Which proc to send to
-      if(p .gt. nprocs-1) p = nprocs - 1            ! Last proc gets remaining particles
-      tosend(p) = tosend(p) + 1
-      particle => particle%next
-    end do
+      ! Find average number of particles per proc
+      nlocal = floor(real(np) / nprocs)
 
-    ! 1. Communicate nparticles to send/receive to/from each proc
-    ! 2. Find start position for each proc in send/recv buff
-    do p=0,nprocs-1
-      call mpi_sendrecv(tosend(p),   1,mpi_integer,p,1, &
-                        toreceive(p),1,mpi_integer,p,1, &
-                        mpi_comm_world,status,ierror)
-      if(p .eq. 0) then
-        sendbase(p)    = 1
-        receivebase(p) = 1
-      else
-        sendbase(p)    = sendbase(p-1)    + (tosend(p-1)    * nvar)
-        receivebase(p) = receivebase(p-1) + (toreceive(p-1) * nvar)
-      end if
-    end do
+      ! Determine how many particles to send to which proc
+      tosend = 0
+      particle => head
+      do while( associated(particle) )
+        p = floor((particle%unique-1) / nlocal)       ! Which proc to send to
+        if(p .gt. nprocs-1) p = nprocs - 1            ! Last proc gets remaining particles
+        tosend(p) = tosend(p) + 1
+        particle => particle%next
+      end do
 
-    base = sendbase  ! will be changed during filling send buffer
-
-    ! Allocate send/receive buffers
-    allocate(sendbuff(sum(tosend)*nvar),recvbuff(sum(toreceive)*nvar))
-
-    ! Fill send buffer
-    particle => head
-    do while( associated(particle) )
-      p = floor((particle%unique-1) / nlocal)       ! Which proc to send to
-      if(p .gt. nprocs-1) p = nprocs-1              ! Last proc gets remaining particles
-
-      if(lpartdumpth .or. lpartdumpmr) call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
-
-      sendbuff(base(p))           =  particle%unique
-      sendbuff(base(p)+1)         = (wrxid * (nxg / nxprocs) + particle%x - 3) * deltax
-      sendbuff(base(p)+2)         = (wryid * (nyg / nyprocs) + particle%y - 3) * deltay
-      sendbuff(base(p)+3)         = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
-
-      nvl = 3
-      if(lpartdumpui) then
-        sendbuff(base(p)+nvl+1)   = particle%ures * deltax
-        sendbuff(base(p)+nvl+2)   = particle%vres * deltay
-        sendbuff(base(p)+nvl+3)   = particle%wres / dzi_t(floor(particle%z))
-        nvl = nvl + 3
-        if(lpartsgs) then
-          sendbuff(base(p)+nvl+1) = particle%usgs * deltax
-          sendbuff(base(p)+nvl+2) = particle%vsgs * deltay
-          sendbuff(base(p)+nvl+3) = particle%wsgs / dzi_t(floor(particle%z))
-          nvl = nvl + 3
-        end if
-      end if
-      if(lpartdumpth) then
-        sendbuff(base(p)+nvl+1)   = thl
-        sendbuff(base(p)+nvl+2)   = thv
-        nvl = nvl + 2
-      end if
-      if(lpartdumpmr) then
-        sendbuff(base(p)+nvl+1)   = rt
-        sendbuff(base(p)+nvl+2)   = rl
-      end if
-
-      base(p)             = base(p) + nvar
-
-      particle => particle%next
-    end do
-
-    ! Non=blocking send and receive from/to each other proc
-    ! Find total #send/recv's for non-blocking send/recv request checking 
-    nsr = 0
-    do p = 0, nprocs-1
-      if(tosend(p)    .gt. 0) nsr = nsr + 1
-      if(toreceive(p) .gt. 0) nsr = nsr + 1
-    end do
-    ! Allocate status & request arrays
-    allocate(status_array(mpi_status_size,nsr),req(nsr))
- 
-    ! Do send/receives 
-    isr = 1 
-    do p=0,nprocs-1
-      if(tosend(p) .gt. 0) then
-        start = sendbase(p)
-        if(p .eq. nprocs-1) then
-          end = size(sendbuff)
+      ! 1. Communicate nparticles to send/receive to/from each proc
+      ! 2. Find start position for each proc in send/recv buff
+      do p=0,nprocs-1
+        call mpi_sendrecv(tosend(p),   1,mpi_integer,p,1, &
+                          toreceive(p),1,mpi_integer,p,1, &
+                          mpi_comm_world,status,ierror)
+        if(p .eq. 0) then
+          sendbase(p)    = 1
+          receivebase(p) = 1
         else
-          end = sendbase(p+1)-1
+          sendbase(p)    = sendbase(p-1)    + (tosend(p-1)    * nvar)
+          receivebase(p) = receivebase(p-1) + (toreceive(p-1) * nvar)
         end if
-        call mpi_isend(sendbuff(start:end),tosend(p)*nvar,mpi_double_precision,p,(myid+1)*(p+nprocs),mpi_comm_world,req(isr),ierror)
-        isr = isr + 1
-      end if
-      if(toreceive(p) .gt. 0) then
-        start = receivebase(p)
-        if(p .eq. nprocs-1) then
-          end = size(recvbuff)
-        else 
-          end = receivebase(p+1)-1
-        end if       
-        call mpi_irecv(recvbuff(start:end),toreceive(p)*nvar,mpi_double_precision,p,(p+1)*(myid+nprocs),mpi_comm_world,req(isr),ierror)
-        isr = isr + 1
-      end if
-    end do
+      end do
 
-    ! Wait for all communication to finish
-    call mpi_waitall(nsr,req,status_array,ierror)
+      base = sendbase  ! will be changed during filling send buffer
 
-    ! Sort particles
-    allocate(sb_sorted(size(recvbuff)/nvar,nvar-1))
-    bloc = myid * nlocal + 1
-    ii = 1
-    do p = 1, size(recvbuff)/nvar
+      ! Allocate send/receive buffers
+      allocate(sendbuff(sum(tosend)*nvar),recvbuff(sum(toreceive)*nvar))
 
-      loc = recvbuff(ii)-bloc+1
-      sb_sorted(loc,1) = recvbuff(ii+1)
-      sb_sorted(loc,2) = recvbuff(ii+2)
-      sb_sorted(loc,3) = recvbuff(ii+3)
-      nvl = 3 
-      if(lpartdumpui) then
-        sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1) + umean
-        sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2) + vmean
-        sb_sorted(loc,nvl+3) = recvbuff(ii+nvl+3)
-        nvl = nvl + 3
-        if(lpartsgs) then
-          sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
-          sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
+      ! Fill send buffer
+      particle => head
+      do while( associated(particle) )
+        p = floor((particle%unique-1) / nlocal)       ! Which proc to send to
+        if(p .gt. nprocs-1) p = nprocs-1              ! Last proc gets remaining particles
+
+        if(lpartdumpth .or. lpartdumpmr) call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
+
+        sendbuff(base(p))           =  particle%unique
+        sendbuff(base(p)+1)         = (wrxid * (nxg / nxprocs) + particle%x - 3) * deltax
+        sendbuff(base(p)+2)         = (wryid * (nyg / nyprocs) + particle%y - 3) * deltay
+        sendbuff(base(p)+3)         = zm(floor(particle%z)) + (particle%z-floor(particle%z)) / dzi_t(floor(particle%z))
+
+        nvl = 3
+        if(lpartdumpui) then
+          sendbuff(base(p)+nvl+1)   = particle%ures * deltax
+          sendbuff(base(p)+nvl+2)   = particle%vres * deltay
+          sendbuff(base(p)+nvl+3)   = particle%wres / dzi_t(floor(particle%z))
+          nvl = nvl + 3
+          if(lpartsgs) then
+            sendbuff(base(p)+nvl+1) = particle%usgs * deltax
+            sendbuff(base(p)+nvl+2) = particle%vsgs * deltay
+            sendbuff(base(p)+nvl+3) = particle%wsgs / dzi_t(floor(particle%z))
+            nvl = nvl + 3
+          end if
+        end if
+        if(lpartdumpth) then
+          sendbuff(base(p)+nvl+1)   = thl
+          sendbuff(base(p)+nvl+2)   = thv
+          nvl = nvl + 2
+        end if
+        if(lpartdumpmr) then
+          sendbuff(base(p)+nvl+1)   = rt
+          sendbuff(base(p)+nvl+2)   = rl
+        end if
+
+        base(p)             = base(p) + nvar
+
+        particle => particle%next
+      end do
+
+      ! Non=blocking send and receive from/to each other proc
+      ! Find total #send/recv's for non-blocking send/recv request checking 
+      nsr = 0
+      do p = 0, nprocs-1
+        if(tosend(p)    .gt. 0) nsr = nsr + 1
+        if(toreceive(p) .gt. 0) nsr = nsr + 1
+      end do
+      ! Allocate status & request arrays
+      allocate(status_array(mpi_status_size,nsr),req(nsr))
+ 
+      ! Do send/receives 
+      isr = 1 
+      do p=0,nprocs-1
+        if(tosend(p) .gt. 0) then
+          start = sendbase(p)
+          if(p .eq. nprocs-1) then
+            end = size(sendbuff)
+          else
+            end = sendbase(p+1)-1
+          end if
+          call mpi_isend(sendbuff(start:end),tosend(p)*nvar,mpi_double_precision,p,(myid+1)*(p+nprocs),mpi_comm_world,req(isr),ierror)
+          isr = isr + 1
+        end if
+        if(toreceive(p) .gt. 0) then
+          start = receivebase(p)
+          if(p .eq. nprocs-1) then
+            end = size(recvbuff)
+          else 
+            end = receivebase(p+1)-1
+          end if       
+          call mpi_irecv(recvbuff(start:end),toreceive(p)*nvar,mpi_double_precision,p,(p+1)*(myid+nprocs),mpi_comm_world,req(isr),ierror)
+          isr = isr + 1
+        end if
+      end do
+
+      ! Wait for all communication to finish
+      call mpi_waitall(nsr,req,status_array,ierror)
+
+      ! Sort particles
+      allocate(sb_sorted(size(recvbuff)/nvar,nvar-1))
+      bloc = myid * nlocal + 1
+      ii = 1
+      do p = 1, size(recvbuff)/nvar
+
+        loc = recvbuff(ii)-bloc+1
+        sb_sorted(loc,1) = recvbuff(ii+1)
+        sb_sorted(loc,2) = recvbuff(ii+2)
+        sb_sorted(loc,3) = recvbuff(ii+3)
+        nvl = 3 
+        if(lpartdumpui) then
+          sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1) + umean
+          sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2) + vmean
           sb_sorted(loc,nvl+3) = recvbuff(ii+nvl+3)
           nvl = nvl + 3
+          if(lpartsgs) then
+            sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
+            sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
+            sb_sorted(loc,nvl+3) = recvbuff(ii+nvl+3)
+            nvl = nvl + 3
+          end if
+        end if
+        if(lpartdumpth) then
+          sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
+          sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
+          nvl = nvl + 2
+        end if
+        if(lpartdumpmr) then
+          sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
+          sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
+        end if
+
+        ii = ii + nvar
+      end do
+
+      ! Write to NetCDF
+      call writevar_nc(ncpartid,tname,time,ncpartrec)
+      call writevar_nc(ncpartid,'x',sb_sorted(:,1),ncpartrec)
+      call writevar_nc(ncpartid,'y',sb_sorted(:,2),ncpartrec)
+      call writevar_nc(ncpartid,'z',sb_sorted(:,3),ncpartrec)
+      nvl = 3
+      if(lpartdumpui) then
+        call writevar_nc(ncpartid,'u',sb_sorted(:,nvl+1),ncpartrec)
+        call writevar_nc(ncpartid,'v',sb_sorted(:,nvl+2),ncpartrec)
+        call writevar_nc(ncpartid,'w',sb_sorted(:,nvl+3),ncpartrec)
+        nvl = nvl + 3
+        if(lpartsgs) then
+          call writevar_nc(ncpartid,'us',sb_sorted(:,nvl+1),ncpartrec)
+          call writevar_nc(ncpartid,'vs',sb_sorted(:,nvl+2),ncpartrec)
+          call writevar_nc(ncpartid,'ws',sb_sorted(:,nvl+3),ncpartrec)
+          nvl = nvl + 3
         end if
       end if
       if(lpartdumpth) then
-        sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
-        sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
+        call writevar_nc(ncpartid,'t', sb_sorted(:,nvl+1),ncpartrec)
+        call writevar_nc(ncpartid,'tv',sb_sorted(:,nvl+2),ncpartrec)
         nvl = nvl + 2
       end if
       if(lpartdumpmr) then
-        sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
-        sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
+        call writevar_nc(ncpartid,'rt',sb_sorted(:,nvl+1),ncpartrec)
+        call writevar_nc(ncpartid,'rl',sb_sorted(:,nvl+2),ncpartrec)
       end if
 
-      ii = ii + nvar
-    end do
+      ! Cleanup!
+      deallocate(tosend,toreceive,base,sendbase,receivebase)
+      deallocate(sendbuff,recvbuff)
+      deallocate(sb_sorted)
+      deallocate(status_array,req)
 
-    ! Write to NetCDF
-    call writevar_nc(ncpartid,tname,time,ncpartrec)
-    call writevar_nc(ncpartid,'x',sb_sorted(:,1),ncpartrec)
-    call writevar_nc(ncpartid,'y',sb_sorted(:,2),ncpartrec)
-    call writevar_nc(ncpartid,'z',sb_sorted(:,3),ncpartrec)
-    nvl = 3
-    if(lpartdumpui) then
-      call writevar_nc(ncpartid,'u',sb_sorted(:,nvl+1),ncpartrec)
-      call writevar_nc(ncpartid,'v',sb_sorted(:,nvl+2),ncpartrec)
-      call writevar_nc(ncpartid,'w',sb_sorted(:,nvl+3),ncpartrec)
-      nvl = nvl + 3
-      if(lpartsgs) then
-        call writevar_nc(ncpartid,'us',sb_sorted(:,nvl+1),ncpartrec)
-        call writevar_nc(ncpartid,'vs',sb_sorted(:,nvl+2),ncpartrec)
-        call writevar_nc(ncpartid,'ws',sb_sorted(:,nvl+3),ncpartrec)
-        nvl = nvl + 3
-      end if
     end if
-    if(lpartdumpth) then
-      call writevar_nc(ncpartid,'t', sb_sorted(:,nvl+1),ncpartrec)
-      call writevar_nc(ncpartid,'tv',sb_sorted(:,nvl+2),ncpartrec)
-      nvl = nvl + 2
-    end if
-    if(lpartdumpmr) then
-      call writevar_nc(ncpartid,'rt',sb_sorted(:,nvl+1),ncpartrec)
-      call writevar_nc(ncpartid,'rl',sb_sorted(:,nvl+2),ncpartrec)
-    end if
-
-    ! Cleanup!
-    deallocate(tosend,toreceive,base,sendbase,receivebase)
-    deallocate(sendbuff,recvbuff)
-    deallocate(sb_sorted)
-    deallocate(status_array,req)
  
   end subroutine balanced_particledump
 
