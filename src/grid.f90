@@ -367,9 +367,9 @@ contains
     real    :: zmnvc(-1:nzp+1)
     character (len=51) :: &
          fm1 = '(//" ",49("-")/,"   grid dimensions:"/)            ',      &
-         fm2 = '("   nxp-4 = ",i3,", dx, dx = ",f8.1,",",f9.1," m")',      &
-         fm3 = '("   nyp-4 = ",i3,", dy, dy = ",f8.1,",",f9.1," m")',      &
-         fm4 = '("   nzp   = ",i3,", dz, dz = ",f8.1,",",f9.1," m")',      &
+         fm2 = '("   nxp-4 = ",i4,", dx, dx = ",f8.1,",",f9.1," m")',      &
+         fm3 = '("   nyp-4 = ",i4,", dy, dy = ",f8.1,",",f9.1," m")',      &
+         fm4 = '("   nzp   = ",i4,", dz, dz = ",f8.1,",",f9.1," m")',      &
          fm5 = '("   thermo level: ",i3)                        '
 
     nxyzp  = nxp*nyp*nzp
