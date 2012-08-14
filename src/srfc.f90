@@ -235,7 +235,7 @@ contains
 			obl(i,j)) + psim(z0m(i,j) / obl(i,j))) / (log(zt(2) / &
 			z0h(i,j)) - psih(zt(2) / obl(i,j)) + psih(z0h(i,j) / &
 			obl(i,j)))
-             ra(i,j) = 1. / (cs(i,j)* wspd(i,j))
+             ra(i,j) =  1. / (cs(i,j)* wspd(i,j))
           end do
        end do
 
@@ -255,8 +255,8 @@ contains
        do j=3, nyp-2
           do i=3, nxp-2
 
-             wt_sfc(i,j) = - (thetaav(i,j) - tskinav(i,j)) / ra(i,j) 
-             wq_sfc(i,j) = - (vaporav(i,j) - qskinav(i,j)) / ra(i,j)
+             wt_sfc(i,j)  = - (thetaav(i,j) - tskinav(i,j)) / ra(i,j) 
+             wq_sfc(i,j)  = - (vaporav(i,j) - qskinav(i,j)) / ra(i,j)
 
              uw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j)                  &
                               *(a_up(2,i,j)+umean)/wspd(i,j)
@@ -280,10 +280,9 @@ contains
       ffact = 1.
 
       !homogeneous surface fluxes from nc file
-      !if (myid==1)print*,shls
 
       if (.true.) then
-         times=time_in*24.0*3600.0
+         times=time_in*86400.
          if (times .lt. timels(1))then
             tcnt = 1
             tfrac = 0.
@@ -294,11 +293,10 @@ contains
                  go to 10
                end if
             end do
-         10 continue
-         tfrac = (times - timels(tcnt)) / (timels(tcnt+1)-timels(tcnt))
+            10 continue
+            tfrac = (times - timels(tcnt)) / (timels(tcnt+1)-timels(tcnt))
          end if 
-         if (myid==1) print*,times,timels(tcnt),tcnt
-
+      
          wt_sfc(1,1)=(shls(tcnt)+(shls(tcnt+1)-shls(tcnt))*tfrac)/(0.5*(dn0(1)+dn0(2))*cp)
          wq_sfc(1,1)=(lhls(tcnt)+(lhls(tcnt+1)-lhls(tcnt))*tfrac)/(0.5*(dn0(1)+dn0(2))*alvl)
          a_ustar(1,1)=(usls(tcnt)+(usls(tcnt+1)-usls(tcnt))*tfrac) 
@@ -447,7 +445,7 @@ contains
   subroutine srfcscls(n2,n3,z,z0,th00,u,dth,drt,ustar,tstar,rstar,obl)
 
     use defs, only : vonk, g, ep2
-    use grid ,only: nstep
+    use grid ,only: nstep, runtype
 
     implicit none
 
@@ -494,7 +492,6 @@ contains
           !   zeta  = z/lmo
           !   ustar(i,j) =  vonk*u(i,j)/(lnz + am*zeta)
           !   tstar(i,j) = (vonk*dtv/(lnz + ah*zeta))/pr
-          !print*,"STABLE ATMOSPHERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 
           !
           ! NEUTRAL CASE
@@ -512,7 +509,7 @@ contains
           ! use neutral values.
           !
           else
-             if (first_call .or. tstar(i,j)*dtv <= 0.) then
+             if ((runtype=='INITIAL' .and. first_call) .or.( tstar(i,j)*dtv <= 0.)) then
              ustar(i,j) =  vonk*u(i,j)/lnz
              tstar(i,j) =  vonk*dtv/(pr*lnz)
              lmo = -1.e10

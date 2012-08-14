@@ -591,6 +591,10 @@ contains
        write(10) a_tskin
        write(10) a_qskin
        write(10) a_Wl
+       write(10) a_sflxd
+       write(10) a_sflxu
+       write(10) a_lflxd
+       write(10) a_lflxu
        write(10) a_sflxd_avn
        write(10) a_sflxu_avn
        write(10) a_lflxd_avn
@@ -658,6 +662,10 @@ contains
           read(10) a_tskin
           read(10) a_qskin
           read(10) a_Wl
+          read(10) a_sflxd
+          read(10) a_sflxu
+          read(10) a_lflxd
+          read(10) a_lflxu
           read(10) a_sflxd_avn
           read(10) a_sflxu_avn
           read(10) a_lflxd_avn
