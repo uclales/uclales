@@ -8,20 +8,21 @@
 #   Command-line input: script asks for the variables to be merged             #   
 #   'all' puts all variables (x,y,z,u,v,w,t,tv,rt,rl) into one NetCDF file     #
 #                                                                              #
-#   TODO: add units, description, etc. to NetCDF output                        #  
+#   TODO: fix long names                                                       #  
 #                                                                              #
 ################################################################################
 
 import numpy;
 from netCDF4 import Dataset
 from pylab import *
-import time
+import time as time2
 import sys
 
 # USER INPUT:
 pref   = 'arm'       # Path to particle output 
-nfx    = 8           # Number of cores in x-direction
-nfy    = 3           # Number of cores in y-direction
+nfx    = 1           # Number of cores in x-direction
+nfy    = 1           # Number of cores in y-direction
+compr  = False       # Use zlib compression (saves ~20%, but script very slow)?
 
 # No need to change below
 # ----------------------------------------------
@@ -30,7 +31,7 @@ if(vars[0] == 'all'):
   vars = (['x','y','z','u','v','w','t','tv','rt','rl'])
 print 'Merging: ', vars
 
-globalstart = time.time()
+globalstart = time2.time()
 # 1. Find total number of particles: 
 np = 0
 for i in range(nfx):
@@ -45,7 +46,6 @@ for i in range(nfx):
           varin = ncin.variables[var.strip()]
         except KeyError as e:
           sys.exit("One or more variables not found, stopping..")
-
 print 'Found ', np, ' particles!'
 
 # 2. Create new NetCDF
@@ -55,25 +55,62 @@ pdim    = ncout.createDimension('particles', np)
 tdim    = ncout.createDimension('time'      ,None)
 print 'output file = ',fileout
 
-x  = ncout.createVariable('x', 'f4',('time','particles',)) if 'x'  in vars else 1
-y  = ncout.createVariable('y', 'f4',('time','particles',)) if 'y'  in vars else 1
-z  = ncout.createVariable('z', 'f4',('time','particles',)) if 'z'  in vars else 1
-u  = ncout.createVariable('u', 'f4',('time','particles',)) if 'u'  in vars else 1
-v  = ncout.createVariable('v', 'f4',('time','particles',)) if 'v'  in vars else 1
-w  = ncout.createVariable('w', 'f4',('time','particles',)) if 'w'  in vars else 1
-t  = ncout.createVariable('t', 'f4',('time','particles',)) if 't'  in vars else 1
-tv = ncout.createVariable('tv','f4',('time','particles',)) if 'tv' in vars else 1
-rt = ncout.createVariable('rt','f4',('time','particles',)) if 'rt' in vars else 1
-rl = ncout.createVariable('rl','f4',('time','particles',)) if 'rl' in vars else 1
+time            = ncout.createVariable('time', 'f4',('time',),zlib=compr)
+time.units      = 's' 
+time.longname   = 'Time' 
+if 'x' in vars:
+  x             = ncout.createVariable('x', 'f4',('time','particles',),zlib=compr)
+  x.units       = ncin.variables["x"].units
+  x.longname    = ncin.variables["x"].longname.rstrip(' \t\r\n\0') 
+if 'y' in vars: 
+  y             = ncout.createVariable('y', 'f4',('time','particles',),zlib=compr)
+  y.units       = ncin.variables["y"].units
+  y.longname    = ncin.variables["y"].longname 
+if 'z' in vars: 
+  z             = ncout.createVariable('z', 'f4',('time','particles',),zlib=compr)
+  z.units       = ncin.variables["z"].units
+  z.longname    = ncin.variables["z"].longname 
+if 'u' in vars: 
+  u             = ncout.createVariable('u', 'f4',('time','particles',),zlib=compr)
+  u.units       = ncin.variables["u"].units
+  u.longname    = ncin.variables["u"].longname 
+if 'v' in vars: 
+  v             = ncout.createVariable('v', 'f4',('time','particles',),zlib=compr)
+  v.units       = ncin.variables["v"].units
+  v.longname    = ncin.variables["v"].longname 
+if 'w' in vars: 
+  w             = ncout.createVariable('w', 'f4',('time','particles',),zlib=compr)
+  w.units       = ncin.variables["w"].units
+  w.longname    = ncin.variables["w"].longname 
+if 't' in vars: 
+  t             = ncout.createVariable('t', 'f4',('time','particles',),zlib=compr)
+  t.units       = ncin.variables["t"].units
+  t.longname    = ncin.variables["t"].longname 
+if 'tv' in vars:
+  tv            = ncout.createVariable('tv', 'f4',('time','particles',),zlib=compr)
+  tv.units      = ncin.variables["tv"].units
+  tv.longname   = ncin.variables["tv"].longname 
+if 'rt' in vars:
+  rt            = ncout.createVariable('rt', 'f4',('time','particles',),zlib=compr)
+  rt.units      = ncin.variables["rt"].units
+  rt.longname   = ncin.variables["rt"].longname 
+if 'rl' in vars:
+  rl            = ncout.createVariable('rl', 'f4',('time','particles',),zlib=compr)
+  rl.units      = ncin.variables["rl"].units
+  rl.longname   = ncin.variables["rl"].longname 
+ncin.close()
 
 # 3. Read in file-by-file and write to new NetCDF
 loc = 0
 for i in range(nfx):
   for j in range(nfy):
-    start = time.time()
+    start = time2.time()
     filein = pref + '.particles.' + str(i).zfill(4) + str(j).zfill(4) + '.nc'
     ncin   = Dataset(filein, 'r')
     npl    = size(ncin.variables["particles"])
+
+    if(i==0 and j==0):
+      time[:] = ncin.variables["time"][:]
 
     if 'x' in vars:
       x[:,loc:loc+npl]  = ncin.variables["x"][:,:] 
@@ -98,8 +135,8 @@ for i in range(nfx):
 
     ncin.close()
     loc += npl
-    print 'Processed: ',filein, ' in ', time.time()-start, 's' 
+    print 'Processed: ',filein, ' in ', time2.time()-start, 's' 
 
 ncout.close()
-print 'Total user time: ', time.time()-globalstart, 's' 
+print 'Total user time: ', time2.time()-globalstart, 's' 
 
