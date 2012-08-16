@@ -106,7 +106,7 @@ contains
        !
        if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) then
          call write_ps(nzp,dn0,u0,v0,zm,zt,time)
-         if(lpartic .and. lpartstat) call particlestat(.true.,time)
+         !if(lpartic .and. lpartstat) call particlestat(.true.,time)
          if(lpartic .and. lpartdump) call balanced_particledump(time)
        end if
 
@@ -269,7 +269,7 @@ contains
        call thermo (level)
        if (debug) WRITE (0,*) 't_step statflg statistics, myid=',myid
        call statistics (time+dt)
-       if(lpartic .and. lpartstat) call particlestat(.false.,time+dt)
+       !if(lpartic .and. lpartstat) call particlestat(.false.,time+dt)
        sflg = .False.
     end if
   end subroutine t_step
