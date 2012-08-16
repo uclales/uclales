@@ -1102,6 +1102,7 @@ contains
   ! 
   subroutine  write_ps(n1,dn0,u0,v0,zm,zt,time)
 
+    use mpi_interface, only : myid
     use netcdf
     use defs, only : alvl, cp
 
@@ -1111,63 +1112,68 @@ contains
 
     integer :: iret, VarID, k, n, kp1
 
-    lsttm = time
-    do k=1,n1
-       kp1 = min(n1,k+1)
-       svctr(k,20) = (svctr(k,20)+svctr(k,21))*cp
-       svctr(k,22) = svctr(k,22)+svctr(k,23)
-       svctr(k,24) = svctr(k,24)+svctr(k,25)
-       svctr(k,26) = svctr(k,26)+svctr(k,27)
-       svctr(k,53) = (svctr(k,53)+svctr(k,54))*alvl
-       svctr(k,21) = svctr(k,21)*cp
-       svctr(k,54) = svctr(k,54)*alvl
-       svctr(k,62) = svctr(k,62)*alvl
-       svctr(k,37) = svctr(k,44) + svctr(k,47) +(                         &
-            +svctr(k,45) + svctr(kp1,45) + svctr(k,46) + svctr(kp1,46)    &
-            +svctr(k,42) + svctr(kp1,42) + svctr(k,43) + svctr(kp1,43)    &
-            -svctr(k,36) - svctr(kp1,36)   )*0.5       
-       if (lsttm>fsttm) then
-          svctr(k,49) = (tke_res(k) - tke0(k))/(lsttm-fsttm)
-       else
-          svctr(k,49) = 0.
-       end if
-       svctr(k,10:nv2) = svctr(k,10:nv2)/nsmp
-    end do
+    ! BvS: check if nsmp != 0, causes div/0 
+    if(nsmp .ne. 0) then
+      lsttm = time
+      do k=1,n1
+         kp1 = min(n1,k+1)
+         svctr(k,20) = (svctr(k,20)+svctr(k,21))*cp
+         svctr(k,22) = svctr(k,22)+svctr(k,23)
+         svctr(k,24) = svctr(k,24)+svctr(k,25)
+         svctr(k,26) = svctr(k,26)+svctr(k,27)
+         svctr(k,53) = (svctr(k,53)+svctr(k,54))*alvl
+         svctr(k,21) = svctr(k,21)*cp
+         svctr(k,54) = svctr(k,54)*alvl
+         svctr(k,62) = svctr(k,62)*alvl
+         svctr(k,37) = svctr(k,44) + svctr(k,47) +(                         &
+              +svctr(k,45) + svctr(kp1,45) + svctr(k,46) + svctr(kp1,46)    &
+              +svctr(k,42) + svctr(kp1,42) + svctr(k,43) + svctr(kp1,43)    &
+              -svctr(k,36) - svctr(kp1,36)   )*0.5       
+         if (lsttm>fsttm) then
+            svctr(k,49) = (tke_res(k) - tke0(k))/(lsttm-fsttm)
+         else
+            svctr(k,49) = 0.
+         end if
+         svctr(k,10:nv2) = svctr(k,10:nv2)/nsmp
+      end do
 
-    iret = nf90_inq_VarID(ncid2, s2(1), VarID)
-    iret = nf90_put_var(ncid2, VarID, time, start=(/nrec2/))
-    if (nrec2 == 1) then
-       iret = nf90_inq_varid(ncid2, s2(2), VarID)
-       iret = nf90_put_var(ncid2, VarID, zt, start = (/nrec2/))
-       iret = nf90_inq_varid(ncid2, s2(3), VarID)
-       iret = nf90_put_var(ncid2, VarID, zm, start = (/nrec2/))
-       iret = nf90_inq_varid(ncid2, s2(4), VarID)
-       iret = nf90_put_var(ncid2, VarID, dn0, start = (/nrec2/))
-       iret = nf90_inq_varid(ncid2, s2(5), VarID)
-       iret = nf90_put_var(ncid2, VarID, u0, start = (/nrec2/))
-       iret = nf90_inq_varid(ncid2, s2(6), VarID)
-       iret = nf90_put_var(ncid2, VarID, v0, start = (/nrec2/))
+      iret = nf90_inq_VarID(ncid2, s2(1), VarID)
+      iret = nf90_put_var(ncid2, VarID, time, start=(/nrec2/))
+      if (nrec2 == 1) then
+         iret = nf90_inq_varid(ncid2, s2(2), VarID)
+         iret = nf90_put_var(ncid2, VarID, zt, start = (/nrec2/))
+         iret = nf90_inq_varid(ncid2, s2(3), VarID)
+         iret = nf90_put_var(ncid2, VarID, zm, start = (/nrec2/))
+         iret = nf90_inq_varid(ncid2, s2(4), VarID)
+         iret = nf90_put_var(ncid2, VarID, dn0, start = (/nrec2/))
+         iret = nf90_inq_varid(ncid2, s2(5), VarID)
+         iret = nf90_put_var(ncid2, VarID, u0, start = (/nrec2/))
+         iret = nf90_inq_varid(ncid2, s2(6), VarID)
+         iret = nf90_put_var(ncid2, VarID, v0, start = (/nrec2/))
+      end if
+
+      iret = nf90_inq_VarID(ncid2, s2(7), VarID)
+      iret = nf90_put_var(ncid2, VarID, fsttm, start=(/nrec2/))
+      iret = nf90_inq_VarID(ncid2, s2(8), VarID)
+      iret = nf90_put_var(ncid2, VarID, lsttm, start=(/nrec2/))
+      iret = nf90_inq_VarID(ncid2, s2(9), VarID)
+      iret = nf90_put_var(ncid2, VarID, nsmp,  start=(/nrec2/))
+      do n=10,nv2
+         iret = nf90_inq_varid(ncid2, s2(n), VarID)
+         iret = nf90_put_var(ncid2,VarID,svctr(:,n), start=(/1,nrec2/),    &
+              count=(/n1,1/))
+      end do
+
+      iret  = nf90_sync(ncid2)
+      nrec2 = nrec2+1
+      nsmp  = 0.
+
+      do k=1,n1
+         svctr(k,:) = 0.
+      end do
+    else
+      if(myid==0) print*,'Attempt to write_ps with zero samples, skipping..'
     end if
-
-    iret = nf90_inq_VarID(ncid2, s2(7), VarID)
-    iret = nf90_put_var(ncid2, VarID, fsttm, start=(/nrec2/))
-    iret = nf90_inq_VarID(ncid2, s2(8), VarID)
-    iret = nf90_put_var(ncid2, VarID, lsttm, start=(/nrec2/))
-    iret = nf90_inq_VarID(ncid2, s2(9), VarID)
-    iret = nf90_put_var(ncid2, VarID, nsmp,  start=(/nrec2/))
-    do n=10,nv2
-       iret = nf90_inq_varid(ncid2, s2(n), VarID)
-       iret = nf90_put_var(ncid2,VarID,svctr(:,n), start=(/1,nrec2/),    &
-            count=(/n1,1/))
-    end do
-
-    iret  = nf90_sync(ncid2)
-    nrec2 = nrec2+1
-    nsmp  = 0.
-
-    do k=1,n1
-       svctr(k,:) = 0.
-    end do
 
   end subroutine write_ps
   !
