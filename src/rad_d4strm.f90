@@ -142,6 +142,9 @@ contains
     real :: randomNumber
     ! ----------------------------------------
 
+    !Problem here: We start the randomSequence again after each restart
+    !and thus the sequence(randoms) is different 
+
     if (.not.Initialized) then
        call init_ckd   
        randoms = new_RandomNumberSequence(1+myid)
