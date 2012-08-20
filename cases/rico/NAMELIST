@@ -9,7 +9,7 @@
   dzmax        = 10.
   dzrat        = 1.0
   dtlong       = 5.
-  timmax       = 200.
+  timmax       = 300.
   wctime       = 99960. 
   runtype      = 'INITIAL'
   filprf       = 'rico'
