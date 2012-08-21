@@ -8,8 +8,13 @@
   deltaz       = 25.
   dzmax        = 10.
   dzrat        = 1.0
+<<<<<<< HEAD
   dtlong       = 1.
   timmax       = 36000.
+=======
+  dtlong       = 5.
+  timmax       = 300.
+>>>>>>> f0f6663... New merge_particle script (fortran) -> allows for automatic starting of post-processing in job scripts
   wctime       = 99960. 
   runtype      = 'INITIAL'
   filprf       = 'rico'
