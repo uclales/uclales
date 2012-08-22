@@ -104,8 +104,8 @@ module modparticles
   real                                :: ceps, labda, spngl  
 
   ! Test switches...
-  logical                             :: lfsloc = .true.  ! Local or global calculated fs()
-  logical                             :: fixedfs = .false.  ! Fix fs at 1.
+  logical                             :: lfsloc = .false.  ! Local or global calculated fs()
+  logical                             :: fixedfs = .true.  ! Fix fs at 1.
 
 contains
   !
@@ -127,9 +127,11 @@ contains
 
     if (lpartsgs .and. nstep == 1) then
       call calc_sgstke                ! Estimates SGS-TKE
-      call calc_restke                ! Calculated Resolved TKE
       call fsubgrid                   ! Calculates bulk fraction SGS-TKE / TOTAL-TKE
-      call fsubgrid_local             ! Calculated local   "     "     "      "
+      if(lfsloc) then   ! only needed when using local fs
+        call calc_restke              ! Calculated Resolved TKE
+        call fsubgrid_local           ! Calculated local   "     "     "      "
+      end if
     end if
 
     ! Randomize particles lowest grid level
