@@ -230,6 +230,10 @@ contains
           sflg = .True.
        end if
 
+       if (lpartic) then
+         call particles(time,timmax)
+       end if
+
        call tendencies(nstep)
        call thermo(level)
 
@@ -257,10 +261,6 @@ contains
        call update (nstep)
        call poisson 
        call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
-
-       if (lpartic) then
-         call particles(time,timmax)
-       end if
 
     end do
 
