@@ -1,4 +1,6 @@
 #
+# Only suitable for Blizzard (or similar IBM systems)!
+#
 # automatically starts a poor man's parallelization for
 # merging the particle output from UCLA-LES
 # call by adding 'python auto_particlemerge.py' after 'poe ./uclales'

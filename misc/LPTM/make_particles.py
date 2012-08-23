@@ -5,15 +5,11 @@
 #   equations, we need to start with a density weighted distribution.          # 
 #   Requires only the math module,which is available by default in Python.     #
 #   Call: "python make_particles.py", all options are hardcoded.               # 
-#   Pylab is optional for plotting, numpy for easy math calculations           #
-#   requires module python/2.7-ve0 (or similar) on MPI systems                 #
 #    - Bart van Stratum, Aug 2012                                              #
 #                                                                              #
 ################################################################################
 
 from math import floor
-#import numpy
-#from pylab import *
 
 # USER INPUT:
 tstart      = 0.          # release time of particles
