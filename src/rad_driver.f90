@@ -36,12 +36,12 @@ module radiation
 
   contains
 
-    subroutine d4stream(n1, n2, n3, alat, time, sknt, sfc_albedo, CCN, dn0, &
+    subroutine d4stream(n1, n2, n3, alat, time, strtim, sknt, sfc_albedo, CCN, dn0, &
          pi0, pi1, dzi_m, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,sflxd, albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa, rr,ice,nice,grp)
 
 
       integer, intent (in) :: n1, n2, n3
-      real, intent (in)    :: alat, time, sknt, sfc_albedo, CCN
+      real, intent (in)    :: alat, time, strtim, sknt, sfc_albedo, CCN
       real, dimension (n1), intent (in)                 :: dn0, pi0, pi1, dzi_m
       real, dimension (n1,n2,n3), intent (in)           :: pip, th, rv, rc
       real, optional, dimension (n1,n2,n3), intent (in) :: rr,ice,nice,grp
@@ -123,7 +123,7 @@ module radiation
             !print *, "pre",pre(:)
             !print *, "u0",u0
 
-            call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
+            call rad( time, strtim, i, j, sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
                  fds, fus, fdir, fuir, plwc=plwc, pre=pre, useMcICA=.True.)
 
             do k=1,n1

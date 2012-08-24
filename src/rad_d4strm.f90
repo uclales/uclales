@@ -22,14 +22,13 @@ module fuliou
   use defs, only   : nv, nv1, mb, pi, totalpower, g, R, ep2
   use cldwtr, only : init_cldwtr, cloud_water, init_cldice, cloud_ice, init_cldgrp, cloud_grp
   use solver, only : qft
-  use mpi_interface, only : myid
+  use mpi_interface, only : myid, nxpg, nypg
   use RandomNumbers
   use ckd
 
   implicit none
 
   logical, save :: Initialized = .False.
-  type(randomNumberSequence), save :: randoms
   real, parameter :: minSolarZenithCosForVis = 1.e-4
 
 contains
@@ -42,7 +41,6 @@ contains
 
     if (.not.Initialized) then
        call init_ckd   
-       randoms = new_RandomNumberSequence(1+myid)
        call init_cldwtr
        call init_cldice
        call init_cldgrp
@@ -56,9 +54,11 @@ contains
   ! defined by input ckd file
   !
 
-  subroutine rad (as, u0, ss, pts, ee, pp, pt, ph, po, fds, fus, fdir, fuir, &
+  subroutine rad (time, strtim, i, j, as, u0, ss, pts, ee, pp, pt, ph, po, fds, fus, fdir, fuir, &
        plwc, pre, piwc, pde, prwc, pgwc, useMcICA )
 
+    real, intent (in)  :: time, strtim
+    integer, intent (in) :: i,j
     real, intent (in)  :: pp (nv1) ! pressure at interfaces
 
     real, dimension(nv), intent (in)  :: &
@@ -88,21 +88,28 @@ contains
          fdir, fuir   ! downward and upward ir flux
 
     logical            :: McICA = .False. 
+    real               :: times
+    type(randomNumberSequence) :: randoms
+
+    times = (time - strtim)*86400.
 
     if(present(useMcICA)) McICA = useMcICA
+
+    !Malte: Init RandomNumberSequence every timestep (bit identical restart)
+    randoms = new_RandomNumberSequence((/myid+1, INT(times*10.), i, j/))
     
     if (present(piwc).and.present(pgwc)) then
-       call rad_ir(pts, ee, pp, pt, ph, po, fdir, fuir, &
+       call rad_ir(times, i, j, randoms, pts, ee, pp, pt, ph, po, fdir, fuir, &
                    plwc, pre, piwc, pde, prwc, pgwc, McICA  )
     else
-       call rad_ir(pts, ee, pp, pt, ph, po, fdir, fuir, &
+       call rad_ir(times, i, j, randoms, pts, ee, pp, pt, ph, po, fdir, fuir, &
                    plwc, pre, prwc=prwc, useMcICA=McICA  )
     endif
     if (present(piwc).and.present(pgwc)) then
-       call rad_vis(as, u0, ss, pp, pt, ph, po, fds, fus,  &
+       call rad_vis(times, i, j, randoms, as, u0, ss, pp, pt, ph, po, fds, fus,  &
                     plwc, pre, piwc, pde, prwc, pgwc, McICA  )
     else
-       call rad_vis(as, u0, ss, pp, pt, ph, po, fds, fus,  &
+       call rad_vis(times, i, j, randoms, as, u0, ss, pp, pt, ph, po, fds, fus,  &
                     plwc, pre,prwc=prwc, useMcICA=McICA  )
     endif
 
@@ -113,10 +120,14 @@ contains
   ! Computes IR radiative fluxes using a band structure 
   ! defined by input ckd file
   !
-  subroutine rad_ir (pts, ee, pp, pt, ph, po, fdir, fuir, &
+  subroutine rad_ir (times, i, j, randoms, pts, ee, pp, pt, ph, po, fdir, fuir, &
        plwc, pre, piwc, pde, prwc, pgwc, useMcICA  )
 
-    real, intent (in)  :: pp (nv1) ! pressure at interfaces
+    real, intent (in)    :: times
+    type(randomNumberSequence), intent (inout) :: randoms
+    integer, intent (in) :: i,j
+
+    real, intent (in)    :: pp (nv1) ! pressure at interfaces
 
     real, dimension(nv), intent (in)  :: &
          pt,   & ! temperature [K] at mid points
@@ -158,17 +169,7 @@ contains
     real :: randomNumber
     ! ----------------------------------------
 
-    !Problem here: We start the randomSequence again after each restart
-    !and thus the sequence(randoms) is different 
-
-    if (.not.Initialized) then
-       call init_ckd   
-       randoms = new_RandomNumberSequence(1+myid)
-       call init_cldwtr
-       call init_cldice
-       call init_cldgrp
-       Initialized = .True.
-    end if
+    if (.not.Initialized) call rad_init
 
     if(.not. allocated(bandweights)) then 
       allocate(bandweights(size(ir_bands)))
@@ -254,10 +255,13 @@ contains
   ! defined by input ckd file
   !
 
-  subroutine rad_vis (as, u0, ss, pp, pt, ph, po, fds, fus,  &
+  subroutine rad_vis (times, i, j, randoms, as, u0, ss, pp, pt, ph, po, fds, fus,  &
        plwc, pre, piwc, pde, prwc, pgwc, useMcICA  )
 
-    real, intent (in)  :: pp (nv1) ! pressure at interfaces
+    real, intent (in)    :: times
+    type(randomNumberSequence), intent (inout) :: randoms
+    integer, intent (in) :: i,j
+    real, intent (in)    :: pp (nv1) ! pressure at interfaces
 
     real, dimension(nv), intent (in)  :: &
          pt,   & ! temperature [K] at mid points

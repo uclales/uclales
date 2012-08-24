@@ -378,25 +378,42 @@ module lsmdata
      
     !Set heterogeneity periods in the domain (hetper)
     if (hetper==1) then
-       LAIG( 3:(nxpg-2)/2,               3:(nypg-2)/2 ) = 2.
-       LAIG( 3:(nxpg-2)/2,        (nypg-2)/2:(nypg-2) ) = 6.
-       LAIG( (nxpg-2)/2:(nxpg-2),        3:(nypg-2)/2 ) = 6.
-       LAIG( (nxpg-2)/2:(nxpg-2), (nypg-2)/2:(nypg-2) ) = 2.
+       LAIG( 3:(nxpg-2)/2,                       3:(nypg-2)/2 ) = 2.
+       LAIG( 3:(nxpg-2)/2,                (nypg-2)/2:(nypg-2) ) = 6.
+       LAIG( (nxpg-2)/2:(nxpg-2),                3:(nypg-2)/2 ) = 6.
+       LAIG( (nxpg-2)/2:(nxpg-2),         (nypg-2)/2:(nypg-2) ) = 2.
+
     else if (hetper==2) then
-       LAIG(3              :((nxpg-2)/4)   ,:) = 2.
-       LAIG(((nxpg-2)/4)   :((nxpg-2)/2)   ,:) = 6.
-       LAIG(((nxpg-2)/2)   :((nxpg-2)*3/4) ,:) = 2.
-       LAIG(((nxpg-2)*3/4) :(nxpg-2)       ,:) = 6.
-    
-       print*,"CHECK INPUT:::"
-       print*,LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
-                   3+yoffset(wryid):nyp+yoffset(wryid)-2 )
-       print*,"myid:",myid,"xoffset:",xoffset(wrxid)
-       print*,"myid:",myid,"yoffset:",yoffset(wrxid)
+       LAIG( 3:(nxpg-2)/4,                       3:(nypg-2)/4 ) = 2.
+       LAIG( 3:(nxpg-2)/4,              (nypg-2)/4:(nypg-2)/2 ) = 6.
+       LAIG( 3:(nxpg-2)/4,            (nypg-2)/2:(nypg-2)*3/4 ) = 2.
+       LAIG( 3:(nxpg-2)/4,              (nypg-2)*3/4:(nypg-2) ) = 6.
+
+       LAIG( (nxpg-2)/4:(nxpg-2)/2,              3:(nypg-2)/4 ) = 6.
+       LAIG( (nxpg-2)/4:(nxpg-2)/2,     (nypg-2)/4:(nypg-2)/2 ) = 2.
+       LAIG( (nxpg-2)/4:(nxpg-2)/2,   (nypg-2)/2:(nypg-2)*3/4 ) = 6.
+       LAIG( (nxpg-2)/4:(nxpg-2)/2,     (nypg-2)*3/4:(nypg-2) ) = 2.
+
+       LAIG( (nxpg-2)/2:(nxpg-2)*3/4,            3:(nypg-2)/4 ) = 2.
+       LAIG( (nxpg-2)/2:(nxpg-2)*3/4,   (nypg-2)/4:(nypg-2)/2 ) = 6.
+       LAIG( (nxpg-2)/2:(nxpg-2)*3/4, (nypg-2)/2:(nypg-2)*3/4 ) = 2.
+       LAIG( (nxpg-2)/2:(nxpg-2)*3/4,   (nypg-2)*3/4:(nypg-2) ) = 6.
+
+       LAIG( (nxpg-2)*3/4:(nxpg-2),              3:(nypg-2)/4 ) = 6.
+       LAIG( (nxpg-2)*3/4:(nxpg-2),     (nypg-2)/4:(nypg-2)/2 ) = 2.
+       LAIG( (nxpg-2)*3/4:(nxpg-2),   (nypg-2)/2:(nypg-2)*3/4 ) = 6.
+       LAIG( (nxpg-2)*3/4:(nxpg-2),     (nypg-2)*3/4:(nypg-2) ) = 2.
     end if
+
+    !print*,"CHECK INPUT:::"
+    !print*,LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
+    !            3+yoffset(wryid):nyp+yoffset(wryid)-2 )
+    !print*,"myid:",myid,"xoffset:",xoffset(wrxid)
+    !print*,"myid:",myid,"yoffset:",yoffset(wrxid)
 
     LAI(3:(nxp-2),3:(nyp-2)) = LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
                                3+yoffset(wryid):nyp+yoffset(wryid)-2 )
+
     !print*,"CHECK OUTPUT:::"
     !print*,"myid:",myid,"LAIG:",LAIG(3,:)
     !print*,"myid:",myid,"LAI:",LAI(3,:)
