@@ -1292,6 +1292,7 @@ contains
       particle => head
       do while(associated(particle))
         k               = floor(particle%z) + 1
+  
         npartprofl(k)   = npartprofl(k) + 1
         uprofl(k)       = uprofl(k)     + (particle%ures / dxi)
         vprofl(k)       = vprofl(k)     + (particle%vres / dyi)
@@ -1341,7 +1342,7 @@ contains
       ! Divide summed values by ntime and nparticle samples and
       ! correct for Galilean transformation 
       do k = 1,nzp
-        if(npartprofl(k) > 0) then 
+        if(npartprof(k) > 0) then 
           npartprof(k) = npartprof(k) / (nstatsamp)
           uprof(k)     = uprof(k)     / (nstatsamp * npartprof(k)) + umean
           vprof(k)     = vprof(k)     / (nstatsamp * npartprof(k)) + vmean
@@ -1376,7 +1377,7 @@ contains
         call writevar_nc(ncpartstatid,'w_2',w2prof,ncpartstatrec)
         call writevar_nc(ncpartstatid,'tke',tkeprof,ncpartstatrec)
         call writevar_nc(ncpartstatid,'t',tprof,ncpartstatrec)
-        call writevar_nc(ncpartstatid,'tv',tprof,ncpartstatrec)
+        call writevar_nc(ncpartstatid,'tv',tvprof,ncpartstatrec)
         call writevar_nc(ncpartstatid,'rt',rtprof,ncpartstatrec)
         call writevar_nc(ncpartstatid,'rl',rlprof,ncpartstatrec)
         call writevar_nc(ncpartstatid,'cc',ccprof,ncpartstatrec)
@@ -1417,8 +1418,10 @@ contains
       ccprof     = 0
       ccprofl    = 0
       if(lpartsgs) then
-        fsprof     = 0
-        fsprofl    = 0
+        fsprof      = 0
+        fsprofl     = 0
+        sigma2prof  = 0.
+        sigma2profl = 0.
       end if
       nstatsamp  = 0
     end if
@@ -2014,9 +2017,41 @@ contains
                    rtprof(nzp),   rtprofl(nzp),    &
                    rlprof(nzp),   rlprofl(nzp),    &
                    ccprof(nzp),   ccprofl(nzp))
+
+      npartprof      = 0.
+      npartprofl     = 0.
+      uprof          = 0.
+      vprof          = 0.
+      wprof          = 0.
+      u2prof         = 0.
+      v2prof         = 0.
+      w2prof         = 0.
+      tkeprof        = 0.
+      tprof          = 0.
+      tvprof         = 0.
+      rtprof         = 0.
+      rlprof         = 0.
+      ccprof         = 0.
+      uprofl         = 0.
+      vprofl         = 0.
+      wprofl         = 0.
+      u2profl        = 0.
+      v2profl        = 0.
+      w2profl        = 0.
+      tkeprofl       = 0.
+      tprofl         = 0.
+      tvprofl        = 0.
+      rtprofl        = 0.
+      rlprofl        = 0.
+      ccprofl        = 0.
+
       if(lpartsgs) then
         allocate(sigma2prof(nzp),sigma2profl(nzp), &
                  fsprof(nzp),    fsprofl(nzp))
+        sigma2prof   = 0.
+        sigma2profl  = 0.
+        fsprof       = 0.
+        fsprofl      = 0.
       end if
     end if  
     close(ifinput)
