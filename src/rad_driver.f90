@@ -19,13 +19,13 @@
 !
 module radiation
 
-  use defs, only       : cp, rcp, cpr, rowt, p00, pi, nv1, nv, SolarConstant
+  use defs, only       : cp, rcp, cpr, rowt, roice, p00, pi, nv1, nv, SolarConstant
   use fuliou, only     : rad
   implicit none
   character (len=10), parameter :: background = 'backrad_in'
- !character (len=19), parameter :: background = 'datafiles/s11.lay'
- !character (len=19), parameter :: background = 'datafiles/astx.lay'
- !character (len=19), parameter :: background = 'datafiles/dsrt.lay'
+ ! character (len=19), parameter :: background = 'datafiles/s11.lay'
+ ! character (len=19), parameter :: background = 'datafiles/astx.lay'
+ !  character (len=19), parameter :: background = 'datafiles/dsrt.lay'
 
   logical, save     :: first_time = .True.
   real, allocatable, save ::  pp(:), pt(:), ph(:), po(:), pre(:), pde(:), &
@@ -78,6 +78,7 @@ module radiation
       ! call the radiation 
       !
       prw = (4./3.)*pi*rowt
+      pri = (3.*sqrt(3.)/8.)*roice
       do j=3,n3-2
          do i=3,n2-2
             do k=1,n1
@@ -91,9 +92,10 @@ module radiation
                pt(kk) = th(k,i,j)*exner(k)
                !old
              !  pt(kk) = tk(k,i,j)
-               ph(kk) = rv(k,i,j)
+               ph(kk) = max(0.,rv(k,i,j))
                plwc(kk) = 1000.*dn0(k)*max(0.,rc(k,i,j))
                pre(kk)  = 1.e6*(plwc(kk)/(1000.*prw*CCN*dn0(k)))**(1./3.)
+               pre(kk)=min(max(pre(kk),4.18),31.23)
                if (plwc(kk).le.0.) pre(kk) = 0.
                if (present(rr)) then
                  prwc(kk) = 1000.*dn0(k)*rr(k,i,j)
@@ -102,7 +104,13 @@ module radiation
                end if
                if (present(ice)) then
                  piwc(kk) = 1000.*dn0(k)*ice(k,i,j)
-                 pde(kk)  = 1.e6*(piwc(kk)/(1000.*prw*nice(k,i,j)*dn0(k)))**(1./3.)
+
+                 if (nice(k,i,j).gt.0.0) then
+                    pde(kk)  = 1.e6*(piwc(kk)/(1000.*pri*nice(k,i,j)*dn0(k)))**(1./3.)
+                    pde(kk)=min(max(pde(kk),20.),180.)
+                 else
+                    pde(kk)  = 0.0
+                 endif
                else
                   piwc(kk) = 0.
                end if
@@ -123,8 +131,13 @@ module radiation
             !print *, "pre",pre(:)
             !print *, "u0",u0
 
-            call rad( time, strtim, i, j, sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
-                 fds, fus, fdir, fuir, plwc=plwc, pre=pre, useMcICA=.True.)
+            if (present(ice).and.present(grp)) then
+               call rad( time, strtim, i, j, sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
+                    fds, fus, fdir, fuir, plwc=plwc, pre=pre, piwc=piwc, pde=pde, pgwc=pgwc, useMcICA=.true.)
+            else
+               call rad( time, strtim, i, j, sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
+                    fds, fus, fdir, fuir, plwc=plwc, pre=pre, useMcICA=.true.)
+            end if
 
             do k=1,n1
                kk = nv1 - (k-1)
