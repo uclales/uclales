@@ -99,17 +99,17 @@ contains
     randoms = new_RandomNumberSequence((/myid+1, INT(times*10.), i, j/))
     
     if (present(piwc).and.present(pgwc)) then
-       call rad_ir(times, i, j, randoms, pts, ee, pp, pt, ph, po, fdir, fuir, &
+       call rad_ir(randoms, pts, ee, pp, pt, ph, po, fdir, fuir, &
                    plwc, pre, piwc, pde, prwc, pgwc, McICA  )
     else
-       call rad_ir(times, i, j, randoms, pts, ee, pp, pt, ph, po, fdir, fuir, &
+       call rad_ir(randoms, pts, ee, pp, pt, ph, po, fdir, fuir, &
                    plwc, pre, prwc=prwc, useMcICA=McICA  )
     endif
     if (present(piwc).and.present(pgwc)) then
-       call rad_vis(times, i, j, randoms, as, u0, ss, pp, pt, ph, po, fds, fus,  &
+       call rad_vis(randoms, as, u0, ss, pp, pt, ph, po, fds, fus,  &
                     plwc, pre, piwc, pde, prwc, pgwc, McICA  )
     else
-       call rad_vis(times, i, j, randoms, as, u0, ss, pp, pt, ph, po, fds, fus,  &
+       call rad_vis(randoms, as, u0, ss, pp, pt, ph, po, fds, fus,  &
                     plwc, pre,prwc=prwc, useMcICA=McICA  )
     endif
 
@@ -120,12 +120,10 @@ contains
   ! Computes IR radiative fluxes using a band structure 
   ! defined by input ckd file
   !
-  subroutine rad_ir (times, i, j, randoms, pts, ee, pp, pt, ph, po, fdir, fuir, &
+  subroutine rad_ir (randoms, pts, ee, pp, pt, ph, po, fdir, fuir, &
        plwc, pre, piwc, pde, prwc, pgwc, useMcICA  )
 
-    real, intent (in)    :: times
     type(randomNumberSequence), intent (inout) :: randoms
-    integer, intent (in) :: i,j
 
     real, intent (in)    :: pp (nv1) ! pressure at interfaces
 
@@ -255,12 +253,11 @@ contains
   ! defined by input ckd file
   !
 
-  subroutine rad_vis (times, i, j, randoms, as, u0, ss, pp, pt, ph, po, fds, fus,  &
+  subroutine rad_vis (randoms, as, u0, ss, pp, pt, ph, po, fds, fus,  &
        plwc, pre, piwc, pde, prwc, pgwc, useMcICA  )
 
-    real, intent (in)    :: times
     type(randomNumberSequence), intent (inout) :: randoms
-    integer, intent (in) :: i,j
+
     real, intent (in)    :: pp (nv1) ! pressure at interfaces
 
     real, dimension(nv), intent (in)  :: &
