@@ -211,7 +211,7 @@ module lsmdata
       print *, 'iostat error: ', ierr
       stop 'ERROR: Problem in namoptions SURFNAMELIST'
     endif
-    write(6 ,SURFNAMELIST)
+    !write(6 ,SURFNAMELIST)
     close(17)
 
     ! --------------------------------------------------------

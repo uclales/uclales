@@ -49,7 +49,7 @@ module radiation
       real, dimension (n2,n3), intent (out),optional    :: albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa
 
       integer :: kk
-      real    :: xfact, prw, p0(n1), exner(n1), pres(n1)
+      real    :: xfact, prw, pri, p0(n1), exner(n1), pres(n1)
 
       if (first_time) then
          p0(n1) = (p00*(pi0(n1)/cp)**cpr) / 100.
@@ -113,6 +113,7 @@ module radiation
                  endif
                else
                   piwc(kk) = 0.
+                  pde(kk) = 0.0
                end if
                if (present(grp)) then
                  pgwc(kk) = 1000.*dn0(k)*grp(k,i,j)
