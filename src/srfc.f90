@@ -192,7 +192,7 @@ contains
 
        !Initialize Land Surface 
        if (init_lsm) then
-          call initlsm(time_in)
+          call initlsm(sst,time_in)
           init_lsm = .false.
        end if
 

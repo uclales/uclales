@@ -177,7 +177,7 @@ module lsmdata
   ! Malte: initialize LSM and surface layer
   ! Adopted from DALES (vanHeerwaarden)
   !
-  subroutine initlsm(time_in)
+  subroutine initlsm(sst,time_in)
     
     use grid, only : nzp, nxp, nyp, th00, vapor, iradtyp, a_G0, a_Qnet, &
                      a_tskin, a_qskin, a_phiw, a_tsoil, a_Wl, dt
@@ -186,7 +186,7 @@ module lsmdata
 
     integer :: k,ierr
 
-    real, intent(in) :: time_in
+    real, intent(in) :: sst,time_in
 
     ! --------------------------------------------------------
     ! Read LSM-specific NAMELIST (SURFNAMELIST)
@@ -295,7 +295,7 @@ module lsmdata
 
     if ((time_in*86400.) .le. dt) then
 
-       a_tskin          = th00
+       a_tskin          = sst
        a_qskin          = sum(vapor(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
 
        a_phiw(1,:,:)    = phiwav(1)
