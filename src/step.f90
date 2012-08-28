@@ -65,6 +65,7 @@ contains
     use modcross, only : triggercross, exitcross, lcross
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
+    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, lpartstat, exitparticlestat, write_particle_hist, particlestat
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
@@ -103,15 +104,22 @@ contains
        !
        ! output control
        !
-       if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) &
-       call write_ps(nzp,dn0,u0,v0,zm,zt,time)
+       if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) then
+         call write_ps(nzp,dn0,u0,v0,zm,zt,time)
+         if(lpartic .and. lpartstat) call particlestat(.true.,time)
+       end if
 
-       if ((mod(tplsdt,frqhis) < dt .or. time >= timmax) .and. outflg)   &
-            call write_hist(2, time)
+       if ((mod(tplsdt,frqhis) < dt .or. time >= timmax) .and. outflg) then
+         call write_hist(2, time)
+         if(lpartic) call write_particle_hist(2,time)
+       end if
+
        !irina     
        !if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time>=timrsm .or. time==dt)   &
-       if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt)   &
-            call write_hist(1, time)
+       if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) then   
+         call write_hist(1, time)
+         if(lpartic) call write_particle_hist(1,time)
+       end if
 
 !irina more frequent outputs for certain hours in astex
 
@@ -169,8 +177,18 @@ contains
     enddo
 
     call write_hist(1, time)
+
     iret = close_anal()
+
+    if (lpartic) then
+      call write_particle_hist(1, time)
+      call exit_particles
+      if(lpartdump) call exitparticledump
+      if(lpartstat) call exitparticlestat
+    end if
+
     if (lcross) call exitcross
+
     iret = close_stat()
 
     if (t2 .ge. wctime .and. myid == 0) write(*,*) '  Wall clock limit wctime reached, stopped simulation for restart'
@@ -203,6 +221,7 @@ contains
     use lsvar, only : varlscale
     use util, only : velset,get_avg
     use modtimedep, only : timedep
+    use modparticles, only : particles, lpartic, particlestat,lpartstat
 
     logical, parameter :: debug = .false.
 !     integer :: k
@@ -219,6 +238,10 @@ contains
 
        if (statflg .and. nstep.eq.3) then
           sflg = .True.
+       end if
+
+       if (lpartic) then
+         call particles(time,timmax)
        end if
 
        call tendencies(nstep)
@@ -248,6 +271,7 @@ contains
        call update (nstep)
        call poisson 
        call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
+
     end do
 
     if (statflg) then 
@@ -255,6 +279,7 @@ contains
        call thermo (level)
        if (debug) WRITE (0,*) 't_step statflg statistics, myid=',myid
        call statistics (time+dt)
+       if(lpartic .and. lpartstat) call particlestat(.false.,time+dt)
        sflg = .False.
     end if
   end subroutine t_step
