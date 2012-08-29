@@ -106,7 +106,7 @@ contains
        !
        if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) then
          call write_ps(nzp,dn0,u0,v0,zm,zt,time)
-         !if(lpartic .and. lpartstat) call particlestat(.true.,time)
+         if(lpartic .and. lpartstat) call particlestat(.true.,time)
          if(lpartic .and. lpartdump) call balanced_particledump(time)
        end if
 
@@ -117,10 +117,10 @@ contains
 
        !irina     
        !if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time>=timrsm .or. time==dt)   &
-       if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) then   
-         call write_hist(1, time)
-         if(lpartic) call write_particle_hist(1,time)
-       end if
+       !if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) then   
+       !  call write_hist(1, time)
+       !  if(lpartic) call write_particle_hist(1,time)
+       !end if
 
 !irina more frequent outputs for certain hours in astex
 
@@ -280,7 +280,7 @@ contains
        call thermo (level)
        if (debug) WRITE (0,*) 't_step statflg statistics, myid=',myid
        call statistics (time+dt)
-       !if(lpartic .and. lpartstat) call particlestat(.false.,time+dt)
+       if(lpartic .and. lpartstat) call particlestat(.false.,time+dt)
        sflg = .False.
     end if
   end subroutine t_step
