@@ -204,6 +204,7 @@ contains
        if (.not.lwaterbudget) then
           call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
                a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r)
+          prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)) * dt / 3.
        else
           call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
                a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r,rct=a_rct)
@@ -359,11 +360,7 @@ contains
              case(iwtrdff)
                 call resetvar(cldw,rc)
                 call resetvar(rain,rrain,nrain)
-                if (lwaterbudget) then
-                   call wtr_dff_SB(n1,dn0,rrain,nrain,rc,rs,rv,tl,temp,ev=rev_acc(i,j),zm=zm)
-                else
-                   call wtr_dff_SB(n1,dn0,rrain,nrain,rc,rs,rv,tl,temp)
-                end if
+                call wtr_dff_SB(n1,dn0,rrain,nrain,rc,rs,rv,tl,temp,ev=rev_acc(i,j),zm=zm)
              case(iauto)
                 call resetvar(cldw,rc)
                 call resetvar(rain,rrain,nrain)
@@ -2036,9 +2033,9 @@ contains
        alfq(metnr) = meteor%a_vel * gfct((meteor%nu+meteor%b_vel+2.0)/meteor%mu)&
             &                / gfct((meteor%nu+2.0)/meteor%mu)
        c_lam(metnr) = gfct((meteor%nu+1.0)/meteor%mu)/gfct((meteor%nu+2.0)/meteor%mu)
-       WRITE(0,'(a,i5,3a,e9.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  alfn = ',alfn(metnr)
-       WRITE(0,'(a,i5,3a,e9.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  alfq = ',alfq(metnr)
-       WRITE(0,'(a,i5,3a,e9.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  clam = ',c_lam(metnr)
+       WRITE(0,'(a,i5,3a,e11.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  alfn = ',alfn(metnr)
+       WRITE(0,'(a,i5,3a,e11.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  alfq = ',alfq(metnr)
+       WRITE(0,'(a,i5,3a,e11.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  clam = ',c_lam(metnr)
        firsttime(metnr) =.false.
     end if
 
@@ -3080,7 +3077,7 @@ contains
           jj = jlm(i)
           kk = klm(i)
            
-          hlp = R_l * (1.0 +  (R_l/R_d-1.0) * qv(kk,jj,ii)) 
+          hlp = R_l * (1.0 +  (R_d/R_l-1.0) * qv(kk,jj,ii)) 
 
           ! ... dynamics
           T_0(i,j,k)      = tk(kk,jj,ii)

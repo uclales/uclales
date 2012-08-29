@@ -77,9 +77,9 @@ contains
 
     use util, only : fftinix,fftiniy
     use defs, only : SolarConstant
-    use sgsm, only : csx, prndtl
+    use sgsm, only : csx, prndtl, clouddiff
     !irina
-    use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon
+    use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon,lhomflx
     !use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon, sst
     use step, only : timmax, timrsm, istpfl, corflg, outflg, frqanl, frqhis,          &
          frqcross , strtim, radfrq, cntlat,& 
@@ -93,7 +93,7 @@ contains
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
          filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype, CCN, lwaterbudget, lcouvreux
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,irsflg, iseed, hfilin,   &
-         zrand
+         zrand,lhomrestart
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
     use modnudge, only : lnudge,tnudgefac
@@ -137,9 +137,12 @@ contains
          lrandommicro, microseq,timenuc ,nin_set,cloud_type, &  !thijs: sequence of variables for microphysics
          lwaterbudget, &                 ! axel: flag for liquid water budget diagnostics (only level=3)
          lcouvreux , tau , &                    ! The Couvreux 'radioactive' scalar
-         deflate_level , &                         !Compression of the crosssections
+         deflate_level , lhomflx,lhomrestart, &                         !Compression of the crosssections
+         clouddiff, &                         
          lpartic,lpartsgs,lrandsurf,lpartstat,lpartdump,lpartdumpui,lpartdumpth,lpartdumpmr,frqpartdump           ! Particles
 
+
+         
     deflev = deflate_level
     ps       = 0.
     ts       = th00

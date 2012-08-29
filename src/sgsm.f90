@@ -31,7 +31,7 @@ module sgsm
   real, parameter     :: tkemin=1.e-20
   real :: csx = 0.23
   real :: prndtl = 0.3333333333
-
+  real :: clouddiff = -1.
   real, allocatable, dimension (:,:) :: sxy1, sxy2, sxy3, sxz1, sxz2, sxz3    &
        , sxz4, sxz5, sxz6  ,szx1, szx2, szx3, szx4, szx5
   real, allocatable, dimension (:,:,:) :: szxy 
@@ -245,8 +245,9 @@ contains
       
     use defs, only          : pi, vonk
     use stat, only          : tke_sgs
-    use util, only          : get_avg3, get_cor3
+    use util, only          : get_avg3, get_cor3, calclevel
     use mpi_interface, only : cyclics, cyclicc
+    use grid, only          : liquid
 
     implicit none
 
@@ -255,7 +256,7 @@ contains
     real, intent(in)    :: dxi,dyi,zm(n1),dn0(n1)
     real, intent(inout) :: ri(n1,n2,n3),kh(n1,n2,n3)
     real, intent(out)   :: km(n1,n2,n3),szxy(n1,n2,n3)
-
+    integer             :: cb, ct
     real    :: delta,pr
 
     pr    = abs(prndtl)
@@ -338,6 +339,21 @@ contains
           enddo
        enddo
     enddo
+    if (clouddiff> 0) then ! Additional diffusion outside of the clouds - but in the cloud layer
+      call calclevel(liquid, cb, 'base')
+      call calclevel(liquid, ct, 'top')    
+      do j=3,n3-2
+        do i=3,n2-2
+            do k=cb,ct
+              if (liquid(k,i,j) <1e-10) then
+                kh(k,i,j) = clouddiff * kh(k,i,j) 
+              end if
+            enddo
+        enddo
+      enddo
+        
+    
+    end if
     call cyclics(n1,n2,n3,kh,req)
     call cyclicc(n1,n2,n3,kh,req)
 

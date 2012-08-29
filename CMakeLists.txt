@@ -79,7 +79,8 @@ elseif (Fortran_COMPILER_NAME STREQUAL "XL")
   if(MPI)
     set (COMPILER_WRAPPER mpxlf95)
   endif()
-  set(CMAKE_Fortran_FLAGS "-qthreaded -qsmp -qfree=F90 -qrealsize=8  -qwarn64 -qnosave -qinitauto=FFF00000 -qflttrap=en:ov:zero:inv:imp -qflag=w:e")
+  #set(CMAKE_Fortran_FLAGS "-qthreaded -qsmp -qfree=F90 -qrealsize=8  -qwarn64 -qnosave -qinitauto=FFF00000 -qflttrap=en:ov:zero:inv:imp -qflag=w:e")
+  set(CMAKE_Fortran_FLAGS "-qfree=F90 -qrealsize=8  -qwarn64 -qnosave -qinitauto=FFF00000 -qflttrap=en:ov:zero:inv:imp -qflag=w:e")
   set(CMAKE_Fortran_FLAGS_RELEASE "-O4 -qnoipa -qstrict=none:exceptions -qinitauto=ff -qsigtrap")
   set(CMAKE_Fortran_FLAGS_DEBUG "-O2 -qfullpath -C -g -qflttrp=enable:inexact:invalid:nanq:overflow:zerodivide -qsigtrap -qinitauto")
   set (PROFILER_FLAG "-pg")
@@ -117,11 +118,11 @@ ADD_SUBDIRECTORY( src)
 #####################
 # DOCUMENTATION
 #####################
-#add_custom_target(todo ALL)
-#ADD_CUSTOM_COMMAND(TARGET todo POST_BUILD
-#                  COMMAND echo "UCLALES TODO LIST" > TODO
-#                  COMMAND date  >> TODO
-#                  COMMAND grep -Rin \\todo  src | sed 's/!.*TODO//I' >>  TODO
-#                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-#                  )
-#
+add_custom_target(todo ALL)
+ADD_CUSTOM_COMMAND(TARGET todo POST_BUILD
+                  COMMAND echo "UCLALES TODO LIST" > TODO
+                  COMMAND date  >> TODO
+                  COMMAND grep -Rin \\todo  src | sed 's/!.*TODO//I' >>  TODO
+                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                  )
+

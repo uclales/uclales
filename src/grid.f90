@@ -254,7 +254,9 @@ contains
       a_rpp =>a_xp(:,:,:,6)
       a_npp =>a_xp(:,:,:,7)
       allocate (prc_acc(nxp,nyp))
+      allocate (rev_acc(nxp,nyp))
       prc_acc(:,:) = 0.   ! accumulated precipitation for 2D output  [kg/m2]
+      rev_acc(:,:) = 0.   ! accumulated evaporation of rainwater     [kg/m2]
     end if
     if (lwaterbudget) then 
       ! for liquid water budget and precipitation efficiency diagnostic
@@ -263,7 +265,6 @@ contains
       allocate (cnd_acc(nxp,nyp),cev_acc(nxp,nyp),rev_acc(nxp,nyp))
       cnd_acc(:,:) = 0.   ! accumulated condensation                 [kg/m2]
       cev_acc(:,:) = 0.   ! accumulated evaporation of cloud water   [kg/m2]
-      rev_acc(:,:) = 0.   ! accumulated evaporation of raindwater    [kg/m2]
     end if
     ! ice microphysics
     if (level >= 4) then
@@ -342,9 +343,9 @@ contains
     real    :: zmnvc(-1:nzp+1)
     character (len=51) :: &
          fm1 = '(//" ",49("-")/,"   grid dimensions:"/)            ',      &
-         fm2 = '("   nxp-4 = ",i3,", dx, dx = ",f8.1,",",f8.1," m")',      &
-         fm3 = '("   nyp-4 = ",i3,", dy, dy = ",f8.1,",",f8.1," m")',      &
-         fm4 = '("   nzp   = ",i3,", dz, dz = ",f8.1,",",f8.1," m")',      &
+         fm2 = '("   nxp-4 = ",i4,", dx, dx = ",f8.1,",",f9.1," m")',      &
+         fm3 = '("   nyp-4 = ",i4,", dy, dy = ",f8.1,",",f9.1," m")',      &
+         fm4 = '("   nzp   = ",i4,", dz, dz = ",f8.1,",",f9.1," m")',      &
          fm5 = '("   thermo level: ",i3)                        '
 
     nxyzp  = nxp*nyp*nzp

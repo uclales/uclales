@@ -124,6 +124,11 @@ contains
 
 !     if (.not.(lxy .or. lxz .or. lyz)) lcross = .false.
     if (lcross) call open_nc(trim(expname)//'.out.xy.'//cmpicoordx//'.'//cmpicoordy//'.nc', nccrossxyid, nccrossrec, rtimee)
+    do n=1,nkcross
+     if (zcross(n) < 0) then
+       call addvar_nc(nccrossxyid, trim(hname(n)),trim(hlname(n)), 'm', (/tname/), (/tlongname/), (/tunit/))
+      end if
+    end do
     do n=1,nvar_all
       call addcross(crossvars(n))
     end do
@@ -445,7 +450,7 @@ contains
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
        prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta
     use modnetcdf, only : writevar_nc, fillvalue_double
-    use util,      only : get_avg3, get_var3
+    use util,      only : get_avg3, get_var3, calclevel
     use defs,      only : ep2
     real, intent(in) :: rtimee
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
@@ -511,10 +516,13 @@ contains
       select case (nint(zcross(n)))
       case(-1)
         kcross(n) = zi
+        call writevar_nc(nccrossxyid, trim(hname(n)), zt(zi), nccrossrec)
   
       case(-2)
+        call writevar_nc(nccrossxyid, trim(hname(n)), zt(cb), nccrossrec)
         kcross(n) = cb
       case(-3)
+        call writevar_nc(nccrossxyid, trim(hname(n)), zt(lcl), nccrossrec)
         kcross(n) = lcl
       case default
       end select
@@ -546,7 +554,7 @@ contains
       case('w')
         do j=3,nyp-2
           do i=3,nxp-2
-              do k=1,nzp
+              do k=2,nzp
                 interp(k,i,j) = 0.5*dzi_t(k) * (a_wp(k-1,i,j) / dzi_m(k) + a_wp(k,i,j) / dzi_m(k-1))
               end do
           end do
@@ -952,61 +960,7 @@ contains
       end do
     end do
   end subroutine calcdepth
-   
-  subroutine calclevel(varin,varout,location, threshold)
-    use grid, only : nzp, nxp, nyp, zt
-    use mpi_interface, only : double_scalar_par_max, double_scalar_par_min
-    real, intent(in), dimension(:,:,:) :: varin
-    real, intent(in), optional :: threshold
-    integer, intent(out) :: varout
-    integer :: klocal
-    real :: rlocal, rglobal
-    character(*), intent(in) :: location
-    integer :: i, j, k, km1
-    real :: thres
-    
 
-     if (present(threshold)) then
-      thres = threshold
-    else
-      thres = 0.0
-    end if
-   
-    select case(location)
-    case ('top')
-      klocal = 0
-      do j = 3, nyp - 2
-        do i = 3, nxp - 2
-          top:do k = nzp - 1, 2, -1
-            if (varin(k,i,j) > thres) then
-              klocal = max(klocal, k)
-              exit top
-            end if
-          end do top
-        end do
-      end do
-      rlocal = klocal
-      call double_scalar_par_max(rlocal,rglobal) 
-      varout = rglobal
-    case ('base')
-      klocal = nzp 
-      do j = 3, nyp - 2
-        do i = 3, nxp - 2
-          base:do k = 2, nzp - 1
-            if (varin(k,i,j) > thres) then
-              klocal = min(klocal, k)
-              exit base
-            end if
-          end do base
-        end do
-      end do
-      rlocal = klocal
-      call double_scalar_par_min(rlocal,rglobal) 
-      varout = rglobal
-
-    end select
-  end subroutine calclevel
-  
   subroutine calcdev(varin, base, top, varout)
     use grid, only : nzp, nxp, nyp, zm, zt, a_wp, dzi_t
     use util, only : get_avg3
@@ -1050,7 +1004,9 @@ contains
             varout(i,j) = fillvalue_double
           else
             do k=2,nzp-1
-              varout(i,j) = varout(i,j) + varin(k,i,j) - mean(k) 
+              if (mask(k,i,j) > 0) then
+                varout(i,j) = varout(i,j) + varin(k,i,j) - mean(k) 
+              end if
             end do
             varout(i,j) = varout(i,j)/real(nr)
           end if
