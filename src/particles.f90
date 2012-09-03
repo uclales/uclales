@@ -1939,38 +1939,41 @@ contains
       ! read particles from partstartpos, create linked list
       do n = 1, np
         read(ifinput,*) tstart, xstart, ystart, zstart
-        if(floor(xstart / xsizelocal) == wrxid) then
-          if(floor(ystart / ysizelocal) == wryid) then
-            call add_particle(particle)
-            particle%unique         = n !+ myid/1000.0
-            particle%x              = (xstart - (float(wrxid) * xsizelocal)) / deltax + 3.  ! +3 here for ghost cells.
-            particle%y              = (ystart - (float(wryid) * ysizelocal)) / deltay + 3.  ! +3 here for ghost cells.
-            do k=kmax,1,1
-              if ( zm(k)<zstart ) exit
-            end do
-            particle%z              = k + (zstart-zm(k))*dzi_t(k)
-            particle%zprev          = particle%z
-            particle%xstart         = xstart
-            particle%ystart         = ystart
-            particle%zstart         = zstart
-            particle%tstart         = tstart
-            particle%ures           = 0.
-            particle%vres           = 0.
-            particle%wres           = 0.
-            particle%ures_prev      = 0.
-            particle%vres_prev      = 0.
-            particle%wres_prev      = 0.
-            particle%usgs           = 0.
-            particle%vsgs           = 0.
-            particle%wsgs           = 0.
-            particle%usgs_prev      = 0.
-            particle%vsgs_prev      = 0.
-            particle%wsgs_prev      = 0.
-            particle%sigma2_sgs     = 0.
-            particle%partstep       = 0
-
-            if(tstart < firststartl) firststartl = tstart
-
+        if(xstart < 0. .or. xstart > nxg*deltax .or. ystart < 0. .or. ystart > nyg*deltay .or. zstart < 0. .or. zstart > zm(nzp-1)) then
+          if (myid == 0) print *, '  ABORTING: particle initialized outsize domain'
+           call appl_abort(0)
+        else 
+          if(floor(xstart / xsizelocal) == wrxid) then
+            if(floor(ystart / ysizelocal) == wryid) then
+              call add_particle(particle)
+              particle%unique         = n !+ myid/1000.0
+              particle%x              = (xstart - (float(wrxid) * xsizelocal)) / deltax + 3.  ! +3 here for ghost cells.
+              particle%y              = (ystart - (float(wryid) * ysizelocal)) / deltay + 3.  ! +3 here for ghost cells.
+              do k=kmax,1,1
+                if ( zm(k)<zstart ) exit
+              end do
+              particle%z              = k + (zstart-zm(k))*dzi_t(k)
+              particle%zprev          = particle%z
+              particle%xstart         = xstart
+              particle%ystart         = ystart
+              particle%zstart         = zstart
+              particle%tstart         = tstart
+              particle%ures           = 0.
+              particle%vres           = 0.
+              particle%wres           = 0.
+              particle%ures_prev      = 0.
+              particle%vres_prev      = 0.
+              particle%wres_prev      = 0.
+              particle%usgs           = 0.
+              particle%vsgs           = 0.
+              particle%wsgs           = 0.
+              particle%usgs_prev      = 0.
+              particle%vsgs_prev      = 0.
+              particle%wsgs_prev      = 0.
+              particle%sigma2_sgs     = 0.
+              particle%partstep       = 0
+              if(tstart < firststartl) firststartl = tstart
+            end if
           end if
         end if
       end do
