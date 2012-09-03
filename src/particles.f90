@@ -1346,8 +1346,9 @@ contains
 
       ! Divide summed values by ntime and nparticle samples and
       ! correct for Galilean transformation 
-      do k = 1,nzp
-        if(npartprof(k) > 0) then 
+      do k = 1,nzp-1
+        if(npartprof(k) > 0) then
+          print*,k 
           npartprof(k) = npartprof(k) / (nstatsamp)
           uprof(k)     = uprof(k)     / (nstatsamp * npartprof(k)) + umean
           vprof(k)     = vprof(k)     / (nstatsamp * npartprof(k)) + vmean
@@ -1369,7 +1370,45 @@ contains
         end if
       end do      
 
-      if(myid==0) print*,'particles 1-2-3-4:',npartprof(2),npartprof(3),npartprof(4),npartprof(5)
+      ! Force lowest level (ghost cell below surface) to fillvalue
+      npartprof(1)      = -32678
+      uprof(1)          = -32678
+      vprof(1)          = -32678
+      wprof(1)          = -32678
+      u2prof(1)         = -32678
+      v2prof(1)         = -32678
+      w2prof(1)         = -32678 
+      tkeprof(1)        = -32678
+      tprof(1)          = -32678
+      tvprof(1)         = -32678
+      rtprof(1)         = -32678
+      rlprof(1)         = -32678
+      ccprof(1)         = -32678
+      if(lpartsgs) then
+        sigma2prof(1)   = -32678
+        fsprof(1)       = -32678
+      end if     
+
+      ! Force highest level (ghost cell above domain) to fillvalue
+      npartprof(nzp)    = -32678
+      uprof(nzp)        = -32678
+      vprof(nzp)        = -32678
+      wprof(nzp)        = -32678
+      u2prof(nzp)       = -32678
+      v2prof(nzp)       = -32678
+      w2prof(nzp)       = -32678
+      tkeprof(nzp)      = -32678
+      tprof(nzp)        = -32678
+      tvprof(nzp)       = -32678
+      rtprof(nzp)       = -32678
+      rlprof(nzp)       = -32678
+      ccprof(nzp)       = -32678
+      if(lpartsgs) then
+        sigma2prof(nzp) = -32678
+        fsprof(nzp)     = -32678
+      end if     
+
+      !if(myid==0) print*,'particles 1-2-3-4:',npartprof(2),npartprof(3),npartprof(4),npartprof(5)
 
       if(myid == 0) then
         call writevar_nc(ncpartstatid,tname,time,ncpartstatrec)
@@ -2207,7 +2246,6 @@ contains
   end subroutine initparticledump
 
 
-
   !
   !--------------------------------------------------------------------------
   ! subroutine initparticlestat : creates NetCDF file for particle statistics. 
@@ -2233,7 +2271,7 @@ contains
     dimname(1)     = zname
     dimlongname(1) = zlongname
     dimunit(1)     = zunit
-    dimsize(1)     = nzp-2
+    dimsize(1)     = nzp
     dimname(2)     = tname
     dimlongname(2) = tlongname
     dimunit(2)     = tunit
