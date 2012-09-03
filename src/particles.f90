@@ -1890,7 +1890,7 @@ contains
       open (666,file=hname,status='old',form='unformatted')
       read (666,iostat=io) np,tnextdump
       do
-        read (666,iostat=io) pu,pts,pstp,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs,pwr,pwrp,pus,pvs,pws,pusp,pvsp,pwsp,psg2
+        read (666,iostat=io) pu,pts,pstp,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs,pzp,pwr,pwrp,pus,pvs,pws,pusp,pvsp,pwsp,psg2
         if(io .ne. 0) exit
         call add_particle(particle)
         particle%unique         = pu
@@ -2038,12 +2038,12 @@ contains
       v2prof         = 0.
       w2prof         = 0.
       tkeprof        = 0.
-      tprof          = 0.
-      tvprof         = 0.
-      rtprof         = 0.
-      rlprof         = 0.
-      ccprof         = 0.
-      uprofl         = 0.
+      tprof          = 0. 
+      tvprof         = 0. 
+      rtprof         = 0. 
+      rlprof         = 0. 
+      ccprof         = 0. 
+      uprofl         = 0. 
       vprofl         = 0.
       wprofl         = 0.
       u2profl        = 0.
@@ -2126,13 +2126,12 @@ contains
       write(666) particle%unique, particle%tstart, particle%partstep, & 
         particle%x, particle%xstart, particle%ures, particle%ures_prev, & 
         particle%y, particle%ystart, particle%vres, particle%vres_prev, & 
-        particle%z, particle%zstart, particle%wres, particle%wres_prev, &
+        particle%z, particle%zstart, particle%zprev, particle%wres, particle%wres_prev, &
         particle%usgs,      particle%vsgs,      particle%wsgs, &
         particle%usgs_prev, particle%vsgs_prev, particle%wsgs_prev, &
         particle%sigma2_sgs
       particle => particle%next
     end do 
-
     close(666)
 
   end subroutine write_particle_hist
