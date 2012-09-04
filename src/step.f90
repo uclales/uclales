@@ -145,26 +145,26 @@ contains
        ! output control
        !
        if(savgflg) then
-         print*,'     profiles at time=',time
+         if(myid==0) print*,'     profiles at time=',time
          call write_ps(nzp,dn0,u0,v0,zm,zt,time)
          if(lpartic .and. lpartstat) call particlestat(.true.,time)
          if(lpartic .and. lpartdump) call balanced_particledump(time)
        end if
 
        if (hisflg) then
-         print*,'     history at time=',time
+         if(myid==0) print*,'     history at time=',time
          call write_hist(2, time)
          if(lpartic) call write_particle_hist(2,time)
        end if
 
        if (anlflg) then
-         print*,'     analysis at time=',time
+         if(myid==0) print*,'     analysis at time=',time
          call thermo(level)
          call write_anal(time)
        end if
 
        if (crossflg) then
-         print*,'     cross at time=',time
+         if(myid==0) print*,'     cross at time=',time
          call thermo(level)
          call triggercross(time)
        end if
