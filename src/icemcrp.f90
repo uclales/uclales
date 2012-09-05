@@ -49,7 +49,7 @@ module mcrp
   use util, only : get_avg3, azero, sclrset
   implicit none
 
-  logical, parameter :: droplet_sedim = .False., khairoutdinov = .False., turbulence = .False.,ice_multiplication = .TRUE.
+  logical, parameter :: droplet_sedim = .False., khairoutdinov = .false., turbulence = .False.,ice_multiplication = .TRUE., kessler = .false.
   integer            :: nprocess,nprocwarm=5,nprocice=18
 
   integer,parameter  :: iwtrdff = 3,iauto = 1,iaccr = 2,isedimrd = 4,isedimcd = 5, &
@@ -603,6 +603,9 @@ contains
     real, parameter :: kc_bet = 0.00174
     real, parameter :: csx = 0.23
     real, parameter :: ce = 0.93
+    
+    real, parameter :: alpha = 1.e-3 ! s-1 Kessler scheme
+    real, parameter :: rc0 = 1.e-3   ! kg/kg Kessler scheme
 
     integer :: k
     real    :: k_au0,k_au, Xc, Dc, au, tau, phi, kc_alf, kc_rad, kc_sig, k_c, Re, epsilon, l
@@ -669,6 +672,13 @@ contains
              Dc = ( Xc / prw )**(1./3.)
              au = Cau * (Dc * mmt / 2.)**Eau
           end if
+	  if (kessler) then
+	     if (rc(k) > rc0) then
+	        au = alpha * (rc(k) -rc0)
+	     else
+	        au = 0.
+	     end if
+	  end if
           au    = au * dt
           au    = min(au,rc(k))
           rp(k) = rp(k) + au
