@@ -22,13 +22,14 @@ module fuliou
   use defs, only   : nv, nv1, mb, pi, totalpower, g, R, ep2
   use cldwtr, only : init_cldwtr, cloud_water, init_cldice, cloud_ice, init_cldgrp, cloud_grp
   use solver, only : qft
-  use mpi_interface, only : myid, nxpg, nypg
+  use mpi_interface, only : myid
   use RandomNumbers
   use ckd
 
   implicit none
 
   logical, save :: Initialized = .False.
+  type(randomNumberSequence), save :: randoms
   real, parameter :: minSolarZenithCosForVis = 1.e-4
 
 contains
@@ -41,6 +42,7 @@ contains
 
     if (.not.Initialized) then
        call init_ckd   
+       randoms = new_RandomNumberSequence(1+myid)
        call init_cldwtr
        call init_cldice
        call init_cldgrp
@@ -54,11 +56,9 @@ contains
   ! defined by input ckd file
   !
 
-  subroutine rad (time, strtim, i, j, as, u0, ss, pts, ee, pp, pt, ph, po, fds, fus, fdir, fuir, &
+  subroutine rad (as, u0, ss, pts, ee, pp, pt, ph, po, fds, fus, fdir, fuir, &
        plwc, pre, piwc, pde, prwc, pgwc, useMcICA )
 
-    real, intent (in)  :: time, strtim
-    integer, intent (in) :: i,j
     real, intent (in)  :: pp (nv1) ! pressure at interfaces
 
     real, dimension(nv), intent (in)  :: &
@@ -88,28 +88,21 @@ contains
          fdir, fuir   ! downward and upward ir flux
 
     logical            :: McICA = .False. 
-    real               :: times
-    type(randomNumberSequence) :: randoms
-
-    times = (time - strtim)*86400.
 
     if(present(useMcICA)) McICA = useMcICA
-
-    !Malte: Init RandomNumberSequence every timestep (bit identical restart)
-    randoms = new_RandomNumberSequence((/myid+1, INT(times*10.), i, j/))
     
     if (present(piwc).and.present(pgwc)) then
-       call rad_ir(randoms, pts, ee, pp, pt, ph, po, fdir, fuir, &
+       call rad_ir(pts, ee, pp, pt, ph, po, fdir, fuir, &
                    plwc, pre, piwc, pde, prwc, pgwc, McICA  )
     else
-       call rad_ir(randoms, pts, ee, pp, pt, ph, po, fdir, fuir, &
+       call rad_ir(pts, ee, pp, pt, ph, po, fdir, fuir, &
                    plwc, pre, prwc=prwc, useMcICA=McICA  )
     endif
     if (present(piwc).and.present(pgwc)) then
-       call rad_vis(randoms, as, u0, ss, pp, pt, ph, po, fds, fus,  &
+       call rad_vis(as, u0, ss, pp, pt, ph, po, fds, fus,  &
                     plwc, pre, piwc, pde, prwc, pgwc, McICA  )
     else
-       call rad_vis(randoms, as, u0, ss, pp, pt, ph, po, fds, fus,  &
+       call rad_vis(as, u0, ss, pp, pt, ph, po, fds, fus,  &
                     plwc, pre,prwc=prwc, useMcICA=McICA  )
     endif
 
@@ -120,12 +113,10 @@ contains
   ! Computes IR radiative fluxes using a band structure 
   ! defined by input ckd file
   !
-  subroutine rad_ir (randoms, pts, ee, pp, pt, ph, po, fdir, fuir, &
+  subroutine rad_ir (pts, ee, pp, pt, ph, po, fdir, fuir, &
        plwc, pre, piwc, pde, prwc, pgwc, useMcICA  )
 
-    type(randomNumberSequence), intent (inout) :: randoms
-
-    real, intent (in)    :: pp (nv1) ! pressure at interfaces
+    real, intent (in)  :: pp (nv1) ! pressure at interfaces
 
     real, dimension(nv), intent (in)  :: &
          pt,   & ! temperature [K] at mid points
@@ -253,12 +244,10 @@ contains
   ! defined by input ckd file
   !
 
-  subroutine rad_vis (randoms, as, u0, ss, pp, pt, ph, po, fds, fus,  &
+  subroutine rad_vis (as, u0, ss, pp, pt, ph, po, fds, fus,  &
        plwc, pre, piwc, pde, prwc, pgwc, useMcICA  )
 
-    type(randomNumberSequence), intent (inout) :: randoms
-
-    real, intent (in)    :: pp (nv1) ! pressure at interfaces
+    real, intent (in)  :: pp (nv1) ! pressure at interfaces
 
     real, dimension(nv), intent (in)  :: &
          pt,   & ! temperature [K] at mid points
@@ -358,11 +347,11 @@ contains
            call cloud_water(ib, pre, plwc, dz, tw, ww, www)
            call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tw,ww,www)
          end if
-        if (present(piwc)) then
+         if (present(piwc)) then
            call cloud_ice(ib, pde, piwc, dz, ti, wi, wwi)
            call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, ti,wi,wwi)
          end if 
-        if (present(pgwc)) then
+         if (present(pgwc)) then
            call cloud_grp(ib,pgwc, dz, tgr, wgr, wwgr)
            call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tgr, wgr,wwgr)
          end if 

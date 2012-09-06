@@ -22,7 +22,7 @@ module radiation
   use defs, only       : cp, rcp, cpr, rowt, roice, p00, pi, nv1, nv, SolarConstant
   use fuliou, only     : rad
   implicit none
-  character (len=10), parameter :: background = 'backrad_in'
+ character (len=10), parameter :: background = 'backrad_in'
  ! character (len=19), parameter :: background = 'datafiles/s11.lay'
  ! character (len=19), parameter :: background = 'datafiles/astx.lay'
  !  character (len=19), parameter :: background = 'datafiles/dsrt.lay'
@@ -36,16 +36,16 @@ module radiation
 
   contains
 
-    subroutine d4stream(n1, n2, n3, alat, time, strtim, sknt, sfc_albedo, CCN, dn0, &
+    subroutine d4stream(n1, n2, n3, alat, time, sknt, sfc_albedo, CCN, dn0, &
          pi0, pi1, dzi_m, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,sflxd, albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa, rr,ice,nice,grp)
 
 
       integer, intent (in) :: n1, n2, n3
-      real, intent (in)    :: alat, time, strtim, sknt, sfc_albedo, CCN
+      real, intent (in)    :: alat, time, sknt, sfc_albedo, CCN
       real, dimension (n1), intent (in)                 :: dn0, pi0, pi1, dzi_m
       real, dimension (n1,n2,n3), intent (in)           :: pip, th, rv, rc
       real, optional, dimension (n1,n2,n3), intent (in) :: rr,ice,nice,grp
-      real, dimension (n1,n2,n3), intent (inout)        :: tt, rflx, sflx, lflxu, lflxd, sflxu, sflxd 
+      real, dimension (n1,n2,n3), intent (inout)        :: tt, rflx, sflx, lflxu, lflxd, sflxu, sflxd
       real, dimension (n2,n3), intent (out),optional    :: albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa
 
       integer :: kk
@@ -104,7 +104,6 @@ module radiation
                end if
                if (present(ice)) then
                  piwc(kk) = 1000.*dn0(k)*ice(k,i,j)
-
                  if (nice(k,i,j).gt.0.0) then
                     pde(kk)  = 1.e6*(piwc(kk)/(1000.*pri*nice(k,i,j)*dn0(k)))**(1./3.)
                     pde(kk)=min(max(pde(kk),20.),180.)
@@ -133,10 +132,10 @@ module radiation
             !print *, "u0",u0
 
             if (present(ice).and.present(grp)) then
-               call rad( time, strtim, i, j, sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
+               call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
                     fds, fus, fdir, fuir, plwc=plwc, pre=pre, piwc=piwc, pde=pde, pgwc=pgwc, useMcICA=.true.)
             else
-               call rad( time, strtim, i, j, sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
+               call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
                     fds, fus, fdir, fuir, plwc=plwc, pre=pre, useMcICA=.true.)
             end if
 
@@ -185,7 +184,6 @@ module radiation
             do k=2,n1-3
                xfact  = exner(k)*dzi_m(k)/(cp*dn0(k))
                tt(k,i,j) = tt(k,i,j) - (rflx(k,i,j) - rflx(k-1,i,j))*xfact
-             !  print *, 'dt', k, rc(k,i,j),(rflx(k,i,j) - rflx(k-1,i,j))*xfact*3600.
             end do
 
          end do

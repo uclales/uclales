@@ -45,7 +45,7 @@ contains
   ! -------------------------------------------------------------------
   ! subroutine forcings:  calls the appropriate large-scale forcings
   !irina
-  subroutine forcings(time_in, cntlat, sst, div, strtim, case_name)
+  subroutine forcings(time_in, cntlat, sst, div, case_name)
 
 !irina
     use grid, only: nxp, nyp, nzp, zm, zt, dzi_t, dzi_m, dn0, iradtyp, liquid  &
@@ -57,7 +57,7 @@ contains
     use util, only : get_avg
 
 !irina
-    real, optional, intent (in) :: time_in, cntlat, sst, div, strtim
+    real, optional, intent (in) :: time_in, cntlat, sst, div
     real, dimension (nzp):: um,vm
 
     character (len=5), intent (in) :: case_name
@@ -89,13 +89,13 @@ contains
           !a_scr1 = a_theta/a_pexnr 
           select case (level)
           case(3)
-             call d4stream(nzp, nxp, nyp, cntlat, time_in, strtim, sst, sfc_albedo, CCN,   &
+             call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,   &
                   dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt,&
                   a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
                   rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
                   lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
           case(4,5)
-             call d4stream(nzp, nxp, nyp, cntlat, time_in, strtim, sst, sfc_albedo, CCN,   &
+             call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,   &
                   dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt,&
                   a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
                   rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
@@ -107,7 +107,7 @@ contains
           case default
              xref1 = 0.
              xref2 = 0.
-             call d4stream(nzp, nxp, nyp, cntlat, time_in, strtim, sst, sfc_albedo, CCN,    &
+             call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,    &
                   dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt, &
                   a_rflx, a_sflx,a_lflxu, a_lflxd,a_sflxu,a_sflxd,albedo, &
                   sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
