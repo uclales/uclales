@@ -563,7 +563,7 @@ contains
              ! Eq (1) of Lewellen and Yoh (1993)
              ! consistent with Eq (1) of Larson et al. (2001)
              alf = 0.622*rst*alvl/(R*tkl**2)  
-             svar(k,i,j) = (rt(k,i,j) - rst) ! /(1.0 + alf*alvl/cp)
+             svar(k,i,j) = (rt(k,i,j) - rst) /(1.0 + alf*alvl/cp)
           end do
        end do
     end do
