@@ -117,7 +117,7 @@ contains
        if (hisflg) then
          if(myid==0) print*,'     history at time=',time
          call write_hist(2, time)
-         if(lpartic) call write_particle_hist(1,time)
+         if(lpartic) call write_particle_hist(2,time)
        end if
 
        if (anlflg) then
@@ -268,7 +268,7 @@ contains
       lpdumpflg  = .true.
     end if
 
-    if(myid.eq.0) print*,statflg,savgflg,anlflg,hisflg,crossflg,lpdumpflg
+    !if(myid.eq.0) print*,statflg,savgflg,anlflg,hisflg,crossflg,lpdumpflg
     !stop
     !if(myid.eq.0) print*,'dt old:new',itime/tres,idtt/tres,idt/tres,(itnssam-itime)/tres,statflg
 
