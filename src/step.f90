@@ -68,7 +68,7 @@ contains
     use modcross, only : triggercross, exitcross, lcross
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
-    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, lpartstat, exitparticlestat, write_particle_hist, particlestat, balanced_particledump, frqpartdump
+    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, lpartstat, exitparticlestat, write_particle_hist, particlestat, balanced_particledump,frqpartdump
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
@@ -106,10 +106,10 @@ contains
        !
 
        ! Sample particles; automatically samples when savgflg=.true., don't sample double...
-       if(statflg .and. savgflg .eqv. .false.) call particlestat(.false.,time+dt)
+       if(statflg .and. (savgflg .eqv. .false.)) call particlestat(.false.,time+dt)
 
        if(savgflg) then
-         !if(myid==0) print*,'     profiles at time=',time
+         if(myid==0) print*,'     profiles at time=',time
          call write_ps(nzp,dn0,u0,v0,zm,zt,time)
          call particlestat(.true.,time)
        end if
@@ -136,6 +136,21 @@ contains
          if(myid==0) print*,'     particle dump at time=',time
          call balanced_particledump(time)
        end if
+
+       statflg   = .false.
+       savgflg   = .false.
+       hisflg    = .false.
+       anlflg    = .false.
+       crossflg  = .false.
+       lpdumpflg = .false.      
+ 
+       ! REMOVE THIS?
+       !irina     
+       !if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time>=timrsm .or. time==dt)   &
+       !if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) then   
+       !  call write_hist(1, time)
+       !  if(lpartic) call write_particle_hist(1,time)
+       !end if
 
        if(myid == 0) then
           call cpu_time(t2)           !t1=timing()
@@ -253,8 +268,7 @@ contains
       lpdumpflg  = .true.
     end if
 
-
-    !if(myid.eq.0) print*,statflg,savgflg,anlflg,hisflg,crossflg
+    if(myid.eq.0) print*,statflg,savgflg,anlflg,hisflg,crossflg,lpdumpflg
     !stop
     !if(myid.eq.0) print*,'dt old:new',itime/tres,idtt/tres,idt/tres,(itnssam-itime)/tres,statflg
 

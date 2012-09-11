@@ -16,8 +16,8 @@
   hfilin       = 'rico.rst'
   savg_intvl   = 60.
   ssam_intvl   = 30.
-  frqhis       = 100.
-  frqanl       = 150.
+  frqhis       = 60.
+  frqanl       = 60.
   level        = 3
   CCN          = 70.e6
   corflg       = .true.

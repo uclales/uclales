@@ -108,7 +108,6 @@ contains
           call init_anal(time+dt)
           call initcross(time, filprf)
           call thermo(level)
-          !call triggercross(time)
           call write_hist(0, time)
           if(lpartic) call write_particle_hist(0,time)
        end if

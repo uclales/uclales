@@ -1539,7 +1539,7 @@ contains
     integer, allocatable, dimension(:)   :: req
     real                                 :: thl,thv,rt,rl
 
-    if(time > tnextdump) then
+    if(time >= tnextdump) then
 
       nvar = 4                             ! id,x,y,z
       if(lpartdumpui)  nvar = nvar + 3     ! u,v,w
