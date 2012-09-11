@@ -47,6 +47,9 @@ module step
 
   integer :: istp
 
+  ! Flags for sampling, statistics output, etc.  
+  logical :: savgflg=.false.,anlflg=.false.,hisflg=.false.,crossflg=.false.,lpdumpflg=.false.
+
 contains
   ! 
   ! ----------------------------------------------------------------------
@@ -65,34 +68,30 @@ contains
     use modcross, only : triggercross, exitcross, lcross
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
-    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, lpartstat, exitparticlestat, write_particle_hist, particlestat, balanced_particledump
+    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, lpartstat, exitparticlestat, write_particle_hist, particlestat, balanced_particledump, frqpartdump
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
     real    :: t1,t2,tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax
     integer :: iret
+
+    real    :: dt_prev
+
     !
     ! Timestep loop for program
     !
     begtime = time
-    istp = 0
-  !irina  
-  !  timrsm = timrsm + begtime
-   
-  ! print *, 'time timrsm',time, timrsm
-  !  timmax = min(timmax,timrsm)
-  ! print *, 'timmax',timmax
-    t2 = 0.
-    do while (time + 0.1*dt < timmax .and. t2 < wctime)
+    istp    = 0
+    t2      = 0.
+    do while (time < timmax .and. t2 < wctime)
        call cpu_time(t1)           !t1=timing()
+       istp = istp + 1
 
-       istp = istp+1
-       tplsdt = time + dt + 0.1*dt
-       statflg = (min(mod(tplsdt,ssam_intvl),mod(tplsdt,savg_intvl)) < dt  &
-            .or. tplsdt >= timmax .or. tplsdt < 2.*dt) 
+       call stathandling
+       if(myid .eq. 0 .and. statflg) print*,'     sampling stat at t=',time+dt
 
        call t_step
-       time  = time + dt
+       time = time + dt
 
        call cfl(cflmax)
        call double_scalar_par_max(cflmax,gcflmax)
@@ -100,63 +99,42 @@ contains
        call peclet(pecletmax)
        call double_scalar_par_max(pecletmax,gpecletmax)
        pecletmax = gpecletmax
+       dt_prev = dt
        dt = min(dtlong,dt*peak_cfl/(cflmax+epsilon(1.)))
        !
        ! output control
        !
-       if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) then
+
+       ! Sample particles; automatically samples when savgflg=.true., don't sample double...
+       if(statflg .and. savgflg .eqv. .false.) call particlestat(.false.,time+dt)
+
+       if(savgflg) then
+         !if(myid==0) print*,'     profiles at time=',time
          call write_ps(nzp,dn0,u0,v0,zm,zt,time)
-         if(lpartic .and. lpartstat) call particlestat(.true.,time)
-         if(lpartic .and. lpartdump) call balanced_particledump(time)
+         call particlestat(.true.,time)
        end if
 
-       if ((mod(tplsdt,frqhis) < dt .or. time >= timmax) .and. outflg) then
+       if (hisflg) then
+         if(myid==0) print*,'     history at time=',time
          call write_hist(2, time)
-         if(lpartic) call write_particle_hist(2,time)
+         if(lpartic) call write_particle_hist(1,time)
        end if
 
-       !irina     
-       !if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time>=timrsm .or. time==dt)   &
-       !if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) then   
-       !  call write_hist(1, time)
-       !  if(lpartic) call write_particle_hist(1,time)
-       !end if
-
-!irina more frequent outputs for certain hours in astex
-
-!       frqanl=3600.
-
-!       if (time>=7200 .and. time<=10800) then
-!       frqanl=300.
-!       end if
- 
-!       if (time>=25200 .and. time<=28800) then
-!       frqanl=300.
-!       end if
-
-!       if (time>=39600 .and. time<=43200) then
-!       frqanl=300.
-!       end if
-
-!       if (time>=68400 .and. time<=72000) then
-!       frqanl=300.
-!       end if
-
-!       if (time>=82800 .and. time<=86400) then
-!       frqanl=300.
-!       end if
-
-!       if (time>=126000 .and. time<=129600) then
-!       frqanl=300.
-!       end if
-
-       if ((mod(tplsdt,frqanl) < dt .or. time >= timmax) .and. outflg) then
-          call thermo(level)
-          call write_anal(time)
+       if (anlflg) then
+         if(myid==0) print*,'     analysis at time=',time
+         call thermo(level)
+         call write_anal(time)
        end if
-       if ((mod(tplsdt,frqcross) < dt .or. time >= timmax) .and. outflg) then
-          call thermo(level)
-          call triggercross(time)
+
+       if (crossflg) then
+         if(myid==0) print*,'     cross at time=',time
+         call thermo(level)
+         call triggercross(time)
+       end if
+
+       if (lpdumpflg) then
+         if(myid==0) print*,'     particle dump at time=',time
+         call balanced_particledump(time)
        end if
 
        if(myid == 0) then
@@ -164,17 +142,16 @@ contains
           if (mod(istp,istpfl) == 0 ) then
               if (wctime.gt.1e9) then
                 print "('   Timestep # ',i5," //     &
-                       "'   Model time(sec)=',f10.2,3x,'CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2)",     &
-                       istp, time, t2-t1, t2*(timmax/time-1)
+                       "'   Model time(sec)=',f10.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2)",     &
+                       istp, time, dt_prev, t2-t1, t2*(timmax/time-1)
               else
                 print "('   Timestep # ',i5," //     &
-                       "'   Model time(sec)=',f10.2,3x,'CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2,'  WC Time left(sec) = ',f10.2)",     &
-                       istp, time, t2-t1, t2*(timmax/time-1),wctime-t2
+                       "'   Model time(sec)=',f10.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2,'  WC Time left(sec) = ',f10.2)",     &
+                       istp, time, dt_prev, t2-t1, t2*(timmax/time-1),wctime-t2
               end if
           end if
        endif
        call broadcast(t2, 0)
-        
     enddo
 
     call write_hist(1, time)
@@ -196,6 +173,93 @@ contains
     if (time.ge.timmax .and. myid == 0) write(*,*) '  Max simulation time timmax reached. Finished simulation successfully'
 
   end subroutine stepper
+
+  !
+  ! -------------------------------------------
+  ! subroutine stathandling: Event handling statistics and output.
+  ! Changed dt when nextevent-time < dt to nextevent-time to end
+  ! up exactly at the required sampling or output time
+  ! EXPERIMENTAL!! BvS, Sep2012
+  ! 
+  subroutine stathandling
+    use grid, only          : dt   
+    use stat, only          : savg_intvl, ssam_intvl
+    use modcross, only      : lcross
+    use mpi_interface, only : myid
+    use modparticles, only  : lpartic,lpartdump,frqpartdump
+
+    integer, parameter  :: long   = selected_int_kind(18)
+    integer(kind=long)  :: itnssam=1e16,itnsavg=1e16,itnanl=1e16,itnhist=1e16,itncross=1e16,itnlpdump=1e16
+    integer(kind=long)  :: issam_intvl=1e16,isavg_intvl=1e16,ifrqanl=1e16,ifrqhis=1e16,ifrqcross=1e16,ifrqlpdump=1e16
+    integer(kind=long)  :: itime,idt
+    real, parameter     :: tres = 1e9
+
+    ! Switch to integer microseconds
+    issam_intvl  = int(ssam_intvl   *tres,long)
+    isavg_intvl  = int(savg_intvl   *tres,long)
+    ifrqanl      = int(frqanl       *tres,long)
+    ifrqhis      = int(frqhis       *tres,long)
+    ifrqcross    = int(frqcross     *tres,long)
+    ifrqlpdump   = int(frqpartdump  *tres,long)
+
+    itime        = int(time * tres,long)  
+    idt          = int(dt   * tres,long)
+
+    ! Time next events
+    itnssam      = (floor(itime/(ssam_intvl*tres))  + 1) * issam_intvl
+    itnsavg      = (floor(itime/(savg_intvl*tres))  + 1) * isavg_intvl
+    itnanl       = (floor(itime/(frqanl*tres))      + 1) * ifrqanl
+    itnhist      = (floor(itime/(frqhis*tres))      + 1) * ifrqhis
+    if(lcross) &
+      itncross   = (floor(itime/(frqcross*tres))    + 1) * ifrqcross
+    if(lpartic .and. lpartdump) &
+      itnlpdump  = (floor(itime/(frqpartdump*tres)) + 1) * ifrqlpdump
+
+    ! Limit time step to first event
+    idt = min(itnssam-itime,itnsavg-itime,&                    ! Profile sampling and writing
+               itnanl-itime,itnhist-itime,itncross-itime,&     ! Analysis, history and cross-sections
+               itnlpdump-itime,&                               ! Lagrangian particles
+               int(timmax*tres,long)-itime,idt)                ! End of simulation, current dt
+
+    ! And back to normal seconds
+    dt   = idt  / tres 
+    time = itime / tres        ! This can be tricky.................
+ 
+    ! Set flags
+    statflg  = .false.
+    savgflg  = .false.
+    hisflg   = .false.
+    anlflg   = .false.
+    crossflg = .false.
+    lpdumpflg= .false.
+
+    if(mod(itime+idt,issam_intvl) .eq. 0) then
+      statflg    = .true.
+    end if
+    if(mod(itime+idt,isavg_intvl) .eq. 0) then
+      statflg    = .true.
+      savgflg    = .true.
+    end if
+    if(mod(itime+idt,ifrqanl)     .eq. 0) then
+      anlflg     = .true.
+    end if
+    if(mod(itime+idt,ifrqhis)     .eq. 0) then
+      hisflg     = .true.
+    end if 
+    if(mod(itime+idt,ifrqcross)   .eq. 0) then
+      crossflg   = .true.
+    end if
+    if(mod(itime+idt,ifrqlpdump)  .eq. 0) then
+      lpdumpflg  = .true.
+    end if
+
+
+    !if(myid.eq.0) print*,statflg,savgflg,anlflg,hisflg,crossflg
+    !stop
+    !if(myid.eq.0) print*,'dt old:new',itime/tres,idtt/tres,idt/tres,(itnssam-itime)/tres,statflg
+
+  end subroutine stathandling
+
   ! 
   !----------------------------------------------------------------------
   ! subroutine t_step: Called by driver to timestep through the LES

@@ -9,15 +9,15 @@
   dzmax        = 10.
   dzrat        = 1.0
   dtlong       = 5.
-  timmax       = 120.
+  timmax       = 600.
   wctime       = 99960. 
   runtype      = 'INITIAL'
   filprf       = 'rico'
   hfilin       = 'rico.rst'
   savg_intvl   = 60.
   ssam_intvl   = 30.
-  frqhis       = 3600.
-  frqanl       = 3600.
+  frqhis       = 100.
+  frqanl       = 150.
   level        = 3
   CCN          = 70.e6
   corflg       = .true.
@@ -47,5 +47,5 @@
   lpartdumpui  = .true.
   lpartdumpth  = .true.
   lpartdumpmr  = .true.
-  frqpartdump  = 10.
+  frqpartdump  = 60.
  /

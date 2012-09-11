@@ -1348,7 +1348,6 @@ contains
       ! correct for Galilean transformation 
       do k = 1,nzp-1
         if(npartprof(k) > 0) then
-          print*,k 
           npartprof(k) = npartprof(k) / (nstatsamp)
           uprof(k)     = uprof(k)     / (nstatsamp * npartprof(k)) + umean
           vprof(k)     = vprof(k)     / (nstatsamp * npartprof(k)) + vmean

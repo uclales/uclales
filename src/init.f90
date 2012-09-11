@@ -43,13 +43,14 @@ contains
   subroutine initialize
 !irina use lsvarflg
     use step, only : time, outflg,lsvarflg
-    use stat, only : init_stat
+    use stat, only : init_stat, write_ps, statistics
     use mpi_interface, only : appl_abort, myid
     use thrm, only : thermo
     use mcrp, only : initmcrp
     use modcross, only : initcross, triggercross
-    use modparticles, only: init_particles, lpartic, lpartdump, lpartstat, initparticledump, initparticlestat, write_particle_hist
-
+    use grid, only : nzp,dn0,u0,v0,zm,zt
+    use modparticles, only: init_particles, lpartic, lpartdump, lpartstat, initparticledump, initparticlestat, write_particle_hist, particlestat
+ 
     implicit none
 
     if (runtype == 'INITIAL') then
@@ -100,11 +101,14 @@ contains
           call write_anal(time)
           call initcross(time, filprf)
           call triggercross(time)
+          call statistics (time)
+          call write_ps(nzp,dn0,u0,v0,zm,zt,time)
+          call particlestat(.true.,time)
        else
           call init_anal(time+dt)
           call initcross(time, filprf)
           call thermo(level)
-          call triggercross(time)
+          !call triggercross(time)
           call write_hist(0, time)
           if(lpartic) call write_particle_hist(0,time)
        end if
