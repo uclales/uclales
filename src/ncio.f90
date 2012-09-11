@@ -253,11 +253,11 @@ contains
     use mpi_interface, only :myid
 
 !irina
-    integer, parameter :: nnames = 30
+    integer, parameter :: nnames = 31
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,&
          'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,&  
-         'w      ','t      ','p      ','q      ','l      ','r      '   ,'n      ',&
+         'w      ','t      ','p      ','q      ','l      ','r      '   ,'n      ','au     ',&
          'rice   ','nice   ','rsnow  ','rgrp   ',&
          'nsnow  ','ngrp   ','rhail  ','nhail  ',          &
          'rflx   ','lflxu  ','lflxd  '/)
@@ -268,7 +268,7 @@ contains
     nvar0 = nbase + naddsc    
     if (level  >= 1) nvar0 = nvar0+1
     if (level  >= 2) nvar0 = nvar0+1
-    if (level  >= 3) nvar0 = nvar0+2
+    if (level  >= 3) nvar0 = nvar0+3
     if (level  >= 4) nvar0 = nvar0+4
     if (level  >= 5) nvar0 = nvar0+4
     if (iradtyp > 1) nvar0 = nvar0+3
@@ -299,34 +299,36 @@ contains
        sanal(nvar0) = sbase(nbase+3)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(nbase+4)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(nbase+5)
     end if
     if (level >= 4) then
-       nvar0 = nvar0+1
-       sanal(nvar0) = sbase(20)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(21)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(22)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(23)
-    end if
-    if (level >= 5) then
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(24)
+    end if
+    if (level >= 5) then
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(25)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(26)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(27)
-    end if
-    if (iradtyp > 1) then
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(28)
+    end if
+    if (iradtyp > 1) then
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(29)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(30)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(31)
     end if
 
 
@@ -427,16 +429,16 @@ contains
     end if
     nn = nbase+2
     if (level >=3) then
-       do n = nbase+2, 18
+       do n = nbase+2, 19
         nn = nn+1
        call newvar(nn-12)
        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
             count=icnt)
-      end do
+       end do
     endif
     if (level >=4) then
-      do n = 20, 23
+      do n = 21, 24
        nn = nn+1
        call newvar(nn-12)
        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
@@ -446,7 +448,7 @@ contains
     endif  
 
     if (level >=5) then
-      do n = 24, 27
+      do n = 25, 28
        nn = nn+1
        call newvar(nn-12)
        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
@@ -470,10 +472,10 @@ contains
             count=icnt)
     end if
 
-!     if (nn /= nvar0) then
-!        if (myid == 0) print *, 'ABORTING:  Anal write error'
-!        call appl_abort(0)
-!     end if
+     if (nn /= nvar0) then
+        if (myid == 0) print *, 'ABORTING:  Anal write error'
+        call appl_abort(0)
+     end if
 
     if (myid==0) print "(//' ',12('-'),'   Record ',I3,' to: ',A60)",    &
          nrec0,fname
@@ -1255,6 +1257,10 @@ contains
     case('s_3')    
        if (itype==0) ncinfo = 'Third moment of s (extended liquid water specific humidity)'
        if (itype==1) ncinfo = ''
+       if (itype==2) ncinfo = 'tttt'
+    case('au')    
+       if (itype==0) ncinfo = 'Autoconversion rate'
+       if (itype==1) ncinfo = 'g/(kg s)'
        if (itype==2) ncinfo = 'tttt'
 
     case default
