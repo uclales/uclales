@@ -49,7 +49,8 @@ module mcrp
   use util, only : get_avg3, azero, sclrset
   implicit none
 
-  logical, parameter :: droplet_sedim = .False., khairoutdinov = .false., turbulence = .False.,ice_multiplication = .TRUE., kessler = .false.
+  logical, parameter :: droplet_sedim = .False., khairoutdinov = .false., turbulence = .False., &
+                        ice_multiplication = .TRUE., kessler = .false., khairoutdinov_au = .false.
   integer            :: nprocess,nprocwarm=5,nprocice=18
 
   integer,parameter  :: iwtrdff = 3,iauto = 1,iaccr = 2,isedimrd = 4,isedimcd = 5, &
@@ -674,7 +675,7 @@ contains
           !
           ! Khairoutdinov and Kogan
           !
-          if (khairoutdinov) then
+          if (khairoutdinov_au) then
              Dc = ( Xc / prw )**(1./3.)
              au(k) = Cau * (Dc * mmt / 2.)**Eau
           end if
