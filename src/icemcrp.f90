@@ -29,7 +29,7 @@ module mcrp
   use mpi_interface,  only : myid, double_scalar_par_max, double_scalar_par_sum
   use defs, only : tmelt,alvl, alvi,rowt,roice, pi, Rm, cp,t_hn
   use grid, only : dt,nstep,rkbeta,rkalpha, dxi, dyi ,dzi_t, nxp, nyp, nzp,nfpt, a_pexnr, pi0,pi1,a_rp, a_tp, th00, ccn,    &
-       dn0, pi0,pi1, a_rt, a_tt,a_rpp, a_rpt, a_npp, a_au, a_npt, vapor, liquid, a_wp, zm,      &
+       dn0, pi0,pi1, a_rt, a_tt,a_rpp, a_rpt, a_npp, a_npt, vapor, liquid, a_wp, zm,      &
        a_theta, a_scr1, a_scr2, a_scr7, rsi, &
        a_ricep , a_ricet  , & ! ice mixing ratio
        a_nicep , a_nicet  , & ! ice number concentration
@@ -204,12 +204,11 @@ contains
     case(3)
        if (.not.lwaterbudget) then
           call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
-               a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r,a_au)
-	  !print *,'autoconversion rate 35: ', a_au(90,1,1)
+               a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r)
        else
           call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
-               a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r,a_au,rct=a_rct)
-          
+               a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r,rct=a_rct)
+
           prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)) * dt / 3.
 
           if (debug.and.lwaterbudget.and. .false.) then
@@ -253,7 +252,7 @@ contains
        end if
     case(4)
        call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
-            a_npp,a_rt,a_rpt,a_npt,a_scr7, prc_r,a_au,rsi, a_ricet,a_nicet,a_rsnowt,a_rgrt,&
+            a_npp,a_rt,a_rpt,a_npt,a_scr7, prc_r,rsi, a_ricet,a_nicet,a_rsnowt,a_rgrt,&
             a_ricep,a_nicep,a_rsnowp,a_rgrp, &
             prc_i, prc_s, prc_g)
        prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)+prc_i(2,:,:)+prc_s(2,:,:)+prc_g(2,:,:)) * dt / 3.
@@ -282,7 +281,7 @@ contains
   !
 
   subroutine mcrph(level,n1,n2,n3,dn0,exner,pi0,pi1,thl,tlt,tk,vapor,rsat,rcld,prc_c, &
-       rp, np, rtt,rpt,npt,dissip, prc_r, aut,rsati, ricet,nicet,rsnowt,rgrpt,ricep,nicep,rsnowp,rgrpp, &
+       rp, np, rtt,rpt,npt,dissip, prc_r,rsati, ricet,nicet,rsnowt,rgrpt,ricep,nicep,rsnowp,rgrpp, &
        prc_i, prc_s, prc_g, rct)
 
     integer, intent (in) :: level,n1,n2,n3
@@ -302,15 +301,14 @@ contains
          npt,&!rain droplet number tendency
          rct,&! cloud water tendency
          dissip, &
-         prc_r, &
-	 aut  ! autoconversion rate
+         prc_r
 
     real, dimension(n1,n2,n3), intent (inout),optional :: rsati, ricet,nicet,rsnowt,rgrpt,&
          ricep,nicep,rsnowp,rgrpp
 
     real, dimension(n1,n2,n3), intent (inout),optional :: prc_i, prc_s, prc_g
 
-    real, dimension(n1) :: tl,temp,rv,rc,nrain,rrain,nice, nin_active,rice,nsnow,rsnow,ngrp,rgrp,rs,rsi,s_i,r1,au
+    real, dimension(n1) :: tl,temp,rv,rc,nrain,rrain,nice, nin_active,rice,nsnow,rsnow,ngrp,rgrp,rs,rsi,s_i,r1
     integer :: i, j,n
 !as    logical,save  :: firsttime = .true.
     !     real :: dtrk
@@ -370,7 +368,7 @@ contains
              case(iauto)
                 call resetvar(cldw,rc)
                 call resetvar(rain,rrain,nrain)
-                call auto_SB(n1,dn0,rc,rrain,nrain,tl,dissip(1:n1,i,j),au)
+                call auto_SB(n1,dn0,rc,rrain,nrain,tl,dissip(1:n1,i,j))
              case(iaccr)
                 call resetvar(cldw,rc)
                 call resetvar(rain,rrain,nrain)
@@ -475,7 +473,6 @@ contains
           rtt(2:n1,i,j) = rtt(2:n1,i,j) +(rv(2:n1) - vapor(2:n1,i,j))/dt + (rc(2:n1) - rcld(2:n1,i,j))/dt
           rpt(2:n1,i,j) = max(rpt(2:n1,i,j) +(rrain(2:n1) - rp(2:n1,i,j))/dt,-rp(2:n1,i,j)/dt)
           npt(2:n1,i,j) = max(npt(2:n1,i,j) +(nrain(2:n1) - np(2:n1,i,j))/dt,-np(2:n1,i,j)/dt)
-	  aut(2:n1,i,j) = au(2:n1)
           
           if (present(rct)) then
 !             rct(2:n1,i,j) = (rc(2:n1) - rcld(2:n1,i,j))/dt
@@ -495,8 +492,6 @@ contains
     deallocate(convice,convliq)
     !print *,maxval(s_i),maxloc(s_i)
   end subroutine mcrph
-
-
   real elemental function snownr(mu, t, qsg)
     real, intent(in) :: mu, t, qsg
     real, parameter :: zn0s1 = 7.6275e6, zn0s2 = -0.107, zams = 0.038
@@ -574,7 +569,7 @@ contains
     end do
 
   end subroutine wtr_dff_SB
-  subroutine auto_SB(n1,dn0,rc,rp,np,tl,diss,au)
+  subroutine auto_SB(n1,dn0,rc,rp,np,tl,diss)
     !
     ! ---------------------------------------------------------------------
     ! AUTO_SB:  calculates the evolution of mass- and number mxg-ratio for
@@ -587,7 +582,6 @@ contains
     integer, intent (in) :: n1
     real, intent (in)    :: dn0(n1), diss(n1)
     real, intent (inout) :: rc(n1), rp(n1), np(n1),tl(n1)
-    real, intent (out)   :: au(n1)
 
     real            :: nu_c  = 0.           ! width parameter of cloud DSD
     real, parameter :: kc_0  = 9.44e+9      ! Long-Kernel
@@ -615,7 +609,7 @@ contains
     real, parameter :: rc0 = 1.e-3   ! kg/kg Kessler scheme
 
     integer :: k
-    real    :: k_au0,k_au, Xc, Dc, tau, phi, kc_alf, kc_rad, kc_sig, k_c, Re, epsilon, l
+    real    :: k_au0,k_au, Xc, Dc, au, tau, phi, kc_alf, kc_rad, kc_sig, k_c, Re, epsilon, l
     real, dimension(n1) :: Resum, Recnt
 
     !
@@ -662,7 +656,7 @@ contains
 
           ! which one is correct here?
           !au = k_au * rc(k)**2 * Xc**2
-          au(k) = k_au * dn0(k) * rc(k)**2 * Xc**2
+          au = k_au * dn0(k) * rc(k)**2 * Xc**2
           !
           ! small threshold that should not influence the result
           !
@@ -670,37 +664,31 @@ contains
              tau = 1.0-rc(k)/(rc(k)+rp(k)+eps0)
              tau = MIN(MAX(tau,eps0),0.9)
              phi = k_1 * tau**k_2 * (1.0 - tau**k_2)**3
-             au(k)  = au(k) * (1.0 + phi/(1.0 - tau)**2)
+             au  = au * (1.0 + phi/(1.0 - tau)**2)
           endif
           !
           ! Khairoutdinov and Kogan
           !
           if (khairoutdinov_au) then
              Dc = ( Xc / prw )**(1./3.)
-             au(k) = Cau * (Dc * mmt / 2.)**Eau
+             au = Cau * (Dc * mmt / 2.)**Eau
           end if
 	  if (kessler) then
 	     if (rc(k) > rc0) then
-	        au(k) = alpha * (rc(k) -rc0)
+	        au = alpha * (rc(k) -rc0)
 	     else
-	        au(k) = 0.
+	        au = 0.
 	     end if
 	  end if
-          au(k)    = au(k) * dt
-          au(k)    = min(au(k),rc(k))
-          rp(k) = rp(k) + au(k)
-          rc(k) = rc(k) - au(k)
-          tl(k) = tl(k) + convliq(k)*au(k)
-          np(k) = np(k) + au(k)/cldw%x_max
-	  au(k) = au(k) / dt                      ! conversion for unit per sec.
-       else
-         au(k) = 0.
+          au    = au * dt
+          au    = min(au,rc(k))
+          rp(k) = rp(k) + au
+          rc(k) = rc(k) - au
+          tl(k) = tl(k) + convliq(k)*au
+          np(k) = np(k) + au/cldw%x_max
        end if
     end do
-	  !print *,'rc = ',rc(82)
-	  !print *,'au = ',au(82)
-    
-    !print *,'autoconversion rate: ', au(35)
+
     !if (isIO().and.MAXVAL(rc).gt.0) THEN
     !if (isIO()) THEN
     !  WRITE(0,'(a,15e15.4)') '  k_au = ',k_au0
