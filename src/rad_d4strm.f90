@@ -283,7 +283,7 @@ contains
 
     ! ----------------------------------------
     logical            :: McICA = .False. 
-    logical, parameter :: solarWeighted = .false. 
+    logical, parameter :: solarWeighted = .true. 
 
     real, dimension (nv)   :: tw,ww,tg,tgm,dz, tauNoGas, wNoGas, tau, w
     real, dimension (nv)   :: ti,wi

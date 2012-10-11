@@ -54,7 +54,7 @@ module radiation
       if (first_time) then
          p0(n1) = (p00*(pi0(n1)/cp)**cpr) / 100.
          p0(n1-1) = (p00*(pi0(n1-1)/cp)**cpr) / 100.
-         call setup(background,n1,npts,nv1,nv,p0)
+         call setup(background,n1,npts,nv1,nv,p0,pi0)
          first_time = .False.
          if (allocated(pre))   pre(:) = 0.
          if (allocated(pde))   pde(:) = 0.
@@ -182,14 +182,13 @@ module radiation
               lflxd_toa(i,j) = fdir(1)
             end if 
             do k=2,n1-3
-               xfact  = exner(k)*dzi_m(k)/(cp*dn0(k))
+               xfact  = dzi_m(k)/(cp*dn0(k)*exner(k))
                if (xfact.le.0.) then
-                 print*,'xfact',xfact,exner(k),dzi_m(k),dn0(k),i,j,k
-                 stop
+                  print*,'xfact',xfact,exner(k),dzi_m(k),dn0(k),i,j,k
+                  stop
                endif
                tt(k,i,j) = tt(k,i,j) - (rflx(k,i,j) - rflx(k-1,i,j))*xfact
             end do
-
          end do
       end do
 
@@ -197,23 +196,24 @@ module radiation
 
   ! ---------------------------------------------------------------------------
   ! sets up the input data to extend through an atmopshere of appreiciable
-  ! depth using a background souding specified as a paramter, match this to
+  ! depth using a background sounding specified as a parameter, match this to
   ! the original sounding using p0 as this does not depend on time and thus
   ! allows us to recompute the same background matching after a history start
   !
-  subroutine setup(background,n1,npts,nv1,nv,zp)
-  use mpi_interface, only : myid
+    subroutine setup(background,n1,npts,nv1,nv,zp,pi0)
+
+    use mpi_interface, only : myid
 
     character (len=10), intent (in) :: background
     integer, intent (in) :: n1
     integer, intent (out):: npts,nv1,nv
-    real, intent (in)    :: zp(n1)
+    real, intent (in)    :: zp(n1), pi0(n1)
 
     real, allocatable  :: sp(:), st(:), sh(:), so(:), sl(:)
 
     integer :: k, ns, norig, index
     logical :: blend
-    real    :: pa, pb, ptop, ptest, test, dp1, dp2, dp3, Tsurf
+    real    :: pa, pb, ptop, ptest, test, dp1, dp2, dp3, Tsurf, pp2
 
     open ( unit = 08, file = background, status = 'old' )
     print *, 'Reading Background Sounding: ',background
@@ -288,12 +288,21 @@ module radiation
           ph(k) =  intrpl(sp(index),sh(index),sp(index+1),sh(index+1),pp(k))
           po(k) =  intrpl(sp(index),so(index),sp(index+1),so(index+1),pp(k))
        end do
-       !
-       ! set the ozone constant below the reference profile
-       !
-       do k=npts+1,nv
-          po(k) =  po(npts)
+      ! !
+      ! ! set the ozone constant below the reference profile
+      ! !
+      ! do k=npts+1,nv
+      !    po(k) =  po(npts)
+      ! end do
+
+      ! interpolate ozone profile
+       do k=npts+1,nv1
+            pp2 = (p00*(pi0(nv-k+2)/cp)**cpr) / 100.
+            index  = getindex(sp,ns,pp2)
+            po(k) =  intrpl(sp(index),so(index),sp(index+1),so(index+1),pp2)
+            print*,'ozone profile: ', po(k), pp2, sp (index), sp(index+1)
        end do
+
     end if
   
   end subroutine setup
