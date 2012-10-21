@@ -69,7 +69,7 @@ contains
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
 
-    real, parameter    :: peak_cfl = 0.4, peak_peclet = 0.5
+    real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
     real    :: t1,t2,tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax
     integer :: iret
