@@ -24,6 +24,7 @@ set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/config)
 
 #  make sure that the default is a RELEASE
 if (NOT CMAKE_BUILD_TYPE)
+  MESSAGE(STATUS "CMAKE_BUILD_TYPE not specified, defaulting to RELEASE")
   set (CMAKE_BUILD_TYPE RELEASE CACHE STRING
       "Choose the type of build, options are: None Debug Release." FORCE )
 endif ()
@@ -78,9 +79,10 @@ elseif (Fortran_COMPILER_NAME STREQUAL "XL")
   if(MPI)
     set (COMPILER_WRAPPER mpxlf95)
   endif()
-  set(CMAKE_Fortran_FLAGS "-qthreaded -qsmp -qfree=F90 -qrealsize=8  -qwarn64 -qnosave -qinitauto=FFF00000 -qflttrap=en:ov:zero:inv:imp -qflag=w:e")
+  #set(CMAKE_Fortran_FLAGS "-qthreaded -qsmp -qfree=F90 -qrealsize=8  -qwarn64 -qnosave -qinitauto=FFF00000 -qflttrap=en:ov:zero:inv:imp -qflag=w:e")
+  set(CMAKE_Fortran_FLAGS "-qfree=F90 -qrealsize=8  -qwarn64 -qnosave -qinitauto=FFF00000 -qflttrap=en:ov:zero:inv:imp -qflag=w:e")
   set(CMAKE_Fortran_FLAGS_RELEASE "-O4 -qnoipa -qstrict=none:exceptions -qinitauto=ff -qsigtrap")
-  set(CMAKE_Fortran_FLAGS_DEBUG "-O2 -qfullpath -C -qflttrp=enable:inexact:invalid:nanq:overflow:zerodivide -qsigtrap -qinitauto")
+  set(CMAKE_Fortran_FLAGS_DEBUG "-O2 -qfullpath -C -g -qflttrp=enable:inexact:invalid:nanq:overflow:zerodivide -qsigtrap -qinitauto")
   set (PROFILER_FLAG "-pg")
 endif ()
 
@@ -111,3 +113,16 @@ MESSAGE(STATUS "Compiler " ${CMAKE_Fortran_COMPILER})
 # COMPILE SRC DIR
 #####################
 ADD_SUBDIRECTORY( src)
+
+
+#####################
+# DOCUMENTATION
+#####################
+add_custom_target(todo ALL)
+ADD_CUSTOM_COMMAND(TARGET todo POST_BUILD
+                  COMMAND echo "UCLALES TODO LIST" > TODO
+                  COMMAND date  >> TODO
+                  COMMAND grep -Rin \\todo  src | sed 's/!.*TODO//I' >>  TODO
+                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                  )
+

@@ -99,6 +99,7 @@ contains
     use modnudge, only : lnudge,tnudgefac
     use modtimedep, only : ltimedep
     use mcrp, only : microseq,lrandommicro,timenuc,nin_set,cloud_type
+    use modparticles, only : lpartic, lpartsgs,lrandsurf,lpartstat, lpartdump, lpartdumpui,lpartdumpth,lpartdumpmr, frqpartdump
 
     implicit none
 
@@ -119,8 +120,7 @@ contains
          runtype, hfilin , filprf , & ! type of run (INITIAL or HISTORY)
          frqhis , frqanl, frqcross, outflg , & ! freq of history/anal writes, output flg
          lsync, lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars,&
-         
-         iradtyp, radfrq , strtim , sfc_albedo, & ! radiation type flag
+                  iradtyp, radfrq , strtim , sfc_albedo, & ! radiation type flag
          isfctyp, ubmin  , zrough , & ! surface parameterization type
          sst    , dthcon , drtcon , & ! SSTs, surface flx parameters
          csx    , prndtl ,          & ! SGS model type, parameters
@@ -138,7 +138,10 @@ contains
          lwaterbudget, &                 ! axel: flag for liquid water budget diagnostics (only level=3)
          lcouvreux , tau , &                    ! The Couvreux 'radioactive' scalar
          deflate_level , lhomflx,lhomrestart, &                         !Compression of the crosssections
-         clouddiff
+         clouddiff, &                         
+         lpartic,lpartsgs,lrandsurf,lpartstat,lpartdump,lpartdumpui,lpartdumpth,lpartdumpmr,frqpartdump           ! Particles
+
+
          
     deflev = deflate_level
     ps       = 0.

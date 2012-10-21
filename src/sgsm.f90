@@ -272,8 +272,14 @@ contains
              ! variable km represents what is commonly known as Km, the eddy viscosity
              ! variable kh represents strain rate factor S^2 (dummy variable)
              !
+             
+             ! Original:
              km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) &
                   *0.5*(dn0(k)+dn0(k+1))/(1./(delta*csx)**2+1./(zm(k)*vonk)**2)
+
+             ! Hack BvS: remove damping
+             !km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) * 0.5 * (dn0(k)+dn0(k+1)) * (csx * delta)**2. 
+
              !
              ! after kh is multiplied with the factor (1-ri/pr), the product of kh 
              ! and km represents the dissipation rate epsilon 
@@ -287,6 +293,8 @@ contains
           km(n1-1,i,j) = km(n1-2,i,j)    
        enddo
     enddo
+
+    !print*,sum(km(1,:,:))/1024.,sum(km(2,:,:))/1024.,sum(km(3,:,:))/1024.,sum(km(4,:,:))/1024.,sum(km(5,:,:))/1024.,sum(km(6,:,:))/1024.,sum(km(7,:,:))/1024.,sum(km(8,:,:))/1024.,sum(km(9,:,:))/1024.,sum(km(10,:,:))/1024.
 
     call cyclics(n1,n2,n3,km,req)
     call cyclicc(n1,n2,n3,km,req)
@@ -307,7 +315,7 @@ contains
           ! variable sz1 which corresponds to Km^2.
           !
           tke_sgs(k) = sz1(k)/(delta*pi*(csx**2))**2
-          sz1(k) = 1./sqrt(1./(delta*csx)**2+1./(zm(k)*vonk+0.001)**2)
+          sz1(k) = 1./sqrt(1./(delta*csx)**1+1./(zm(k)*vonk+0.001)**1)
        end do
        call updtst(n1,'sgs',-1,tke_sgs,1) ! sgs tke
        call updtst(n1,'sgs',-5,sz1,1)      ! mixing length

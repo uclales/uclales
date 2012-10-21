@@ -426,7 +426,7 @@ contains
     iret = nf90_put_var(ncid0, VarID, a_wp(:,i1:i2,j1:j2), start=ibeg,    &
          count=icnt)
     iret = nf90_inq_varid(ncid0, sanal(14), VarID)
-    iret = nf90_put_var(ncid0, VarID, a_theta(:,i1:i2,j1:j2), start=ibeg, &
+    iret = nf90_put_var(ncid0, VarID, a_tp(:,i1:i2,j1:j2)+th00, start=ibeg, &
          count=icnt)
     iret = nf90_inq_varid(ncid0, sanal(15), VarID)
     iret = nf90_put_var(ncid0, VarID, press(:,i1:i2,j1:j2), start=ibeg, &
@@ -445,7 +445,7 @@ contains
     nn = nbase+2
     if (level >=3) then
       do n = nbase+2, 18
-       nn = nn+1
+        nn = nn+1
        call newvar(nn-12)
        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
@@ -554,7 +554,7 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('time')
        if (itype==0) ncinfo = 'Time'
-       if (itype==1) ncinfo = 's'
+       if (itype==1) ncinfo = 'seconds since 2000-00-00 0000'
        if (itype==2) ncinfo = 'time'
     case('zt')
        if (itype==0) ncinfo = 'Vertical displacement of cell centers'
@@ -1012,46 +1012,46 @@ contains
        if (itype==1) ncinfo = 'kg/kg/s'
        if (itype==2) ncinfo = 'tttt'
     case('lwuca')
-       if (itype==0) ncinfo =  'Clear Air Longwave Radiative flux UP'
+       if (itype==0) ncinfo = 'Clear Air Longwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('lwdca')
-       if (itype==0) ncinfo =  'Clear Air Longwave Radiative flux DW'
+       if (itype==0) ncinfo = 'Clear Air Longwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('lflxut')
-       if (itype==0) ncinfo =  'Top of Atmosphere Longwave Radiative flux UP'
+       if (itype==0) ncinfo = 'Top of Atmosphere Longwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
     case('lflxdt')
-       if (itype==0) ncinfo =  'Top of Atmosphere Longwave Radiative flux DW'
+       if (itype==0) ncinfo = 'Top of Atmosphere Longwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
     case('rflx2')
        if (itype==0) ncinfo = 'Variance of total radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('sflx')
        if (itype==0) ncinfo = 'Shortwave radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     !irina
     case('sflxu')
        if (itype==0) ncinfo = 'Shortwave radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('sflxd')
        if (itype==0) ncinfo = 'Shortwave radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('swuca')
-       if (itype==0) ncinfo =  'Clear Air Shortwave Radiative flux UP'
+       if (itype==0) ncinfo = 'Clear Air Shortwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('swdca')
-       if (itype==0) ncinfo =  'Clear Air Shortwave Radiative flux DW'
+       if (itype==0) ncinfo = 'Clear Air Shortwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
    case('sflxut')
        if (itype==0) ncinfo = 'Top of Atmosphere Shortwave radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
@@ -1063,7 +1063,7 @@ contains
     case('sflx2')
        if (itype==0) ncinfo = 'Variance of shortwave radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('l_2')
        if (itype==0) ncinfo = 'Variance of liquid'
        if (itype==1) ncinfo = 'kg^2/kg^2'

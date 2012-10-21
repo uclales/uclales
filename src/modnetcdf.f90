@@ -130,7 +130,7 @@ contains
           if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
           do while(ncall < nrec .and. &
                    xtimes(ncall) /= fillvalue_double .and. &
-                   xtimes(ncall) < rtimee - spacing(1.)) ! Step through the time dimension; stop when one is bigger
+                   xtimes(ncall) <= rtimee - spacing(1.)) ! Step through the time dimension; stop when one is bigger
               ncall=ncall+1
           end do
           ldef = ensuredata_nc(ncid)
