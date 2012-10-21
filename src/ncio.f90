@@ -859,7 +859,7 @@ contains
        if (itype==1) ncinfo = 'm^2/s^2'
        if (itype==2) ncinfo = 'ttmt'
     case('tot_ww')
-       if (itype==0) ncinfo = 'Total vertical flux of v-wind'
+       if (itype==0) ncinfo = 'Total vertical flux of w-wind'
        if (itype==1) ncinfo = 'm^2/s^2'
        if (itype==2) ncinfo = 'ttmt'
     case('sfs_ww')
