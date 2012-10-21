@@ -732,7 +732,7 @@ contains
     k=1
     do while( zt(k+1) <= zrand .and. k < nzp)
        k=k+1
-       xran(k) = 0.2*(zrand - zt(k))/zrand
+       xran(k) = 0.02*(zrand - zt(k))/zrand
        !xran(k) = 0.05*(zrand - zt(k))/zrand
     end do
     call random_pert(nzp,nxp,nyp,zt,a_tp,xran,k)
@@ -741,7 +741,7 @@ contains
        k=1
        do while( zt(k+1) <= zrand .and. k < nzp)
           k=k+1
-          xran(k) = 5.0e-5*(zrand - zt(k))/zrand
+          xran(k) = 1.0e-5*(zrand - zt(k))/zrand
           !xran(k) = 1.0e-5*(zrand - zt(k))/zrand
        end do
        call random_pert(nzp,nxp,nyp,zt,a_rp,xran,k)
