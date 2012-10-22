@@ -17,12 +17,12 @@
 ! Copyright 1999-2008, Bjorn B. Stevens, Dep't Atmos and Ocean Sci, UCLA
 !----------------------------------------------------------------------------
 ! Doxygen:
-!> Lagrangian Particle Tracking Module (LPTM). 
-!! Tracks massless particles driven by the interpolated velocities from the 
+!> Lagrangian Particle Tracking Module (LPTM).
+!! Tracks massless particles driven by the interpolated velocities from the
 !! Eulerian LES grid.
 !>
 !! \author Bart van Stratum
-!! \todo 
+!! \todo
 
 
 module modparticles
@@ -32,7 +32,7 @@ module modparticles
   implicit none
   PUBLIC :: init_particles, particles, exit_particles, initparticledump, initparticlestat, write_particle_hist, particlestat, balanced_particledump
 
-  ! For/from namelist  
+  ! For/from namelist
   logical            :: lpartic        = .false.        !< Switch for enabling particles
   logical            :: lpartsgs       = .false.        !< Switch for enabling particle subgrid scheme
   logical            :: lrandsurf      = .false.        !< Switch for randomizing lowest grid level(s)
@@ -45,7 +45,7 @@ module modparticles
 
   character(30)      :: startfile
   integer            :: ifinput        = 1
-  integer            :: np      
+  integer            :: np
   real               :: tnextdump
   real               :: randint   = 20.
   real               :: tnextrand = 6e6
@@ -72,7 +72,7 @@ module modparticles
   integer            :: ncpartid, ncpartrec             ! Particle dump
   integer            :: ncpartstatid, ncpartstatrec     ! Particle statistics
   integer            :: nstatsamp
-  
+
   ! Arrays for local and domain averaged values
   real, allocatable, dimension(:)     :: npartprof,    npartprofl,  &
                                          uprof,        uprofl,      &
@@ -101,7 +101,7 @@ module modparticles
   real, parameter                     :: C0      = 4.
   real                                :: dsigma2dx = 0, dsigma2dy = 0, dsigma2dz = 0, &
                                          dsigma2dt = 0, sigma2l = 0,   epsl = 0, fsl = 0
-  real                                :: ceps, labda, spngl  
+  real                                :: ceps, labda, spngl
 
   ! Test switches...
   logical                             :: lfsloc = .false.  ! Local or global calculated fs()
@@ -110,16 +110,16 @@ module modparticles
 contains
   !
   !--------------------------------------------------------------------------
-  ! Subroutine particles 
-  !> Main driver of the LPTM, calls both the velocity 
-  !> interpolation from the Eulerian grid and RK3 integration scheme. 
+  ! Subroutine particles
+  !> Main driver of the LPTM, calls both the velocity
+  !> interpolation from the Eulerian grid and RK3 integration scheme.
   !> called from: step.f90
   !--------------------------------------------------------------------------
   !
-  subroutine particles(time,timmax) 
+  subroutine particles(time,timmax)
     use grid, only : dxi, dyi, nstep, dzi_t, dt, nzp, zm, a_km, nxp, nyp, nfpt
     use defs, only : pi
-    use mpi_interface, only : myid 
+    use mpi_interface, only : myid
     implicit none
     real, intent(in)               :: time          !< time of simulation, determines the timing of particle dumps to NetCDF
     real, intent(in)               :: timmax        !< end of simulation, required to write particle dump at last timestep
@@ -152,14 +152,14 @@ contains
           particle%wres = wi3d(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
           if (lpartsgs .and. nstep == 1) then
             call prep_sgs(particle)
-            particle%usgs   = usgs(particle) * dxi 
+            particle%usgs   = usgs(particle) * dxi
             particle%vsgs   = vsgs(particle) * dyi
             particle%wsgs   = wsgs(particle) * dzi_t(floor(particle%z))
           end if
         end if
       particle => particle%next
       end do
-    
+
       ! Integration
       particle => head
       do while( associated(particle) )
@@ -171,14 +171,14 @@ contains
       end do
     end if
 
-    ! Communicate particles to other procs 
+    ! Communicate particles to other procs
     call partcomm
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! Temporary hack, sync particle dump with statistics
     ! see also step.f90
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   
+
     ! Statistics
     !if (nstep==3) then
     !  ! Particle dump
@@ -190,7 +190,7 @@ contains
     !  end if
     !  !call checkdiv
     !end if
-  
+
 
   end subroutine particles
 
@@ -205,7 +205,7 @@ contains
     use defs, only             : pi, vonk, g
     use mpi_interface, only    : nxg, nyg
     implicit none
-    
+
     real                       :: thvp,thvm, ri
     real                       :: S2,N2,cm,ch,cl,l,ch1,ch2,ceps1,ceps2
     integer                    :: i,j,k,ip,im,jp,jm,kp,km
@@ -214,14 +214,14 @@ contains
     real, parameter            :: ric   = 0.23
     !real, parameter            :: ris   = 0.06
 
-    ! Uncorrected parameters 
+    ! Uncorrected parameters
     cl    = (2./3.)**0.5
     cm    = (1./pi) * (2./(3.*alpha))**(3./2.)
-    ch    = (4./(3.*gamma)) * (1./pi) * (2./(3.*alpha))**0.5 
+    ch    = (4./(3.*gamma)) * (1./pi) * (2./(3.*alpha))**0.5
     ceps  = pi * (2./(3.*alpha))**(3./2.)
     ch1   = cm
     ch2   = ch - ch1
-    ceps1 = cm - cl**2 * (ric**(-1) - 1) 
+    ceps1 = cm - cl**2 * (ric**(-1) - 1)
     ceps2 = ceps - ceps1
     labda = ((1/dzi_t(1))/dxi/dyi)**(1./3.)
 
@@ -233,7 +233,7 @@ contains
           im = i-1
           do k=2,nzp-1
             kp = k+1
-            km = k-1            
+            km = k-1
 
             ! 1. Brunt-Vaisala^2
             thvp = (0.5*(a_tp(k,i,j) + a_tp(kp,i,j))) * (1. + 0.61 * (0.5*(a_rp(k,i,j) + a_rp(kp,i,j))))
@@ -246,7 +246,7 @@ contains
             S2 = ( &
               2. * ((a_up(k,i,j)   -  a_up(k,im,j))   * dxi       )**2    + &
               2. * ((a_vp(k,i,j)   -  a_vp(k,i,jm))   * dyi       )**2    + &
-              2. * ((a_wp(k,i,j)   -  a_wp(km,i,j))   * dzi_t(k)  )**2) 
+              2. * ((a_wp(k,i,j)   -  a_wp(km,i,j))   * dzi_t(k)  )**2)
 
             ! {13 = 31}^2 = dvdz^2 + dwdx^2
             S2 = S2 + 0.25 * ( &
@@ -304,22 +304,22 @@ contains
     use grid, only              : nzp, a_up, a_vp, a_wp, nxp, nyp
     use mpi_interface, only     : ierror, mpi_double_precision, mpi_sum, mpi_comm_world, nxg, nyg
     implicit none
-    
+
     integer                           :: i,j,k,ip,im,jp,jm,kp,km
     real, allocatable, dimension(:)   :: u_avl, v_avl, u_av, v_av
-   
+
     allocate(u_avl(nzp),v_avl(nzp),u_av(nzp),v_av(nzp))
 
     do k=1,nzp
       u_avl(k)    = sum(a_up(k,3:nxp-2,3:nyp-2))
       v_avl(k)    = sum(a_vp(k,3:nxp-2,3:nyp-2))
-    end do 
+    end do
 
     call mpi_allreduce(u_avl,u_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
     call mpi_allreduce(v_avl,v_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
 
-    u_av        = u_av    / (nxg * nyg)  
-    v_av        = v_av    / (nxg * nyg)     
+    u_av        = u_av    / (nxg * nyg)
+    v_av        = v_av    / (nxg * nyg)
 
     do j=2,nyp-1
        jp = j+1
@@ -329,10 +329,10 @@ contains
           im = i-1
           do k=2,nzp-1
             kp = k+1
-            km = k-1            
+            km = k-1
             rese(k,i,j) = ((0.5 * (a_up(k,i,j) + a_up(k,im,j)) - u_av(k))**2.  + &
                            (0.5 * (a_vp(k,i,j) + a_vp(k,i,jm)) - v_av(k))**2.  + &
-                           (0.5 * (a_wp(k,i,j) + a_wp(km,i,j))          )**2.) / 2. 
+                           (0.5 * (a_wp(k,i,j) + a_wp(km,i,j))          )**2.) / 2.
           end do
           rese(1,i,j)   = rese(2,i,j)
           rese(nzp,i,j) = rese(nzp-1,i,j)
@@ -345,7 +345,7 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine fsubgrid_local : 
+  ! subroutine fsubgrid_local :
   !> Calculates fs (contribution sgs turbulence to total turbulence)
   !> at grid center
   !--------------------------------------------------------------------------
@@ -354,9 +354,9 @@ contains
     use grid, only    : nzp, nxp, nyp, dzi_m, nfpt
     implicit none
 
-    integer :: i,j,k,im,ip,jm,jp,km,kp  
-    real    :: dfsdz 
- 
+    integer :: i,j,k,im,ip,jm,jp,km,kp
+    real    :: dfsdz
+
     do j=2,nyp-1
       jp = j+1
       jm = j-1
@@ -373,7 +373,7 @@ contains
           end if
         end do
         ! Extrapolate for lowest half level
-        dfsdz = (fs_local(3,i,j) - fs_local(2,i,j)) * dzi_m(2)       
+        dfsdz = (fs_local(3,i,j) - fs_local(2,i,j)) * dzi_m(2)
         fs_local(1,i,j) = fs_local(2,i,j) - (dfsdz / dzi_m(1))
       end do
     end do
@@ -382,7 +382,7 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine fsubgrid : 
+  ! subroutine fsubgrid :
   !> Calculates fs (contribution sgs turbulence to total turbulence)
   !--------------------------------------------------------------------------
   !
@@ -390,7 +390,7 @@ contains
     use grid, only : a_up, a_vp, a_wp, nzp, nxp, nyp, dt, nstep, zt, nfpt
     use mpi_interface, only : ierror, mpi_double_precision, mpi_sum, mpi_comm_world, nxg, nyg
     implicit none
-  
+
     integer    :: k
     real, allocatable, dimension(:)   :: &
        u_avl, v_avl, u2_avl, v2_avl, w2_avl, sgse_avl,     &
@@ -408,29 +408,29 @@ contains
         v_avl(k)    = sum(a_vp(k,3:nxp-2,3:nyp-2))
         w2_avl(k)   = sum(a_wp(k,3:nxp-2,3:nyp-2)**2.)
         sgse_avl(k) = sum(sgse(k,3:nxp-2,3:nyp-2))
-      end do 
+      end do
 
       call mpi_allreduce(u_avl,u_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
       call mpi_allreduce(v_avl,v_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
       call mpi_allreduce(w2_avl,w2_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
       call mpi_allreduce(sgse_avl,sgse_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-  
-      u_av        = u_av    / (nxg * nyg)  
-      v_av        = v_av    / (nxg * nyg)     
- 
+
+      u_av        = u_av    / (nxg * nyg)
+      v_av        = v_av    / (nxg * nyg)
+
       do k=1,nzp
         u2_avl(k) = sum((a_up(k,3:nxp-2,3:nyp-2) - u_av(k))**2.)
         v2_avl(k) = sum((a_vp(k,3:nxp-2,3:nyp-2) - v_av(k))**2.)
-      end do 
+      end do
 
       call mpi_allreduce(u2_avl,u2_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
       call mpi_allreduce(v2_avl,v2_av,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
 
-      u2_av       = u2_av   / (nxg * nyg)    
-      v2_av       = v2_av   / (nxg * nyg)    
-      w2_av       = w2_av   / (nxg * nyg)    
-      sgse_av     = sgse_av / (nxg * nyg) 
- 
+      u2_av       = u2_av   / (nxg * nyg)
+      v2_av       = v2_av   / (nxg * nyg)
+      w2_av       = w2_av   / (nxg * nyg)
+      sgse_av     = sgse_av / (nxg * nyg)
+
       do k=2, nzp
         e_res(k)  = 0.5 * (u2_av(k) + v2_av(k) + 0.5*(w2_av(k) + w2_av(k-1)))
         if(k > nzp-nfpt) then       ! fix fs in ghost cells & sponge layer
@@ -441,7 +441,7 @@ contains
       end do
 
       e_res(1)    = -e_res(2)                   ! e_res -> 0 at surface
-      fs(1)       = fs(2) - (fs(3) - fs(2))     ! fs    -> extrapolate to surface 
+      fs(1)       = fs(2) - (fs(3) - fs(2))     ! fs    -> extrapolate to surface
       !fs(1)       = 1. + (1.-fs(2))            ! fs    -> 1 at surface
 
       !Raw statistics dump
@@ -454,7 +454,7 @@ contains
       !    write(ifoutput,'(I10,9E15.6)') k,zt(k),u_av(k),u2_av(k),v_av(k),v2_av(k),w2_av(k),e_res(k),sgse_av(k),fs(k)
       !  end do
 
-      !  close(ifoutput) 
+      !  close(ifoutput)
       !end if
 
       deallocate(u_avl,v_avl,u2_avl,v2_avl,w2_avl,sgse_avl,u_av,v_av,u2_av,v2_av,w2_av,sgse_av,e_res)
@@ -466,7 +466,7 @@ contains
   !--------------------------------------------------------------------------
   ! subroutine prep_sgs : prepares some variables for subgrid velocity
   !--------------------------------------------------------------------------
-  ! 
+  !
   subroutine prep_sgs(particle)
     use grid, only : dxi, dyi, dt, a_scr7, zm, zt, dzi_t, dzi_m, a_tp, a_rp, nxp, nyp, nzp, th00, nfpt, distim
     use defs, only : g,pi
@@ -482,10 +482,10 @@ contains
       fsl        = i3d(particle%x,particle%y,particle%z,fs_local)
     else
       fsl        = (1-deltaz) * fs(zbottom) + deltaz * fs(zbottom+1)
-    end if    
+    end if
 
     sigma2l      = i3d(particle%x,particle%y,particle%z,sgse) * (2./3.)
-    
+
     dsigma2dx    = (2./3.) * (i3d(particle%x+0.5,particle%y,particle%z,sgse) - &
                               i3d(particle%x-0.5,particle%y,particle%z,sgse)) * dxi
     dsigma2dy    = (2./3.) * (i3d(particle%x,particle%y+0.5,particle%z,sgse) - &
@@ -509,7 +509,7 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine usgs 
+  ! subroutine usgs
   !> Calculation subgrid (u) velocity particle based on subgrid-TKE
   !--------------------------------------------------------------------------
   !
@@ -525,17 +525,17 @@ contains
     t3        = ((fsl * C0 * (ceps/labda) * (1.5*sigma2l)**(1.5))**0.5 * xi(idum))
     !ts        = -spngl * (particle%usgs / dxi)
 
-    ! 1. dissipation subgrid velocity cannot exceed subgrid velocity itself 
+    ! 1. dissipation subgrid velocity cannot exceed subgrid velocity itself
     if(sign(1.,t1 + particle%usgs / dxi) .ne. sign(1.,particle%usgs / dxi)) t1 = - particle%usgs / dxi
-    ! 2. decrease subgrid velocity cannot exceed subgrid velocity itself 
+    ! 2. decrease subgrid velocity cannot exceed subgrid velocity itself
     if(sign(1.,t2 + particle%usgs / dxi) .ne. sign(1.,particle%usgs / dxi)) t2 = - particle%usgs / dxi
     ! 3. Terms 1. and 2. combined may not exceed sugbrid velocity itself
     if(sign(1.,t1 + t2 + particle%usgs / dxi) .ne. sign(1.,particle%usgs / dxi)) then
       t1 = -0.5 * particle%usgs / dxi
       t2 = -0.5 * particle%usgs / dxi
     end if
-     
-    usgs = (particle%usgs / dxi) + (t1 + t2 + t3)  
+
+    usgs = (particle%usgs / dxi) + (t1 + t2 + t3)
 
   end function usgs
 
@@ -557,19 +557,19 @@ contains
     t3        = ((fsl * C0 * (ceps/labda) * (1.5*sigma2l)**(1.5))**0.5 * xi(idum))
     !ts        = -spngl * (particle%vsgs / dyi)
 
-    ! 1. dissipation subgrid velocity cannot exceed subgrid velocity itself 
+    ! 1. dissipation subgrid velocity cannot exceed subgrid velocity itself
     if(sign(1.,t1 + particle%vsgs / dyi) .ne. sign(1.,particle%vsgs / dyi)) t1 = - particle%vsgs / dyi
-    ! 2. decrease subgrid velocity cannot exceed subgrid velocity itself 
+    ! 2. decrease subgrid velocity cannot exceed subgrid velocity itself
     if(sign(1.,t2 + particle%vsgs / dyi) .ne. sign(1.,particle%vsgs / dyi)) t2 = - particle%vsgs / dyi
     ! 3. Terms 1. and 2. combined may not exceed sugbrid velocity
     if(sign(1.,t1 + t2 + particle%vsgs / dyi) .ne. sign(1.,particle%vsgs / dyi)) then
       t1 = -0.5 * particle%vsgs / dyi
       t2 = -0.5 * particle%vsgs / dyi
     end if
- 
-    vsgs = (particle%vsgs / dyi) + (t1 + t2 + t3) 
 
-  end function vsgs 
+    vsgs = (particle%vsgs / dyi) + (t1 + t2 + t3)
+
+  end function vsgs
 
   !
   !--------------------------------------------------------------------------
@@ -590,24 +590,24 @@ contains
     t3        = ((fsl * C0 * (ceps/labda) * (1.5*sigma2l)**(1.5))**0.5 * xi(idum))
     !ts        = -spngl * (particle%wsgs / dzi)
 
-    ! 1. dissipation subgrid velocity cannot exceed subgrid velocity itself 
+    ! 1. dissipation subgrid velocity cannot exceed subgrid velocity itself
     if(sign(1.,t1 + particle%wsgs / dzi) .ne. sign(1.,particle%wsgs / dzi)) t1 = - particle%wsgs / dzi
-    ! 2. decrease subgrid velocity cannot exceed subgrid velocity itself 
+    ! 2. decrease subgrid velocity cannot exceed subgrid velocity itself
     if(sign(1.,t2 + particle%wsgs / dzi) .ne. sign(1.,particle%wsgs / dzi)) t2 = - particle%wsgs / dzi
     ! 3. Terms 1. and 2. combined may not exceed sugbrid velocity
     if(sign(1.,t1 + t2 + particle%wsgs / dzi) .ne. sign(1.,particle%wsgs / dzi)) then
       t1 = -0.5 * particle%wsgs / dzi
       t2 = -0.5 * particle%wsgs / dzi
     end if
- 
-    wsgs = (particle%wsgs / dzi) + (t1 + t2 + t3) 
+
+    wsgs = (particle%wsgs / dzi) + (t1 + t2 + t3)
 
   end function wsgs
 
   !
   !--------------------------------------------------------------------------
-  ! Subroutine globalrandomize 
-  !> Randomizes the X,Y,Z positions of all particles in 
+  ! Subroutine globalrandomize
+  !> Randomizes the X,Y,Z positions of all particles in
   !> the lowest grid level every RK3 cycle. Called from: particles()
   !--------------------------------------------------------------------------
   !
@@ -615,7 +615,7 @@ contains
     use mpi_interface, only : nxg, nyg, nyprocs, nxprocs, mpi_integer, mpi_double_precision, mpi_sum, mpi_comm_world, ierror, wrxid, wryid, ranktable, mpi_status_size, myid
     use grid, only : deltax, deltay
     implicit none
-  
+
     type (particle_record), pointer:: particle,ptr
     real               :: zmax = 1.                  ! Max height in grid coordinates
     !integer            :: status(mpi_status_size)
@@ -631,11 +631,11 @@ contains
       !if( particle%z <= (1. + zmax) .and. particle%wres < 0. ) nlocal = nlocal + 1
       if( particle%z <= (1. + zmax) ) nlocal = nlocal + 1
       particle => particle%next
-    end do 
+    end do
 
     call mpi_allreduce(nlocal,nglobal,1,mpi_integer,mpi_sum,mpi_comm_world,ierror)
 
-    if(nlocal > 0) then            
+    if(nlocal > 0) then
       ! Give them a random location and place in send buffer
       allocate(buffsend(nrpartvar * nlocal))
       ii = 0
@@ -644,18 +644,18 @@ contains
         !if( particle%z <= (1. + zmax) .and. particle%wres < 0. ) then
         if( particle%z <= (1. + zmax) ) then
           call random_number(randnr)          ! Random seed has been called from init_particles...
-          particle%x    = randnr(1) * float(nxg) 
+          particle%x    = randnr(1) * float(nxg)
           particle%y    = randnr(2) * float(nyg)
           particle%z    = 1. + (zmax * randnr(3))
-          particle%ures = 0. 
-          particle%vres = 0. 
-          particle%wres = 0. 
-          particle%usgs = 0. 
-          particle%vsgs = 0. 
-          particle%wsgs = 0. 
+          particle%ures = 0.
+          particle%vres = 0.
+          particle%wres = 0.
+          particle%usgs = 0.
+          particle%vsgs = 0.
+          particle%wsgs = 0.
 
           call partbuffer(particle, buffsend(ii+1:ii+nrpartvar),ii,.true.)
-          
+
           ptr => particle
           particle => particle%next
           call delete_particle(ptr)
@@ -663,7 +663,7 @@ contains
         else
           particle => particle%next
         end if
-      end do 
+      end do
     end if
 
     ! Communicate number of local particles to each proc
@@ -674,7 +674,7 @@ contains
     allocate(displacements(nxprocs*nyprocs))
     displacements(1) = 0
     do i = 2,nxprocs*nyprocs
-      displacements(i) = displacements(i-1) + recvcount(i-1) 
+      displacements(i) = displacements(i-1) + recvcount(i-1)
     end do
     allocate(buffrecv(sum(recvcount)))
 
@@ -685,7 +685,7 @@ contains
     xsizelocal = nxg / nxprocs
     ysizelocal = nyg / nyprocs
     ii = 0
-    do i=1,nglobal   
+    do i=1,nglobal
       tempx = buffrecv(ii+2)
       tempy = buffrecv(ii+3)
       ! If on proc: add particle
@@ -723,13 +723,13 @@ contains
     !  ii = ii + nrpartvar
     !end do
     !close(999)
-    
+
   end subroutine globalrandomize
 
   !
   !--------------------------------------------------------------------------
   ! Function ui3d
-  !> Performs a trilinear interpolation from the Eulerian grid to the 
+  !> Performs a trilinear interpolation from the Eulerian grid to the
   !> particle position.
   !--------------------------------------------------------------------------
   !
@@ -746,13 +746,13 @@ contains
     deltax = x - 1   - xbottom
     deltay = y - 0.5 - ybottom
 
-    ! u(1,:,:) == u(2,:,:) with zt(1) = - zt(2). By multiplying u(1,:,:) with -1, 
-    ! the velocity interpolates to 0 at the surface.  
+    ! u(1,:,:) == u(2,:,:) with zt(1) = - zt(2). By multiplying u(1,:,:) with -1,
+    ! the velocity interpolates to 0 at the surface.
     if (zbottom==1)  then
       sign = -1
     else
       sign = 1
-    end if      
+    end if
 
     deltaz = ((zm(floor(z)) + (z - floor(z)) / dzi_t(floor(z))) - zt(zbottom)) * dzi_m(zbottom)
     ui3d          =  (1-deltaz) * (1-deltay) * (1-deltax) * sign * a_up(zbottom    , xbottom    , ybottom    ) + &    !
@@ -769,7 +769,7 @@ contains
   !
   !--------------------------------------------------------------------------
   ! Function vi3d
-  !> Performs a trilinear interpolation from the Eulerian grid to the 
+  !> Performs a trilinear interpolation from the Eulerian grid to the
   !> particle position.
   !--------------------------------------------------------------------------
   !
@@ -786,13 +786,13 @@ contains
     deltax = x - 0.5 - xbottom
     deltay = y - 1   - ybottom
 
-    ! v(1,:,:) == v(2,:,:) with zt(1) = - zt(2). By multiplying v(1,:,:) with -1, 
-    ! the velocity interpolates to 0 at the surface.  
+    ! v(1,:,:) == v(2,:,:) with zt(1) = - zt(2). By multiplying v(1,:,:) with -1,
+    ! the velocity interpolates to 0 at the surface.
     if (zbottom==1)  then
       sign = -1
     else
       sign = 1
-    end if      
+    end if
 
     deltaz = ((zm(floor(z)) + (z - floor(z)) / dzi_t(floor(z))) - zt(zbottom)) * dzi_m(zbottom)
     vi3d          =  (1-deltaz) * (1-deltay) * (1-deltax) * sign * a_vp(zbottom    , xbottom    , ybottom    ) + &    !
@@ -805,11 +805,11 @@ contains
     &                (  deltaz) * (  deltay) * (  deltax) *        a_vp(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
 
   end function vi3d
-  
+
   !
   !--------------------------------------------------------------------------
   ! Function wi3d
-  !> Performs a trilinear interpolation from the Eulerian grid to the 
+  !> Performs a trilinear interpolation from the Eulerian grid to the
   !> particle position.
   !--------------------------------------------------------------------------
   !
@@ -835,7 +835,7 @@ contains
     &                (  deltaz) * (1-deltay) * (  deltax) *  a_wp(zbottom + 1, xbottom + 1, ybottom    ) + &    ! x+1, z+1
     &                (  deltaz) * (  deltay) * (1-deltax) *  a_wp(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
     &                (  deltaz) * (  deltay) * (  deltax) *  a_wp(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
-  
+
   end function wi3d
 
   !
@@ -849,7 +849,7 @@ contains
     implicit none
     real, intent(in)                    :: x, y, z                               !< local x,y,z position in grid coordinates
     real, dimension(:,:,:), intent(in)  :: input                                 !< scalar field used to interpolate from
- 
+
     integer  :: xbottom, ybottom, zbottom
     real     :: i3d, deltax, deltay, deltaz
 
@@ -859,7 +859,7 @@ contains
     deltax = x - 0.5 - xbottom
     deltay = y - 0.5 - ybottom
     deltaz = z + 0.5 - zbottom
-    
+
     i3d           =  (1-deltaz) * (1-deltay) * (1-deltax) *  input(zbottom    , xbottom    , ybottom    ) + &    !
     &                (1-deltaz) * (1-deltay) * (  deltax) *  input(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
     &                (1-deltaz) * (  deltay) * (1-deltax) *  input(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
@@ -882,7 +882,7 @@ contains
     implicit none
     real, intent(in)                    :: z                                     !< local z position in grid coordinates
     real, dimension(:), intent(in)      :: input                                 !< profile used to interpolate from
- 
+
     integer  :: zbottom
     real     :: i1d, deltaz
 
@@ -895,7 +895,7 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! Subroutine rk3 
+  ! Subroutine rk3
   !> Third-order Runge-Kutta scheme for spatial integration of the particles.
   !--------------------------------------------------------------------------
   !
@@ -903,7 +903,7 @@ contains
     use grid, only : rkalpha, rkbeta, nstep, dt, dxi, dyi, dzi_t
     implicit none
     TYPE (particle_record), POINTER:: particle
-      
+
     particle%zprev = particle%z
 
     particle%x     = particle%x + rkalpha(nstep) * (particle%ures + particle%usgs) * dt + rkbeta(nstep) * (particle%ures_prev + particle%usgs_prev) * dt
@@ -917,7 +917,7 @@ contains
     particle%usgs_prev = particle%usgs
     particle%vsgs_prev = particle%vsgs
     particle%wsgs_prev = particle%wsgs
-   
+
    if ( nstep==3 ) then
       particle%ures_prev   = 0.
       particle%vres_prev   = 0.
@@ -931,7 +931,7 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! Subroutine partcomm 
+  ! Subroutine partcomm
   !> Handles the cyclic boundary conditions (through MPI) and sends
   !> particles from processor to processor
   !--------------------------------------------------------------------------
@@ -970,16 +970,16 @@ contains
       if( particle%y >= nyloc + 3 ) nton = nton + 1
       if( particle%y < 3          ) ntos = ntos + 1
       particle => particle%next
-    end do 
+    end do
 
     call mpi_sendrecv(nton,1,mpi_integer,ranktable(wrxid,wryid+1),4, &
                       nfrs,1,mpi_integer,ranktable(wrxid,wryid-1),4, &
-                      mpi_comm_world,status,ierror) 
+                      mpi_comm_world,status,ierror)
 
     call mpi_sendrecv(ntos,1,mpi_integer,ranktable(wrxid,wryid-1),5, &
                       nfrn,1,mpi_integer,ranktable(wrxid,wryid+1),5, &
-                      mpi_comm_world,status,ierror) 
-   
+                      mpi_comm_world,status,ierror)
+
     ! ---------------------------
     if( nton > 0 ) then
       allocate(buffsend(nrpartvar * nton))
@@ -1000,7 +1000,7 @@ contains
       end do
       call mpi_isend(buffsend,nrpartvar*nton,mpi_double_precision,ranktable(wrxid,wryid+1),6,mpi_comm_world,request,ierror)
     end if
-   
+
     if(nfrs > 0) then
       allocate(buffrecv(nrpartvar * nfrs))
       call mpi_recv(buffrecv,nrpartvar*nfrs,mpi_double_precision,ranktable(wrxid,wryid-1),6,mpi_comm_world,status,ierror)
@@ -1013,7 +1013,7 @@ contains
     end if
 
     ! Wait for comm to finish
-    if(nton>0) then 
+    if(nton>0) then
       call mpi_wait(request,status,ierror)
       deallocate(buffsend)
     end if
@@ -1052,7 +1052,7 @@ contains
     end if
 
     ! Wait for comm to finish
-    if(ntos>0) then 
+    if(ntos>0) then
       call mpi_wait(request,status,ierror)
       deallocate(buffsend)
     end if
@@ -1066,15 +1066,15 @@ contains
       if( particle%x >= nxloc + 3 ) ntoe = ntoe + 1
       if( particle%x < 3          ) ntow = ntow + 1
       particle => particle%next
-    end do 
+    end do
 
     call mpi_sendrecv(ntoe,1,mpi_integer,ranktable(wrxid+1,wryid),8, &
                       nfrw,1,mpi_integer,ranktable(wrxid-1,wryid),8, &
-                      mpi_comm_world,status,ierror) 
+                      mpi_comm_world,status,ierror)
 
     call mpi_sendrecv(ntow,1,mpi_integer,ranktable(wrxid-1,wryid),9, &
                       nfre,1,mpi_integer,ranktable(wrxid+1,wryid),9, &
-                      mpi_comm_world,status,ierror) 
+                      mpi_comm_world,status,ierror)
 
     ! ---------------------------
     if( ntoe > 0 ) then
@@ -1109,7 +1109,7 @@ contains
     end if
 
     ! Wait for comm to finish
-    if(ntoe>0) then 
+    if(ntoe>0) then
       call mpi_wait(request,status,ierror)
       deallocate(buffsend)
     end if
@@ -1148,7 +1148,7 @@ contains
     end if
 
     ! Wait for comm to finish
-    if(ntow>0) then 
+    if(ntow>0) then
       call mpi_wait(request,status,ierror)
       deallocate(buffsend)
     end if
@@ -1158,14 +1158,14 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! Subroutine partbuffer 
-  !> Packs/receives particle records to/from an array, sendable over MPI 
+  ! Subroutine partbuffer
+  !> Packs/receives particle records to/from an array, sendable over MPI
   !--------------------------------------------------------------------------
   !
   subroutine partbuffer(particle, buffer, n, send)
     implicit none
 
-    logical,intent(in)                :: send                               !< 
+    logical,intent(in)                :: send                               !<
     integer,intent(in)                :: n
     real,dimension(n+1:n+nrpartvar)   :: buffer
     TYPE (particle_record), POINTER:: particle
@@ -1224,22 +1224,22 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! Subroutine thermo 
+  ! Subroutine thermo
   !> Calculates thermodynamic variables at particle position (thl, thv,
-  !> qt, qs)  
+  !> qt, qs)
   !--------------------------------------------------------------------------
   !
   subroutine thermo(px,py,pz,thl,thv,rt,rl)
     use thrm,         only : rslf
     use grid,         only : a_pexnr, a_rp, a_theta, a_tp, pi0, pi1,th00
     !use grid,         only : tname,nzp,dxi,dyi,dzi_t,nxp,nyp,umean,vmean, a_tp, a_rp, press, th00, a_pexnr, a_theta,pi0,pi1
-    
+
     use defs,         only : p00,cp,R,Rm,tmelt,alvl,cpr,ep2,ep
     use thrm,         only : rslf
     implicit none
-   
+
     real, intent(in)  :: px,py,pz
-    real, intent(out) :: thl,thv,rt,rl 
+    real, intent(out) :: thl,thv,rt,rl
     real, parameter   :: epsln = 1.e-4
     real              :: exner,ploc,tlloc,rsloc,dtx,tx,txi,tx1
     integer           :: iterate
@@ -1247,8 +1247,8 @@ contains
     ! scalar interpolations and calculations
     exner   = (i1d(pz,pi0)+i1d(pz,pi1)+i3d(px,py,pz,a_pexnr)) / cp
     ploc    = p00 * exner**cpr               ! Pressure
-    thl     = i3d(px,py,pz,a_tp) + th00      ! Liquid water potential T 
-    tlloc   = thl * exner                    ! Liquid water T 
+    thl     = i3d(px,py,pz,a_tp) + th00      ! Liquid water potential T
+    tlloc   = thl * exner                    ! Liquid water T
     rsloc   = rslf(ploc,tlloc)               ! Saturation vapor mixing ratio
     rt      = i3d(px,py,pz,a_rp)             ! Total water mixing ratio
     rl      = max(rt-rsloc,0.)               ! Liquid water mixing ratio
@@ -1269,15 +1269,15 @@ contains
       end do
     end if
 
-    thv = i3d(px,py,pz,a_theta) * (1.+ep2*(rt-rl))  
+    thv = i3d(px,py,pz,a_theta) * (1.+ep2*(rt-rl))
 
   end subroutine thermo
 
   !
   !--------------------------------------------------------------------------
-  ! Subroutine particlestat 
+  ! Subroutine particlestat
   !> Performs the sampling and saving of binned and slab averaged particle
-  !> statistics. Output written to *.particlestat.nc  
+  !> statistics. Output written to *.particlestat.nc
   !--------------------------------------------------------------------------
   !
   subroutine particlestat(dowrite,time)
@@ -1292,12 +1292,13 @@ contains
     real                    :: thv,thl,rt,rl           ! From subroutine thermo
     type (particle_record), pointer:: particle
 
+    if (.not. lpartstat) return
     ! Time averaging step
     if(.not. dowrite) then
       particle => head
       do while(associated(particle))
         k               = floor(particle%z) + 1
-  
+
         npartprofl(k)   = npartprofl(k) + 1
         uprofl(k)       = uprofl(k)     + (particle%ures / dxi)
         vprofl(k)       = vprofl(k)     + (particle%vres / dyi)
@@ -1319,7 +1320,7 @@ contains
           if(lfsloc) fsprofl(k) = fsprofl(k) + i3d(particle%x,particle%y,particle%z,fs_local)
         end if
         particle => particle%next
-      end do 
+      end do
 
       nstatsamp = nstatsamp + 1
     end if
@@ -1342,10 +1343,10 @@ contains
       if(lpartsgs) then
         call mpi_allreduce(sigma2profl,sigma2prof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
         if(lfsloc) call mpi_allreduce(fsprofl,fsprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-      end if 
+      end if
 
       ! Divide summed values by ntime and nparticle samples and
-      ! correct for Galilean transformation 
+      ! correct for Galilean transformation
       do k = 1,nzp-1
         if(npartprof(k) > 0) then
           npartprof(k) = npartprof(k) / (nstatsamp)
@@ -1354,7 +1355,7 @@ contains
           wprof(k)     = wprof(k)     / (nstatsamp * npartprof(k))
           u2prof(k)    = u2prof(k)    / (nstatsamp * npartprof(k)) - (uprof(k)-umean)**2.
           v2prof(k)    = v2prof(k)    / (nstatsamp * npartprof(k)) - (vprof(k)-vmean)**2.
-          w2prof(k)    = w2prof(k)    / (nstatsamp * npartprof(k)) - wprof(k)**2. 
+          w2prof(k)    = w2prof(k)    / (nstatsamp * npartprof(k)) - wprof(k)**2.
           tkeprof(k)   = 0.5 * (u2prof(k) + v2prof(k) + w2prof(k))
           ! scalars
           tprof(k)     = tprof(k)     / (nstatsamp * npartprof(k))
@@ -1367,7 +1368,7 @@ contains
             if(lfsloc) fsprof(k) = fsprof(k)   / (nstatsamp * npartprof(k))
           end if
         end if
-      end do      
+      end do
 
       ! Force lowest level (ghost cell below surface) to fillvalue
       npartprof(1)      = -32678
@@ -1376,7 +1377,7 @@ contains
       wprof(1)          = -32678
       u2prof(1)         = -32678
       v2prof(1)         = -32678
-      w2prof(1)         = -32678 
+      w2prof(1)         = -32678
       tkeprof(1)        = -32678
       tprof(1)          = -32678
       tvprof(1)         = -32678
@@ -1386,7 +1387,7 @@ contains
       if(lpartsgs) then
         sigma2prof(1)   = -32678
         fsprof(1)       = -32678
-      end if     
+      end if
 
       ! Force highest level (ghost cell above domain) to fillvalue
       npartprof(nzp)    = -32678
@@ -1405,7 +1406,7 @@ contains
       if(lpartsgs) then
         sigma2prof(nzp) = -32678
         fsprof(nzp)     = -32678
-      end if     
+      end if
 
       !if(myid==0) print*,'particles 1-2-3-4:',npartprof(2),npartprof(3),npartprof(4),npartprof(5)
 
@@ -1473,7 +1474,7 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine rawparticledump : Quick'n'dirty binary particle dump per core 
+  ! subroutine rawparticledump : Quick'n'dirty binary particle dump per core
   !   to test performance versus NetCDF
   !--------------------------------------------------------------------------
   !
@@ -1538,7 +1539,7 @@ contains
     integer, allocatable, dimension(:,:) :: status_array
     integer, allocatable, dimension(:)   :: req
     real                                 :: thl,thv,rt,rl
-
+    if (.not. lpartic) return
     if(time >= tnextdump) then
 
       nvar = 4                             ! id,x,y,z
@@ -1625,7 +1626,7 @@ contains
       end do
 
       ! Non=blocking send and receive from/to each other proc
-      ! Find total #send/recv's for non-blocking send/recv request checking 
+      ! Find total #send/recv's for non-blocking send/recv request checking
       nsr = 0
       do p = 0, nprocs-1
         if(tosend(p)    .gt. 0) nsr = nsr + 1
@@ -1633,9 +1634,9 @@ contains
       end do
       ! Allocate status & request arrays
       allocate(status_array(mpi_status_size,nsr),req(nsr))
- 
-      ! Do send/receives 
-      isr = 1 
+
+      ! Do send/receives
+      isr = 1
       do p=0,nprocs-1
         if(tosend(p) .gt. 0) then
           start = sendbase(p)
@@ -1651,9 +1652,9 @@ contains
           start = receivebase(p)
           if(p .eq. nprocs-1) then
             end = size(recvbuff)
-          else 
+          else
             end = receivebase(p+1)-1
-          end if       
+          end if
           call mpi_irecv(recvbuff(start:end),toreceive(p)*nvar,mpi_double_precision,p,(p+1)*(myid+nprocs),mpi_comm_world,req(isr),ierror)
           isr = isr + 1
         end if
@@ -1672,7 +1673,7 @@ contains
         sb_sorted(loc,1) = recvbuff(ii+1)
         sb_sorted(loc,2) = recvbuff(ii+2)
         sb_sorted(loc,3) = recvbuff(ii+3)
-        nvl = 3 
+        nvl = 3
         if(lpartdumpui) then
           sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1) + umean
           sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2) + vmean
@@ -1733,7 +1734,7 @@ contains
       deallocate(status_array,req)
 
     end if
- 
+
   end subroutine balanced_particledump
 
 
@@ -1769,8 +1770,8 @@ contains
       end do
     end do
   end do
- 
-  if(myid==0) print*,'   divergence; max=',divmax, ', total=',divtot 
+
+  if(myid==0) print*,'   divergence; max=',divmax, ', total=',divtot
 
   end subroutine checkdiv
 
@@ -1799,7 +1800,7 @@ contains
   !
   !--------------------------------------------------------------------------
   ! function xi & random : creates component of white Gaussian noise (random
-  !   number from Gaussian distr.) using the Box-Müller algorithm   
+  !   number from Gaussian distr.) using the Box-Müller algorithm
   !--------------------------------------------------------------------------
   !
   function xi(idum)
@@ -1809,7 +1810,7 @@ contains
     real :: xi, fac, gset, rsq, v1, v2
     save iset, gset
     data iset /0/
-    
+
     rsq   = 0.
     v1    = 0.
     v2    = 0.
@@ -1834,7 +1835,7 @@ contains
   function random(idum)
     implicit none
     integer, parameter :: ntab = 32
-    integer (KIND=selected_int_kind(10)):: idum 
+    integer (KIND=selected_int_kind(10)):: idum
     integer (KIND=selected_int_kind(10)):: ia, im, iq, ir, iv(ntab), iy, ndiv, threshold=1
     real :: random, am, eps1, rnmx
 
@@ -1862,7 +1863,7 @@ contains
       end do
       iy = iv(1)
     end if
-    
+
     k      = idum / real(iq)
     idum   = ia * (idum - k * iq) - ir * k
     if (idum <= 0) idum = idum + im
@@ -1879,7 +1880,7 @@ contains
   !
   !--------------------------------------------------------------------------
   !
-  ! subroutine init_particles: initialize particles, reading initial position, 
+  ! subroutine init_particles: initialize particles, reading initial position,
   ! etc. Called from subroutine initialize (init.f90)
   !--------------------------------------------------------------------------
   !
@@ -1965,7 +1966,7 @@ contains
         tnextrand = 9e9
       end if
 
-    else                 
+    else
     ! ------------------------------------------------------
     ! Cold start -> load particle startpositions from txt
 
@@ -1980,7 +1981,7 @@ contains
         if(xstart < 0. .or. xstart > nxg*deltax .or. ystart < 0. .or. ystart > nyg*deltay .or. zstart < 0. .or. zstart > zm(nzp-1)) then
           if (myid == 0) print *, '  ABORTING: particle initialized outsize domain'
            call appl_abort(0)
-        else 
+        else
           if(floor(xstart / xsizelocal) == wrxid) then
             if(floor(ystart / ysizelocal) == wryid) then
               call add_particle(particle)
@@ -2051,7 +2052,7 @@ contains
     ipartstep       = 23
     nrpartvar       = ipartstep
 
-    ! 1D arrays for online statistics 
+    ! 1D arrays for online statistics
     if(lpartstat) then
       allocate(npartprof(nzp),npartprofl(nzp),     &
                    uprof(nzp),    uprofl(nzp),     &
@@ -2076,12 +2077,12 @@ contains
       v2prof         = 0.
       w2prof         = 0.
       tkeprof        = 0.
-      tprof          = 0. 
-      tvprof         = 0. 
-      rtprof         = 0. 
-      rlprof         = 0. 
-      ccprof         = 0. 
-      uprofl         = 0. 
+      tprof          = 0.
+      tvprof         = 0.
+      rtprof         = 0.
+      rlprof         = 0.
+      ccprof         = 0.
+      uprofl         = 0.
       vprofl         = 0.
       wprofl         = 0.
       u2profl        = 0.
@@ -2102,14 +2103,14 @@ contains
         fsprof       = 0.
         fsprofl      = 0.
       end if
-    end if  
+    end if
     close(ifinput)
 
     if(lpartsgs)  allocate(sgse(nzp,nxp,nyp),rese(nzp,nxp,nyp),fs_local(nzp,nxp,nyp),fs(nzp))
     call init_random_seed()
 
   end subroutine init_particles
-  
+
   !
   !--------------------------------------------------------------------------
   ! subroutine exit_particles
@@ -2142,6 +2143,8 @@ contains
     type (particle_record), pointer:: particle
     integer              :: iblank
 
+    if (.not. lpartic) return
+
     write(hname,'(i4.4,a1,i4.4)') wrxid,'_',wryid
     hname = trim(hname)//'.'//trim(filprf)//'.particles'
 
@@ -2150,9 +2153,9 @@ contains
        hname = trim(hname)//'.iflg'
     case(0)
        hname = trim(hname)//'.R'
-    case(1) 
+    case(1)
        hname = trim(hname)//'.rst'
-    case(2) 
+    case(2)
        iblank=index(hname,' ')
        write (hname(iblank:iblank+7),'(a1,i6.6,a1)') '.', int(time), 's'
     end select
@@ -2161,22 +2164,22 @@ contains
     write(666) np,tnextdump
     particle => head
     do while(associated(particle))
-      write(666) particle%unique, particle%tstart, particle%partstep, & 
-        particle%x, particle%xstart, particle%ures, particle%ures_prev, & 
-        particle%y, particle%ystart, particle%vres, particle%vres_prev, & 
+      write(666) particle%unique, particle%tstart, particle%partstep, &
+        particle%x, particle%xstart, particle%ures, particle%ures_prev, &
+        particle%y, particle%ystart, particle%vres, particle%vres_prev, &
         particle%z, particle%zstart, particle%zprev, particle%wres, particle%wres_prev, &
         particle%usgs,      particle%vsgs,      particle%wsgs, &
         particle%usgs_prev, particle%vsgs_prev, particle%wsgs_prev, &
         particle%sigma2_sgs
       particle => particle%next
-    end do 
+    end do
     close(666)
 
   end subroutine write_particle_hist
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine initparticledump : creates NetCDF file for particle dump. 
+  ! subroutine initparticledump : creates NetCDF file for particle dump.
   !   Called from: init.f90
   !--------------------------------------------------------------------------
   !
@@ -2195,10 +2198,12 @@ contains
     integer, parameter                :: precis = 0
     character (len=80)                :: hname
 
+    if (.not. lpartic) return
+
     nlocal = floor(real(np) / (nxprocs*nyprocs))
     if(myid .eq. nxprocs*nyprocs-1) then
       nlocal = np - (nxprocs*nyprocs-1) * nlocal
-    end if 
+    end if
 
     allocate(dimvalues(nlocal,2))
 
@@ -2209,7 +2214,7 @@ contains
 
     dimname(1)     = 'particles'
     dimlongname(1) = 'ID of particle'
-    dimunit(1)     = '-'    
+    dimunit(1)     = '-'
     dimsize(1)     = nlocal
     dimname(2)     = tname
     dimlongname(2) = tlongname
@@ -2218,7 +2223,7 @@ contains
 
     write(hname,'(i4.4,i4.4)') wrxid,wryid
     hname = trim(filprf)//'.particles.'//trim(hname)//'.nc'
- 
+
     call open_nc(hname, ncpartid, ncpartrec, time, .false.)
     call addvar_nc(ncpartid,'x','x-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
     call addvar_nc(ncpartid,'y','y-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
@@ -2241,13 +2246,13 @@ contains
       call addvar_nc(ncpartid,'rt','total water mixing ratio','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
       call addvar_nc(ncpartid,'rl','liquid water mixing ratio','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
     end if
- 
+
   end subroutine initparticledump
 
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine initparticlestat : creates NetCDF file for particle statistics. 
+  ! subroutine initparticlestat : creates NetCDF file for particle statistics.
   !   Called from: init.f90
   !--------------------------------------------------------------------------
   !
@@ -2263,6 +2268,8 @@ contains
     real, allocatable, dimension(:,:) :: dimvalues
     integer, dimension(2)             :: dimsize
 
+    if (.not. lpartic) return
+
     allocate(dimvalues(nzp,2))
     dimvalues = 0
     dimvalues(1:nzp,1)  = zt(1:nzp)
@@ -2275,7 +2282,7 @@ contains
     dimlongname(2) = tlongname
     dimunit(2)     = tunit
     dimsize(2)     = 0
- 
+
     if(myid == 0) then
       call open_nc(trim(filprf)//'.particlestat.nc', ncpartstatid, ncpartstatrec, time, .false.)
       call addvar_nc(ncpartstatid,'np','Number of particles','-',dimname,dimlongname,dimunit,dimsize,dimvalues)
@@ -2295,8 +2302,8 @@ contains
         call addvar_nc(ncpartstatid,'fs','fraction subgrid TKE','-',dimname,dimlongname,dimunit,dimsize,dimvalues)
         call addvar_nc(ncpartstatid,'sgstke','subgrid TKE of particle','m s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
       end if
-    end if 
- 
+    end if
+
   end subroutine initparticlestat
 
   !
@@ -2308,7 +2315,8 @@ contains
   subroutine exitparticledump
     use modnetcdf,       only : close_nc
     implicit none
-    call close_nc(ncpartid)     
+    if (.not. lpartic) return
+    call close_nc(ncpartid)
   end subroutine exitparticledump
 
   !
@@ -2320,7 +2328,8 @@ contains
   subroutine exitparticlestat
     use modnetcdf,       only : close_nc
     implicit none
-    call close_nc(ncpartstatid)     
+    if (.not. lpartic) return
+    call close_nc(ncpartstatid)
   end subroutine exitparticlestat
 
   !
@@ -2329,12 +2338,12 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine add_particle(ptr)
-    implicit none                                         
-                                   
+    implicit none
+
     TYPE (particle_record), POINTER:: ptr
     TYPE (particle_record), POINTER:: new_p
 
-    if( .not. associated(head) ) then 
+    if( .not. associated(head) ) then
       allocate(head)
       tail => head
       nullify(head%prev)
@@ -2404,13 +2413,13 @@ contains
   subroutine init_random_seed()
     integer :: i, n, clock
     integer, dimension(:), allocatable :: seed
- 
+
     call random_seed(size = n)
     allocate(seed(n))
     call system_clock(count=clock)
     seed = clock + 37 * (/ (i - 1, i = 1, n) /)
     call random_seed(put = seed)
- 
+
     deallocate(seed)
   end subroutine init_random_seed
 
@@ -2419,7 +2428,7 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine initparticledump : creates NetCDF file for particle dump. 
+  ! subroutine initparticledump : creates NetCDF file for particle dump.
   !   Called from: init.f90
   !--------------------------------------------------------------------------
   !
@@ -2446,13 +2455,13 @@ contains
 
   !  dimname(1)     = 'particles'
   !  dimlongname(1) = 'ID of particle'
-  !  dimunit(1)     = '-'    
+  !  dimunit(1)     = '-'
   !  dimsize(1)     = np
   !  dimname(2)     = tname
   !  dimlongname(2) = tlongname
   !  dimunit(2)     = tunit
   !  dimsize(2)     = 0
- 
+
   !  if(myid == 0) then
   !    call open_nc(trim(filprf)//'.particles.nc', ncpartid, ncpartrec, time, .false.)
   !    call addvar_nc(ncpartid,'x','x-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
@@ -2476,8 +2485,8 @@ contains
   !      call addvar_nc(ncpartid,'rt','total water mixing ratio','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
   !      call addvar_nc(ncpartid,'rl','liquid water mixing ratio','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
   !    end if
-  !  end if 
- 
+  !  end if
+
   !end subroutine initparticledump
 
   !
@@ -2593,13 +2602,13 @@ contains
   !        particles_merged(partid,nvl+1) = rt
   !        particles_merged(partid,nvl+2) = rl
   !      end if
-  !      ii = ii + nvar 
-  !    end do 
+  !      ii = ii + nvar
+  !    end do
 
   !    ! Add remote particles
   !    do pid = 1,(nxprocs*nyprocs)-1
   !      allocate(recvbuff(nremote(pid)*nvar))
-  !      call mpi_recv(recvbuff,nremote(pid)*nvar,mpi_double_precision,pid,pid,mpi_comm_world,status,ierror)   
+  !      call mpi_recv(recvbuff,nremote(pid)*nvar,mpi_double_precision,pid,pid,mpi_comm_world,status,ierror)
   !      ii = 1
   !      do i=1,nremote(pid)
   !        partid = int(recvbuff(ii))
@@ -2628,8 +2637,8 @@ contains
   !          particles_merged(partid,nvl+1) = recvbuff(ii+nvl+1)
   !          particles_merged(partid,nvl+2) = recvbuff(ii+nvl+2)
   !        end if
-  !        ii = ii + nvar 
-  !      end do 
+  !        ii = ii + nvar
+  !      end do
   !      deallocate(recvbuff)
   !    end do
 
@@ -2668,19 +2677,19 @@ contains
   !      call writevar_nc(ncpartid,'rl',particles_merged(:,nvl+2),ncpartrec)
   !    end if
   !  end if
-  !  
+  !
   !  if(myid==0) deallocate(particles_merged)
   !  deallocate(nremote, sendbuff)
- 
+
   !end subroutine particledump
 
   !
   !--------------------------------------------------------------------------
-  ! Subroutine randomize 
+  ! Subroutine randomize
   !
   !> !!!! DEPRECATED !!!!!
   !
-  !> Randomizes the X,Y,Z positions of all particles in 
+  !> Randomizes the X,Y,Z positions of all particles in
   !> the lowest grid level every RK3 cycle. Called from: particles()
   !--------------------------------------------------------------------------
   !
@@ -2688,21 +2697,21 @@ contains
   !  use mpi_interface, only : nxg, nyg, nyprocs, nxprocs
   !  implicit none
 
-  !  logical, intent(in) :: once            !> flag: randomize all particles (false) or only the onces which sink into the surface layer (true)?  
+  !  logical, intent(in) :: once            !> flag: randomize all particles (false) or only the onces which sink into the surface layer (true)?
   !  real                :: zmax = 1.       ! Max height in grid coordinates
-  !  integer             :: nyloc, nxloc 
+  !  integer             :: nyloc, nxloc
   !  type (particle_record), pointer:: particle
   !  real                :: randnr(3)
 
   !  nyloc   = nyg / nyprocs
   !  nxloc   = nxg / nxprocs
 
-  !  if(once) then 
+  !  if(once) then
   !    particle => head
   !    do while(associated(particle) )
   !      if( particle%z <= (1. + zmax) .and. particle%zprev > (1. + zmax) ) then
   !        call random_number(randnr)
-  !        particle%x = (randnr(1) * nyloc) + 3 
+  !        particle%x = (randnr(1) * nyloc) + 3
   !        particle%y = (randnr(2) * nxloc) + 3
   !        !particle%z = zmax * randnr(3)    + 1
   !        particle%ures_prev = 0.
@@ -2710,20 +2719,20 @@ contains
   !        particle%wres_prev = 0.
   !      end if
   !      particle => particle%next
-  !    end do 
+  !    end do
   !  else
   !    particle => head
   !    do while(associated(particle) )
   !      if( particle%z <= (1. + zmax) ) then
   !        call random_number(randnr)
-  !        particle%x = (randnr(1) * nyloc) + 3 
+  !        particle%x = (randnr(1) * nyloc) + 3
   !        particle%y = (randnr(2) * nxloc) + 3
-  !        !particle%z = zmax * randnr(3)    + 1 
+  !        !particle%z = zmax * randnr(3)    + 1
   !      end if
   !      particle => particle%next
-  !    end do 
-  !  end if 
- 
+  !    end do
+  !  end if
+
   !end subroutine randomize
 
 end module modparticles
