@@ -1,4 +1,4 @@
-set (ENV{NETCDF_ROOT} /sw/squeeze-x64/netcdf-latest-static-intel12)
+set (ENV{NETCDF_ROOT} /sw/squeeze-x64/netcdf-latest-static-intel11)
 set (ENV{HDF5_ROOT} /sw/squeeze-x64/hdf5-1.8.7-static)
 set (ENV{FFTW_ROOT} /sw/squeeze-x64/fftw-3.2.1)
 set (NETCDF_USE_STATIC_LIBRARIES TRUE)
