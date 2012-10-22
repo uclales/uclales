@@ -21,11 +21,11 @@ program ucla_les
 
   implicit none
 
-  real :: t1, t2 
+  real :: t1, t2
 
-  call cpu_time(t1) 
+  call cpu_time(t1)
   call driver
-  call cpu_time(t2) 
+  call cpu_time(t2)
 
   print "(/,' ',49('-')/,' ',A16,F10.1,' s')", '  Execution time: ', t2-t1
   stop ' ..... Normal termination'
@@ -78,17 +78,18 @@ contains
     use util, only : fftinix,fftiniy
     use defs, only : SolarConstant
     use sgsm, only : csx, prndtl, clouddiff
+    use advf, only : lmtr
     !irina
     use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon,lhomflx
     !use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon, sst
     use step, only : timmax, timrsm, istpfl, corflg, outflg, frqanl, frqhis,          &
-         frqcross , strtim, radfrq, cntlat,& 
+         frqcross , strtim, radfrq, cntlat,&
          case_name,lsvarflg, sst, div, wctime , tau                  !irina
-!cgils         
+!cgils
     use modnetcdf, only : lsync, deflate_level
     use ncio, only : deflev => deflate_level
     use modcross, only : lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars
-    use forc, only : lstendflg, sfc_albedo     
+    use forc, only : lstendflg, sfc_albedo
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
          filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype, CCN, lwaterbudget, lcouvreux
@@ -128,9 +129,9 @@ contains
          hs     , ps     , ts    ,  & ! sounding heights, pressure, temperature
          us     , vs     , rts   ,  & ! sounding E/W winds, water vapor
          umean  , vmean  , th00  ,  & ! gallilean E/W wind, basic state
-         case_name,                 & !irina:name of the case, i.e. astex, rico, etc  
-         lsvarflg,                  & !irina:flag for time bvarying large scale forcing  
-         lstendflg,                  & !irina:flag for time large scale advective tendencies  
+         case_name, lmtr,           & !irina:name of the case, i.e. astex, rico, etc
+         lsvarflg,                  & !irina:flag for time bvarying large scale forcing
+         lstendflg,                  & !irina:flag for time large scale advective tendencies
          div,  &                       !irina: divergence
          lnudge, tnudgefac, ltimedep, &             !thijs: Nudging
          SolarConstant, & ! SolarConstant (In case of prescribed TOA radiation
@@ -138,18 +139,18 @@ contains
          lwaterbudget, &                 ! axel: flag for liquid water budget diagnostics (only level=3)
          lcouvreux , tau , &                    ! The Couvreux 'radioactive' scalar
          deflate_level , lhomflx,lhomrestart, &                         !Compression of the crosssections
-         clouddiff, &                         
+         clouddiff, &
          lpartic,lpartsgs,lrandsurf,lpartstat,lpartdump,lpartdumpui,lpartdumpth,lpartdumpmr,frqpartdump           ! Particles
 
 
-         
+
     deflev = deflate_level
     ps       = 0.
     ts       = th00
     !
-    ! these are for initializing the temp variables used in ffts in x and y 
+    ! these are for initializing the temp variables used in ffts in x and y
     ! directions.
-    ! 
+    !
       fftinix=1
       fftiniy=1
     !
@@ -177,12 +178,12 @@ contains
           if (myid == 0) print *, '  ABORTING: min(nxp,nyp) must be > 4.'
           call appl_abort(0)
        endif
-       
+
        if (nzp < 3 ) then
           if (myid == 0) print *, '  ABORTING: nzp must be > 2 '
           call appl_abort(0)
        endif
-       
+
        if (cntlat < -90. .or. cntlat > 90.) then
           if (myid == 0) print *, '  ABORTING: central latitude out of bounds.'
           call appl_abort(0)
