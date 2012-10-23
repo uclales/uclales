@@ -307,11 +307,11 @@ contains
 
     !Malte: allocate variables for homogeneous fluxes (no lsm used)
     if (isfctyp == 0) then
-       allocate(shls(2883))
-       allocate(lhls(2883))
-       allocate(usls(2883))
-       allocate(timels(2883))
-       memsize = memsize + 4*2883
+       allocate(shls(1740))
+       allocate(lhls(1740))
+       allocate(usls(1740))
+       allocate(timels(1740))
+       memsize = memsize + 4*1740
     end if
     !End Malte
 

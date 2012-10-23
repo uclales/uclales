@@ -287,7 +287,7 @@ contains
             tcnt = 1
             tfrac = 0.
          else
-            do l=1,2883
+            do l=1,1740
                if ( (times .ge. timels(l)) .and. (times .lt. timels(l+1)) ) then
                  tcnt = l
                  go to 10

@@ -33,6 +33,9 @@ module lsmdata
 
   ! Surface heterogeneity variables
   integer           :: hetper = 1         !<  Set number of heterogeneity periods in the domain
+  integer           :: hetlen             !<  Length of a patch [number of grid cells]
+  integer           :: xhet               !<  Loop variable for patch in x-dir
+  integer           :: yhet               !<  Loop variable for patch in y-dir
 
   real              :: lambdasat          !<  heat conductivity saturated soil [W/m/K]
   real              :: Ke                 !<  Kersten number [-]
@@ -373,52 +376,38 @@ module lsmdata
     ! std:    LAI=4. albedo=0.20 z0mav=0.035 z0hav=0.035
     ! grass:  LAI=2. albedo=0.25 z0mav=0.035 z0hav=0.035
     ! forest: LAI=6. albedo=0.15 z0mav=0.500 z0hav=0.500
+    ! hetper sets the number of heterogeneity periods in the domain
+    ! hetper*2 is the number of patches in x or y direction
     
     if (hetero) then
-     
-    !Set heterogeneity periods in the domain (hetper)
-    if (hetper==1) then
-       LAIG( 3:(nxpg-2)/2,                       3:(nypg-2)/2 ) = 2.
-       LAIG( 3:(nxpg-2)/2,                (nypg-2)/2:(nypg-2) ) = 6.
-       LAIG( (nxpg-2)/2:(nxpg-2),                3:(nypg-2)/2 ) = 6.
-       LAIG( (nxpg-2)/2:(nxpg-2),         (nypg-2)/2:(nypg-2) ) = 2.
+       hetlen = nxpg/(2*hetper)
 
-    else if (hetper==2) then
-       LAIG( 3:(nxpg-2)/4,                       3:(nypg-2)/4 ) = 2.
-       LAIG( 3:(nxpg-2)/4,              (nypg-2)/4:(nypg-2)/2 ) = 6.
-       LAIG( 3:(nxpg-2)/4,            (nypg-2)/2:(nypg-2)*3/4 ) = 2.
-       LAIG( 3:(nxpg-2)/4,              (nypg-2)*3/4:(nypg-2) ) = 6.
+       do yhet=0,(hetper*2)
+          do xhet=0,(hetper*2) 
 
-       LAIG( (nxpg-2)/4:(nxpg-2)/2,              3:(nypg-2)/4 ) = 6.
-       LAIG( (nxpg-2)/4:(nxpg-2)/2,     (nypg-2)/4:(nypg-2)/2 ) = 2.
-       LAIG( (nxpg-2)/4:(nxpg-2)/2,   (nypg-2)/2:(nypg-2)*3/4 ) = 6.
-       LAIG( (nxpg-2)/4:(nxpg-2)/2,     (nypg-2)*3/4:(nypg-2) ) = 2.
+             if (mod(yhet,2) .eq. 0) then 
+                if (mod(xhet,2) .eq. 0) then
+                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = 2.
+                else if (mod(xhet,2) .ne. 0) then
+                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = 6.
+                end if
+             end if              
 
-       LAIG( (nxpg-2)/2:(nxpg-2)*3/4,            3:(nypg-2)/4 ) = 2.
-       LAIG( (nxpg-2)/2:(nxpg-2)*3/4,   (nypg-2)/4:(nypg-2)/2 ) = 6.
-       LAIG( (nxpg-2)/2:(nxpg-2)*3/4, (nypg-2)/2:(nypg-2)*3/4 ) = 2.
-       LAIG( (nxpg-2)/2:(nxpg-2)*3/4,   (nypg-2)*3/4:(nypg-2) ) = 6.
+             if (mod(yhet,2) .ne. 0) then
+                if (mod(xhet,2) .eq. 0) then
+                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = 6.
+                else if (mod(xhet,2) .ne. 0) then
+                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = 2.
+                end if 
+             end if   
 
-       LAIG( (nxpg-2)*3/4:(nxpg-2),              3:(nypg-2)/4 ) = 6.
-       LAIG( (nxpg-2)*3/4:(nxpg-2),     (nypg-2)/4:(nypg-2)/2 ) = 2.
-       LAIG( (nxpg-2)*3/4:(nxpg-2),   (nypg-2)/2:(nypg-2)*3/4 ) = 6.
-       LAIG( (nxpg-2)*3/4:(nxpg-2),     (nypg-2)*3/4:(nypg-2) ) = 2.
+          end do
+       end do
+
     end if
-
-    !print*,"CHECK INPUT:::"
-    !print*,LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
-    !            3+yoffset(wryid):nyp+yoffset(wryid)-2 )
-    !print*,"myid:",myid,"xoffset:",xoffset(wrxid)
-    !print*,"myid:",myid,"yoffset:",yoffset(wrxid)
 
     LAI(3:(nxp-2),3:(nyp-2)) = LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
                                3+yoffset(wryid):nyp+yoffset(wryid)-2 )
-
-    !print*,"CHECK OUTPUT:::"
-    !print*,"myid:",myid,"LAIG:",LAIG(3,:)
-    !print*,"myid:",myid,"LAI:",LAI(3,:)
-
-    end if 
 
     deallocate(LAIG)
 
