@@ -19,6 +19,7 @@ $(LES_ARC)(rad_d4strm.o) \
 $(LES_ARC)(rad_driver.o) \
 $(LES_ARC)(grid.o)   \
 $(LES_ARC)(util.o)   \
+$(LES_ARC)(particles.o)   \
 $(LES_ARC)(thrm.o)   \
 $(LES_ARC)(rad_gcss.o)   \
 $(LES_ARC)(modnetcdf.o)   \
