@@ -22,7 +22,8 @@
 !! Eulerian LES grid.
 !>
 !! \author Bart van Stratum
-!! \todo
+!! \todo Merge interpolation functions!
+!! \todo Extend Lagrange interpolation to non-equidistant grids
 
 
 module modparticles
@@ -42,6 +43,7 @@ module modparticles
   logical            :: lpartdumpth    = .false.        !< Switch for writing temperatures (liquid water / virtual potential T) to dump
   logical            :: lpartdumpmr    = .false.        !< Switch for writing moisture (total / liquid (+rain if level==3) water mixing ratio) to dump
   real               :: frqpartdump    =  3600          !< Time interval for particle dump
+  integer            :: int_part       =  3             !< Interpolation scheme, 1=linear, 3=3rd order Lagrange
 
   character(30)      :: startfile
   integer            :: ifinput        = 1
@@ -107,6 +109,10 @@ module modparticles
   logical                             :: lfsloc = .false.  ! Local or global calculated fs()
   logical                             :: fixedfs = .true.  ! Fix fs at 1.
 
+  ! Interpolation
+  real, dimension(4,4)                :: t2t
+  real, dimension(4)                  :: t2o
+
 contains
   !
   !--------------------------------------------------------------------------
@@ -124,6 +130,8 @@ contains
     real, intent(in)               :: time          !< time of simulation, determines the timing of particle dumps to NetCDF
     real, intent(in)               :: timmax        !< end of simulation, required to write particle dump at last timestep
     type (particle_record), pointer:: particle
+    real :: u1,u2
+
 
     if (lpartsgs .and. nstep == 1) then
       call calc_sgstke                ! Estimates SGS-TKE
@@ -150,6 +158,13 @@ contains
           particle%ures = ui3d(particle%x,particle%y,particle%z) * dxi
           particle%vres = vi3d(particle%x,particle%y,particle%z) * dyi
           particle%wres = wi3d(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
+
+          !int_part = 1
+          !u1 = wi3d(particle%x,particle%y,particle%z)
+          !int_part = 3
+          !u2 = wi3d(particle%x,particle%y,particle%z)
+          !print*,particle%z,u1,u2
+
           if (lpartsgs .and. nstep == 1) then
             call prep_sgs(particle)
             particle%usgs   = usgs(particle) * dxi
@@ -728,6 +743,27 @@ contains
 
   !
   !--------------------------------------------------------------------------
+  ! Function la3rd
+  !> Performs a 3rd order Lagrangian interpolation
+  !> CAUTION: for now only for equidistant grid! 
+  !--------------------------------------------------------------------------
+  !
+  function la3rd(arr_in,delta)
+    real                           :: la3rd
+    real, dimension(:), intent(in) :: arr_in 
+    real, intent(in)               :: delta
+    real, parameter                :: c1 = 1./6.
+    real, parameter                :: c2 = 1./2.
+
+    la3rd = -arr_in(1) * c1 * delta      * (1.-delta) * (1.+(1.-delta)) + &
+             arr_in(2) * c2 * (1.+delta) * (1.-delta) * (1.+(1.-delta)) + &
+             arr_in(3) * c2 * (1.+delta) * delta      * (1.+(1.-delta)) - &
+             arr_in(4) * c1 * (1.+delta) * delta      * (1.-delta) 
+
+  end function la3rd
+
+  !
+  !--------------------------------------------------------------------------
   ! Function ui3d
   !> Performs a trilinear interpolation from the Eulerian grid to the
   !> particle position.
@@ -737,7 +773,7 @@ contains
     use grid, only : a_up, dzi_m, dzi_t, zt, zm
     implicit none
     real, intent(in) :: x, y, z                               !< local x,y,z position in grid coordinates
-    integer          :: xbottom, ybottom, zbottom
+    integer          :: xbottom, ybottom, zbottom, i,j,k,kstart=1
     real             :: ui3d, deltax, deltay, deltaz, sign
 
     xbottom = floor(x) - 1
@@ -745,24 +781,67 @@ contains
     zbottom = floor(z + 0.5)
     deltax = x - 1   - xbottom
     deltay = y - 0.5 - ybottom
-
-    ! u(1,:,:) == u(2,:,:) with zt(1) = - zt(2). By multiplying u(1,:,:) with -1,
-    ! the velocity interpolates to 0 at the surface.
-    if (zbottom==1)  then
-      sign = -1
-    else
-      sign = 1
-    end if
-
     deltaz = ((zm(floor(z)) + (z - floor(z)) / dzi_t(floor(z))) - zt(zbottom)) * dzi_m(zbottom)
-    ui3d          =  (1-deltaz) * (1-deltay) * (1-deltax) * sign * a_up(zbottom    , xbottom    , ybottom    ) + &    !
-    &                (1-deltaz) * (1-deltay) * (  deltax) * sign * a_up(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
-    &                (1-deltaz) * (  deltay) * (1-deltax) * sign * a_up(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
-    &                (1-deltaz) * (  deltay) * (  deltax) * sign * a_up(zbottom    , xbottom + 1, ybottom + 1) + &    ! x+1,y+1
-    &                (  deltaz) * (1-deltay) * (1-deltax) *        a_up(zbottom + 1, xbottom    , ybottom    ) + &    ! z+1
-    &                (  deltaz) * (1-deltay) * (  deltax) *        a_up(zbottom + 1, xbottom + 1, ybottom    ) + &    ! x+1, z+1
-    &                (  deltaz) * (  deltay) * (1-deltax) *        a_up(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
-    &                (  deltaz) * (  deltay) * (  deltax) *        a_up(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
+
+    ! --------------
+    ! 3rd order (3D) Lagrangian interpolation
+    ! --------------
+    if(int_part .eq. 3) then 
+      t2t(:,:) = 0.
+      t2o(:)   = 0.
+
+      if(zbottom .eq. 1) then  ! Near surface, missing one ghost cell
+        kstart = 2
+      end if
+
+      ! Step 1: from 3d to 2d
+      do i=1,4
+        do k=kstart,4
+          t2t(k,i) = la3rd(a_up(zbottom+k-2,xbottom+i-2,ybottom-1:ybottom+2),deltay)
+        end do
+      end do
+     
+      ! Step 2: from 2d to 1d
+      do k=kstart,4
+        t2o(k) = la3rd(t2t(k,:),deltax)
+      end do
+
+      ! Mirror boundaries near surface
+      if(zbottom == 2) then
+        t2o(1) = -t2o(2)
+      else if(zbottom == 1) then
+        t2o(1) = -t2o(4)
+        t2o(2) = -t2o(3)
+      end if
+
+      ! Step 3: get velocity
+      ui3d = la3rd(t2o,deltaz)
+
+    ! --------------
+    ! Tri-linear interpolation
+    ! --------------
+    else if(int_part .eq. 1) then 
+
+      ! u(1,:,:) == u(2,:,:) with zt(1) = - zt(2). By multiplying u(1,:,:) with -1,
+      ! the velocity interpolates to 0 at the surface.
+      if (zbottom==1)  then
+        sign = -1
+      else
+        sign = 1
+      end if
+
+      deltaz = ((zm(floor(z)) + (z - floor(z)) / dzi_t(floor(z))) - zt(zbottom)) * dzi_m(zbottom)
+
+      ui3d          =  (1-deltaz) * (1-deltay) * (1-deltax) * sign * a_up(zbottom    , xbottom    , ybottom    ) + &    !
+      &                (1-deltaz) * (1-deltay) * (  deltax) * sign * a_up(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
+      &                (1-deltaz) * (  deltay) * (1-deltax) * sign * a_up(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
+      &                (1-deltaz) * (  deltay) * (  deltax) * sign * a_up(zbottom    , xbottom + 1, ybottom + 1) + &    ! x+1,y+1
+      &                (  deltaz) * (1-deltay) * (1-deltax) *        a_up(zbottom + 1, xbottom    , ybottom    ) + &    ! z+1
+      &                (  deltaz) * (1-deltay) * (  deltax) *        a_up(zbottom + 1, xbottom + 1, ybottom    ) + &    ! x+1, z+1
+      &                (  deltaz) * (  deltay) * (1-deltax) *        a_up(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
+      &                (  deltaz) * (  deltay) * (  deltax) *        a_up(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
+
+    end if
 
   end function ui3d
 
@@ -777,7 +856,7 @@ contains
     use grid, only : a_vp, dzi_m, dzi_t, zt, zm
     implicit none
     real, intent(in) :: x, y, z                               !< local x,y,z position in grid coordinates
-    integer          :: xbottom, ybottom, zbottom
+    integer          :: xbottom, ybottom, zbottom, i,j,k,kstart=1
     real             :: vi3d, deltax, deltay, deltaz, sign
 
     xbottom = floor(x - 0.5)
@@ -785,24 +864,65 @@ contains
     zbottom = floor(z + 0.5)
     deltax = x - 0.5 - xbottom
     deltay = y - 1   - ybottom
-
-    ! v(1,:,:) == v(2,:,:) with zt(1) = - zt(2). By multiplying v(1,:,:) with -1,
-    ! the velocity interpolates to 0 at the surface.
-    if (zbottom==1)  then
-      sign = -1
-    else
-      sign = 1
-    end if
-
     deltaz = ((zm(floor(z)) + (z - floor(z)) / dzi_t(floor(z))) - zt(zbottom)) * dzi_m(zbottom)
-    vi3d          =  (1-deltaz) * (1-deltay) * (1-deltax) * sign * a_vp(zbottom    , xbottom    , ybottom    ) + &    !
-    &                (1-deltaz) * (1-deltay) * (  deltax) * sign * a_vp(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
-    &                (1-deltaz) * (  deltay) * (1-deltax) * sign * a_vp(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
-    &                (1-deltaz) * (  deltay) * (  deltax) * sign * a_vp(zbottom    , xbottom + 1, ybottom + 1) + &    ! x+1,y+1
-    &                (  deltaz) * (1-deltay) * (1-deltax) *        a_vp(zbottom + 1, xbottom    , ybottom    ) + &    ! z+1
-    &                (  deltaz) * (1-deltay) * (  deltax) *        a_vp(zbottom + 1, xbottom + 1, ybottom    ) + &    ! x+1, z+1
-    &                (  deltaz) * (  deltay) * (1-deltax) *        a_vp(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
-    &                (  deltaz) * (  deltay) * (  deltax) *        a_vp(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
+
+    ! --------------
+    ! 3rd order (3D) Lagrangian interpolation
+    ! --------------
+    if(int_part .eq. 3) then 
+      t2t(:,:) = 0.
+      t2o(:)   = 0.
+
+      if(zbottom .eq. 1) then  ! Near surface, missing one ghost cell
+        kstart = 2
+      end if
+
+      ! Step 1: from 3d to 2d
+      do i=1,4
+        do k=kstart,4
+          t2t(k,i) = la3rd(a_vp(zbottom+k-2,xbottom+i-2,ybottom-1:ybottom+2),deltay)
+        end do
+      end do
+     
+      ! Step 2: from 2d to 1d
+      do k=kstart,4
+        t2o(k) = la3rd(t2t(k,:),deltax)
+      end do
+
+      ! Mirror boundaries near surface
+      if(zbottom == 2) then
+        t2o(1) = -t2o(2)
+      else if(zbottom == 1) then
+        t2o(1) = -t2o(4)
+        t2o(2) = -t2o(3)
+      end if
+
+      ! Step 3: get velocity
+      vi3d = la3rd(t2o,deltaz)
+
+    ! --------------
+    ! Tri-linear interpolation
+    ! --------------
+    else if(int_part .eq. 1) then 
+
+      ! v(1,:,:) == v(2,:,:) with zt(1) = - zt(2). By multiplying v(1,:,:) with -1,
+      ! the velocity interpolates to 0 at the surface.
+      if (zbottom==1)  then
+        sign = -1
+      else
+        sign = 1
+      end if
+
+      vi3d          =  (1-deltaz) * (1-deltay) * (1-deltax) * sign * a_vp(zbottom    , xbottom    , ybottom    ) + &    !
+      &                (1-deltaz) * (1-deltay) * (  deltax) * sign * a_vp(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
+      &                (1-deltaz) * (  deltay) * (1-deltax) * sign * a_vp(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
+      &                (1-deltaz) * (  deltay) * (  deltax) * sign * a_vp(zbottom    , xbottom + 1, ybottom + 1) + &    ! x+1,y+1
+      &                (  deltaz) * (1-deltay) * (1-deltax) *        a_vp(zbottom + 1, xbottom    , ybottom    ) + &    ! z+1
+      &                (  deltaz) * (1-deltay) * (  deltax) *        a_vp(zbottom + 1, xbottom + 1, ybottom    ) + &    ! x+1, z+1
+      &                (  deltaz) * (  deltay) * (1-deltax) *        a_vp(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
+      &                (  deltaz) * (  deltay) * (  deltax) *        a_vp(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
+
+    end if
 
   end function vi3d
 
@@ -817,7 +937,7 @@ contains
     use grid, only : a_wp, dzi_m, dzi_t, zt, zm
     implicit none
     real, intent(in) :: x, y, z                               !< local x,y,z position in grid coordinates
-    integer          :: xbottom, ybottom, zbottom
+    integer          :: xbottom, ybottom, zbottom, i,j,k,kstart=1
     real             :: wi3d, deltax, deltay, deltaz
 
     xbottom = floor(x - 0.5)
@@ -827,14 +947,53 @@ contains
     deltay = y - 0.5 - ybottom
     deltaz = z - zbottom
 
-    wi3d          =  (1-deltaz) * (1-deltay) * (1-deltax) *  a_wp(zbottom    , xbottom    , ybottom    ) + &    !
-    &                (1-deltaz) * (1-deltay) * (  deltax) *  a_wp(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
-    &                (1-deltaz) * (  deltay) * (1-deltax) *  a_wp(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
-    &                (1-deltaz) * (  deltay) * (  deltax) *  a_wp(zbottom    , xbottom + 1, ybottom + 1) + &    ! x+1,y+1
-    &                (  deltaz) * (1-deltay) * (1-deltax) *  a_wp(zbottom + 1, xbottom    , ybottom    ) + &    ! z+1
-    &                (  deltaz) * (1-deltay) * (  deltax) *  a_wp(zbottom + 1, xbottom + 1, ybottom    ) + &    ! x+1, z+1
-    &                (  deltaz) * (  deltay) * (1-deltax) *  a_wp(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
-    &                (  deltaz) * (  deltay) * (  deltax) *  a_wp(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
+    ! --------------
+    ! 3rd order (3D) Lagrangian interpolation
+    ! --------------
+    if(int_part .eq. 3) then 
+      t2t(:,:) = 0.
+      t2o(:)   = 0.
+
+      if(zbottom .eq. 1) then  ! Near surface, missing one ghost cell
+        kstart = 2
+      end if
+
+      ! Step 1: from 3d to 2d
+      do i=1,4
+        do k=kstart,4
+          t2t(k,i) = la3rd(a_wp(zbottom+k-2,xbottom+i-2,ybottom-1:ybottom+2),deltay)
+        end do
+      end do
+
+      ! Step 2: from 2d to 1d
+      do k=kstart,4
+        t2o(k) = la3rd(t2t(k,:),deltax)
+      end do
+
+      ! Mirror boundaries near surface
+      if(zbottom == 1) then
+        t2o(1) = -t2o(3)
+      end if
+
+      ! Step 3: get velocity
+      wi3d = la3rd(t2o,deltaz)
+
+
+    ! --------------
+    ! Tri-linear interpolation
+    ! --------------
+    else if(int_part .eq. 1) then 
+
+      wi3d          =  (1-deltaz) * (1-deltay) * (1-deltax) *  a_wp(zbottom    , xbottom    , ybottom    ) + &    !
+      &                (1-deltaz) * (1-deltay) * (  deltax) *  a_wp(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
+      &                (1-deltaz) * (  deltay) * (1-deltax) *  a_wp(zbottom    , xbottom    , ybottom + 1) + &    ! y+1
+      &                (1-deltaz) * (  deltay) * (  deltax) *  a_wp(zbottom    , xbottom + 1, ybottom + 1) + &    ! x+1,y+1
+      &                (  deltaz) * (1-deltay) * (1-deltax) *  a_wp(zbottom + 1, xbottom    , ybottom    ) + &    ! z+1
+      &                (  deltaz) * (1-deltay) * (  deltax) *  a_wp(zbottom + 1, xbottom + 1, ybottom    ) + &    ! x+1, z+1
+      &                (  deltaz) * (  deltay) * (1-deltax) *  a_wp(zbottom + 1, xbottom    , ybottom + 1) + &    ! y+1, z+1
+      &                (  deltaz) * (  deltay) * (  deltax) *  a_wp(zbottom + 1, xbottom + 1, ybottom + 1)        ! x+1,y+1,z+1
+
+    end if
 
   end function wi3d
 
@@ -2108,6 +2267,16 @@ contains
 
     if(lpartsgs)  allocate(sgse(nzp,nxp,nyp),rese(nzp,nxp,nyp),fs_local(nzp,nxp,nyp),fs(nzp))
     call init_random_seed()
+
+    ! Check interpolation option
+    if(int_part .eq. 1) then
+      print*,'Linear interpolation Lagrangian particles'
+    else if(int_part .eq. 3) then
+      print*,'3rd order Lagrange interpolation Lagrangian particles'
+    else
+      print*,'Invalid option interpolation Lagrangian particles, defaulting to linear'
+      int_part = 1
+    end if
 
   end subroutine init_particles
 
