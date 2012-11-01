@@ -106,12 +106,12 @@ contains
        !
 
        ! Sample particles; automatically samples when savgflg=.true., don't sample double...
-       if(lpartstat .and. statflg .and. (savgflg .eqv. .false.)) call particlestat(.false.,time+dt)
+       if(lpartic .and. lpartstat .and. statflg .and. (savgflg .eqv. .false.)) call particlestat(.false.,time+dt)
 
        if(savgflg) then
          if(myid==0) print*,'     profiles at time=',time
          call write_ps(nzp,dn0,u0,v0,zm,zt,time)
-         if (lpartstat) call particlestat(.true.,time)
+         if (lpartic .and. lpartstat) call particlestat(.true.,time)
        end if
 
        if (hisflg) then
@@ -261,10 +261,10 @@ contains
     if(mod(itime+idt,ifrqhis)     .eq. 0) then
       hisflg     = .true.
     end if
-    if(mod(itime+idt,ifrqcross)   .eq. 0) then
+    if((mod(itime+idt,ifrqcross)   .eq. 0) .and. lcross) then
       crossflg   = .true.
     end if
-    if(mod(itime+idt,ifrqlpdump)  .eq. 0) then
+    if((mod(itime+idt,ifrqlpdump)  .eq. 0) .and. lpartic .and. lpartdump) then
       lpdumpflg  = .true.
     end if
 

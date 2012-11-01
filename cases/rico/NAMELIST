@@ -1,6 +1,6 @@
  &model
-  nxp          = 68
-  nyp          = 68
+  nxp          = 36
+  nyp          = 36
   nzp          = 70
   nxpart       = .true.
   deltax       = 25.
@@ -14,8 +14,8 @@
   runtype      = 'INITIAL'
   filprf       = 'rico'
   hfilin       = 'rico.rst'
-  savg_intvl   = 900.
-  ssam_intvl   = 30.
+  savg_intvl   = 240.
+  ssam_intvl   = 120.
   frqhis       = 7200.
   frqanl       = 7200.
   level        = 3
@@ -39,7 +39,7 @@
   case_name    = 'rico'
   lsvarflg     = .false.
   div          = 0.00000000
-  lpartic      = .true.
+  lpartic      = .false.
   lpartsgs     = .false.
   lrandsurf    = .false.
   lpartstat    = .true.
@@ -47,5 +47,5 @@
   lpartdumpui  = .true.
   lpartdumpth  = .true.
   lpartdumpmr  = .true.
-  frqpartdump  = 90000.
+  frqpartdump  = 60.
  /
