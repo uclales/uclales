@@ -109,12 +109,12 @@ contains
        !
 
        ! Sample particles; automatically samples when savgflg=.true., don't sample double...
-       if(statflg .and. (savgflg .eqv. .false.)) call particlestat(.false.,time+dt)
+       if(statflg .and. (savgflg .eqv. .false.).and.lpartic) call particlestat(.false.,time+dt)
 
        if(savgflg) then
          if(myid==0) print*,'     profiles at time=',time
          call write_ps(nzp,dn0,u0,v0,zm,zt,time)
-         call particlestat(.true.,time)
+         if(lpartic) call particlestat(.true.,time)
        end if
 
        if (hisflg) then
@@ -135,7 +135,7 @@ contains
          call triggercross(time)
        end if
 
-       if (lpdumpflg) then
+       if (lpdumpflg.and.lpartic) then
          if(myid==0) print*,'     particle dump at time=',time
          call balanced_particledump(time)
        end if
