@@ -41,7 +41,7 @@ module modparticles
   logical            :: lpartdumpui    = .false.        !< Switch for writing velocities to dump
   logical            :: lpartdumpth    = .false.        !< Switch for writing temperatures (liquid water / virtual potential T) to dump
   logical            :: lpartdumpmr    = .false.        !< Switch for writing moisture (total / liquid (+rain if level==3) water mixing ratio) to dump
-  real               :: frqpartdump    =  3600          !< Time interval for particle dump
+  real               :: frqpartdump    =  100000          !< Time interval for particle dump
 
   character(30)      :: startfile
   integer            :: ifinput        = 1
@@ -302,12 +302,13 @@ contains
   !
   subroutine calc_restke
     use grid, only              : nzp, a_up, a_vp, a_wp, nxp, nyp
-    use mpi_interface, only     : ierror, mpi_double_precision, mpi_sum, mpi_comm_world, nxg, nyg
+    use mpi_interface, only     : mpi_double_precision, mpi_sum, mpi_comm_world, nxg, nyg
     implicit none
     
     integer                           :: i,j,k,ip,im,jp,jm,kp,km
     real, allocatable, dimension(:)   :: u_avl, v_avl, u_av, v_av
-   
+    integer                           :: ierror 
+ 
     allocate(u_avl(nzp),v_avl(nzp),u_av(nzp),v_av(nzp))
 
     do k=1,nzp
@@ -388,10 +389,11 @@ contains
   !
   subroutine fsubgrid
     use grid, only : a_up, a_vp, a_wp, nzp, nxp, nyp, dt, nstep, zt, nfpt
-    use mpi_interface, only : ierror, mpi_double_precision, mpi_sum, mpi_comm_world, nxg, nyg
+    use mpi_interface, only : mpi_double_precision, mpi_sum, mpi_comm_world, nxg, nyg
     implicit none
   
     integer    :: k
+    integer                           :: ierror 
     real, allocatable, dimension(:)   :: &
        u_avl, v_avl, u2_avl, v2_avl, w2_avl, sgse_avl,     &
        u_av,  v_av,  u2_av,  v2_av,  w2_av,  sgse_av, e_res
@@ -612,7 +614,7 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine globalrandomize()
-    use mpi_interface, only : nxg, nyg, nyprocs, nxprocs, mpi_integer, mpi_double_precision, mpi_sum, mpi_comm_world, ierror, wrxid, wryid, ranktable, mpi_status_size, myid
+    use mpi_interface, only : nxg, nyg, nyprocs, nxprocs, mpi_integer, mpi_double_precision, mpi_sum, mpi_comm_world, wrxid, wryid, ranktable, mpi_status_size, myid
     use grid, only : deltax, deltay
     implicit none
   
@@ -624,7 +626,8 @@ contains
     integer            :: nglobal, nlocal=0, ii, i
     real               :: xsizelocal,ysizelocal,tempx,tempy
     real               :: randnr(3)
-
+    integer            :: ierror
+  
     ! Count number of local particles < zmax
     particle => head
     do while(associated(particle) )
@@ -937,7 +940,7 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine partcomm
-    use mpi_interface, only : wrxid, wryid, ranktable, nxg, nyg, xcomm, ycomm, ierror, mpi_status_size, mpi_integer, mpi_double_precision, mpi_comm_world, nyprocs, nxprocs,myid
+    use mpi_interface, only : wrxid, wryid, ranktable, nxg, nyg, xcomm, ycomm, mpi_status_size, mpi_integer, mpi_double_precision, mpi_comm_world, nyprocs, nxprocs,myid
     implicit none
 
     type (particle_record), pointer:: particle,ptr
@@ -949,7 +952,8 @@ contains
     integer :: nton,ntos,ntoe,ntow
     integer :: nfrn,nfrs,nfre,nfrw
     integer :: nyloc, nxloc
-
+    integer :: ierror
+ 
     nton  = 0
     ntos  = 0
     ntoe  = 0
@@ -1281,7 +1285,7 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine particlestat(dowrite,time)
-    use mpi_interface, only : mpi_comm_world, myid, mpi_double_precision, mpi_sum, ierror, nxprocs, nyprocs, nxg, nyg
+    use mpi_interface, only : mpi_comm_world, myid, mpi_double_precision, mpi_sum, nxprocs, nyprocs, nxg, nyg
     use modnetcdf,     only : writevar_nc, fillvalue_double
     use grid,          only : tname,dxi,dyi,dzi_t,nzp,umean,vmean,nzp
     implicit none
@@ -1291,7 +1295,8 @@ contains
     integer                 :: k
     real                    :: thv,thl,rt,rl           ! From subroutine thermo
     type (particle_record), pointer:: particle
-
+    integer                 :: ierror
+ 
     ! Time averaging step
     if(.not. dowrite) then
       particle => head
@@ -1523,7 +1528,7 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine balanced_particledump(time)
-    use mpi_interface, only : mpi_comm_world, myid, mpi_integer, mpi_double_precision, ierror, nxprocs, nyprocs, mpi_status_size, wrxid, wryid, nxg, nyg, mpi_sum
+    use mpi_interface, only : mpi_comm_world, myid, mpi_integer, mpi_double_precision, nxprocs, nyprocs, mpi_status_size, wrxid, wryid, nxg, nyg, mpi_sum
     use grid,          only : tname, deltax, deltay, dzi_t, zm, umean, vmean
     use modnetcdf,     only : writevar_nc, fillvalue_double
     implicit none
@@ -1538,6 +1543,7 @@ contains
     integer, allocatable, dimension(:,:) :: status_array
     integer, allocatable, dimension(:)   :: req
     real                                 :: thl,thv,rt,rl
+    integer                              :: ierror
 
     if(time >= tnextdump) then
 
@@ -1884,7 +1890,7 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine init_particles(hot,hfilin)
-    use mpi_interface, only : wrxid, wryid, nxg, nyg, myid, nxprocs, nyprocs, appl_abort, ierror,mpi_double_precision,mpi_comm_world,mpi_min
+    use mpi_interface, only : wrxid, wryid, nxg, nyg, myid, nxprocs, nyprocs, appl_abort, mpi_double_precision,mpi_comm_world,mpi_min
     use grid, only : zm, deltax, deltay, zt,dzi_t, nzp, nxp, nyp
     use grid, only : a_up, a_vp, a_wp
 
@@ -1898,6 +1904,7 @@ contains
     integer  :: pstp,idot
     type (particle_record), pointer:: particle
     character (len=80) :: hname,prefix,suffix
+    integer  :: ierror
 
     xsizelocal = (nxg / nxprocs) * deltax
     ysizelocal = (nyg / nyprocs) * deltay
