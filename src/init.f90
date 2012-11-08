@@ -31,7 +31,7 @@ module init
 !  integer, dimension(1) :: seed
   real, dimension(nns)  :: us,vs,ts,thds,ps,hs,rts,rss,tks,xs,xsi
   real                  :: zrand = 200.
-  character  (len=80)   :: hfilin = 'test.'  
+  character  (len=80)   :: hfilin = 'test.'
   logical               :: lhomrestart = .false.
 
 contains
@@ -43,12 +43,13 @@ contains
   subroutine initialize
 !irina use lsvarflg
     use step, only : time, outflg,lsvarflg
-    use stat, only : init_stat
+    use stat, only : init_stat, write_ps, statistics
     use mpi_interface, only : appl_abort, myid
     use thrm, only : thermo
     use mcrp, only : initmcrp
     use modcross, only : initcross, triggercross
-    use modparticles, only: init_particles, lpartic, lpartdump, lpartstat, initparticledump, initparticlestat, write_particle_hist
+    use grid, only : nzp,dn0,u0,v0,zm,zt
+    use modparticles, only: init_particles, lpartic, lpartdump, lpartstat, initparticledump, initparticlestat, write_particle_hist, particlestat
 
     implicit none
 
@@ -77,7 +78,7 @@ contains
        if (lsvarflg) then
        call lsvar_init
        end if
-    !    
+    !
 
     if (lpartic) then
       if(runtype == 'INITIAL') then
@@ -90,7 +91,7 @@ contains
     end if
 
     ! write analysis and history files from restart if appropriate
-    ! 
+    !
     if (outflg) then
        if (runtype == 'INITIAL') then
           call write_hist(1, time)
@@ -100,11 +101,13 @@ contains
           call write_anal(time)
           call initcross(time, filprf)
           call triggercross(time)
+          call statistics (time)
+          call write_ps(nzp,dn0,u0,v0,zm,zt,time)
+          if(lpartic) call particlestat(.true.,time)
        else
           call init_anal(time+dt)
           call initcross(time, filprf)
           call thermo(level)
-          call triggercross(time)
           call write_hist(0, time)
           if(lpartic) call write_particle_hist(0,time)
        end if
@@ -115,7 +118,7 @@ contains
   !
   !----------------------------------------------------------------------
   ! FLDINIT: Initializeds 3D fields, mostly from 1D basic state
-  ! 
+  !
   subroutine fldinit
 
     use defs, only : alvl, cpr, cp, p00
@@ -190,7 +193,7 @@ contains
        xran(k) = 0.2*(zrand - zt(k))/zrand
        !xran(k) = 0.05*(zrand - zt(k))/zrand
     end do
-    call random_pert(nzp,nxp,nyp,zt,a_tp,xran,k) 
+    call random_pert(nzp,nxp,nyp,zt,a_tp,xran,k)
 
     if (associated(a_rp)) then
        k=1
@@ -199,10 +202,10 @@ contains
           xran(k) = 5.0e-5*(zrand - zt(k))/zrand
           !xran(k) = 1.0e-5*(zrand - zt(k))/zrand
        end do
-       call random_pert(nzp,nxp,nyp,zt,a_rp,xran,k) 
+       call random_pert(nzp,nxp,nyp,zt,a_rp,xran,k)
     end if
     call azero(nxyzp,a_wp)
-    !    
+    !
     ! initialize thermodynamic fields
     !
     call thermo (level)
@@ -212,7 +215,7 @@ contains
   end subroutine fldinit
   !----------------------------------------------------------------------
   ! SPONGE_INIT: Initializes variables for sponge layer
-  ! 
+  !
   subroutine sponge_init
 
     use mpi_interface, only: myid
@@ -293,9 +296,9 @@ contains
             end if
           else
             rts(ns) = rts(ns)*1.e-3
-          end if       
-       
-       
+          end if
+
+
        !
        ! filling pressure array:
        ! ipsflg = 0 :pressure in millibars
@@ -353,7 +356,7 @@ contains
           if (myid == 0) print *, '  ABORTING: itsflg not supported'
           call appl_abort(0)
        end select
-       
+
        do iterate1 = 1,1
          if (irsflg == 0) then
            rts(ns) = xs(ns)*rslf(ps(ns),tks(ns))
@@ -388,13 +391,13 @@ contains
             tks(ns)=xx
          case default
          end select
-         
+
        end do
        ns = ns+1
-      
+
     end do
     ns=ns-1
-!                                  
+!
     ! compute height levels of input sounding.
     !
     if (ipsflg == 0) then
@@ -438,7 +441,7 @@ contains
   !
   !----------------------------------------------------------------------
   ! BASIC_STATE: This routine computes the basic state values
-  ! of pressure, density, moisture and temperature.  The basi!state 
+  ! of pressure, density, moisture and temperature.  The basi!state
   ! temperature is assumed to be a the volume weighted average value of
   ! the sounding
   !
@@ -476,7 +479,7 @@ contains
     end if
     !
     ! calculate theta_v for an unsaturated layer, neglecting condensate here is
-    ! okay as this is only used for the first estimate of pi1, which will be 
+    ! okay as this is only used for the first estimate of pi1, which will be
     ! updated in a consistent manner on the first dynamic timestep
     !
     do k=1,nzp
@@ -503,7 +506,7 @@ contains
        v0(k)=v0(k)-vmean
     end do
     !
-    ! define pi1 as the difference between pi associated with th0 and pi 
+    ! define pi1 as the difference between pi associated with th0 and pi
     ! associated with th00, thus satisfying pi1+pi0 = pi = cp*(p/p00)**(R/cp)
     !
     do k=1,nzp
@@ -519,11 +522,11 @@ contains
          rt0(k) = 1e-2*x0(k)*rslf(v1db(k),exner*th0(k))
        end if
      end do
-   
+
     u0(1) = u0(2)
     v0(1) = v0(2)
     psrf  = ps(1)
-    
+
     if(myid == 0) write (*,fmt) (zt(k),u0(k),v0(k),dn0(k),v1da(k),v1db(k), &
          th0(k),v1dc(k),rt0(k)*1000.,k=1,nzp)
 
@@ -550,7 +553,7 @@ contains
              l=l+1
           end do
           wt=(zb(k)-za(l))/(za(l+1)-za(l))
-          xb(k)=xa(l)+(xa(l+1)-xa(l))*wt    
+          xb(k)=xa(l)+(xa(l+1)-xa(l))*wt
        else
           wt=(zb(k)-za(na))/(za(na-1)-za(na))
           xb(k)=xa(na)+(xa(na-1)-xa(na))*wt
@@ -607,9 +610,9 @@ contains
     seed = iseed * (/ (i, i = 1, n) /)
     call random_seed(put=seed)
     deallocate (seed)
-    ! seed must be a double precision odd whole number greater than 
+    ! seed must be a double precision odd whole number greater than
     ! or equal to 1.0 and less than 2**48.
-    !seed(1) = iseed        
+    !seed(1) = iseed
     !call random_seed(put=seed)
     n2g = nxpg
     n3g = nypg
@@ -655,27 +658,27 @@ contains
   !----------------------------------------------------------------------
   ! Lsvar_init if lsvarflg is true reads the lsvar forcing from the respective
   ! file lscale_in
-  ! 
+  !
   subroutine lsvar_init
 
    use forc,only   : t_ls,div_ls,sst_ls,ugeo_ls,vgeo_ls
 
     implicit none
-    
+
     ! reads the time varying lscale forcings
     !
     if (t_ls(2) == 0.) then
        open (1,file='lscale_in',status='old',form='formatted')
-         ! print *, 'lsvar_init read'                 
+         ! print *, 'lsvar_init read'
        do ns=1,nns
           read (1,*,end=100) t_ls(ns),div_ls(ns),sst_ls(ns),&
                              ugeo_ls(ns),vgeo_ls(ns)
-          !print *, t_ls(ns),div_ls(ns),sst_ls(ns), ugeo_ls(ns),vgeo_ls(ns)                 
+          !print *, t_ls(ns),div_ls(ns),sst_ls(ns), ugeo_ls(ns),vgeo_ls(ns)
        end do
        close (1)
     end if
 100 continue
- 
+
     return
   end subroutine lsvar_init
 
@@ -683,15 +686,15 @@ contains
   !----------------------------------------------------------------------
   ! Lstend_init if lstendflg is true reads the lstend  from the respective
   ! file lstend_in
-  ! 
+  !
   subroutine lstend_init
 
    use grid,only   : wfls,dqtdtls,dthldtls
     use mpi_interface, only : myid
-   
+
 
    implicit none
-   
+
    real     :: lowdthldtls,highdthldtls,lowdqtdtls,highdqtdtls,lowwfls,highwfls,highheight,lowheight,fac
    integer :: k
 
@@ -699,11 +702,11 @@ contains
     !
  !   print *, wfls
     if (wfls(2) == 0.) then
- !         print *, 'lstend_init '                 
+ !         print *, 'lstend_init '
         open (1,file='lstend_in',status='old',form='formatted')
         read (1,*,end=100) lowheight,lowwfls,lowdqtdtls,lowdthldtls
         read (1,*,end=100) highheight,highwfls,highdqtdtls,highdthldtls
-        if(myid == 0)  print *, 'lstend_init read'                 
+        if(myid == 0)  print *, 'lstend_init read'
         do  k=2,nzp-1
           if (highheight<zt(k)) then
             lowheight = highheight
@@ -721,7 +724,7 @@ contains
        close (1)
     end if
 100 continue
- 
+
     return
   end subroutine lstend_init
 
@@ -754,7 +757,7 @@ contains
        xran(k) = 0.2*(zrand - zt(k))/zrand
        !xran(k) = 0.05*(zrand - zt(k))/zrand
     end do
-    call random_pert(nzp,nxp,nyp,zt,a_tp,xran,k) 
+    call random_pert(nzp,nxp,nyp,zt,a_tp,xran,k)
 
     if (associated(a_rp)) then
        k=1
@@ -763,15 +766,15 @@ contains
           xran(k) = 5.0e-5*(zrand - zt(k))/zrand
           !xran(k) = 1.0e-5*(zrand - zt(k))/zrand
        end do
-       call random_pert(nzp,nxp,nyp,zt,a_rp,xran,k) 
+       call random_pert(nzp,nxp,nyp,zt,a_rp,xran,k)
     end if
     call azero(nxyzp,a_wp)
-    !    
+    !
     ! initialize thermodynamic fields
     !
     call thermo (level)
     call atob(nxyzp,a_pexnr,press)
-    
+
   end subroutine homogenize
 
   !

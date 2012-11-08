@@ -1,0 +1,6 @@
+set (ENV{NETCDF_ROOT} /sw/squeeze-x64/netcdf_fortran-4.2-static-intel12/ /sw/squeeze-x64/netcdf-4.2-static)
+set (HDF5_ROOT_DIR_HINT /sw/squeeze-x64/hdf5-1.8.8-static)
+# set (ENV{FFTW_ROOT} ENV{HOME})
+set (CMAKE_LIBRARY_PATH /usr/lib64)
+set (NETCDF_USE_STATIC_LIBRARIES TRUE)
+set (HDF5_USE_STATIC_LIBRARIES TRUE)

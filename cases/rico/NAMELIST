@@ -1,7 +1,7 @@
  &model
   nxp          = 36
   nyp          = 36
-  nzp          = 130
+  nzp          = 70
   nxpart       = .true.
   deltax       = 25.
   deltay       = 25.
@@ -9,15 +9,15 @@
   dzmax        = 10.
   dzrat        = 1.0
   dtlong       = 5.
-  timmax       = 100.
+  timmax       = 5400.
   wctime       = 99960. 
   runtype      = 'INITIAL'
   filprf       = 'rico'
   hfilin       = 'rico.rst'
-  savg_intvl   = 180.
-  ssam_intvl   = 60.
-  frqhis       = 3600.
-  frqanl       = 3600.
+  savg_intvl   = 240.
+  ssam_intvl   = 120.
+  frqhis       = 7200.
+  frqanl       = 7200.
   level        = 3
   CCN          = 70.e6
   corflg       = .true.
@@ -39,13 +39,13 @@
   case_name    = 'rico'
   lsvarflg     = .false.
   div          = 0.00000000
-  lpartic      = .true.
+  lpartic      = .false.
   lpartsgs     = .false.
-  lrandsurf    = .true.
+  lrandsurf    = .false.
   lpartstat    = .true.
   lpartdump    = .true.
   lpartdumpui  = .true.
   lpartdumpth  = .true.
   lpartdumpmr  = .true.
-  frqpartdump  = 10.
+  frqpartdump  = 60.
  /

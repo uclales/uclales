@@ -39,7 +39,7 @@ module step
   logical :: outflg = .true.
   logical :: statflg = .false.
   real    :: tau = 900.
-!irina  
+!irina
   real    :: sst=292.
   real    :: div = 3.75e-6
   logical :: lsvarflg = .false.
@@ -47,15 +47,18 @@ module step
 
   integer :: istp
 
+  ! Flags for sampling, statistics output, etc.
+  logical :: savgflg=.false.,anlflg=.false.,hisflg=.false.,crossflg=.false.,lpdumpflg=.false.
+
 contains
-  ! 
+  !
   ! ----------------------------------------------------------------------
   ! Subroutine model:  This is the main driver for the model's time
   ! integration.  It calls the routine tstep, which steps through the
   ! physical processes active on a time-step and updates variables.  It
   ! then checks to see whether or not different output options are
   ! satisfied.
-  ! 
+  !
   subroutine stepper
 
     use mpi_interface, only : myid, broadcast, double_scalar_par_max
@@ -65,34 +68,30 @@ contains
     use modcross, only : triggercross, exitcross, lcross
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
-    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, lpartstat, exitparticlestat, write_particle_hist, particlestat
+    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, lpartstat, exitparticlestat, write_particle_hist, particlestat, balanced_particledump,frqpartdump
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
     real    :: t1,t2,tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax
     integer :: iret
+
+    real    :: dt_prev
+
     !
     ! Timestep loop for program
     !
     begtime = time
-    istp = 0
-  !irina  
-  !  timrsm = timrsm + begtime
-   
-  ! print *, 'time timrsm',time, timrsm
-  !  timmax = min(timmax,timrsm)
-  ! print *, 'timmax',timmax
-    t2 = 0.
-    do while (time + 0.1*dt < timmax .and. t2 < wctime)
+    istp    = 0
+    t2      = 0.
+    do while (time < timmax .and. t2 < wctime)
        call cpu_time(t1)           !t1=timing()
+       istp = istp + 1
 
-       istp = istp+1
-       tplsdt = time + dt + 0.1*dt
-       statflg = (min(mod(tplsdt,ssam_intvl),mod(tplsdt,savg_intvl)) < dt  &
-            .or. tplsdt >= timmax .or. tplsdt < 2.*dt) 
+       call stathandling
+       if(myid .eq. 0 .and. statflg) print*,'     sampling stat at t=',time+dt
 
        call t_step
-       time  = time + dt
+       time = time + dt
 
        call cfl(cflmax)
        call double_scalar_par_max(cflmax,gcflmax)
@@ -100,80 +99,74 @@ contains
        call peclet(pecletmax)
        call double_scalar_par_max(pecletmax,gpecletmax)
        pecletmax = gpecletmax
+       dt_prev = dt
        dt = min(dtlong,dt*peak_cfl/(cflmax+epsilon(1.)))
        !
        ! output control
        !
-       if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) then
+
+       ! Sample particles; automatically samples when savgflg=.true., don't sample double...
+       if(lpartic .and. lpartstat .and. statflg .and. (savgflg .eqv. .false.)) call particlestat(.false.,time+dt)
+
+       if(savgflg) then
+         if(myid==0) print*,'     profiles at time=',time
          call write_ps(nzp,dn0,u0,v0,zm,zt,time)
-         if(lpartic .and. lpartstat) call particlestat(.true.,time)
+         if (lpartic .and. lpartstat) call particlestat(.true.,time)
        end if
 
-       if ((mod(tplsdt,frqhis) < dt .or. time >= timmax) .and. outflg) then
+       if (hisflg) then
+         if(myid==0) print*,'     history at time=',time
          call write_hist(2, time)
          if(lpartic) call write_particle_hist(2,time)
        end if
 
-       !irina     
+       if (anlflg) then
+         if(myid==0) print*,'     analysis at time=',time
+         call thermo(level)
+         call write_anal(time)
+       end if
+
+       if (crossflg) then
+         if(myid==0) print*,'     cross at time=',time
+         call thermo(level)
+         call triggercross(time)
+       end if
+
+       if (lpdumpflg) then
+         if(myid==0) print*,'     particle dump at time=',time
+         call balanced_particledump(time)
+       end if
+
+       statflg   = .false.
+       savgflg   = .false.
+       hisflg    = .false.
+       anlflg    = .false.
+       crossflg  = .false.
+       lpdumpflg = .false.
+
+       ! REMOVE THIS?
+       !irina
        !if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time>=timrsm .or. time==dt)   &
-       if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) then   
-         call write_hist(1, time)
-         if(lpartic) call write_particle_hist(1,time)
-       end if
-
-!irina more frequent outputs for certain hours in astex
-
-!       frqanl=3600.
-
-!       if (time>=7200 .and. time<=10800) then
-!       frqanl=300.
-!       end if
- 
-!       if (time>=25200 .and. time<=28800) then
-!       frqanl=300.
-!       end if
-
-!       if (time>=39600 .and. time<=43200) then
-!       frqanl=300.
-!       end if
-
-!       if (time>=68400 .and. time<=72000) then
-!       frqanl=300.
-!       end if
-
-!       if (time>=82800 .and. time<=86400) then
-!       frqanl=300.
-!       end if
-
-!       if (time>=126000 .and. time<=129600) then
-!       frqanl=300.
-!       end if
-
-       if ((mod(tplsdt,frqanl) < dt .or. time >= timmax) .and. outflg) then
-          call thermo(level)
-          call write_anal(time)
-       end if
-       if ((mod(tplsdt,frqcross) < dt .or. time >= timmax) .and. outflg) then
-          call thermo(level)
-          call triggercross(time)
-       end if
+       !if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) then
+       !  call write_hist(1, time)
+       !  if(lpartic) call write_particle_hist(1,time)
+       !end if
 
        if(myid == 0) then
           call cpu_time(t2)           !t1=timing()
           if (mod(istp,istpfl) == 0 ) then
               if (wctime.gt.1e9) then
                 print "('   Timestep # ',i5," //     &
-                       "'   Model time(sec)=',f10.2,3x,'CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2)",     &
-                       istp, time, t2-t1, t2*(timmax/time-1)
+                       "'   Model time(sec)=',f10.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2)",     &
+                       istp, time, dt_prev, t2-t1, t2*(timmax/time-1)
               else
                 print "('   Timestep # ',i5," //     &
-                       "'   Model time(sec)=',f10.2,3x,'CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2,'  WC Time left(sec) = ',f10.2)",     &
-                       istp, time, t2-t1, t2*(timmax/time-1),wctime-t2
+                       "'   Model time(sec)=',f10.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2,'  WC Time left(sec) = ',f10.2)",     &
+                       istp, time, dt_prev, t2-t1, t2*(timmax/time-1),wctime-t2
               end if
           end if
        endif
        call broadcast(t2, 0)
-        
     enddo
 
     call write_hist(1, time)
@@ -195,12 +188,98 @@ contains
     if (time.ge.timmax .and. myid == 0) write(*,*) '  Max simulation time timmax reached. Finished simulation successfully'
 
   end subroutine stepper
-  ! 
+
+  !
+  ! -------------------------------------------
+  ! subroutine stathandling: Event handling statistics and output.
+  ! Changed dt when nextevent-time < dt to nextevent-time to end
+  ! up exactly at the required sampling or output time
+  ! EXPERIMENTAL!! BvS, Sep2012
+  !
+  subroutine stathandling
+    use grid, only          : dt
+    use stat, only          : savg_intvl, ssam_intvl
+    use modcross, only      : lcross
+    use mpi_interface, only : myid
+    use modparticles, only  : lpartic,lpartdump,frqpartdump
+
+    integer, parameter  :: long   = selected_int_kind(18)
+    integer(kind=long)  :: itnssam=1e16,itnsavg=1e16,itnanl=1e16,itnhist=1e16,itncross=1e16,itnlpdump=1e16
+    integer(kind=long)  :: issam_intvl=1e16,isavg_intvl=1e16,ifrqanl=1e16,ifrqhis=1e16,ifrqcross=1e16,ifrqlpdump=1e16
+    integer(kind=long)  :: itime,idt
+    real, parameter     :: tres = 1e9
+
+    ! Switch to integer microseconds
+    issam_intvl  = int(ssam_intvl   *tres,long)
+    isavg_intvl  = int(savg_intvl   *tres,long)
+    ifrqanl      = int(frqanl       *tres,long)
+    ifrqhis      = int(frqhis       *tres,long)
+    ifrqcross    = int(frqcross     *tres,long)
+    ifrqlpdump   = int(frqpartdump  *tres,long)
+
+    itime        = int(time * tres,long)
+    idt          = int(dt   * tres,long)
+
+    ! Time next events
+    itnssam      = (floor(itime/(ssam_intvl*tres))  + 1) * issam_intvl
+    itnsavg      = (floor(itime/(savg_intvl*tres))  + 1) * isavg_intvl
+    itnanl       = (floor(itime/(frqanl*tres))      + 1) * ifrqanl
+    itnhist      = (floor(itime/(frqhis*tres))      + 1) * ifrqhis
+    if(lcross) &
+      itncross   = (floor(itime/(frqcross*tres))    + 1) * ifrqcross
+    if(lpartic .and. lpartdump) &
+      itnlpdump  = (floor(itime/(frqpartdump*tres)) + 1) * ifrqlpdump
+
+    ! Limit time step to first event
+    idt = min(itnssam-itime,itnsavg-itime,&                    ! Profile sampling and writing
+               itnanl-itime,itnhist-itime,itncross-itime,&     ! Analysis, history and cross-sections
+               itnlpdump-itime,&                               ! Lagrangian particles
+               int(timmax*tres,long)-itime,idt)                ! End of simulation, current dt
+
+    ! And back to normal seconds
+    dt   = idt  / tres
+    time = itime / tres        ! This can be tricky.................
+
+    ! Set flags
+    statflg  = .false.
+    savgflg  = .false.
+    hisflg   = .false.
+    anlflg   = .false.
+    crossflg = .false.
+    lpdumpflg= .false.
+
+    if(mod(itime+idt,issam_intvl) .eq. 0) then
+      statflg    = .true.
+    end if
+    if(mod(itime+idt,isavg_intvl) .eq. 0) then
+      statflg    = .true.
+      savgflg    = .true.
+    end if
+    if(mod(itime+idt,ifrqanl)     .eq. 0) then
+      anlflg     = .true.
+    end if
+    if(mod(itime+idt,ifrqhis)     .eq. 0) then
+      hisflg     = .true.
+    end if
+    if((mod(itime+idt,ifrqcross)   .eq. 0) .and. lcross) then
+      crossflg   = .true.
+    end if
+    if((mod(itime+idt,ifrqlpdump)  .eq. 0) .and. lpartic .and. lpartdump) then
+      lpdumpflg  = .true.
+    end if
+
+    !if(myid.eq.0) print*,statflg,savgflg,anlflg,hisflg,crossflg,lpdumpflg
+    !stop
+    !if(myid.eq.0) print*,'dt old:new',itime/tres,idtt/tres,idt/tres,(itnssam-itime)/tres,statflg
+
+  end subroutine stathandling
+
+  !
   !----------------------------------------------------------------------
   ! subroutine t_step: Called by driver to timestep through the LES
   ! routines.  Within many subroutines, data is accumulated during
   ! the course of a timestep for the purposes of statistical analysis.
-  ! 
+  !
   subroutine t_step
 
     use mpi_interface, only : myid
@@ -227,12 +306,12 @@ contains
 !     integer :: k
     real :: xtime
 !     character (len=11)    :: fname = 'debugXX.dat'
-  
+
     xtime = time/86400. + strtim
     call timedep(time,timmax, sst)
     do nstep = 1,3
 
-       ! Add additional criteria to ensure that some profile statistics that are  
+       ! Add additional criteria to ensure that some profile statistics that are
        ! updated every 'ssam_intvl' outside the main statistics module
        ! are not updated (summed) in all three RK substeps.
 
@@ -250,7 +329,7 @@ contains
        if (lsvarflg) then
           call varlscale(time,case_name,sst,div,u0,v0)
        end if
-       call surface(sst)      
+       call surface(sst)
 
        call diffuse
        call fadvect
@@ -264,17 +343,17 @@ contains
           call forcings(xtime,cntlat,sst,div,case_name)
           call micro(level,istp)
        end if
-       call corlos 
+       call corlos
        call buoyancy
        call sponge
        call decay
        call update (nstep)
-       call poisson 
+       call poisson
        call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
 
     end do
 
-    if (statflg) then 
+    if (statflg) then
        if (debug) WRITE (0,*) 't_step statflg thermo, myid=',myid
        call thermo (level)
        if (debug) WRITE (0,*) 't_step statflg statistics, myid=',myid
@@ -283,10 +362,10 @@ contains
        sflg = .False.
     end if
   end subroutine t_step
-  ! 
+  !
   !----------------------------------------------------------------------
   ! subroutine tend0: sets all tendency arrays to zero
-  ! 
+  !
   subroutine tendencies(nstep)
 
     use grid, only : a_ut, a_vt, a_wt, a_tt, a_rt, a_rpt, a_npt, &
@@ -298,10 +377,10 @@ contains
     use util, only : azero
 
     integer, intent (in) :: nstep
-  
+
     select case(nstep)
     case default
-  
+
        call azero(nxyzp*nscl,a_xt1)
        a_ut => a_xt1(:,:,:,1)
        a_vt => a_xt1(:,:,:,2)
@@ -356,7 +435,7 @@ contains
     end select
 
   end subroutine tendencies
-  ! 
+  !
   ! ----------------------------------------------------------------------
   ! subroutine update:
   !
@@ -386,68 +465,68 @@ contains
     if (level >= 3) then
        a_rpp(1,:,:) = 0.
        a_npp(1,:,:) = 0.
-       where (a_rpp < 0.) 
+       where (a_rpp < 0.)
           a_rpp=0.
        end where
-       where (a_npp < 0.) 
+       where (a_npp < 0.)
           a_npp=0.
        end where
-       where (liquid < 0.) 
+       where (liquid < 0.)
           liquid=0.
        end where
     end if
     if (level >= 4) then
        a_ricep(1,:,:) = 0.
        a_nicep(1,:,:) = 0.
-       a_rsnowp(1,:,:) = 0. 
+       a_rsnowp(1,:,:) = 0.
        a_rgrp(1,:,:) = 0.
-       where (a_ricep < 0.) 
+       where (a_ricep < 0.)
           a_ricep=0.
        end where
-       where (a_ricep < 0.) 
+       where (a_ricep < 0.)
           a_ricep=0.
        end where
-       where (a_ricep <= 0.) 
+       where (a_ricep <= 0.)
           a_nicep=0.
        end where
-       where (a_nicep < 0.) 
+       where (a_nicep < 0.)
           a_nicep=0.
        end where
-       where (a_rsnowp < 0.) 
+       where (a_rsnowp < 0.)
           a_rsnowp=0.
        end where
-       where (a_rgrp < 0.) 
+       where (a_rgrp < 0.)
           a_rgrp=0.
        end where
     end if
     if (level >= 5) then
-       a_nsnowp(1,:,:) = 0. 
+       a_nsnowp(1,:,:) = 0.
        a_ngrp(1,:,:)   = 0.
        a_rhailp(1,:,:) = 0.
        a_nhailp(1,:,:) = 0.
-       where (a_rhailp < 0.) 
+       where (a_rhailp < 0.)
           a_rhailp=0.
        end where
-       where (a_rhailp <= 0.) 
+       where (a_rhailp <= 0.)
           a_nhailp=0.
        end where
-       where (a_rsnowp <= 0.) 
+       where (a_rsnowp <= 0.)
           a_nsnowp=0.
        end where
-       where (a_rgrp <= 0.) 
+       where (a_rgrp <= 0.)
           a_ngrp=0.
        end where
-       where (a_nhailp < 0.) 
+       where (a_nhailp < 0.)
           a_nhailp=0.
        end where
-       where (a_nsnowp < 0.) 
+       where (a_nsnowp < 0.)
           a_nsnowp=0.
        end where
-       where (a_ngrp < 0.) 
+       where (a_ngrp < 0.)
           a_ngrp=0.
        end where
     end if
-    
+
   end subroutine update
   !
   !----------------------------------------------------------------------
@@ -522,7 +601,7 @@ contains
     end do
 
   end function pecletl
-  ! 
+  !
   ! ----------------------------------------------------------------------
   ! subroutine buoyancy:
   !
@@ -540,8 +619,8 @@ contains
     if (level>2) rl = rl + a_rpp
     if (level>3) rl = rl + a_ricep + a_rsnowp + a_rgrp
     if (level>4) rl = rl + a_rhailp
-    
-    
+
+
     call boyanc(nzp,nxp,nyp,level,a_wt,a_theta,vapor,rl,th00,a_scr1)
     call ae1mm(nzp,nxp,nyp,a_wt,awtbar)
     call update_pi1(nzp,awtbar,pi1)
@@ -549,7 +628,7 @@ contains
     if (sflg)  call comp_tke(nzp,nxp,nyp,dzi_m,th00,a_up,a_vp,a_wp,a_scr1,a_scr3)
 
   end subroutine buoyancy
-  ! 
+  !
   ! ----------------------------------------------------------------------
   ! subroutine boyanc:
   !
@@ -566,7 +645,7 @@ contains
     real :: gover2
 
     gover2  = 0.5*g
- 
+
     do j=3,n3-2
        do i=3,n2-2
           if (level >= 2) then
@@ -579,7 +658,7 @@ contains
                 scr(k,i,j)=gover2*(th(k,i,j)/th00-1.)
              end do
           end if
-          
+
           do k=2,n1-2
              wt(k,i,j)=wt(k,i,j)+scr(k,i,j)+scr(k+1,i,j)
           end do
@@ -587,12 +666,12 @@ contains
     end do
 
   end subroutine boyanc
-  ! 
+  !
   ! ----------------------------------------------------------------------
   ! subroutine corlos:  This is the coriolis driver, its purpose is to
-  ! from the coriolis accelerations for u and v and add them into the 
+  ! from the coriolis accelerations for u and v and add them into the
   ! accumulated tendency arrays of ut and vt.
-  ! 
+  !
   subroutine corlos
 
     use defs, only : omega
@@ -619,12 +698,12 @@ contains
     end if
 
   end subroutine corlos
-! 
+!
 ! ----------------------------------------------------------------------
-! subroutine sponge: does the rayleigh friction for the momentum terms, 
+! subroutine sponge: does the rayleigh friction for the momentum terms,
 ! and newtonian damping of thermal term the damping is accumulated with the
-! other tendencies 
-! 
+! other tendencies
+!
   subroutine sponge
 
     use grid, only : u0, v0, a_up, a_vp, a_wp, a_tp, a_ut, a_vt, a_wt, a_tt,&
@@ -645,15 +724,15 @@ contains
           end do
        end do
     end if
-       
+
   end subroutine sponge
-  
+
   subroutine decay
     use grid, only : lcouvreux, a_cvrxp, a_cvrxt, nxp, nyp, nzp, dt
     integer :: i, j, k
     real    :: rate
     if (lcouvreux) then
-      rate = 1./(max(tau, dt))    
+      rate = 1./(max(tau, dt))
       do j = 3, nyp - 2
         do i = 3, nxp - 2
           do k = 2, nzp
@@ -662,12 +741,12 @@ contains
         end do
       end do
     end if
-              
+
   end subroutine
 
   !
   ! --------------------------------------------------------------------
-  ! subroutine get_diverg: gets velocity tendency divergence and puts it 
+  ! subroutine get_diverg: gets velocity tendency divergence and puts it
   ! into a complex value array for use in pressure calculation
   !
   real function divergence(n1,n2,n3,u,v,w,dn0,dz,dx,dy)

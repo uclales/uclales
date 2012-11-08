@@ -15,11 +15,11 @@ from math import floor
 #from pylab import *
 
 # USER INPUT:
-tstart      = 000.       # 'release' time of particles
+tstart      = 00.      # 'release' time of particles
 nxy         = 32**2.     # Goal number of particles per level
-nz          = 128         # Number of vertical levels
-dz          = 25.         # Vertical grid spacing
-xysize      = 800.       # Domain size LES
+nz          = 68         # Number of vertical levels
+dz          = 25.        # Vertical grid spacing
+xysize      = 800.      # Domain size LES
 
 ps          = 101540.     # From UCLALES Namelist
 th00        = 299.8       #     "          "
