@@ -29,11 +29,11 @@ module mpi_interface
   !    ycomm, commyid - communicator for y side processors and rank wrt it
   !    nxnzp = nx*nzp
   !    nynzp = ny*nzp
-  !    wrxid, wryid, nxprocs,nyprocs: (wrxid,wryid)=myid in 
+  !    wrxid, wryid, nxprocs,nyprocs: (wrxid,wryid)=myid in
   !        ranktable (nxprocs,nyprocs)
-  !    nxpa,nypa: arrays containing nxp and nyp for all nxprocs and nyprocs 
+  !    nxpa,nypa: arrays containing nxp and nyp for all nxprocs and nyprocs
   !         respectively
-  !    nynza, nxnza: arrays containing nynzp and nxnzp on nxprocs and nyprocs 
+  !    nynza, nxnza: arrays containing nynzp and nxnzp on nxprocs and nyprocs
   !         respectively
   !
 
@@ -64,8 +64,8 @@ contains
 
     character (len=8) date
 
-    call mpi_init(ierror)  
-    call mpi_comm_size(MPI_COMM_WORLD, pecount, ierror)    
+    call mpi_init(ierror)
+    call mpi_comm_size(MPI_COMM_WORLD, pecount, ierror)
     call mpi_comm_rank(MPI_COMM_WORLD, myid, ierror)
 
     select case (kind(0.0))
@@ -116,7 +116,7 @@ contains
        if( (nyp-4)/nyprocs.lt.5 .or. nxpart) then
           nyprocs=int(sqrt(real(pecount)))
           nxprocs=pecount/nyprocs
-          do while (nyprocs*nxprocs .ne. pecount)
+          do while (nyprocs*nxprocs .ne. pecount .and. mod(nxprocs,nxp-4) == 0 .and. mod(nyprocs,nyp-4) == 0)
              nyprocs=nyprocs+1
              nxprocs=pecount/nyprocs
           end do
@@ -150,7 +150,7 @@ contains
        if( (nxp-4)/nxprocs.lt.5 .or. nxpart) then
           nxprocs=int(sqrt(real(pecount)))
           nyprocs=pecount/nxprocs
-          do while (nyprocs*nxprocs .ne. pecount)
+          do while (nyprocs*nxprocs .ne. pecount .and. mod(nxprocs,nxp-4) == 0 .and. mod(nyprocs,nyp-4) == 0)
              nxprocs=nxprocs+1
              nyprocs=pecount/nxprocs
           end do
@@ -220,7 +220,7 @@ contains
        ranktable(i, -1) = ranktable(i, nyprocs - 1)
        ranktable(i, nyprocs) = ranktable(i, 0)
     enddo
-    do j = 0, nyprocs-1 
+    do j = 0, nyprocs-1
        ranktable(-1, j) = ranktable(nxprocs - 1, j)
        ranktable(nxprocs, j) = ranktable(0, j)
     enddo
@@ -316,7 +316,7 @@ contains
   end subroutine define_decomp
   !
   !----------------------------------------------------------------------
-  ! INIT_ALLTOALL_REORDERXY: Defines the mpi derived types to do a data 
+  ! INIT_ALLTOALL_REORDERXY: Defines the mpi derived types to do a data
   ! movement of the form A(m,n/p,z) -> B(n,m/p,z) for data of type MY_CMPLX
   !
   subroutine init_alltoall_reorder(nxp,nyp,nzp)
@@ -351,7 +351,7 @@ contains
        if(i .lt. jj) nypa(i)=nypa(i)+1
     enddo
 
-    nynzg=ny*nzp    
+    nynzg=ny*nzp
     ii = nynzg/nxprocs
     ii= nynzg - nxprocs*ii
     do i=0,nxprocs-1
@@ -359,7 +359,7 @@ contains
        if (i .lt. ii) nynza(i)=nynza(i)+1
     enddo
 
-    nxnzg=nx*nzp    
+    nxnzg=nx*nzp
     jj = nxnzg/nyprocs
     jj= nxnzg - nyprocs*jj
     do i=0,nyprocs-1
