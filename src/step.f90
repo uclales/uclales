@@ -86,6 +86,7 @@ contains
     do while (time < timmax .and. t2 < wctime)
        call cpu_time(t1)           !t1=timing()
        istp = istp + 1
+ print *, 'a'
 
        call stathandling
        if(myid .eq. 0 .and. statflg) print*,'     sampling stat at t=',time+dt
@@ -198,12 +199,12 @@ contains
   !
   subroutine stathandling
     use grid, only          : dt
+    use defs, only          : long
     use stat, only          : savg_intvl, ssam_intvl
     use modcross, only      : lcross
     use mpi_interface, only : myid
     use modparticles, only  : lpartic,lpartdump,frqpartdump
 
-    integer, parameter  :: long   = selected_int_kind(18)
     integer(kind=long)  :: itnssam=1e16,itnsavg=1e16,itnanl=1e16,itnhist=1e16,itncross=1e16,itnlpdump=1e16
     integer(kind=long)  :: issam_intvl=1e16,isavg_intvl=1e16,ifrqanl=1e16,ifrqhis=1e16,ifrqcross=1e16,ifrqlpdump=1e16
     integer(kind=long)  :: itime,idt
