@@ -21,7 +21,7 @@ module grid
 
 !axel
 !  use ncio, only : open_nc, define_nc
-!irina  
+!irina
 !  use step, only : case_name
   implicit none
   !
@@ -78,15 +78,15 @@ module grid
        cev_acc, &  ! accumulated evaporation of cloud water [kg/m2] (diagnostic for 2D output)
        rev_acc     ! accumulated evaporation of rainwater   [kg/m2] (diagnostic for 2D output)
   !
-  ! 3D Arrays 
+  ! 3D Arrays
   !irina
   real, dimension (:,:,:), allocatable ::                                     &
        a_theta, a_pexnr, press, vapor, a_rflx, a_sflx, liquid, rsi,           &
        a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7,                &
        a_lflxu, a_lflxd, a_sflxu, a_sflxd,a_km, &
-       prc_c, prc_r, prc_i, prc_s, prc_g, prc_h 
+       prc_c, prc_r, prc_i, prc_s, prc_g, prc_h
   !
-  ! Named pointers (to 3D arrays) 
+  ! Named pointers (to 3D arrays)
   !
   real, dimension (:,:,:), pointer :: a_up, a_ut, a_vp, a_vt, a_wp, a_wt,     &
        a_sp, a_st, a_tp, a_tt, a_rp, a_rt, a_rpp, a_rpt, a_npp, a_npt,        &
@@ -98,7 +98,7 @@ module grid
        a_ngrp,   a_ngrt,    &
        a_rhailp, a_rhailt,  & ! hail
        a_nhailp, a_nhailt, a_rct, a_cld, a_cvrxp, a_cvrxt
- 
+
 
   character(40)      :: zname      = 'zt'
   character(40)      :: zhname     = 'zm'
@@ -139,7 +139,7 @@ contains
     integer :: memsize
 
     allocate (u0(nzp),v0(nzp),pi0(nzp),pi1(nzp),th0(nzp),dn0(nzp),rt0(nzp))
-!cgils    
+!cgils
     allocate (wfls(nzp),dthldtls(nzp),dqtdtls(nzp))
     wfls(:) = 0.
     dthldtls(:) = 0.
@@ -190,10 +190,10 @@ contains
        !irina
        allocate (a_sflxu(nzp,nxp,nyp))
        a_sflxu(:,:,:) = 0.
-       memsize = memsize + nxyzp 
+       memsize = memsize + nxyzp
        allocate (a_sflxd(nzp,nxp,nyp))
        a_sflxd(:,:,:) = 0.
-       memsize = memsize + nxyzp 
+       memsize = memsize + nxyzp
     end if
     if (iradtyp > 2) then
        allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp),sflxu_toa(nxp,nyp),sflxd_toa(nxp,nyp),lflxu_toa(nxp,nyp),lflxd_toa(nxp,nyp))
@@ -207,10 +207,10 @@ contains
         !irina
        allocate (a_sflxu(nzp,nxp,nyp))
        a_sflxu(:,:,:) = 0.
-       memsize = memsize + nxyzp 
+       memsize = memsize + nxyzp
        allocate (a_sflxd(nzp,nxp,nyp))
        a_sflxd(:,:,:) = 0.
-       memsize = memsize + nxyzp 
+       memsize = memsize + nxyzp
     end if
  !
     allocate (a_scr1(nzp,nxp,nyp),a_scr2(nzp,nxp,nyp),a_scr3(nzp,nxp,nyp))
@@ -237,7 +237,7 @@ contains
     end if
 
     allocate (a_xp(nzp,nxp,nyp,nscl), a_xt1(nzp,nxp,nyp,nscl),        &
-         a_xt2(nzp,nxp,nyp,nscl))         
+         a_xt2(nzp,nxp,nyp,nscl))
 
     a_xp(:,:,:,:) = 0.
     a_xt1(:,:,:,:) = 0.
@@ -248,23 +248,28 @@ contains
     a_wp =>a_xp (:,:,:,3)
     a_tp =>a_xp(:,:,:,4)
 
-    if (level >= 0) a_rp =>a_xp (:,:,:,5)    
+    if (level >= 0) a_rp =>a_xp (:,:,:,5)
     ! warm rain with number and mass of rain
-    if (level >= 3) then 
+    if (level >= 3) then
       a_rpp =>a_xp(:,:,:,6)
       a_npp =>a_xp(:,:,:,7)
       allocate (prc_acc(nxp,nyp))
       allocate (rev_acc(nxp,nyp))
       prc_acc(:,:) = 0.   ! accumulated precipitation for 2D output  [kg/m2]
       rev_acc(:,:) = 0.   ! accumulated evaporation of rainwater     [kg/m2]
+    else
+      a_rpp => NULL()
+      a_npp => NULL()
     end if
-    if (lwaterbudget) then 
+    if (lwaterbudget) then
       ! for liquid water budget and precipitation efficiency diagnostic
       a_cld=>a_xp(:,:,:,8)
       a_cld(:,:,:) = 0.
       allocate (cnd_acc(nxp,nyp),cev_acc(nxp,nyp),rev_acc(nxp,nyp))
       cnd_acc(:,:) = 0.   ! accumulated condensation                 [kg/m2]
       cev_acc(:,:) = 0.   ! accumulated evaporation of cloud water   [kg/m2]
+    else
+      a_cld => NULL()
     end if
     ! ice microphysics
     if (level >= 4) then
@@ -272,6 +277,11 @@ contains
       a_nicep  =>a_xp(:,:,:, 9)
       a_rsnowp =>a_xp(:,:,:,10)
       a_rgrp   =>a_xp(:,:,:,11)
+    else
+      a_ricep  => NULL()
+      a_nicep  => NULL()
+      a_rsnowp => NULL()
+      a_rgrp   => NULL()
     end if
     ! SB2006 two-moment scheme with hail
     if (level == 5) then
@@ -279,12 +289,19 @@ contains
       a_ngrp   =>a_xp(:,:,:,13)
       a_rhailp =>a_xp(:,:,:,14)
       a_nhailp =>a_xp(:,:,:,15)
+    else
+      a_nsnowp => NULL()
+      a_ngrp   => NULL()
+      a_rhailp => NULL()
+      a_nhailp => NULL()
     end if
-    if (lcouvreux) then 
+    if (lcouvreux) then
       a_cvrxp=>a_xp(:,:,:,ncvrx)
       a_cvrxp(:,:,:) = 0.
       allocate (trac_sfc(nxp,nyp))
       trac_sfc = 1.
+    else
+      a_cvrxp => NULL()
     end if
 
     allocate (a_ustar(nxp,nyp),a_tstar(nxp,nyp),a_rstar(nxp,nyp))
@@ -293,10 +310,12 @@ contains
 
     if (level >= 2) then
        allocate(prc_c(nzp,nxp,nyp))
+       prc_c = 0.
        memsize = memsize + nxyzp
     end if
     if (level >= 3) then
        allocate(prc_r(nzp,nxp,nyp))
+       prc_r = 0.
        memsize = memsize + nxyzp
     end if
     if (level >= 4) then
@@ -305,10 +324,14 @@ contains
        allocate(prc_g(nzp,nxp,nyp))
        allocate(rsi(nzp,nxp,nyp))
        rsi = 0.
+       prc_i = 0.
+       prc_s = 0.
+       prc_g = 0.
        memsize = memsize + 4*nxyzp
     end if
     if (level >= 5) then
        allocate(prc_h(nzp,nxp,nyp))
+       prc_h = 0.
        memsize = memsize + nxyzp
     end if
 
@@ -336,16 +359,16 @@ contains
   subroutine define_grid
 
     use mpi_interface, only: xoffset, yoffset, wrxid, wryid, nxpg, nypg,   &
-         appl_abort, myid
+         appl_abort, myid, nxg, nyg
 
     integer :: i,j,k,kmax,nchby
     real    :: dzrfm,dz,zb,dzmin
     real    :: zmnvc(-1:nzp+1)
     character (len=51) :: &
          fm1 = '(//" ",49("-")/,"   grid dimensions:"/)            ',      &
-         fm2 = '("   nxp-4 = ",i4,", dx, dx = ",f8.1,",",f9.1," m")',      &
-         fm3 = '("   nyp-4 = ",i4,", dy, dy = ",f8.1,",",f9.1," m")',      &
-         fm4 = '("   nzp   = ",i4,", dz, dz = ",f8.1,",",f9.1," m")',      &
+         fm2 = '("   nxp-4 = ",i3,", dx, dx = ",f8.1,",",f8.1," m")',      &
+         fm3 = '("   nyp-4 = ",i3,", dy, dy = ",f8.1,",",f8.1," m")',      &
+         fm4 = '("   nzp   = ",i3,", dz, dz = ",f8.1,",",f8.1," m")',      &
          fm5 = '("   thermo level: ",i3)                        '
 
     nxyzp  = nxp*nyp*nzp
@@ -355,20 +378,20 @@ contains
     dzmin = 0.
     dxi=1./deltax
     dyi=1./deltay
-    allocate(wsavex(4*nxpg+100),wsavey(4*nypg+100))
+    allocate(wsavex(4*nxg+100),wsavey(4*nyg+100))
     wsavex=0.0
     wsavey=0.0
 
     !
     ! define xm array for grid 1 from deltax
-    !                                      
+    !
     allocate (xm(nxp))
     xm(1)=-float(max(nxpg-2,1))*.5*deltax+xoffset(wrxid)*deltax
     do i=2,nxp-1
        xm(i)=xm(i-1)+deltax
     end do
     xm(nxp)=2*xm(nxp-1)-xm(nxp-2)
-    !    
+    !
     ! define ym array for grid 1 from deltay
     !
     allocate (ym(nyp))
@@ -377,14 +400,15 @@ contains
        ym(j)=ym(j-1)+deltay
     end do
     ym(nyp)=2*ym(nyp-1)-ym(nyp-2)
-    !      
+
+    !
     !      define where the momentum points will lie in vertical
-    !      
+    !
   allocate (zm(nzp))
   select case (abs(igrdtyp))
      !
      ! Read in grid spacings from a file
-     !     
+     !
   case(3)
      open (1,file='zm_grid_in',status='old',form='formatted')
      do k=1,nzp
@@ -398,7 +422,7 @@ contains
      !
      ! Tschebyschev Grid with vertical size given by dzmax
      !
-  case(2) 
+  case(2)
      zm(1) = 0.
      nchby = nzp-3
      do k=1,nzp-2
@@ -407,10 +431,10 @@ contains
      end do
      zm(nzp-1) = dzmax
      zm(nzp) = dzmax + (zm(nzp-1)-zm(nzp-2))
-     !    
+     !
      ! define zm array for grid 1 from deltaz and dzrat, if dzrat is
      ! negative compress grid so that dzmin is the grid spacing in a 100m
-     ! interval below dzmax.  In both cases stretcvh grid uniformly by the 
+     ! interval below dzmax.  In both cases stretcvh grid uniformly by the
      ! ration |dzrat| above dzmax
      !
   case(1)
@@ -426,7 +450,7 @@ contains
            zb=zb-dzmin*abs(dzrat)**k
         end do
      end if
-     
+
      dz=deltaz
      do k=3,nzp
         if(zm(k-1) > zb .and. zm(k-1) < dzmax)then
@@ -443,25 +467,25 @@ contains
      end do
   end select
   !
-  ! Grid Points for Thermal Points (T-Grid): 
-  !    
+  ! Grid Points for Thermal Points (T-Grid):
+  !
   allocate (xt(nxp))
   do i=2,nxp
      xt(i)=.5*(xm(i)+xm(i-1))
   end do
   xt(1)=1.5*xm(1)-.5*xm(2)
-  !    
+  !
   allocate (yt(nyp))
   do j=2,nyp
      yt(j)=.5*(ym(j)+ym(j-1))
   end do
   yt(1)=1.5*ym(1)-.5*ym(2)
-  !      
+  !
   allocate (zt(nzp))
   if (igrdtyp .lt. 0) then
      !
      ! Read in grid spacings from a file
-     !     
+     !
      open (2,file='zt_grid_in',status='old',form='formatted')
      do k=1,nzp
         read (2,*) zt(k)
@@ -470,8 +494,8 @@ contains
    else
      !
      ! calculate where the thermo points will lie based on geometric
-     ! interpolation from the momentum points 
-     !    
+     ! interpolation from the momentum points
+     !
      do k=1,nzp
         zmnvc(k)=zm(k)
      end do
@@ -485,7 +509,7 @@ contains
        zt(k)=zmnvc(k-1)+(zmnvc(k)-zmnvc(k-1))/(1.+dzrfm)
      end do
   end if
-  !    
+  !
   ! compute other arrays based on the vertical grid.
   !   dzi_m: inverse of distance between thermal points k+1 and k
   !   dzi_t: inverse of distance between momentum points k and k-1
@@ -495,7 +519,7 @@ contains
      dzi_m(k)=1./(zt(k+1)-zt(k))
   end do
   dzi_m(nzp)=dzi_m(nzp-1)*dzi_m(nzp-1)/dzi_m(nzp-2)
-  
+
   allocate (dzi_t(nzp))
   do k=2,nzp
      dzi_t(k)=1./(zm(k)-zm(k-1))
@@ -514,9 +538,9 @@ contains
   endif
 
   end subroutine define_grid
-  ! 
+  !
   ! ----------------------------------------------------------------------
-  ! Subroutine write_hist:  This subroutine writes a binary history file 
+  ! Subroutine write_hist:  This subroutine writes a binary history file
   !
   subroutine write_hist(htype, time)
 
@@ -540,9 +564,9 @@ contains
        hname = trim(hname)//'.iflg'
     case(0)
        hname = trim(hname)//'.R'
-    case(1) 
+    case(1)
        hname = trim(hname)//'.rst'
-    case(2) 
+    case(2)
        iblank=index(hname,' ')
        write (hname(iblank:iblank+7),'(a1,i6.6,a1)') '.', int(time), 's'
     end select
@@ -571,9 +595,9 @@ contains
 
     return
   end subroutine write_hist
-  ! 
+  !
   ! ----------------------------------------------------------------------
-  ! Subroutine read_hist:  This subroutine reads a binary history file 
+  ! Subroutine read_hist:  This subroutine reads a binary history file
   !
   subroutine read_hist(time, hfilin)
 
