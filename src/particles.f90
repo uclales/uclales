@@ -27,9 +27,11 @@
 
 
 module modparticles
+
   !--------------------------------------------------------------------------
   ! module modparticles: Langrangian particle tracking, ad(o/a)pted from DALES
   !--------------------------------------------------------------------------
+  use defs, only          : long
   implicit none
   PUBLIC :: init_particles, particles, exit_particles, initparticledump, initparticlestat, write_particle_hist, particlestat, balanced_particledump
 
@@ -47,7 +49,7 @@ module modparticles
 
   character(30)      :: startfile
   integer            :: ifinput        = 1
-  integer            :: np
+  integer(kind=long) :: np
   real               :: tnextdump
   real               :: randint   = 20.
   real               :: tnextrand = 6e6
@@ -63,7 +65,7 @@ module modparticles
     type (particle_record), pointer :: next,prev
   end type
 
-  integer            :: nplisted
+  integer(kind=long) :: nplisted
   type (particle_record), pointer :: head, tail
 
   integer            :: ipunique, ipx, ipy, ipz, ipzprev, ipxstart, ipystart, ipzstart, iptsart
@@ -745,12 +747,12 @@ contains
   !--------------------------------------------------------------------------
   ! Function la3rd
   !> Performs a 3rd order Lagrangian interpolation
-  !> CAUTION: for now only for equidistant grid! 
+  !> CAUTION: for now only for equidistant grid!
   !--------------------------------------------------------------------------
   !
   function la3rd(arr_in,delta)
     real                           :: la3rd
-    real, dimension(:), intent(in) :: arr_in 
+    real, dimension(:), intent(in) :: arr_in
     real, intent(in)               :: delta
     real, parameter                :: c1 = 1./6.
     real, parameter                :: c2 = 1./2.
@@ -758,7 +760,7 @@ contains
     la3rd = -arr_in(1) * c1 * delta      * (1.-delta) * (1.+(1.-delta)) + &
              arr_in(2) * c2 * (1.+delta) * (1.-delta) * (1.+(1.-delta)) + &
              arr_in(3) * c2 * (1.+delta) * delta      * (1.+(1.-delta)) - &
-             arr_in(4) * c1 * (1.+delta) * delta      * (1.-delta) 
+             arr_in(4) * c1 * (1.+delta) * delta      * (1.-delta)
 
   end function la3rd
 
@@ -786,7 +788,7 @@ contains
     ! --------------
     ! 3rd order (3D) Lagrangian interpolation
     ! --------------
-    if(int_part .eq. 3) then 
+    if(int_part .eq. 3) then
       t2t(:,:) = 0.
       t2o(:)   = 0.
 
@@ -800,7 +802,7 @@ contains
           t2t(k,i) = la3rd(a_up(zbottom+k-2,xbottom+i-2,ybottom-1:ybottom+2),deltay)
         end do
       end do
-     
+
       ! Step 2: from 2d to 1d
       do k=kstart,4
         t2o(k) = la3rd(t2t(k,:),deltax)
@@ -820,7 +822,7 @@ contains
     ! --------------
     ! Tri-linear interpolation
     ! --------------
-    else if(int_part .eq. 1) then 
+    else if(int_part .eq. 1) then
 
       ! u(1,:,:) == u(2,:,:) with zt(1) = - zt(2). By multiplying u(1,:,:) with -1,
       ! the velocity interpolates to 0 at the surface.
@@ -869,7 +871,7 @@ contains
     ! --------------
     ! 3rd order (3D) Lagrangian interpolation
     ! --------------
-    if(int_part .eq. 3) then 
+    if(int_part .eq. 3) then
       t2t(:,:) = 0.
       t2o(:)   = 0.
 
@@ -883,7 +885,7 @@ contains
           t2t(k,i) = la3rd(a_vp(zbottom+k-2,xbottom+i-2,ybottom-1:ybottom+2),deltay)
         end do
       end do
-     
+
       ! Step 2: from 2d to 1d
       do k=kstart,4
         t2o(k) = la3rd(t2t(k,:),deltax)
@@ -903,7 +905,7 @@ contains
     ! --------------
     ! Tri-linear interpolation
     ! --------------
-    else if(int_part .eq. 1) then 
+    else if(int_part .eq. 1) then
 
       ! v(1,:,:) == v(2,:,:) with zt(1) = - zt(2). By multiplying v(1,:,:) with -1,
       ! the velocity interpolates to 0 at the surface.
@@ -950,7 +952,7 @@ contains
     ! --------------
     ! 3rd order (3D) Lagrangian interpolation
     ! --------------
-    if(int_part .eq. 3) then 
+    if(int_part .eq. 3) then
       t2t(:,:) = 0.
       t2o(:)   = 0.
 
@@ -982,7 +984,7 @@ contains
     ! --------------
     ! Tri-linear interpolation
     ! --------------
-    else if(int_part .eq. 1) then 
+    else if(int_part .eq. 1) then
 
       wi3d          =  (1-deltaz) * (1-deltay) * (1-deltax) *  a_wp(zbottom    , xbottom    , ybottom    ) + &    !
       &                (1-deltaz) * (1-deltay) * (  deltax) *  a_wp(zbottom    , xbottom + 1, ybottom    ) + &    ! x+1
@@ -2050,7 +2052,8 @@ contains
 
     logical, intent(in) :: hot
     character (len=80), intent(in), optional :: hfilin
-    integer  :: k, n, kmax, io
+    integer(kind=long) :: n
+    integer  :: k, kmax, io
     logical  :: exans
     real     :: tstart, xstart, ystart, zstart, ysizelocal, xsizelocal, firststartl, firststart
     real     :: pu,pts,px,py,pz,pzp,pxs,pys,pzs,pur,pvr,pwr,purp,pvrp,pwrp
@@ -2132,14 +2135,19 @@ contains
       np = 0
       startfile = 'partstartpos'
       open(ifinput,file=startfile,status='old',position='rewind',action='read')
-      read(ifinput,'(I10.1)') np
+      read(ifinput,*) np
+      write(*,*) 'Number of Particles ',np
       if ( np < 1 ) return
       ! read particles from partstartpos, create linked list
       do n = 1, np
+      if (mod(n,10000000)==0) print *,n
         read(ifinput,*) tstart, xstart, ystart, zstart
         if(xstart < 0. .or. xstart > nxg*deltax .or. ystart < 0. .or. ystart > nyg*deltay .or. zstart < 0. .or. zstart > zm(nzp-1)) then
-          if (myid == 0) print *, '  ABORTING: particle initialized outsize domain'
-           call appl_abort(0)
+          if (myid == 0) then
+            print *, '  ABORTING: particle initialized outsize domain'
+            write (*,*) 'X,Y,Z = ', xstart,ystart,zstart
+          end if
+          call appl_abort(0)
         else
           if(floor(xstart / xsizelocal) == wrxid) then
             if(floor(ystart / ysizelocal) == wryid) then
