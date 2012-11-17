@@ -86,7 +86,6 @@ contains
     do while (time < timmax .and. t2 < wctime)
        call cpu_time(t1)           !t1=timing()
        istp = istp + 1
- print *, 'a'
 
        call stathandling
        if(myid .eq. 0 .and. statflg) print*,'     sampling stat at t=',time+dt

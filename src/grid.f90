@@ -378,7 +378,7 @@ contains
     dzmin = 0.
     dxi=1./deltax
     dyi=1./deltay
-    allocate(wsavex(4*nxg+100),wsavey(4*nyg+100))
+    allocate(wsavex(4*nxpg+100),wsavey(4*nypg+100))
     wsavex=0.0
     wsavey=0.0
 
