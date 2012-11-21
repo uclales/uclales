@@ -53,6 +53,8 @@ module mpi_interface
   integer :: stridetype,xstride,ystride,xystride,xylarry,xyzlarry,&
        fxytype,fxyztype
 
+  integer ierror
+
 contains
   !
   !----------------------------------------------------------------------
@@ -60,7 +62,6 @@ contains
   !
   subroutine init_mpi
 
-    integer ierror
     character (len=8) date
 
     call mpi_init(ierror)  
