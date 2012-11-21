@@ -23,11 +23,11 @@ module srfc
  !irina 
  ! real    :: sst = 292.
   real    :: zrough =  0.1
-  real    :: ubmin  =  0.20
+  real    :: ubmin  =  -0.28
   real    :: dthcon = 100.0
   real    :: drtcon = 0.0
 ! linda, b
-  logical :: larms=.true.
+  logical :: larms=.false.
 ! linda, e
   logical :: lhomflx = .false.
 
@@ -231,9 +231,9 @@ contains
           end if
           wt_sfc(1,1)=(shls(tcnt2)+(shls(tcnt)-shls(tcnt2))*tfrac)/(0.5*(dn0(1)+dn0(2))*cp)
           wq_sfc(1,1)=(lhls(tcnt2)+(lhls(tcnt)-lhls(tcnt2))*tfrac)/(0.5*(dn0(1)+dn0(2))*alvl)
-       !elseif (.not.ltimedepsurf) then
-       !   wt_sfc(1,1)  = ffact* dthcon/(0.5*(dn0(1)+dn0(2))*cp)
-       !   wq_sfc(1,1)  = ffact* drtcon/(0.5*(dn0(1)+dn0(2))*alvl)
+       else
+          wt_sfc(1,1)  = ffact* dthcon!/(0.5*(dn0(1)+dn0(2))*cp)
+          wq_sfc(1,1)  = ffact* drtcon!/(0.5*(dn0(1)+dn0(2))*alvl)
        endif
 ! linda, e
 
