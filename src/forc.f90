@@ -57,6 +57,7 @@ contains
           a_lflxu, a_lflxd, a_sflxu, a_sflxd,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa,reff
 
     use mpi_interface, only : myid, appl_abort
+    use util, only : get_avg3
 
 !irina
     real, optional, intent (in) :: time_in, cntlat, sst,div
@@ -67,10 +68,11 @@ contains
     integer :: i, j, k, kp1
 
 !irina
+    real, dimension(nzp) :: am
+
     select case(iradtyp)
     case (1)
-!        call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt)
-        call case_forcing(nzp,nxp,nyp,'cosmo',zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt)
+        call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt)
     case (2)
        select case(level)
        case(1) 
@@ -145,6 +147,19 @@ contains
        enddo
     end if
 
+    if (trim(case_name).eq."waite") then
+
+       call get_avg3(nzp,nxp,nyp,a_up,am)! compute horizontally averaged velocity, linda
+      do k=1,nzp-2
+        do j=3,nyp-2
+          do i=3,nxp-2
+            a_ut(k,i,j)=a_ut(k,i,j)-(am(k)-10.)/12./3600.
+          end do
+        end do
+      end do
+
+    end if
+
     
   end subroutine forcings
   !
@@ -203,7 +218,7 @@ contains
     real, parameter :: zmx_sub = 2260. ! originally 2260.
 
     real (kind=8) :: zig, zil
-    real          :: zibar
+    real          :: zibar, cr
 
     select case (trim(case_name))
     case('rico')
@@ -333,6 +348,32 @@ contains
              enddo
           enddo
        enddo
+    case('waite')
+       do j=3,n3-2
+          do i=3,n2-2
+             do k=2,n1-2
+                if (zt(k).le. 1500.) then
+                   cr=-2.0
+                   tt(k,i,j) = tt(k,i,j)+cr/86400.
+                else
+                   if (zt(k).le.3000.) then
+                      cr=-2.0+1./1500.*(zt(k)-1500.)
+                      tt(k,i,j) = tt(k,i,j)+cr/86400.
+                   else
+                      if (zt(k).le.12000) then
+                         cr=-1.0
+                         tt(k,i,j) = tt(k,i,j)+cr/86400.
+                      else
+                         if (zt(k).le.15000) then
+                            cr=-1.0+1./3000.*(zt(k)-12000)
+                            tt(k,i,j) = tt(k,i,j)+cr/86400.
+                         end if
+                      end if
+                   end if
+                end if
+             end do
+          end do
+       end do
     case default
        if (myid == 0) print *, '  ABORTING: inproper call to radiation'
        call appl_abort(0)
