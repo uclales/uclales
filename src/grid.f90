@@ -49,7 +49,7 @@ module grid
   integer           :: naddsc  = 0         ! number of additional scalars
 
   logical           :: lcouvreux = .false. ! switch for 'radioactive' scalar
-  logical           :: lwaterbudget = .false.  ! switch for liquid water budget diagnostics
+  logical           :: lwaterbudget = .true.  ! switch for liquid water budget diagnostics
   integer           :: ncvrx ! Number of Couvreux scalar
 
   integer           :: nfpt = 10           ! number of rayleigh friction points
@@ -273,7 +273,7 @@ contains
       ! for liquid water budget and precipitation efficiency diagnostic
       a_cld=>a_xp(:,:,:,8)
       a_cld(:,:,:) = 0.
-      allocate (cnd_acc(nxp,nyp),cev_acc(nxp,nyp),rev_acc(nxp,nyp))
+      allocate (cnd_acc(nxp,nyp),cev_acc(nxp,nyp))
       cnd_acc(:,:) = 0.   ! accumulated condensation                 [kg/m2]
       cev_acc(:,:) = 0.   ! accumulated evaporation of cloud water   [kg/m2]
     end if
