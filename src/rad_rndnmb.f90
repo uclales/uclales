@@ -103,7 +103,7 @@ module RandomNumbers
 
   public :: randomNumberSequence
   public :: new_RandomNumberSequence, finalize_RandomNumberSequence, &
-       getRandomInt, getRandomPositiveInt, getRandomReal
+       getRandomInt, getRandomPositiveInt, getRandomReal, getRandomRealReal
 
 contains
   ! -------------------------------------------------------------
@@ -284,6 +284,24 @@ contains
        getRandomReal = dble(localInt            )/(2.0d0**32 - 1.0d0)
     end if
   end function getRandomReal
+  ! --------------------
+  ! --------------------
+  function getRandomRealReal(twister)
+    type(randomNumberSequence), intent(inout) :: twister
+    double precision             :: getRandomRealReal
+    ! Generate a random number on [0,1]
+    !   Equivalent to genrand_real1 in the C code
+    !   The result is stored as double precision but has 32 bit resolution
+
+    integer :: localInt
+
+    localInt = getRandomInt(twister)
+    if(localInt < 0) then
+       getRandomRealReal = real(localInt + 2.0**8)/(2.0**8 - 1.0)
+    else
+       getRandomRealReal = real(localInt            )/(2.0**8 - 1.0)
+    end if
+  end function getRandomRealReal
   ! --------------------
   subroutine finalize_RandomNumberSequence(twister)
     type(randomNumberSequence), intent(inout) :: twister
