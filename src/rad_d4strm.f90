@@ -156,6 +156,7 @@ contains
     real :: fuq2, xir_norm
     real, dimension(:), allocatable, save :: bandWeights
     real :: randomNumber
+    integer :: sz
     ! ----------------------------------------
 
     if (.not.Initialized) then
@@ -172,6 +173,7 @@ contains
       call computeIRBandWeights(ir_bands, irWeighted, bandWeights)
     end if
     if(present(useMcICA)) McICA = useMcICA
+    sz = size(ir_bands)
     
     fdir(:) = 0.0; fuir(:) = 0.0
     call thicks(pp, pt, ph, dz) 
@@ -182,7 +184,7 @@ contains
        !   in the loop through the spectrum below. 
        !
        randomNumber = getRandomReal(randoms)
-       call select_bandg(ir_bands, bandweights, randomNumber, ib, ig1) 
+       call select_bandg(ir_bands, bandweights, randomNumber, ib, ig1, sz) 
        ig2 = ig1
        iblimit = 1
     else
@@ -296,6 +298,7 @@ contains
     integer :: ib, ig, k, ig1, ig2, ibandloop, iblimit
     real    :: fuq1, xs_norm
     real    :: randomNumber
+    integer :: sz
     ! ----------------------------------------
 
     if (.not.Initialized) call rad_init
@@ -309,7 +312,9 @@ contains
     fds(:)  = 0.0
     fus(:)  = 0.0
     bf(:)   = 0.0
-    
+
+    sz = size(solar_bands)
+
     if(u0 > minSolarZenithCosForVis) then
       call thicks(pp, pt, ph, dz) 
   
@@ -319,7 +324,7 @@ contains
          ! Select a single band and g-point (ib, ig1) and use these as the 
          ! limits in the loop through the spectrum below. 
          !
-         call select_bandg(solar_bands, bandweights, randomNumber, ib, ig1) 
+         call select_bandg(solar_bands, bandweights, randomNumber, ib, ig1,sz) 
          ig2 = ig1
          iblimit = 1 
       else
@@ -353,12 +358,12 @@ contains
          if (present(plwc)) then
            call cloud_water(ib, pre, plwc, dz, tw, ww, www)
            call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tw,ww,www)
-        end if
-        if (present(piwc)) then
+         end if
+         if (present(piwc)) then
            call cloud_ice(ib, pde, piwc, dz, ti, wi, wwi)
            call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, ti,wi,wwi)
          end if 
-        if (present(pgwc)) then
+         if (present(pgwc)) then
            call cloud_grp(ib,pgwc, dz, tgr, wgr, wwgr)
            call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tgr, wgr,wwgr)
          end if 
@@ -404,7 +409,7 @@ contains
   ! point, which is given by g_prob.  Note g_prob sums to unity for both
   ! the solar bands (power > 0.) and the infrared bands respectively.
   ! 
-  subroutine select_bandg(bands, bandweights, randomNumber, i, j)
+  subroutine select_bandg(bands, bandweights, randomNumber, i, j, sz)
     type(band_properties), &
           dimension(:),    &
              intent ( in) :: bands
@@ -412,14 +417,17 @@ contains
              intent ( in) :: bandweights
     real,    intent ( in) :: randomNumber
     integer, intent (out) :: i, j
+    integer               :: sz
 
     real :: cumulative
     
-    i=1; j=1 
+    i=1
+    j=1 
     ! The probability contained in the first g point of the first band
     cumulative = gPointWeight(bands(i), j) * bandweights(i)
 
-    do while (randomNumber > cumulative .and. cumulative < 1.0)
+    do while (randomNumber > cumulative .and. cumulative < 1.0.and.(i<sz))
+!    do while (randomNumber > cumulative .and. cumulative < 0.8)
        j = j+1
        if (j > kg(bands(i)) ) then
           i=i+1
