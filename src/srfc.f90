@@ -23,7 +23,7 @@ module srfc
  !irina 
  ! real    :: sst = 292.
   real    :: zrough =  0.1
-  real    :: ubmin  =  -0.28
+  real    :: ubmin  =  0.20
   real    :: dthcon = 100.0
   real    :: drtcon = 0.0
 ! linda, b
