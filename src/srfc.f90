@@ -232,8 +232,8 @@ contains
           wt_sfc(1,1)=(shls(tcnt2)+(shls(tcnt)-shls(tcnt2))*tfrac)/(0.5*(dn0(1)+dn0(2))*cp)
           wq_sfc(1,1)=(lhls(tcnt2)+(lhls(tcnt)-lhls(tcnt2))*tfrac)/(0.5*(dn0(1)+dn0(2))*alvl)
        else
-          wt_sfc(1,1)  = ffact* dthcon!/(0.5*(dn0(1)+dn0(2))*cp)
-          wq_sfc(1,1)  = ffact* drtcon!/(0.5*(dn0(1)+dn0(2))*alvl)
+          wt_sfc(1,1)  = ffact* dthcon/(0.5*(dn0(1)+dn0(2))*cp)
+          wq_sfc(1,1)  = ffact* drtcon/(0.5*(dn0(1)+dn0(2))*alvl)
        endif
 ! linda, e
 
