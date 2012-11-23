@@ -297,6 +297,7 @@ contains
     use defs, only          : p00,p00i,cp,cpr,rcp,r,g,ep2,alvl,Rm,ep
     use thrm, only          : rslf,rsif
     use mpi_interface, only : appl_abort, myid
+    use step, only          : case_name
 
     implicit none
 
@@ -375,7 +376,15 @@ contains
        !
        select case (itsflg)
        case (0)
-          tks(ns)=ts(ns)*(ps(ns)*p00i)**rcp
+          if (trim(case_name).eq."waite") then
+             if (hs(ns).lt.14000.) then
+                tks(ns)=ts(ns)*(ps(ns)*p00i)**rcp
+             else
+                tks(ns) = tks(ns-1)
+             end if
+          else
+             tks(ns)=ts(ns)*(ps(ns)*p00i)**rcp
+          end if
        case (1)
           til=ts(ns)*(ps(ns)*p00i)**rcp
           xx=til
@@ -414,7 +423,15 @@ contains
          end if
          select case (itsflg)
          case (0)
-            tks(ns)=ts(ns)*(ps(ns)*p00i)**rcp
+            if (trim(case_name).eq."waite") then
+               if (hs(ns).lt.14000.) then
+                  tks(ns)=ts(ns)*(ps(ns)*p00i)**rcp
+               else
+                  tks(ns) = tks(ns-1)
+               endif
+            else
+               tks(ns)=ts(ns)*(ps(ns)*p00i)**rcp
+            endif
          case (1)
             til=ts(ns)*(ps(ns)*p00i)**rcp
             xx=til
