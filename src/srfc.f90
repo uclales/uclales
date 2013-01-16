@@ -26,7 +26,7 @@ module srfc
   real    :: ubmin  =  0.20
   real    :: dthcon = 100.0
   real    :: drtcon = 0.0
-
+  logical :: lhomflx = .false.
 contains 
   !
   ! --------------------------------------------------------------------------
@@ -46,6 +46,7 @@ contains
          uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc
     use thrm, only: rslf
     use stat, only: sfc_stat, sflg
+    use util, only : get_avg3
     use mpi_interface, only : nypg, nxpg, double_array_par_sum
 
     implicit none
@@ -54,7 +55,7 @@ contains
     real, optional, intent (inout) :: sst
  !   
     real :: dtdz(nxp,nyp), drdz(nxp,nyp), usfc(nxp,nyp), vsfc(nxp,nyp)       &
-         ,wspd(nxp,nyp), bfct(nxp,nyp)
+         ,wspd(nxp,nyp), bfct(nxp,nyp), mnflx(5), flxarr(5,nxp,nyp)
 
     integer :: i, j, iterate
     real    :: zs, bflx0,bflx, ffact, sst1, bflx1, Vbulk, Vzt, usum
@@ -132,6 +133,19 @@ contains
        end do
        call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,a_rstar  &
             ,uw_sfc,vw_sfc,wt_sfc,wq_sfc,ww_sfc)
+       if (lhomflx) then
+         flxarr(1,:,:) = uw_sfc
+         flxarr(2,:,:) = vw_sfc
+         flxarr(3,:,:) = ww_sfc
+         flxarr(4,:,:) = wt_sfc
+         flxarr(5,:,:) = wq_sfc
+         call get_avg3(5,nxp,nyp,flxarr,mnflx)
+         uw_sfc = mnflx(1)
+         vw_sfc = mnflx(2)
+         ww_sfc = mnflx(3)
+         wt_sfc = mnflx(4)
+         wq_sfc = mnflx(5)
+       end if
        !
        ! fix surface temperature to yield a constant surface buoyancy flux
        ! dthcon

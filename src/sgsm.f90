@@ -31,7 +31,7 @@ module sgsm
   real, parameter     :: tkemin=1.e-20
   real :: csx = 0.23
   real :: prndtl = 0.3333333333
-
+  real :: clouddiff = -1.
   real, allocatable, dimension (:,:) :: sxy1, sxy2, sxy3, sxz1, sxz2, sxz3    &
        , sxz4, sxz5, sxz6  ,szx1, szx2, szx3, szx4, szx5
   real, allocatable, dimension (:,:,:) :: szxy 
@@ -245,8 +245,9 @@ contains
       
     use defs, only          : pi, vonk
     use stat, only          : tke_sgs
-    use util, only          : get_avg3, get_cor3
+    use util, only          : get_avg3, get_cor3, calclevel
     use mpi_interface, only : cyclics, cyclicc
+    use grid, only          : liquid
 
     implicit none
 
@@ -255,7 +256,7 @@ contains
     real, intent(in)    :: dxi,dyi,zm(n1),dn0(n1)
     real, intent(inout) :: ri(n1,n2,n3),kh(n1,n2,n3)
     real, intent(out)   :: km(n1,n2,n3),szxy(n1,n2,n3)
-
+    integer             :: cb, ct
     real    :: delta,pr
 
     pr    = abs(prndtl)
@@ -271,8 +272,14 @@ contains
              ! variable km represents what is commonly known as Km, the eddy viscosity
              ! variable kh represents strain rate factor S^2 (dummy variable)
              !
+             
+             ! Original:
              km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) &
                   *0.5*(dn0(k)+dn0(k+1))/(1./(delta*csx)**2+1./(zm(k)*vonk)**2)
+
+             ! Hack BvS: remove damping
+             !km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) * 0.5 * (dn0(k)+dn0(k+1)) * (csx * delta)**2. 
+
              !
              ! after kh is multiplied with the factor (1-ri/pr), the product of kh 
              ! and km represents the dissipation rate epsilon 
@@ -286,6 +293,8 @@ contains
           km(n1-1,i,j) = km(n1-2,i,j)    
        enddo
     enddo
+
+    !print*,sum(km(1,:,:))/1024.,sum(km(2,:,:))/1024.,sum(km(3,:,:))/1024.,sum(km(4,:,:))/1024.,sum(km(5,:,:))/1024.,sum(km(6,:,:))/1024.,sum(km(7,:,:))/1024.,sum(km(8,:,:))/1024.,sum(km(9,:,:))/1024.,sum(km(10,:,:))/1024.
 
     call cyclics(n1,n2,n3,km,req)
     call cyclicc(n1,n2,n3,km,req)
@@ -306,7 +315,7 @@ contains
           ! variable sz1 which corresponds to Km^2.
           !
           tke_sgs(k) = sz1(k)/(delta*pi*(csx**2))**2
-          sz1(k) = 1./sqrt(1./(delta*csx)**2+1./(zm(k)*vonk+0.001)**2)
+          sz1(k) = 1./sqrt(1./(delta*csx)**1+1./(zm(k)*vonk+0.001)**1)
        end do
        call updtst(n1,'sgs',-1,tke_sgs,1) ! sgs tke
        call updtst(n1,'sgs',-5,sz1,1)      ! mixing length
@@ -330,6 +339,21 @@ contains
           enddo
        enddo
     enddo
+    if (clouddiff> 0) then ! Additional diffusion outside of the clouds - but in the cloud layer
+      call calclevel(liquid, cb, 'base')
+      call calclevel(liquid, ct, 'top')    
+      do j=3,n3-2
+        do i=3,n2-2
+            do k=cb,ct
+              if (liquid(k,i,j) <1e-10) then
+                kh(k,i,j) = clouddiff * kh(k,i,j) 
+              end if
+            enddo
+        enddo
+      enddo
+        
+    
+    end if
     call cyclics(n1,n2,n3,kh,req)
     call cyclicc(n1,n2,n3,kh,req)
 

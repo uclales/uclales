@@ -21,12 +21,12 @@ module advf
 
   implicit none
 
-  integer :: lmtr = 3 
+  integer :: lmtr = 3
 
 contains
   !
   !----------------------------------------------------------------------
-  ! subroutine fadvect: This is the driver for scalar advection.  It 
+  ! subroutine fadvect: This is the driver for scalar advection.  It
   ! advects using the average of the velocities at the current and past
   ! times.
   !
@@ -52,7 +52,7 @@ contains
        call updtst(nzp,'adv',0,v1da,1)
     end if
     !
-    ! loop through the scalar table, setting iscp and isct to the 
+    ! loop through the scalar table, setting iscp and isct to the
     ! appropriate scalar pointer and do the advection, also add large
     ! scale subsidence.  Don't advect TKE here since it resides at a
     ! w-point
@@ -102,10 +102,10 @@ contains
 
   end subroutine advtnd
   !
-  !---------------------------------------------------------------------- 
-  ! Subroutine mamaos: An alternative second order flux limited scheme 
-  ! written by Verica and Christiana as part of the MAMAOS program.  
-  ! 
+  !----------------------------------------------------------------------
+  ! Subroutine mamaos: An alternative second order flux limited scheme
+  ! written by Verica and Christiana as part of the MAMAOS program.
+  !
   ! July 21, 2003
   !
   subroutine mamaos(n1,n2,n3,w,scp0,scp,dzi_t,dzi_m,dn0,dt,lwpt)
@@ -123,7 +123,7 @@ contains
     real    :: dzi_t_local(n1) ! grid spacing for scalars
     real    :: dzi_m_local(n1) ! grid spacing for velocity
     real    :: cfl(n1)       ! cfl numbers at the interface (staggered)
-    real    :: C(n1)         ! limiter    
+    real    :: C(n1)         ! limiter
     real    :: r(n1)         ! slope ratio
     real    :: wpdn(n1)      ! momentum: wp*density
     integer :: i, j, k, kp1, k1, k2
@@ -204,7 +204,7 @@ contains
                   ((1.-C(k))*abs(wpdn(k)) + wpdn(k)*cfl(k)*C(k))
           end do
           do k = 2,n1-1
-             scp(k,i,j) = scp(k,i,j) - ((w(k,i,j)-w(k-1,i,j)) -        & 
+             scp(k,i,j) = scp(k,i,j) - ((w(k,i,j)-w(k-1,i,j)) -        &
                   scp0(k,i,j)*(wpdn(k)-wpdn(k-1))) *                   &
                   dt*dzi_t_local(k)/dn0(k)
           enddo
@@ -214,10 +214,10 @@ contains
 
   end subroutine mamaos
   !
-  !---------------------------------------------------------------------- 
-  ! Subroutine mamaos_x: An alternative second order flux limited scheme 
+  !----------------------------------------------------------------------
+  ! Subroutine mamaos_x: An alternative second order flux limited scheme
   ! for advection in the x direction.  (adapted from mamaos)
-  ! 
+  !
   ! September 3, 2003
   !
   subroutine mamaos_x(n1,n2,n3,u,scp0,scp,dxi,dt)
@@ -230,7 +230,7 @@ contains
     real, intent (inout) :: scp(n1,n2,n3)
 
     real    :: cfl(n2,n1)       ! cfl numbers at the interface (staggered)
-    real    :: C(n2,n1)         ! limiter    
+    real    :: C(n2,n1)         ! limiter
     real    :: r(n2,n1)         ! slope ratio
     real    :: scr(n2,n1)       ! flux scratch array
     integer :: i, j, k, i1, i2
@@ -250,11 +250,11 @@ contains
                 call appl_abort(0)
              end if
           end do
-       end do     
+       end do
           !
           ! calculate the ratio of slopes
           !
-       do k = 2, n1-1 
+       do k = 2, n1-1
           do i = 2,n2-2
              gamma = int(-sign(1.,cfl(i,k)))
              if (abs(scr(i,k) - scp0(k,i,j)) > spacing(scr(i,k))) then
@@ -293,10 +293,10 @@ contains
 
   end subroutine mamaos_x
   !
-  !---------------------------------------------------------------------- 
-  ! Subroutine mamaos_y: An alternative second order flux limited scheme 
+  !----------------------------------------------------------------------
+  ! Subroutine mamaos_y: An alternative second order flux limited scheme
   ! for advection in the y direction.  (adapted from mamaos)
-  ! 
+  !
   ! September 3, 2003
   !
   subroutine mamaos_y(n1,n2,n3,v,scp0,scp,dyi,dt)
@@ -309,7 +309,7 @@ contains
     real, intent (inout) :: scp(n1,n2,n3)
 
     real    :: cfl(n3,n1)       ! cfl numbers at the interface (staggered)
-    real    :: C(n3,n1)         ! limiter    
+    real    :: C(n3,n1)         ! limiter
     real    :: r(n3,n1)         ! slope ratio
     real    :: scr(n3,n1)       ! flux scratch array
     integer :: i, j, k, j1, j2
@@ -333,7 +333,7 @@ contains
           !
           ! calculate the ratio of slopes
           !
-       do k = 2, n1-1 
+       do k = 2, n1-1
           do j = 2,n3-2
              gamma = int(-sign(1.,cfl(j,k)))
              if (abs(scr(j,k) - scp0(k,i,j)) > spacing(scr(j,k))) then
