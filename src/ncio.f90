@@ -752,15 +752,15 @@ contains
        if (itype==2) ncinfo = 'time'
     case('fsttm')
        if (itype==0) ncinfo = 'First sample time'
-       if (itype==1) ncinfo = 'kg/m^3'
+       if (itype==1) ncinfo = 's'
        if (itype==2) ncinfo = 'time'
     case('lsttm')
-       if (itype==0) ncinfo = 'Basic state density'
-       if (itype==1) ncinfo = 'kg/m^3'
+       if (itype==0) ncinfo = 'Last sample time'
+       if (itype==1) ncinfo = 's'
        if (itype==2) ncinfo = 'time'
     case('nsmp')
-       if (itype==0) ncinfo = 'Basic state density'
-       if (itype==1) ncinfo = 'kg/m^3'
+       if (itype==0) ncinfo = 'Sample time counts'
+       if (itype==1) ncinfo = '#'
        if (itype==2) ncinfo = 'time'
     case('u_2')
        if (itype==0) ncinfo = 'Variance of u wind'
