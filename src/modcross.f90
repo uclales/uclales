@@ -477,18 +477,6 @@ contains
        end do
     end do
 
-!-------- calc lcl -------------------
-    call calcavg(tv, liquid, tvenv)
-    call calcavgcld(tv, liquid, tvcld)
-
-    lcl=0
-    do k=1,nzp
-       if (tvcld(k)>tvenv(k)) then
-           lcl=k
-           exit
-       end if 
-    end do
-!-------------------------------------
 
     call get_avg3(nzp,nxp,nyp,tv,tvbar)
     do j=3,nyp-2
@@ -502,12 +490,16 @@ contains
     
     call calclevel(liquid, cb, 'base')
     call calclevel(liquid, ct, 'top')
-    call get_avg3(nzp,nxp,nyp, tv,c1)
+    call get_avg3(nzp,nxp,nyp, tv, c1)
     call get_var3(nzp,nxp,nyp, tv, c1, thvar)
     zi = maxloc(thvar,1)       
     if (cb >= nzp-1) then
       cb = zi
     end if
+
+!-------- calc lcl -------------------
+    lcl=cb+nint(200.*dzi_m(cb))
+!-------------------------------------
     if (lcl >= nzp-1) then
       lcl = 0
     end if
