@@ -1,10 +1,11 @@
+# -*- coding: utf-8 -*-
 ################################################################################
-#                                                                              # 
+#                                                                              #
 #   Create density weighted uniform particle distribution for the Lagrangian   #
 #   Particle Tracking Module in UCLA-LES. As UCLA-LES uses the anelastic       #
-#   equations, we need to start with a density weighted distribution.          # 
+#   equations, we need to start with a density weighted distribution.          #
 #   Requires only the math module,which is available by default in Python.     #
-#   Call: "python make_particles.py", all options are hardcoded.               # 
+#   Call: "python make_particles.py", all options are hardcoded.               #
 #    - Bart van Stratum, Aug 2012                                              #
 #                                                                              #
 ################################################################################
@@ -13,9 +14,9 @@ from math import floor
 
 # USER INPUT:
 tstart      = 0.          # release time of particles
-nxy         = 512**2.     # Goal number of particles per level
-nz          = 158         # Number of vertical levels
-dz          = 25.         # Vertical grid spacing
+nxy         = 128**2.     # Goal number of particles per level
+nz          = 98         # Number of vertical levels
+dz          = 40.         # Vertical grid spacing
 xysize      = 12800.      # Domain size LES
 
 ps          = 101540.     # From UCLALES Namelist
@@ -34,7 +35,7 @@ cpr         = cp/R
 
 # Calculate number of particles.
 # Required before writing the output, first line should
-# contain the total number of particles. 
+# contain the total number of particles.
 npart       = 0
 pi00        = cp * (ps * p00i)**rcp + g * (0.5 * dz) / th00
 for k in range(nz):
@@ -42,12 +43,12 @@ for k in range(nz):
   pi0       = pi00 + g * dz0 / th00
   dn0       = ((cp**(1.-cpr)) * p00) / (R * th00 * pi0**(1.-cpr))
   nxyl      = round((nxy * dn0)**0.5)
-  npart    += nxyl**2. 
+  npart    += nxyl**2.
 
 # Write to partstartpos
 partfile    = open('partstartpos','w')
 partfile.write(str(int(npart))+'\n')
-z = dz / 2. 
+z = dz / 2.
 for k in range(nz):
   dz0       = -float(k+1)  * dz
   pi0       = pi00 + g * dz0 / th00
@@ -65,5 +66,5 @@ for k in range(nz):
     y = dxy/2.
     x += dxy
   z += dz
-  
+
 partfile.close()
