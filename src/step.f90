@@ -105,8 +105,8 @@ contains
        ! output control
        !
 
-       ! Sample particles; automatically samples when savgflg=.true., don't sample double...
-       if(lpartic .and. lpartstat .and. statflg .and. (savgflg .eqv. .false.)) call particlestat(.false.,time+dt)
+       !! Sample particles; automatically samples when savgflg=.true., don't sample double...
+       !if(lpartic .and. lpartstat .and. statflg .and. (savgflg .eqv. .false.)) call particlestat(.false.,time+dt)
 
        if(savgflg) then
          if(myid==0) print*,'     profiles at time=',time
