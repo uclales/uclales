@@ -23,13 +23,13 @@ module fuliou
   use cldwtr, only : init_cldwtr, cloud_water, init_cldice, cloud_ice, init_cldgrp, cloud_grp
   use solver, only : qft
   use mpi_interface, only : myid
-  use RandomNumbers
+!  use RandomNumbers
   use ckd
 
   implicit none
 
   logical, save :: Initialized = .False.
-  type(randomNumberSequence), save :: randoms
+!  type(randomNumberSequence), save :: randoms
   real, parameter :: minSolarZenithCosForVis = 1.e-4
 
 contains
@@ -39,10 +39,21 @@ contains
   ! model on first call
   !
   subroutine rad_init
+  REAL, ALLOCATABLE :: noisedummy(:)
+  INTEGER, DIMENSION(:) , ALLOCATABLE :: seed
+  INTEGER :: i,n
 
     if (.not.Initialized) then
-       call init_ckd   
-       randoms = new_RandomNumberSequence(1+myid)
+       call init_ckd
+       call random_seed(SIZE = n)
+       ALLOCATE( seed(n))
+       DO i=1,n
+          seed(i)=832*i+myid
+       ENDDO
+       ALLOCATE(noisedummy(5000))
+       CALL RANDOM_NUMBER(noisedummy)
+       DEALLOCATE(noisedummy)
+!       randoms = new_RandomNumberSequence(1+myid)
        call init_cldwtr
        call init_cldice
        call init_cldgrp
@@ -157,11 +168,24 @@ contains
     real, dimension(:), allocatable, save :: bandWeights
     real :: randomNumber
     integer :: sz
+    REAL, ALLOCATABLE :: noisedummy(:)
+    INTEGER, DIMENSION(:) , ALLOCATABLE :: seed
+    INTEGER :: i,n
     ! ----------------------------------------
 
     if (.not.Initialized) then
-       call init_ckd   
-       randoms = new_RandomNumberSequence(1+myid)
+       call init_ckd
+       call random_seed(SIZE = n)
+       ALLOCATE( seed(n))
+       DO i=1,n
+          seed(i)=834*i+myid
+       ENDDO
+       ALLOCATE(noisedummy(5000))
+       CALL RANDOM_NUMBER(noisedummy)
+       DEALLOCATE(noisedummy)
+!       IF ( myid == 0 ) OPEN(unit=34,file="random.dat",status="replace",action="write")
+
+!       randoms = new_RandomNumberSequence(1+myid)
        call init_cldwtr
        call init_cldice
        call init_cldgrp
@@ -183,7 +207,9 @@ contains
        ! Select a single band and g-point (ib, ig1) and use these as the limits
        !   in the loop through the spectrum below. 
        !
-       randomNumber = getRandomReal(randoms)
+       call random_number(randomNumber)
+!       randomNumber = getRandomReal(randoms)
+!       IF ( myid == 0 ) write(34,'(f10.7)') randomNumber
        call select_bandg(ir_bands, bandweights, randomNumber, ib, ig1, sz) 
        ig2 = ig1
        iblimit = 1
@@ -319,7 +345,8 @@ contains
       call thicks(pp, pt, ph, dz) 
   
       if (McICA) then
-         randomNumber = getRandomReal(randoms)
+         call random_number(randomNumber)
+!         randomNumber = getRandomReal(randoms)
          !
          ! Select a single band and g-point (ib, ig1) and use these as the 
          ! limits in the loop through the spectrum below. 
@@ -592,19 +619,19 @@ contains
        do k = 2, nv
           tk = (pt(k)+pt(k-1))*0.5
           if ((tk.gt.0.0)) then
-          bf(k) = bf(k) + (fq1/(exp(fq2/tk) - 1.0))*(v1-v2)
+             bf(k) = bf(k) + (fq1/(exp(fq2/tk) - 1.0))*(v1-v2)
           else
              print*,'tk wrong',tk,v1,v2,rlimit,llimit
              stop
           endif
        end do
-          if ((pt(1).gt.0.0)) then
-       bf(1) = bf(1) + (fq1/(exp(fq2/pt(1)) - 1.0))*(v1-v2)
-       bf(nv1) = bf(nv1) + (fq1/(exp(fq2/tskin) - 1.0))*(v1-v2)
-          else
-             print*,'pt wrong',pt(1),v1,v2,rlimit,llimit
-             stop
-          endif
+       if ((pt(1).gt.0.0)) then
+          bf(1) = bf(1) + (fq1/(exp(fq2/pt(1)) - 1.0))*(v1-v2)
+          bf(nv1) = bf(nv1) + (fq1/(exp(fq2/tskin) - 1.0))*(v1-v2)
+       else
+          print*,'pt wrong',pt(1),v1,v2,rlimit,llimit
+          stop
+       endif
        v1 = v2
     end do
 
