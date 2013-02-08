@@ -489,7 +489,7 @@ contains
              exner = (pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp
              p(k,i,j) = p00 * (exner)**cpr
              tk=a_theta(k,i,j)*exner
-             tstar = 1./(1./tk-55.-log(a_rp(k,i,j)/rslf(p(k,i,j),tk))/2840.)+55.
+             tstar = 1./(1./(tk-55.)-log(a_rp(k,i,j)/rslf(p(k,i,j),tk))/2840.)+55.
              th_e(k,i,j) = tk*(p00/p(k,i,j))**(0.2854*(1.-0.28*a_rp(k,i,j)))*exp(a_rp(k,i,j)*(1.+0.81*a_rp(k,i,j))*(3376./tstar-2.54))
           end do
        end do
