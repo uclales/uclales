@@ -407,6 +407,12 @@ contains
           call appl_abort(0)
        end select
 
+       ! set relative humidity to 10% above 10 km to avoid builup of ice
+
+       if ((trim(case_name).eq."waite").and.(hs(ns).gt.10000.).and.hs(ns).lt.15000.) &
+           rts(ns)  = min(0.10*rslf(ps(ns),tks(ns)),0.10*rsif(ps(ns),tks(ns)))
+       if ((trim(case_name).eq."waite").and.(hs(ns).ge.15000.)) rts(ns)  = 0.0
+
        do iterate1 = 1,1
          if (irsflg == 0) then
            rts(ns) = xs(ns)*rslf(ps(ns),tks(ns))
