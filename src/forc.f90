@@ -54,7 +54,7 @@ contains
     use grid, only: nxp, nyp, nzp, zm, zt, dzi_t, dzi_m, dn0, iradtyp, liquid  &
          , a_rflx, a_sflx, albedo, a_tt, a_tp, a_rt, a_rp, a_pexnr, a_scr1 &
          , vapor, a_rpp,a_ricep,a_nicep,a_rgrp, CCN, pi0, pi1, level, a_ut, a_up, a_vt, a_vp,a_theta,&
-          a_lflxu, a_lflxd, a_sflxu, a_sflxd,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa,reff
+          a_lflxu, a_lflxd, a_sflxu, a_sflxd,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa,umean
 
     use mpi_interface, only : myid, appl_abort
     use util, only : get_avg3
@@ -72,7 +72,7 @@ contains
 
     select case(iradtyp)
     case (1)
-        call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt)
+        call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt,umean)
     case (2)
        select case(level)
        case(1) 
@@ -153,7 +153,7 @@ contains
       do k=1,nzp-2
         do j=3,nyp-2
           do i=3,nxp-2
-            a_ut(k,i,j)=a_ut(k,i,j)-(am(k)-10.)/12./3600.
+            a_ut(k,i,j)=a_ut(k,i,j)-(am(k)+umean-10.)/12./3600.
           end do
         end do
       end do
@@ -202,7 +202,7 @@ contains
   ! subroutine case_forcing: adjusts tendencies according to a specified
   ! large scale forcing.  Normally case (run) specific.
   !
-  subroutine case_forcing(n1,n2,n3,case_name,zt,dzi_t,dzi_m,tl,rt,tt,rtt)
+  subroutine case_forcing(n1,n2,n3,case_name,zt,dzi_t,dzi_m,tl,rt,tt,rtt,umean)
 
     use mpi_interface, only : pecount, double_scalar_par_sum,myid, appl_abort
     use stat, only : get_zi
@@ -212,6 +212,7 @@ contains
     real, dimension (n1,n2,n3), intent (in)    :: tl, rt
     real, dimension (n1,n2,n3), intent (inout) :: tt, rtt
     character (len=5), intent (in) :: case_name
+    real, intent (in)    :: umean
 
     integer :: i,j,k,kp1
     real, dimension (n1) :: sf
