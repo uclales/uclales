@@ -79,7 +79,7 @@ contains
   subroutine open_nc(fname, ncid,nrec, rtimee, ldelete)
     use grid,   only : tname
     use netcdf, only : nf90_create, nf90_open, nf90_inquire, nf90_inquire_dimension, &
-                       nf90_inq_varid, nf90_get_var, nf90_put_var, nf90_sync, nf90_share, &
+                       nf90_inq_varid, nf90_get_var, nf90_put_var, nf90_sync, nf90_hdf5, &
                        nf90_write, nf90_noerr, nf90_inquire_variable, nf90_short
     integer, intent (out)          :: ncid   !< NetCDF file number
     integer, intent (out),optional :: nrec   !< The record number that corresponds to the current simulation time
@@ -109,7 +109,7 @@ contains
     ncall = 0
     if (.not.exists) then ! Write the header of the file, and ensure we're in data mode
       call date_and_time(date,time)
-      iret = nf90_create(fname,NF90_SHARE,ncid)
+      iret = nf90_create(fname,NF90_HDF5,ncid)
       if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
       iret = putatt_nc(ncid, 'title', trim(fname))
       if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
