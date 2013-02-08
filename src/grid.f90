@@ -614,6 +614,7 @@ contains
        call newvar(n)
        write(10) a_sp
     end do
+    write(10) prc_acc
 
     close(10)
 
@@ -670,6 +671,7 @@ contains
        do n=nscl+1,nsclx
           read (10)
        end do
+       read (10) prc_acc
 
        close(10)
        !
