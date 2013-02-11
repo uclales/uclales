@@ -1687,15 +1687,16 @@ contains
   subroutine balanced_particledump(time)
     use mpi_interface, only : mpi_comm_world, myid, mpi_integer, mpi_double_precision, ierror, nxprocs, nyprocs, mpi_status_size, wrxid, wryid, nxg, nyg, mpi_sum
     use grid,          only : tname, deltax, deltay, dzi_t, zm, umean, vmean
-    use modnetcdf,     only : writevar_nc, fillvalue_double
+    use modnetcdf,     only : writevar_nc, fillvalue_double, nchandle_error
+    use netcdf,        only : nf90_inq_dimid, nf90_inquire_dimension, nf90_noerr
     implicit none
 
     real, intent(in)                     :: time
     type (particle_record),       pointer:: particle
     integer                              :: status(mpi_status_size)
-    integer                              :: nlocal,nprocs,p,nvar,start,end,nsr,isr,nvl,loc,bloc,ii
+    integer                              :: nlocal,nprocs,p,nvar,start,end,nsr,isr,nvl,loc,bloc,ii,stat,partid,npart
     integer, allocatable, dimension(:)   :: tosend,toreceive,base,sendbase,receivebase
-    real, allocatable, dimension(:)      :: sendbuff,recvbuff
+    real, allocatable, dimension(:)      :: sendbuff,recvbuff,addnpart
     real, allocatable, dimension(:,:)    :: sb_sorted
     integer, allocatable, dimension(:,:) :: status_array
     integer, allocatable, dimension(:)   :: req
@@ -1826,6 +1827,7 @@ contains
 
       ! Sort particles
       allocate(sb_sorted(size(recvbuff)/nvar,nvar-1))
+      allocate(addnpart(size(recvbuff)/nvar))
       bloc = myid * nlocal + 1
       ii = 1
       do p = 1, size(recvbuff)/nvar
@@ -1858,10 +1860,21 @@ contains
         end if
 
         ii = ii + nvar
+	addnpart(p) = p
       end do
 
       ! Write to NetCDF
       call writevar_nc(ncpartid,tname,time,ncpartrec)
+      
+      stat = nf90_inq_dimid(ncpartid, "particles", partid)
+      if (stat /= nf90_noerr) call nchandle_error(ncpartid, stat)
+      stat = nf90_inquire_dimension(ncpartid, partid, len = npart)
+      if (stat /= nf90_noerr) call nchandle_error(ncpartid, stat)
+      ! Write particle dimension again, if the particle number increased.
+      if(size(addnpart) .gt. npart) then 
+        call writevar_nc(ncpartid,'particles',addnpart,ncpartrec)
+      end if
+      
       call writevar_nc(ncpartid,'x',sb_sorted(:,1),ncpartrec)
       call writevar_nc(ncpartid,'y',sb_sorted(:,2),ncpartrec)
       call writevar_nc(ncpartid,'z',sb_sorted(:,3),ncpartrec)
@@ -2382,17 +2395,18 @@ contains
       nlocal = np - (nxprocs*nyprocs-1) * nlocal
     end if
 
-    allocate(dimvalues(nlocal,2))
+    !allocate(dimvalues(nlocal,2))
+    allocate(dimvalues(1,2))
 
     dimvalues      = 0
-    do k=1,nlocal
-      dimvalues(k,1) = k
-    end do
+    !do k=1,nlocal
+    !  dimvalues(k,1) = k
+    !end do
 
     dimname(1)     = 'particles'
     dimlongname(1) = 'ID of particle'
     dimunit(1)     = '-'
-    dimsize(1)     = nlocal
+    dimsize(1)     = 0 !nlocal
     dimname(2)     = tname
     dimlongname(2) = tlongname
     dimunit(2)     = tunit
