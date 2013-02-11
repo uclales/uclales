@@ -1694,13 +1694,13 @@ contains
     real, intent(in)                     :: time
     type (particle_record),       pointer:: particle
     integer                              :: status(mpi_status_size)
-    integer                              :: nlocal,nprocs,p,nvar,start,end,nsr,isr,nvl,loc,bloc,ii,stat,partid,npart
+    integer                              :: nprocs,p,nvar,start,end,nsr,isr,nvl,loc,ii,stat,partid,npart
     integer, allocatable, dimension(:)   :: tosend,toreceive,base,sendbase,receivebase
     real, allocatable, dimension(:)      :: sendbuff,recvbuff,addnpart
     real, allocatable, dimension(:,:)    :: sb_sorted
     integer, allocatable, dimension(:,:) :: status_array
     integer, allocatable, dimension(:)   :: req
-    real                                 :: thl,thv,rt,rl
+    real                                 :: thl,thv,rt,rl,p_real
     if (.not. lpartic) return
     if(time >= tnextdump) then
 
@@ -1714,18 +1714,19 @@ contains
       allocate(tosend(0:nprocs-1),toreceive(0:nprocs-1),base(0:nprocs-1),sendbase(0:nprocs-1),receivebase(0:nprocs-1))
 
       ! Find average number of particles per proc
-      nlocal = floor(real(np) / nprocs)
+      !nlocal = floor(real(np) / nprocs)
 
       ! Determine how many particles to send to which proc
       tosend = 0
       particle => head
       do while( associated(particle) )
-        p = floor((particle%unique-1) / nlocal)       ! Which proc to send to
-        if(p .gt. nprocs-1) p = nprocs - 1            ! Last proc gets remaining particles
-        tosend(p) = tosend(p) + 1
+        !p = floor((particle%unique-1) / nlocal)       ! Which proc to send to
+        !if(p .gt. nprocs-1) p = nprocs - 1            ! Last proc gets remaining particles
+        p = (particle%unique - floor(particle%unique)) * nprocs
+	tosend(p) = tosend(p) + 1
         particle => particle%next
       end do
-
+            
       ! 1. Communicate nparticles to send/receive to/from each proc
       ! 2. Find start position for each proc in send/recv buff
       do p=0,nprocs-1
@@ -1738,19 +1739,20 @@ contains
         else
           sendbase(p)    = sendbase(p-1)    + (tosend(p-1)    * nvar)
           receivebase(p) = receivebase(p-1) + (toreceive(p-1) * nvar)
-        end if
+        end if	
       end do
 
       base = sendbase  ! will be changed during filling send buffer
 
       ! Allocate send/receive buffers
       allocate(sendbuff(sum(tosend)*nvar),recvbuff(sum(toreceive)*nvar))
-
+      
       ! Fill send buffer
       particle => head
       do while( associated(particle) )
-        p = floor((particle%unique-1) / nlocal)       ! Which proc to send to
-        if(p .gt. nprocs-1) p = nprocs-1              ! Last proc gets remaining particles
+        !p = floor((particle%unique-1) / nlocal)       ! Which proc to send to
+        p = (particle%unique - floor(particle%unique)) * nprocs	
+        !if(p .gt. nprocs-1) p = nprocs-1              ! Last proc gets remaining particles
 
         if(lpartdumpth .or. lpartdumpmr) call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
 
@@ -1827,12 +1829,16 @@ contains
 
       ! Sort particles
       allocate(sb_sorted(size(recvbuff)/nvar,nvar-1))
+      write(*,*) 'myid:', myid,', size sb_sorted: ', size(sb_sorted,1)  
+      
+      sb_sorted = fillvalue_double
       allocate(addnpart(size(recvbuff)/nvar))
-      bloc = myid * nlocal + 1
+      !bloc = myid * nlocal + 1
       ii = 1
       do p = 1, size(recvbuff)/nvar
 
-        loc = recvbuff(ii)-bloc+1
+        !loc = recvbuff(ii)-bloc+1
+	loc = floor(recvbuff(ii))
         sb_sorted(loc,1) = recvbuff(ii+1)
         sb_sorted(loc,2) = recvbuff(ii+2)
         sb_sorted(loc,3) = recvbuff(ii+3)
@@ -1865,7 +1871,7 @@ contains
 
       ! Write to NetCDF
       call writevar_nc(ncpartid,tname,time,ncpartrec)
-      
+
       stat = nf90_inq_dimid(ncpartid, "particles", partid)
       if (stat /= nf90_noerr) call nchandle_error(ncpartid, stat)
       stat = nf90_inquire_dimension(ncpartid, partid, len = npart)
@@ -1908,7 +1914,8 @@ contains
       deallocate(status_array,req)
 
     end if
-
+    
+    
   end subroutine balanced_particledump
 
 
@@ -2054,7 +2061,7 @@ contains
   !
   !--------------------------------------------------------------------------
   !
-  ! subroutine init_particles: initialize particles, reading initial position,
+  ! subroutine init_particles: gialize particles, reading initial position,
   ! etc. Called from subroutine initialize (init.f90)
   !--------------------------------------------------------------------------
   !
@@ -2065,8 +2072,8 @@ contains
 
     logical, intent(in) :: hot
     character (len=80), intent(in), optional :: hfilin
-    integer(kind=long) :: n
-    integer  :: k, kmax, io
+    integer(kind=long) :: n, npart
+    integer  :: k, kmax, io, nprocs
     logical  :: exans
     real     :: tstart, xstart, ystart, zstart, ysizelocal, xsizelocal, firststartl, firststart
     real     :: pu,pts,px,py,pz,pzp,pxs,pys,pzs,pur,pvr,pwr,purp,pvrp,pwrp
@@ -2146,10 +2153,13 @@ contains
     ! Cold start -> load particle startpositions from txt
 
       np = 0
+      npart = 0
+      nprocs = nxprocs * nyprocs
+      if(myid==0) write(*,*) 'Number of Processors ',nprocs      
       startfile = 'partstartpos'
       open(ifinput,file=startfile,status='old',position='rewind',action='read')
       read(ifinput,*) np
-      write(*,*) 'Number of Particles ',np
+      if(myid==0) write(*,*) 'Number of Particles ',np
       if ( np < 1 ) return
       ! read particles from partstartpos, create linked list
       do n = 1, np
@@ -2164,8 +2174,9 @@ contains
         else
           if(floor(xstart / xsizelocal) == wrxid) then
             if(floor(ystart / ysizelocal) == wryid) then
+	      npart = npart + 1
               call add_particle(particle)
-              particle%unique         = n !+ myid/1000.0
+              particle%unique         = real(npart) + real(myid)/real(nprocs)    
               particle%x              = (xstart - (float(wrxid) * xsizelocal)) / deltax + 3.  ! +3 here for ghost cells.
               particle%y              = (ystart - (float(wryid) * ysizelocal)) / deltay + 3.  ! +3 here for ghost cells.
               do k=kmax,1,1
@@ -2291,11 +2302,11 @@ contains
 
     ! Check interpolation option
     if(int_part .eq. 1) then
-      print*,'Linear interpolation Lagrangian particles'
+      if(myid==0) print*,'Linear interpolation Lagrangian particles'
     else if(int_part .eq. 3) then
-      print*,'3rd order Lagrange interpolation Lagrangian particles'
+      if(myid==0) print*,'3rd order Lagrange interpolation Lagrangian particles'
     else
-      print*,'Invalid option interpolation Lagrangian particles, defaulting to linear'
+      if(myid==0) print*,'Invalid option interpolation Lagrangian particles, defaulting to linear'
       int_part = 1
     end if
 
@@ -2384,16 +2395,16 @@ contains
     character (40), dimension(2)      :: dimname, dimlongname, dimunit
     real, allocatable, dimension(:,:) :: dimvalues
     integer, dimension(2)             :: dimsize
-    integer                           :: k,nlocal
+    integer                           :: k
     integer, parameter                :: precis = 0
     character (len=80)                :: hname
 
     if (.not. lpartic) return
 
-    nlocal = floor(real(np) / (nxprocs*nyprocs))
-    if(myid .eq. nxprocs*nyprocs-1) then
-      nlocal = np - (nxprocs*nyprocs-1) * nlocal
-    end if
+    !nlocal = floor(real(np) / (nxprocs*nyprocs))
+    !if(myid .eq. nxprocs*nyprocs-1) then
+    !  nlocal = np - (nxprocs*nyprocs-1) * nlocal
+    !end if
 
     !allocate(dimvalues(nlocal,2))
     allocate(dimvalues(1,2))
