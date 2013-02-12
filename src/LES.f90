@@ -100,7 +100,8 @@ contains
     use modnudge, only : lnudge,tnudgefac
     use modtimedep, only : ltimedep
     use mcrp, only : microseq,lrandommicro,timenuc,nin_set,cloud_type
-    use modparticles, only : lpartic, lpartsgs,lrandsurf,lpartstat, lpartdump, lpartdumpui,lpartdumpth,lpartdumpmr, frqpartdump
+    use modparticles, only : lpartic, lpartsgs, lrandsurf, lpartstat, lpartdump, &
+         lpartdumpui, lpartdumpth, lpartdumpmr, frqpartdump, lpartdrop
 
     implicit none
 
@@ -140,8 +141,9 @@ contains
          lcouvreux , tau , &                    ! The Couvreux 'radioactive' scalar
          deflate_level , lhomflx,lhomrestart, &                         !Compression of the crosssections
          clouddiff, &
-         lpartic,lpartsgs,lrandsurf,lpartstat,lpartdump,lpartdumpui,lpartdumpth,lpartdumpmr,frqpartdump           ! Particles
-
+         lpartic,lpartsgs,lrandsurf,lpartstat,lpartdump, &           ! Particles
+	 lpartdumpui,lpartdumpth,lpartdumpmr,frqpartdump,&           ! Particles
+         lpartdrop                                                   ! Particles
 
 
     deflev = deflate_level

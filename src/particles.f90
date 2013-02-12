@@ -46,6 +46,7 @@ module modparticles
   logical            :: lpartdumpmr    = .false.        !< Switch for writing moisture (total / liquid (+rain if level==3) water mixing ratio) to dump
   real               :: frqpartdump    =  3600          !< Time interval for particle dump
   integer            :: int_part       =  3             !< Interpolation scheme, 1=linear, 3=3rd order Lagrange
+  logical            :: lpartdrop      = .false.        !< Switch for rain drop like particles
 
   character(30)      :: startfile
   integer            :: ifinput        = 1
@@ -1751,7 +1752,7 @@ contains
       particle => head
       do while( associated(particle) )
         !p = floor((particle%unique-1) / nlocal)       ! Which proc to send to
-        p = (particle%unique - floor(particle%unique)) * nprocs	
+        p = (particle%unique - floor(particle%unique)) * nprocs
         !if(p .gt. nprocs-1) p = nprocs-1              ! Last proc gets remaining particles
 
         if(lpartdumpth .or. lpartdumpmr) call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
@@ -1829,7 +1830,7 @@ contains
 
       ! Sort particles
       allocate(sb_sorted(size(recvbuff)/nvar,nvar-1))
-      write(*,*) 'myid:', myid,', size sb_sorted: ', size(sb_sorted,1)  
+      if(lpartdrop) write(*,*) 'myid:', myid,', size sb_sorted: ', size(sb_sorted,1)  
       
       sb_sorted = fillvalue_double
       allocate(addnpart(size(recvbuff)/nvar))
