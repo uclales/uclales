@@ -68,7 +68,9 @@ contains
     use modcross, only : triggercross, exitcross, lcross
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
-    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, lpartstat, exitparticlestat, write_particle_hist, particlestat, balanced_particledump,frqpartdump
+    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, &
+         lpartstat, exitparticlestat, write_particle_hist, particlestat, &
+	 balanced_particledump,frqpartdump, deactivate_drops, activate_drops, lpartdrop
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
@@ -143,6 +145,9 @@ contains
        anlflg    = .false.
        crossflg  = .false.
        lpdumpflg = .false.
+       
+       if(lpartic .and. lpartdrop) call deactivate_drops(time)
+       if(lpartic .and. lpartdrop) call activate_drops(time)
 
        ! REMOVE THIS?
        !irina

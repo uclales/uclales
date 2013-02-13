@@ -33,7 +33,8 @@ module modparticles
   !--------------------------------------------------------------------------
   use defs, only          : long
   implicit none
-  PUBLIC :: init_particles, particles, exit_particles, initparticledump, initparticlestat, write_particle_hist, particlestat, balanced_particledump
+  PUBLIC :: init_particles, particles, exit_particles, initparticledump, initparticlestat, write_particle_hist, particlestat, &
+            balanced_particledump, deactivate_drops, activate_drops
 
   ! For/from namelist
   logical            :: lpartic        = .false.        !< Switch for enabling particles
@@ -66,7 +67,7 @@ module modparticles
     type (particle_record), pointer :: next,prev
   end type
 
-  integer(kind=long) :: nplisted
+  integer(kind=long) :: nplisted, npmyid = 0
   type (particle_record), pointer :: head, tail
 
   integer            :: ipunique, ipx, ipy, ipz, ipzprev, ipxstart, ipystart, ipzstart, iptsart
@@ -152,7 +153,8 @@ contains
     end if
 
     ! Interpolation
-    if(np > 0 .and. nplisted > 0) then
+    !if(np > 0 .and. nplisted > 0) then
+    if(nplisted > 0) then
       particle => head
       do while( associated(particle) )
         if ( time - particle%tstart >= 0 ) then
@@ -630,7 +632,8 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine globalrandomize()
-    use mpi_interface, only : nxg, nyg, nyprocs, nxprocs, mpi_integer, mpi_double_precision, mpi_sum, mpi_comm_world, ierror, wrxid, wryid, ranktable, mpi_status_size, myid
+    use mpi_interface, only : nxg, nyg, nyprocs, nxprocs, mpi_integer, mpi_double_precision, &
+        mpi_sum, mpi_comm_world, ierror, wrxid, wryid, ranktable, mpi_status_size, myid
     use grid, only : deltax, deltay
     implicit none
 
@@ -688,40 +691,45 @@ contains
     allocate(recvcount(nxprocs*nyprocs))
     call mpi_allgather(nlocal*nrpartvar,1,mpi_integer,recvcount,1,mpi_integer,mpi_comm_world,ierror)
 
-    ! Create array to receive particles from other procs
-    allocate(displacements(nxprocs*nyprocs))
-    displacements(1) = 0
-    do i = 2,nxprocs*nyprocs
-      displacements(i) = displacements(i-1) + recvcount(i-1)
-    end do
-    allocate(buffrecv(sum(recvcount)))
+    if (sum(recvcount)>0) then
+      ! Create array to receive particles from other procs
+      allocate(displacements(nxprocs*nyprocs))
+      displacements(1) = 0
+      do i = 2,nxprocs*nyprocs
+        displacements(i) = displacements(i-1) + recvcount(i-1)
+      end do
+      allocate(buffrecv(sum(recvcount)))
 
-    ! Send all particles to all procs
-    call mpi_allgatherv(buffsend,nlocal*nrpartvar,mpi_double_precision,buffrecv,recvcount,displacements,mpi_double_precision,mpi_comm_world,ierror)
+      ! Send all particles to all procs
+      call mpi_allgatherv(buffsend,nlocal*nrpartvar,mpi_double_precision,buffrecv,recvcount,displacements,mpi_double_precision,mpi_comm_world,ierror)
 
-    ! Loop through particles, check if on this proc
-    xsizelocal = nxg / nxprocs
-    ysizelocal = nyg / nyprocs
-    ii = 0
-    do i=1,nglobal
-      tempx = buffrecv(ii+2)
-      tempy = buffrecv(ii+3)
-      ! If on proc: add particle
-      if(floor(tempx/xsizelocal) == wrxid) then
-        if(floor(tempy/ysizelocal) == wryid) then
-          call add_particle(particle)
-          call partbuffer(particle,buffrecv(ii+1:ii+nrpartvar),ii,.false.)
-          particle%x = particle%x - (floor(wrxid * xsizelocal)) + 3
-          particle%y = particle%y - (floor(wryid * ysizelocal)) + 3
-          particle%z = particle%z !+ 1
+      ! Loop through particles, check if on this proc
+      xsizelocal = nxg / nxprocs
+      ysizelocal = nyg / nyprocs
+      ii = 0
+      do i=1,nglobal
+        tempx = buffrecv(ii+2)
+        tempy = buffrecv(ii+3)
+        ! If on proc: add particle
+        if(floor(tempx/xsizelocal) == wrxid) then
+          if(floor(tempy/ysizelocal) == wryid) then
+            call add_particle(particle)
+            call partbuffer(particle,buffrecv(ii+1:ii+nrpartvar),ii,.false.)
+            particle%x = particle%x - (floor(wrxid * xsizelocal)) + 3
+            particle%y = particle%y - (floor(wryid * ysizelocal)) + 3
+            particle%z = particle%z !+ 1
+          end if
         end if
-      end if
-      ii = ii + nrpartvar
-    end do
-
+        ii = ii + nrpartvar
+      end do
+      ! Cleanup
+      if(nlocal>0) deallocate(buffrecv)
+      deallocate(displacements)
+    end if
+    
     ! Cleanup
-    if(nlocal>0) deallocate(buffsend,buffrecv)
-    deallocate(recvcount,displacements)
+    if(nlocal>0) deallocate(buffsend)
+    deallocate(recvcount)
     nlocal  = 0
     nglobal = 0
 
@@ -1741,6 +1749,8 @@ contains
           sendbase(p)    = sendbase(p-1)    + (tosend(p-1)    * nvar)
           receivebase(p) = receivebase(p-1) + (toreceive(p-1) * nvar)
         end if	
+	!if(myid==0) write(*,*) 'myid:', myid,', tosend   ',tosend(p)
+	!if(myid==0) write(*,*) 'myid:', myid,', toreceive',toreceive(p)
       end do
 
       base = sendbase  ! will be changed during filling send buffer
@@ -1829,17 +1839,19 @@ contains
       call mpi_waitall(nsr,req,status_array,ierror)
 
       ! Sort particles
-      allocate(sb_sorted(size(recvbuff)/nvar,nvar-1))
-      if(lpartdrop) write(*,*) 'myid:', myid,', size sb_sorted: ', size(sb_sorted,1)  
+      allocate(sb_sorted(npmyid,nvar-1))
+      !allocate(sb_sorted(size(recvbuff)/nvar,nvar-1))
+      if(myid==0) write(*,*) 'myid:', myid,', size sb_sorted: ', size(sb_sorted,1)  
+      !if(lpartdrop) write(*,*) 'myid:', myid,', recvbuff:', recvbuff  
       
       sb_sorted = fillvalue_double
-      allocate(addnpart(size(recvbuff)/nvar))
       !bloc = myid * nlocal + 1
       ii = 1
       do p = 1, size(recvbuff)/nvar
 
         !loc = recvbuff(ii)-bloc+1
 	loc = floor(recvbuff(ii))
+	!if(myid==0) write(*,*) 'myid:', myid,', npmyid: ', recvbuff(ii)
         sb_sorted(loc,1) = recvbuff(ii+1)
         sb_sorted(loc,2) = recvbuff(ii+2)
         sb_sorted(loc,3) = recvbuff(ii+3)
@@ -1867,7 +1879,7 @@ contains
         end if
 
         ii = ii + nvar
-	addnpart(p) = p
+
       end do
 
       ! Write to NetCDF
@@ -1878,8 +1890,13 @@ contains
       stat = nf90_inquire_dimension(ncpartid, partid, len = npart)
       if (stat /= nf90_noerr) call nchandle_error(ncpartid, stat)
       ! Write particle dimension again, if the particle number increased.
-      if(size(addnpart) .gt. npart) then 
+      if(npmyid .gt. npart) then
+        allocate(addnpart(npmyid))
+        do p = 1,npmyid
+	  addnpart(p) = p
+	end do 
         call writevar_nc(ncpartid,'particles',addnpart,ncpartrec)
+	deallocate(addnpart)
       end if
       
       call writevar_nc(ncpartid,'x',sb_sorted(:,1),ncpartrec)
@@ -1978,6 +1995,87 @@ contains
     end if
 
   end subroutine checkbound
+
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine deactivate_drops : deactivates drops when they leave the cloud
+  !--------------------------------------------------------------------------
+  !
+  subroutine deactivate_drops(time)
+    use mpi_interface, only : myid
+    implicit none
+    
+    type (particle_record), pointer:: particle
+    real              :: time
+    
+    if(myid==0) print*,' deactivate_drops  : Deactivate particles after 40s.'
+    
+    particle => head
+    do while(associated(particle))
+      if (time>particle%tstart+40) call delete_particle(particle)
+      particle => particle%next
+    end do    
+  
+  end subroutine deactivate_drops
+
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine activate_drops : deactivates drops when they leave the cloud
+  !--------------------------------------------------------------------------
+  !
+  subroutine activate_drops(time)
+    use mpi_interface, only : myid, nxg, nyg, wrxid, wryid, nyprocs, nxprocs
+    implicit none
+
+    type (particle_record), pointer:: particle
+    real               :: randnr(3), time
+    real               :: zmax = 1.                  ! Max height in grid coordinates
+    real               :: xsizelocal, ysizelocal
+    integer            :: nprocs
+
+    
+    if(myid==0) print*,' activate_drops  : For now, just add one particle each time step.'
+    
+    xsizelocal = nxg / nxprocs
+    ysizelocal = nyg / nyprocs
+    nprocs = nxprocs * nyprocs
+
+    !particle => tail
+    call add_particle(particle)
+    npmyid = npmyid + 1
+
+    if(myid==0) print*,'myid: ',myid,' activate_drops  : npmyid:',npmyid
+
+    call random_number(randnr)          ! Random seed has been called from init_particles...
+
+    particle%unique = real(npmyid) + real(myid)/real(nprocs)
+    particle%x    = randnr(1) * float(nxg)
+    particle%y    = randnr(2) * float(nyg)
+    particle%z    = 1. + (zmax * randnr(3))+ 40.
+    particle%x = particle%x - (floor(wrxid * xsizelocal)) + 3
+    particle%y = particle%y - (floor(wryid * ysizelocal)) + 3
+    particle%z = particle%z !+ 1  
+    particle%zprev          = particle%z
+    particle%xstart         = particle%x
+    particle%ystart         = particle%y
+    particle%zstart         = particle%z
+    particle%tstart         = time
+    particle%ures = 0.
+    particle%vres = 0.
+    particle%wres = 0.
+    particle%ures_prev      = 0.
+    particle%vres_prev      = 0.
+    particle%wres_prev      = 0.
+    particle%usgs = 0.
+    particle%vsgs = 0.
+    particle%wsgs = 0.
+    particle%usgs_prev      = 0.
+    particle%vsgs_prev      = 0.
+    particle%wsgs_prev      = 0.
+    particle%sigma2_sgs     = 0.
+    particle%partstep       = 0
+    
+  end subroutine activate_drops
 
   !
   !--------------------------------------------------------------------------
@@ -2110,7 +2208,11 @@ contains
          call appl_abort(0)
       end if
       open (666,file=hname,status='old',form='unformatted')
-      read (666,iostat=io) np,tnextdump
+      if (lpartdrop) then
+        read (666,iostat=io) np,tnextdump,npmyid
+      else
+        read (666,iostat=io) np,tnextdump
+      end if
       do
         read (666,iostat=io) pu,pts,pstp,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs,pzp,pwr,pwrp,pus,pvs,pws,pusp,pvsp,pwsp,psg2
         if(io .ne. 0) exit
@@ -2149,6 +2251,19 @@ contains
         tnextrand = 9e9
       end if
 
+    else
+    ! ------------------------------------------------------
+    ! Cold start 
+    
+    if(lpartdrop) then
+    ! ------------------------------------------------------
+    ! Cold start -> no startpositions in drop-mode
+      np = 0
+      ! Set first dump times
+      tnextdump = frqpartdump
+      tnextrand = randint
+      nstatsamp = 0
+      
     else
     ! ------------------------------------------------------
     ! Cold start -> load particle startpositions from txt
@@ -2217,6 +2332,7 @@ contains
       tnextrand = firststart
       !tnextstat = 0
       nstatsamp = 0
+    end if
     end if
 
     ipunique        = 1
@@ -2363,7 +2479,11 @@ contains
     end select
 
     open(666,file=trim(hname), form='unformatted')
-    write(666) np,tnextdump
+    if (lpartdrop) then
+      write(666) np,tnextdump,npmyid
+    else
+      write(666) np,tnextdump
+    end if
     particle => head
     do while(associated(particle))
       write(666) particle%unique, particle%tstart, particle%partstep, &
@@ -2537,7 +2657,7 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine init_particles
+  ! subroutine add_particle
   !--------------------------------------------------------------------------
   !
   subroutine add_particle(ptr)
