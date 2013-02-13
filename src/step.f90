@@ -61,7 +61,7 @@ contains
   !
   subroutine stepper
 
-    use mpi_interface, only : myid, broadcast, double_scalar_par_max
+    use mpi_interface, only : myid, broadcast_dbl, double_scalar_par_max, mpi_get_time
     use grid, only : dt, dtlong, zt, zm, nzp, dn0, u0, v0, level, &
          write_hist
     use ncio, only : write_anal, close_anal
@@ -72,7 +72,8 @@ contains
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
-    real    :: t1,t2,tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax
+    real    :: tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax
+    double precision    :: t0,t1,t2
     integer :: iret
 
     real    :: dt_prev
@@ -83,8 +84,9 @@ contains
     begtime = time
     istp    = 0
     t2      = 0.
-    do while (time < timmax .and. t2 < wctime)
-       call cpu_time(t1)           !t1=timing()
+    call mpi_get_time(t0)
+    do while (time < timmax .and. (t2-t0) < wctime)
+       call mpi_get_time(t1)
        istp = istp + 1
 
        call stathandling
@@ -153,20 +155,20 @@ contains
        !end if
 
        if(myid == 0) then
-          call cpu_time(t2)           !t1=timing()
+          call mpi_get_time(t2)
           if (mod(istp,istpfl) == 0 ) then
               if (wctime.gt.1e9) then
                 print "('   Timestep # ',i5," //     &
                        "'   Model time(sec)=',f10.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2)",     &
-                       istp, time, dt_prev, t2-t1, t2*(timmax/time-1)
+                       istp, time, dt_prev, t2-t1, (t2-t0)*(timmax/time-1)
               else
                 print "('   Timestep # ',i5," //     &
                        "'   Model time(sec)=',f10.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2,'  WC Time left(sec) = ',f10.2)",     &
-                       istp, time, dt_prev, t2-t1, t2*(timmax/time-1),wctime-t2
+                       istp, time, dt_prev, t2-t1, (t2-t0)*(timmax/time-1),wctime-t2+t0
               end if
           end if
        endif
-       call broadcast(t2, 0)
+       call broadcast_dbl(t2, 0)
     enddo
 
     call write_hist(1, time)
@@ -184,7 +186,7 @@ contains
 
     iret = close_stat()
 
-    if (t2 .ge. wctime .and. myid == 0) write(*,*) '  Wall clock limit wctime reached, stopped simulation for restart'
+    if ((t2-t0) .ge. wctime .and. myid == 0) write(*,*) '  Wall clock limit wctime reached, stopped simulation for restart'
     if (time.ge.timmax .and. myid == 0) write(*,*) '  Max simulation time timmax reached. Finished simulation successfully'
 
   end subroutine stepper
