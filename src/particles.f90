@@ -1537,6 +1537,24 @@ contains
             sigma2prof(k)  = 1.5 * sigma2prof(k)  / (nstatsamp * npartprof(k))
             if(lfsloc) fsprof(k) = fsprof(k)   / (nstatsamp * npartprof(k))
           end if
+	else
+	  uprof(k)     = -32678
+	  vprof(k)     = -32678
+          wprof(k)     = -32678
+          u2prof(k)    = -32678
+          v2prof(k)    = -32678
+          w2prof(k)    = -32678
+          tkeprof(k)   = -32678
+          ! scalars
+          tprof(k)     = -32678
+          tvprof(k)    = -32678
+          rtprof(k)    = -32678
+          rlprof(k)    = -32678
+          ccprof(k)    = -32678
+          if(lpartsgs) then
+            sigma2prof(k)  = -32678
+            if(lfsloc) fsprof(k) = -32678
+          end if
         end if
       end do
 
