@@ -104,6 +104,9 @@ contains
             ,a_rstar)
        call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,a_rstar  &
             ,uw_sfc,vw_sfc,wt_sfc,wq_sfc,ww_sfc)
+       ! HACK BvS: make sure wq_sfc is zero for Gabls
+       wq_sfc(:,:) = 0.
+
        !
        ! get fluxes from bulk formulae with coefficients given by dthcon and
        ! drtcon (wq=Ch*u*dth, Garrat p.55) and using prescribed sst 
