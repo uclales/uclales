@@ -355,10 +355,14 @@ contains
 
     implicit none
 
-    real, parameter     :: ah   =  7.8   ! stability function parameter
-    real, parameter     :: bh   = 12.0   !   "          "         "
-    real, parameter     :: am   =  4.8   !   "          "         "
-    real, parameter     :: bm   = 19.3   !   "          "         "
+    real, parameter     :: ah   =  4.7   ! stability function parameter
+    real, parameter     :: bh   = 16.0   !   "          "         "
+    real, parameter     :: am   =  4.7   !   "          "         "
+    real, parameter     :: bm   = 16.0   !   "          "         "
+    !real, parameter     :: ah   =  7.8   ! stability function parameter
+    !real, parameter     :: bh   = 12.0   !   "          "         "
+    !real, parameter     :: am   =  4.8   !   "          "         "
+    !real, parameter     :: bm   = 19.3   !   "          "         "
     real, parameter     :: pr   = 0.74   ! prandlt number
     real, parameter     :: eps  = 1.e-10 ! non-zero, small number
 
@@ -381,54 +385,63 @@ contains
     lnz   = log(z/z0) 
     klnz  = vonk/lnz              
     betg  = th00/g
-    cnst2 = -log(2.)
-    cnst1 = 3.14159/2. + 3.*cnst2
+    !cnst2 = -log(2.)
+    !cnst1 = 3.14159/2. + 3.*cnst2
 
     do j=3,n3-2
        do i=3,n2-2
           dtv = dth(i,j) + ep2*th00*drt(i,j)
           !
           ! stable case  ! Stable case is not tested!!
+          ! Replaced by new version below!!
           !
+          !if (dtv > 0.) then
+          !   x     = pr*(betg*u(i,j)**2)/dtv
+          !   y     = (am*z - 0.5*x)/lnz
+          !   x     = (x*ah*z - am**2*z*z)/(lnz**2)
+          !   lmo   = -y + sqrt(x+y**2)
+          !   zeta  = z/lmo
+          !   ustar(i,j) =  vonk*u(i,j)  /(lnz + am*zeta)
+          !   tstar(i,j) = (vonk*dtv/(lnz + ah*zeta))/pr
+          !
+          ! Neutral case
+          ! 
           if (dtv > 0.) then
-             x     = pr*(betg*u(i,j)**2)/dtv
-             y     = (am*z - 0.5*x)/lnz
-             x     = (x*ah*z - am**2*z*z)/(lnz**2)
-             lmo   = -y + sqrt(x+y**2)
-             zeta  = z/lmo
-             ustar(i,j) =  vonk*u(i,j)  /(lnz + am*zeta)
-             tstar(i,j) = (vonk*dtv/(lnz + ah*zeta))/pr
-             !
-             ! Neutral case
-             ! 
-          elseif (dtv == 0.) then
              ustar =  vonk*u(i,j)  /lnz
              tstar =  vonk*dtv/(pr*lnz)
-             !
-             ! ustable case, start iterations from values at previous tstep, 
-             ! unless the sign has changed or if it is the first call, then 
-             ! use neutral values.
-             !
+             lmo = -1.e10
+          !
+          ! ustable case, start iterations from values at previous tstep, 
+          ! unless the sign has changed or if it is the first call, then 
+          ! use neutral values.
+          !
           else
              if (first_call .or. tstar(i,j)*dtv <= 0.) then
                 ustar(i,j) = u(i,j)*klnz
                 tstar(i,j) = (dtv*klnz/pr)
+                lmo = -1.e10
              end if
 
-             do iterate = 1,3
+             do iterate = 1,10
                 lmo   = betg*ustar(i,j)**2/(vonk*tstar(i,j))
+
+                if ((dtv < 0) .and. (lmo > -0.001) ) then
+                   lmo = -0.001999
+                end if
+                if ((dtv > 0) .and. (lmo < +0.001) ) then
+                   lmo = +0.001777
+                end if
+
                 zeta  = z/lmo
-                x     = sqrt( sqrt( 1.0 - bm*zeta ) )
-                psi1  = 2.*log(1.0+x) + log(1.0+x*x) - 2.*atan(x) + cnst1
-                y     = sqrt(1.0 - bh*zeta)
-                psi2  = 2.*log(1.0 + y) +2.*cnst2
-                ustar(i,j) = u(i,j)*vonk/(lnz - psi1)
-                tstar(i,j) = (dtv*vonk/pr)/(lnz - psi2)
+                ustar(i,j) = u(i,j)*vonk/(lnz - psim(zeta))
+                tstar(i,j) = (dtv*vonk/pr)/(lnz - psih(zeta))
              end do
           end if
 
+          !obl(i,j) = lmo
           rstar(i,j) = tstar(i,j)*drt(i,j)/(dtv + eps)
           tstar(i,j) = tstar(i,j)*dth(i,j)/(dtv + eps)
+
        end do
     end do
 
@@ -436,6 +449,54 @@ contains
 
     return
   end subroutine srfcscls
+
+  !
+  ! ----------------------------------------------------------
+  ! Malte: Integrated stability function for momentum
+  !
+  function psim(zeta)
+    implicit none
+
+    real             :: psim
+    real, intent(in) :: zeta
+    real             :: x
+
+    if(zeta <= 0) then
+      x     = (1. - 15. * zeta) ** (0.25)
+      !psim = 3.14159265/2. - 2. *atan(x) + log((1.+x)** 2. * (1. + x**2.)/ 8.)
+      psim  = 3.14159265/2. - atan(x) + 2.*log((1+x)/2.) + log((1+x*x)/2.)
+    else
+      !psim  = - 4.7 * zeta
+      psim  = -2./3. * (zeta - 5./0.35)*exp(-0.35 * zeta) - zeta - (10./3.) / 0.35
+    end if
+
+    return
+  end function psim
+
+  !
+  ! ----------------------------------------------------------------------
+  ! Malte: Integrated stability function for heat
+  !
+  function psih(zeta)
+
+    implicit none
+
+    real             :: psih
+    real, intent(in) :: zeta
+    real             :: x
+
+    if(zeta <= 0) then
+      x     = (1. - 15. * zeta) ** (0.25)
+      psih  = 2. * log( (1. + x ** 2.) / 2. )
+    else
+      !psih  = - 4.7 * zeta
+      psih  = -2./3. * (zeta - 5./0.35)*exp(-0.35 * zeta) - (1. + (2./3.) * zeta) ** (1.5) - (10./3.) / 0.35 + 1.
+    end if
+
+    return
+  end function psih
+
+
   !
   ! ----------------------------------------------------------------------
   ! subroutine: sfcflxs:  this routine returns the surface fluxes based
