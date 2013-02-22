@@ -182,6 +182,7 @@ contains
     integer :: ip,im,jp,jm,kp
     real    :: y1a,y2a,y3a,y1b,y2b,y3b
     real    :: s11_wpt,s22_wpt,s33_wpt,s12_wpt,s13_wpt,s23_wpt
+
     !
     ! calculate components of the stress tensor at their natural locations
     !
