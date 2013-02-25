@@ -72,7 +72,6 @@ contains
       call ladvzu(nzp,nxp,nyp,a_up,a_ut,a_scr1,a_scr2,dztri)
     end if 
 
-
     if (sflg) then
        call get_avg3(nzp,nxp,nyp,a_scr2,v4)
        call updtst(nzp,'adv',-1,v4,1)
@@ -705,8 +704,6 @@ contains
     end do
 
   end subroutine ladvzw2nd
-
-
 
   !
   ! ----------------------------------------------------------------------
