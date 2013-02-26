@@ -37,7 +37,7 @@ contains
     use stat, only : sflg, updtst, acc_tend
     use util, only : get_avg3
 
-    integer :: order = 2   ! 2=2nd order, everything else defaults to original 4th  
+    integer :: order = 4   ! 2=2nd order, everything else defaults to original 4th  
 
     real, allocatable ::  dzmri(:), dztri(:)
     real, allocatable ::  v1(:), v2(:), v3(:), v4(:)

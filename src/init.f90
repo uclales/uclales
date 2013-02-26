@@ -497,11 +497,11 @@ contains
     ! with associated basic state density
     !
     pi0(1)=cp*(ps(1)*p00i)**rcp + g*(hs(1)-zt(1))/th00
-    dn0(1)= ((cp**(1.-cpr))*p00)/(r*th00*pi0(1)**(1.-cpr))
+    dn0(1)=((cp**(1.-cpr))*p00)/(r*th00*pi0(1)**(1.-cpr))
 
     do k=2,nzp
        pi0(k)=pi0(1) + g*(zt(1) - zt(k))/th00
-       dn0(k)= ((cp**(1.-cpr))*p00)/(r*th00*pi0(k)**(1.-cpr))
+       dn0(k)=((cp**(1.-cpr))*p00)/(r*th00*pi0(k)**(1.-cpr))
        u0(k)=u0(k)-umean
        v0(k)=v0(k)-vmean
     end do
