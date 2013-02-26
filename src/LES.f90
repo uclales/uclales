@@ -78,7 +78,8 @@ contains
     use util, only : fftinix,fftiniy
     use defs, only : SolarConstant
     use sgsm, only : csx, prndtl, clouddiff
-    use advf, only : lmtr
+    use advf, only : lmtr,advs
+    use advl, only : advm
     !irina
     use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon,lhomflx
     !use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon, sst
@@ -130,7 +131,8 @@ contains
          us     , vs     , rts   ,  & ! sounding E/W winds, water vapor
          umean  , vmean  , th00  ,  & ! gallilean E/W wind, basic state
          case_name, lmtr,           & !irina:name of the case, i.e. astex, rico, etc
-         lsvarflg,                  & !irina:flag for time bvarying large scale forcing
+         advs, advm,                & ! Advection scheme scalars, momentum
+         lsvarflg,                  & ! irina:flag for time bvarying large scale forcing
          lstendflg,                  & !irina:flag for time large scale advective tendencies
          div,  &                       !irina: divergence
          lnudge, tnudgefac, ltimedep, &             !thijs: Nudging

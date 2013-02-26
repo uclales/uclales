@@ -21,7 +21,10 @@ module advf
 
   implicit none
 
-  integer :: lmtr = 3   ! Default=3
+  integer :: lmtr = 3   !< Flux limiter, 0=none, 1=minmod, 2=superbee, 3=mc, 4=van Leer
+  integer :: advs = 1   !< advection scheme; 1=original upwind, 2=2nd(O) centered (without flux limiter)
+
+  real    :: CC    ! Used to disable flux limiter / upwind scheme
 
 contains
   !
@@ -41,6 +44,14 @@ contains
 
     real    :: v1da(nzp)
     integer :: n
+
+    ! Quick solution to disable flux limiters and go to a second order centered scheme
+    if(advs==2) then
+      CC = 0.
+    else
+      CC = 1.
+    end if
+
     !
     ! diagnose liquid water flux
     !
@@ -200,7 +211,7 @@ contains
           w(n1-1,i,j) = 0.
           do k = 2, n1-2
              w(k,i,j) = 0.5 * wpdn(k) * (scp0(k+1,i,j)+scp0(k,i,j)) -  &
-                  0.5 * (scp0(k+1,i,j)-scp0(k,i,j)) *                  &
+                  CC * 0.5 * (scp0(k+1,i,j)-scp0(k,i,j)) *             &
                   ((1.-C(k))*abs(wpdn(k)) + wpdn(k)*cfl(k)*C(k))
           end do
           do k = 2,n1-1
@@ -279,7 +290,7 @@ contains
              end select
 
              scr(i,k) = 0.5 * u(k,i,j) * (scr(i,k)+scp0(k,i,j)) -      &    ! 2nd order adv
-                  0.5 * (scr(i,k)-scp0(k,i,j)) *                       &    ! Flux lim
+                  CC * 0.5 * (scr(i,k)-scp0(k,i,j)) *                  &    ! Flux lim
                   ((1.-C(i,k))*abs(u(k,i,j)) + u(k,i,j)*cfl(i,k)*C(i,k))    ! Flux lim
           end do
 
@@ -358,7 +369,7 @@ contains
              end select
 
              scr(j,k) = 0.5 * v(k,i,j) * (scr(j,k)+scp0(k,i,j)) -       &
-                  0.5 * (scr(j,k)-scp0(k,i,j)) *                        &
+                  CC * 0.5 * (scr(j,k)-scp0(k,i,j)) *                   &
                   ((1.-C(j,k))*abs(v(k,i,j)) + v(k,i,j)*cfl(j,k)*C(j,k))
           end do
 

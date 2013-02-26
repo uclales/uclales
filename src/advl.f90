@@ -21,6 +21,8 @@ module advl
 
   implicit none
 
+  integer :: advm = 4   !< advection scheme; 2=2nd(O) centered, all else defaults to 4th(O) centered
+
 contains
   !
   ! ----------------------------------------------------------------------
@@ -36,8 +38,6 @@ contains
          nxp, nyp, nzp, dzi_t, dzi_m, dxi, dyi, dn0
     use stat, only : sflg, updtst, acc_tend
     use util, only : get_avg3
-
-    integer :: order = 4   ! 2=2nd order, everything else defaults to original 4th  
 
     real, allocatable ::  dzmri(:), dztri(:)
     real, allocatable ::  v1(:), v2(:), v3(:), v4(:)
@@ -62,7 +62,7 @@ contains
     ! advection of u by (u,v,w) all at current timelevel.  also when flag
     ! is set updated statistical array with uw flux derived from ladvzu
     !
-    if(order==2) then
+    if(advm==2) then
       call ladvxu2nd(nzp,nxp,nyp,a_up,a_ut,a_scr2,dxi)
       call ladvyu2nd(nzp,nxp,nyp,a_up,a_ut,a_vp,a_scr2,dyi)
       call ladvzu2nd(nzp,nxp,nyp,a_up,a_ut,a_scr1,a_scr2,dztri)
@@ -81,7 +81,7 @@ contains
     ! advection of v by (u,v,w) all at current timelevel.  also when flag
     ! is set updated statistical array with uw flux derived from ladvzu
     !    
-    if(order==2) then
+    if(advm==2) then
       call ladvxv2nd(nzp,nxp,nyp,a_up,a_vp,a_vt,a_scr2,dxi)
       call ladvyv2nd(nzp,nxp,nyp,a_vp,a_vt,a_scr2,dyi)
       call ladvzv2nd(nzp,nxp,nyp,a_vp,a_vt,a_scr1,a_scr2,dztri)  
@@ -100,7 +100,7 @@ contains
     ! advection of w by (u,v,w) all at current timelevel.  also when flag
     ! is set updated statistical array with uw flux derived from ladvzu
     !
-    if(order==2) then
+    if(advm==2) then
       call ladvxw2nd(nzp,nxp,nyp,a_up,a_wp,a_wt,a_scr2,dxi)
       call ladvyw2nd(nzp,nxp,nyp,a_vp,a_wp,a_wt,a_scr2,dyi)
       call ladvzw2nd(nzp,nxp,nyp,a_wp,a_wt,a_scr1,a_scr2,dzmri)
