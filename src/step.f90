@@ -331,7 +331,7 @@ contains
        end if
        call surface(sst)
 
-       call diffuse
+       call diffuse(time)
        call fadvect
        call ladvect
        if (level >= 1) then

@@ -61,7 +61,7 @@ contains
   ! SUBROUTINE DIFFUSE: Driver for calculating sub-grid fluxes (thus it
   ! includes call to surface routines) 
   !
-  subroutine diffuse
+  subroutine diffuse(timein)
 
     use grid, only : newvar, nstep, a_up, a_ut, a_vp, a_vt, a_wp, a_wt       &
          ,a_rp, a_tp, a_sp, a_st, vapor, a_pexnr, a_theta,a_km               &
@@ -73,7 +73,12 @@ contains
     use mpi_interface, only: cyclics, cyclicc
     use thrm, only         : bruvais, fll_tkrs
 
+    real, intent(in)       :: timein 
     integer :: n
+
+    ! Hack BvS: slowly increase smago constant...
+    !csx = min(timein*0.23/3600.,0.23)    
+
 
     if (.not.Initialized) call diffuse_init(nzp, nxp, nyp)
 
@@ -281,7 +286,6 @@ contains
              ! BvS: split out wall damping and stability correction 
              labn      = 1./(delta*csx)**2+1./(zm(k)*vonk)**2
              km(k,i,j) =  (dn0(k)+dn0(k+1))/2. * sqrt(max(0.,kh(k,i,j))) * sqrt(max(0.,(1.-ri(k,i,j)/pr))) / labn
-
              !
              ! after kh is multiplied with the factor (1-ri/pr), the product of kh 
              ! and km represents the dissipation rate epsilon 
