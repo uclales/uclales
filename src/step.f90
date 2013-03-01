@@ -288,6 +288,7 @@ contains
          lwaterbudget
     use stat, only : sflg, statistics
     use sgsm, only : diffuse
+    use sgsm_dyn, only : calc_cs
     !irina
     use srfc, only : surface
     !use srfc, only : surface,sst
@@ -330,6 +331,9 @@ contains
           call varlscale(time,case_name,sst,div,u0,v0)
        end if
        call surface(sst)
+
+       ! BvS
+       call calc_cs(time)      ! calculated dynamic value Cs
 
        call diffuse(time)
        call fadvect
