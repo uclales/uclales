@@ -84,7 +84,7 @@ contains
     !use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon, sst
     use step, only : timmax, timrsm, istpfl, corflg, outflg, frqanl, frqhis,          &
          frqcross , strtim, radfrq, cntlat,&
-         case_name,lsvarflg, sst, div, wctime , tau                  !irina
+         case_name,lsvarflg, sst, div, wctime , tau                 !irina
 !cgils
     use modnetcdf, only : lsync, deflate_level
     use ncio, only : deflev => deflate_level
@@ -101,7 +101,7 @@ contains
     use modtimedep, only : ltimedep
     use mcrp, only : microseq,lrandommicro,timenuc,nin_set,cloud_type, lpartdrop
     use modparticles, only : lpartic, lpartsgs, lrandsurf, lpartstat, lpartdump, &
-         lpartdumpui, lpartdumpth, lpartdumpmr, frqpartdump
+         lpartdumpui, lpartdumpth, lpartdumpmr, frqpartdump, ldropstart
 
     implicit none
 
@@ -143,7 +143,7 @@ contains
          clouddiff, &
          lpartic,lpartsgs,lrandsurf,lpartstat,lpartdump, &           ! Particles
 	 lpartdumpui,lpartdumpth,lpartdumpmr,frqpartdump,&           ! Particles
-         lpartdrop                                                   ! Particles
+         lpartdrop, ldropstart                                       ! Particles
 
 
     deflev = deflate_level

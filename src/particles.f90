@@ -48,6 +48,7 @@ module modparticles
   logical            :: lpartdumpmr    = .false.        !< Switch for writing moisture (total / liquid (+rain if level==3) water mixing ratio) to dump
   real               :: frqpartdump    =  3600          !< Time interval for particle dump
   integer            :: int_part       =  3             !< Interpolation scheme, 1=linear, 3=3rd order Lagrange
+  real               :: ldropstart     = 0.             !< Earliest time to start drops
 
   character(30)      :: startfile
   integer            :: ifinput        = 1
@@ -2064,10 +2065,10 @@ contains
     real               :: xsizelocal, ysizelocal
     integer            :: nprocs,i,j,k,newp,np_dum
 
-    
     !if(myid==0) print*,' activate_drops  : Add particles proportional to a_npauto.'
     nprocs = nxprocs * nyprocs
     np_dum = npmyid
+    if (time.ge.ldropstart) then
     
     do j=3,nyp-2
       do i=3,nxp-2
@@ -2116,6 +2117,7 @@ contains
 	end do
       end do
     end do
+    end if
     
     max_auto = MAXVAL(a_npauto)
     write(*,*) 'myid:', myid,', max npauto: ', max_auto
