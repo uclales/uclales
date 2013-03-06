@@ -32,6 +32,7 @@ module modparticles
   ! module modparticles: Langrangian particle tracking, ad(o/a)pted from DALES
   !--------------------------------------------------------------------------
   use defs, only          : long
+  use mcrp, only          : lpartdrop                   !< Switch for rain drop like particles
   implicit none
   PUBLIC :: init_particles, particles, exit_particles, initparticledump, initparticlestat, write_particle_hist, particlestat, &
             balanced_particledump, deactivate_drops, activate_drops
@@ -47,7 +48,6 @@ module modparticles
   logical            :: lpartdumpmr    = .false.        !< Switch for writing moisture (total / liquid (+rain if level==3) water mixing ratio) to dump
   real               :: frqpartdump    =  3600          !< Time interval for particle dump
   integer            :: int_part       =  3             !< Interpolation scheme, 1=linear, 3=3rd order Lagrange
-  logical            :: lpartdrop      = .false.        !< Switch for rain drop like particles
 
   character(30)      :: startfile
   integer            :: ifinput        = 1
@@ -1454,11 +1454,12 @@ contains
     use mpi_interface, only : mpi_comm_world, myid, mpi_double_precision, mpi_sum, ierror, nxprocs, nyprocs, nxg, nyg
     use modnetcdf,     only : writevar_nc, fillvalue_double
     use grid,          only : tname,dxi,dyi,dzi_t,nzp,umean,vmean,nzp
+    use netcdf,        only : nf90_sync
     implicit none
 
     logical, intent(in)     :: dowrite
     real, intent(in)        :: time
-    integer                 :: k
+    integer                 :: k,stat
     real                    :: thv,thl,rt,rl           ! From subroutine thermo
     type (particle_record), pointer:: particle
 
@@ -1623,6 +1624,8 @@ contains
         end if
       end if
 
+      stat  = nf90_sync(ncpartstatid)
+
       npartprof  = 0
       npartprofl = 0
       uprof      = 0
@@ -1715,7 +1718,7 @@ contains
     use mpi_interface, only : mpi_comm_world, myid, mpi_integer, mpi_double_precision, ierror, nxprocs, nyprocs, mpi_status_size, wrxid, wryid, nxg, nyg, mpi_sum
     use grid,          only : tname, deltax, deltay, dzi_t, zm, umean, vmean
     use modnetcdf,     only : writevar_nc, fillvalue_double, nchandle_error
-    use netcdf,        only : nf90_inq_dimid, nf90_inquire_dimension, nf90_noerr
+    use netcdf,        only : nf90_inq_dimid, nf90_inquire_dimension, nf90_noerr, nf90_sync
     implicit none
 
     real, intent(in)                     :: time
@@ -1942,6 +1945,7 @@ contains
         call writevar_nc(ncpartid,'rt',sb_sorted(:,nvl+1),ncpartrec)
         call writevar_nc(ncpartid,'rl',sb_sorted(:,nvl+2),ncpartrec)
       end if
+      stat  = nf90_sync(ncpartid)
 
       ! Cleanup!
       deallocate(tosend,toreceive,base,sendbase,receivebase)
@@ -2023,14 +2027,18 @@ contains
     use mpi_interface, only : myid
     implicit none
     
+    real, intent(in)  :: time
     type (particle_record), pointer:: particle
-    real              :: time
-    
-    if(myid==0) print*,' deactivate_drops  : Deactivate particles after 40s.'
+    real              :: thv,thl,rt,rl           ! From subroutine thermo    
+
+    !if(myid==0) print*,' deactivate_drops  : Deactivate particles if rl=0 at particle position.'
     
     particle => head
     do while(associated(particle))
-      if (time>particle%tstart+40) call delete_particle(particle)
+    
+      call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
+      if(rl==0) call delete_particle(particle)
+      !if (time>particle%tstart+40) call delete_particle(particle)
       particle => particle%next
     end do    
   
@@ -2038,60 +2046,86 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine activate_drops : deactivates drops when they leave the cloud
+  ! subroutine activate_drops : activates drops proportional to the autoconversion rate
+  !! \todo activate_drops: extend to non-equidistant grids ?!
   !--------------------------------------------------------------------------
   !
   subroutine activate_drops(time)
-    use mpi_interface, only : myid, nxg, nyg, wrxid, wryid, nyprocs, nxprocs
+    use mpi_interface, only : myid, nxg, nyg, wrxid, wryid, nyprocs, nxprocs, mpi_comm_world, mpi_integer, mpi_sum, ierror
+    use mcrp,          only : a_npauto
+    use grid,          only : nxp, nyp, nzp, deltax, deltay, deltaz
     implicit none
 
+    real, intent(in)  :: time
     type (particle_record), pointer:: particle
-    real               :: randnr(3), time
+    real               :: randnr(3), max_auto, sum_auto
     real               :: zmax = 1.                  ! Max height in grid coordinates
+    real               :: nppd = 1./10000.               ! number of particles per drops
     real               :: xsizelocal, ysizelocal
-    integer            :: nprocs
+    integer            :: nprocs,i,j,k,newp,np_dum
 
     
-    if(myid==0) print*,' activate_drops  : For now, just add one particle each time step.'
-    
-    xsizelocal = nxg / nxprocs
-    ysizelocal = nyg / nyprocs
+    !if(myid==0) print*,' activate_drops  : Add particles proportional to a_npauto.'
     nprocs = nxprocs * nyprocs
+    np_dum = npmyid
+    
+    do j=3,nyp-2
+      do i=3,nxp-2
+        do k=2,nzp-2
+	  if (a_npauto(k,i,j)>0) then
+	    
+	    a_npauto(k,i,j) = a_npauto(k,i,j)*deltax*deltay*deltaz*nppd
+	    call random_number(randnr)          ! Random seed has been called from init_particles...
+	    if(randnr(1)<(a_npauto(k,i,j)-floor(a_npauto(k,i,j)))) then
+	      a_npauto(k,i,j) = a_npauto(k,i,j) + 1.
+	    end if
+	    
+	    if (floor(a_npauto(k,i,j))>0) then
+              do newp=1,floor(a_npauto(k,i,j))
+	        call add_particle(particle)
+                npmyid = npmyid + 1
+	        call random_number(randnr)          ! Random seed has been called from init_particles...
+            
+	        particle%unique = real(npmyid) + real(myid)/real(nprocs)
+                particle%x    = real(i) + randnr(1)
+                particle%y    = real(j) + randnr(2)
+                particle%z    = real(k) + randnr(3)
+                particle%zprev          = particle%z
+                particle%xstart         = particle%x
+                particle%ystart         = particle%y
+                particle%zstart         = particle%z
+                particle%tstart         = time
+                particle%ures           = 0.
+                particle%vres           = 0.
+                particle%wres           = 0.
+                particle%ures_prev      = 0.
+                particle%vres_prev      = 0.
+                particle%wres_prev      = 0.
+                particle%usgs           = 0.
+                particle%vsgs           = 0.
+                particle%wsgs           = 0.
+                particle%usgs_prev      = 0.
+                particle%vsgs_prev      = 0.
+                particle%wsgs_prev      = 0.
+                particle%sigma2_sgs     = 0.
+                particle%partstep       = 0
+	      end do
+	    end if
 
-    !particle => tail
-    call add_particle(particle)
-    npmyid = npmyid + 1
-
-    if(myid==0) print*,'myid: ',myid,' activate_drops  : npmyid:',npmyid
-
-    call random_number(randnr)          ! Random seed has been called from init_particles...
-
-    particle%unique = real(npmyid) + real(myid)/real(nprocs)
-    particle%x    = randnr(1) * float(nxg)
-    particle%y    = randnr(2) * float(nyg)
-    particle%z    = 1. + (zmax * randnr(3))+ 40.
-    particle%x = particle%x - (floor(wrxid * xsizelocal)) + 3
-    particle%y = particle%y - (floor(wryid * ysizelocal)) + 3
-    particle%z = particle%z !+ 1  
-    particle%zprev          = particle%z
-    particle%xstart         = particle%x
-    particle%ystart         = particle%y
-    particle%zstart         = particle%z
-    particle%tstart         = time
-    particle%ures = 0.
-    particle%vres = 0.
-    particle%wres = 0.
-    particle%ures_prev      = 0.
-    particle%vres_prev      = 0.
-    particle%wres_prev      = 0.
-    particle%usgs = 0.
-    particle%vsgs = 0.
-    particle%wsgs = 0.
-    particle%usgs_prev      = 0.
-    particle%vsgs_prev      = 0.
-    particle%wsgs_prev      = 0.
-    particle%sigma2_sgs     = 0.
-    particle%partstep       = 0
+	  end if
+	end do
+      end do
+    end do
+    
+    max_auto = MAXVAL(a_npauto)
+    write(*,*) 'myid:', myid,', max npauto: ', max_auto
+    sum_auto = sum(a_npauto)
+    write(*,*) 'myid:', myid,', sum npauto: ', sum_auto,', new part.:',npmyid-np_dum
+    
+    call mpi_allreduce(npmyid,np,1,mpi_integer,mpi_sum,mpi_comm_world,ierror)
+    if(myid==0) write(*,*) 'np (active or not):', np
+    
+    deallocate(a_npauto)
     
   end subroutine activate_drops
 
@@ -2342,6 +2376,8 @@ contains
         end if
       end do
 
+      npmyid = npart
+
       ! Collect first start from other procs
       call mpi_allreduce(firststartl,firststart,1,mpi_double_precision,mpi_min,mpi_comm_world,ierror)
 
@@ -2584,8 +2620,8 @@ contains
       call addvar_nc(ncpartid,'tv','virtual potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
     end if
     if(lpartdumpmr) then
-      call addvar_nc(ncpartid,'rt','total water mixing ratio','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-      call addvar_nc(ncpartid,'rl','liquid water mixing ratio','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      call addvar_nc(ncpartid,'rt','total water mixing ratio','kg/kg',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      call addvar_nc(ncpartid,'rl','liquid water mixing ratio','kg/kg',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
     end if
 
   end subroutine initparticledump

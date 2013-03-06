@@ -99,9 +99,9 @@ contains
     use mpi_interface, only : myid, appl_abort
     use modnudge, only : lnudge,tnudgefac
     use modtimedep, only : ltimedep
-    use mcrp, only : microseq,lrandommicro,timenuc,nin_set,cloud_type
+    use mcrp, only : microseq,lrandommicro,timenuc,nin_set,cloud_type, lpartdrop
     use modparticles, only : lpartic, lpartsgs, lrandsurf, lpartstat, lpartdump, &
-         lpartdumpui, lpartdumpth, lpartdumpmr, frqpartdump, lpartdrop
+         lpartdumpui, lpartdumpth, lpartdumpmr, frqpartdump
 
     implicit none
 
