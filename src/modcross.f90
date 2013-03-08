@@ -354,6 +354,7 @@ contains
         longname = 'Tracer top height'
         unit = 'm'
       case ('core')
+        if (level < 2) return
         longname = 'Max. in cloud buoyancy'
         unit = 'K'
       case default
@@ -446,7 +447,7 @@ contains
   end subroutine addcross
 
   subroutine triggercross(rtimee)
-    use grid,      only : nxp, nyp, nzp, tname, zt, zm, dzi_m, dzi_t, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
+    use grid,      only : level,nxp, nyp, nzp, tname, zt, zm, dzi_m, dzi_t, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
        prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta
     use modnetcdf, only : writevar_nc, fillvalue_double
@@ -469,13 +470,24 @@ contains
       nccrossrec = nccrossrec - 1
       call writevar_nc(nccrossyzid, tname, rtimee, nccrossrec)
     end if
-    do j=3,nyp-2
-       do i=3,nxp-2
-          do k=1,nzp
-             tv(k,i,j) = a_theta(k,i,j)*(1.+ep2*a_rp(k,i,j) - liquid(k,i,j))
-          end do
-       end do
-    end do
+    if (level < 2) then
+      do j=3,nyp-2
+        do i=3,nxp-2
+            do k=1,nzp
+              tv(k,i,j) = a_theta(k,i,j)*(1.+ep2*a_rp(k,i,j))
+            end do
+        end do
+      end do
+    else
+      do j=3,nyp-2
+        do i=3,nxp-2
+            do k=1,nzp
+              tv(k,i,j) = a_theta(k,i,j)*(1.+ep2*a_rp(k,i,j) - liquid(k,i,j))
+            end do
+        end do
+      end do
+
+    end if
 
 
     call get_avg3(nzp,nxp,nyp,tv,tvbar)
@@ -488,20 +500,23 @@ contains
     end do
 
 
-    call calclevel(liquid, cb, 'base')
-    call calclevel(liquid, ct, 'top')
     call get_avg3(nzp,nxp,nyp, tv, c1)
     call get_var3(nzp,nxp,nyp, tv, c1, thvar)
     zi = maxloc(thvar,1)
-    if (cb >= nzp-1) then
-      cb = zi
-    end if
+    if (level > 1) then
+      call calclevel(liquid, cb, 'base')
+      call calclevel(liquid, ct, 'top')
 
-!-------- calc lcl -------------------
-    lcl=cb+nint(200.*dzi_m(cb))
-!-------------------------------------
-    if (lcl >= nzp-1) then
-      lcl = 0
+      if (cb >= nzp-1) then
+        cb = zi
+      end if
+
+  !-------- calc lcl -------------------
+      lcl=cb+nint(200.*dzi_m(cb))
+  !-------------------------------------
+      if (lcl >= nzp-1) then
+        lcl = 0
+      end if
     end if
 
     do n = 1, nkcross
