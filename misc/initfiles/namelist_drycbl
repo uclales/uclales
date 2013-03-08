@@ -1,10 +1,10 @@
  &model
-  nxp = 132
-  nyp =   5
-  nzp = 107
+  nxp = 68
+  nyp = 68
+  nzp = 66
   nxpart = .true.
-  dtlong  = 4.
-  timmax = 18000.
+  dtlong  = 20.
+  timmax = 3600.
   runtype= 'INITIAL'
   hfilin = 'dcbl.rst'
   filprf = 'dcbl_x'
@@ -16,4 +16,10 @@
   rts=   10.,   10.,
   us =   0.,    0.,
   vs =  -0.,   -0.,
+  savg_intvl=600.
+  ssam_intvl=  30.
+  frqcross=60.
+  lcross=.true.
+  lxz = .true.
+  lxy = .false.
  /
