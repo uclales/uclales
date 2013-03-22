@@ -75,9 +75,9 @@ contains
        call lsvar_init
        end if
 
-    !Malte: prescribe homogeneous surface fluxes
+    
     if (isfctyp==0) then
-        call homo_surf
+        call homo_surf       !Malte: prescribe homogeneous surface fluxes
     end if
 
     !

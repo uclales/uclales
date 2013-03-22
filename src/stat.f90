@@ -163,7 +163,7 @@ contains
          , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa &
          , a_ricep, a_rsnowp, a_rgrp, a_rhailp, a_nicep, a_nsnowp, a_ngrp, a_nhailp &
          , vapor, a_Wl, isfctyp, a_tskin, a_qskin, a_Qnet, a_G0
-    use lsmdata, only: tndskin,ra,rsurf,rsveg,rssoil,obl,cliq,Cskinav
+    use lsmdata, only: tndskin,ra,rsurf,rsveg,rssoil,obl,cliq,Cskinav,init_lsm
 
     real, intent (in) :: time
 
@@ -216,7 +216,8 @@ contains
     if (level >=1) call ts_lvl1(nzp, nxp, nyp, dn0, zt, dzi_m, a_rp)
     if (level >=2) call ts_lvl2(nzp, nxp, nyp, a_rp, a_scr2, zt)
 
-    if (isfctyp==5) call accum_lsm(nxp,nyp,a_Qnet,a_G0,tndskin,ra,rsurf,rsveg, &
+    ! BvS: only when LSM initialized
+    if (isfctyp==5 .and. init_lsm .eq. .False.) call accum_lsm(nxp,nyp,a_Qnet,a_G0,tndskin,ra,rsurf,rsveg, &
                                    rssoil,a_tskin,a_qskin,obl,cliq,a_Wl,Cskinav)
 
     if (debug) WRITE (0,*) 'statistics: set_ts ok,  myid=',myid

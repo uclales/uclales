@@ -212,8 +212,12 @@ contains
        call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,u0bar,v0bar,umean,vmean)
 
        ! a) Calculate Monin Obuhkov Length from surface scalars
+       do j=3,nyp-2
+         do i=3,nxp-2
              dtdz(i,j) = thetaav(i,j) - tskinav(i,j)
              drdz(i,j) = vaporav(i,j) - qskinav(i,j)
+         end do
+       end do
        tskinavg = sum(a_tskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
        sst = tskinavg*(psrf/p00)**(rcp)
        call srfcscls(nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,drdz,a_ustar,a_tstar,a_rstar,obl)
