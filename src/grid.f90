@@ -50,7 +50,9 @@ module grid
   integer           :: level   = 0         ! thermodynamic level
   integer           :: naddsc  = 0         ! number of additional scalars
 
+  logical           :: lcouvreux = .false.  ! switch for 'radioactive' scalar
   logical           :: lwaterbudget = .false.  ! switch for liquid water budget diagnostics
+  integer           :: ncvrx               ! Number of Couvreux scalar
 
   integer           :: nfpt = 10           ! number of rayleigh friction points
   real              :: distim = 300.0      ! dissipation timescale
@@ -72,7 +74,7 @@ module grid
   ! 2D Arrays (surface fluxes)
   !
   real, dimension (:,:), allocatable :: albedo, a_ustar, a_tstar, a_rstar,    &
-       uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa, &
+       uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, trac_sfc, sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa, &
        prc_acc, &  ! accumulated precipitation [kg/m2] (diagnostic for 2D output)
        cnd_acc, &  ! accumulated condensation  [kg/m2] (diagnostic for 2D output)
        cev_acc, &  ! accumulated evaporation of cloud water [kg/m2] (diagnostic for 2D output)
@@ -106,21 +108,21 @@ module grid
        a_rgrp,   a_rgrt,    & ! graupel
        a_ngrp,   a_ngrt,    &
        a_rhailp, a_rhailt,  & ! hail
-       a_nhailp, a_nhailt, a_rct, a_cld
+       a_nhailp, a_nhailt, a_rct, a_cld, a_cvrxp, a_cvrxt
  
 
-  character(40)      :: zname      = 'z'
-  character(40)      :: zhname     = 'zh'
+  character(40)      :: zname      = 'zt'
+  character(40)      :: zhname     = 'zm'
   character(40)      :: zlongname  = 'Vertical position of cell centers'
   character(40)      :: zhlongname = 'Vertical position of cell faces'
   character(40)      :: zunit      = 'm'
-  character(40)      :: xname      = 'x'
-  character(40)      :: xhname     = 'xh'
+  character(40)      :: xname      = 'xt'
+  character(40)      :: xhname     = 'xm'
   character(40)      :: xlongname  = 'Longitudinal position of cell centers'
   character(40)      :: xhlongname = 'Longitudinal position of cell faces'
   character(40)      :: xunit      = 'm'
-  character(40)      :: yname      = 'y'
-  character(40)      :: yhname     = 'yh'
+  character(40)      :: yname      = 'yt'
+  character(40)      :: yhname     = 'ym'
   character(40)      :: ylongname  = 'Lateral position of cell centers'
   character(40)      :: yhlongname = 'Lateral position of cell faces'
   character(40)      :: yunit      = 'm'
@@ -239,6 +241,10 @@ contains
     if (level   > 4) nscl = nscl+4  ! ns,ng,qh,nh (for Axel's two-moment scheme)
 
     if (lwaterbudget) nscl = nscl+1 ! additional cloud water a_cld in the tracer array
+    if (lcouvreux) then
+      nscl  = nscl+1 ! Additional radioactive scalar
+      ncvrx = nscl
+    end if
 
     allocate (a_xp(nzp,nxp,nyp,nscl), a_xt1(nzp,nxp,nyp,nscl),        &
          a_xt2(nzp,nxp,nyp,nscl))         
@@ -282,6 +288,12 @@ contains
       a_ngrp   =>a_xp(:,:,:,13)
       a_rhailp =>a_xp(:,:,:,14)
       a_nhailp =>a_xp(:,:,:,15)
+    end if
+    if (lcouvreux) then 
+      a_cvrxp=>a_xp(:,:,:,ncvrx)
+      a_cvrxp(:,:,:) = 0.
+      allocate (trac_sfc(nxp,nyp))
+      trac_sfc = 1.
     end if
 
     allocate (a_ustar(nxp,nyp),a_tstar(nxp,nyp),a_rstar(nxp,nyp))

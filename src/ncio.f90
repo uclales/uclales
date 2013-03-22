@@ -8,10 +8,10 @@
   implicit none
   private
 
-  public :: open_nc, define_nc, init_anal, close_anal, write_anal
+  public :: open_nc, define_nc, init_anal, close_anal, write_anal, deflate_level
 
   integer, private, save  :: nrec0, nvar0, nbase=15
-  integer, save           :: ncid0,ncid_s, ncid_cross
+  integer, save           :: ncid0,ncid_s, ncid_cross, deflate_level
   integer, save           :: crossx, crossy, crossz
   character (len=7), dimension(30) :: crossnames
   character (len=7),  private :: v_snm='sxx    ' 
@@ -48,7 +48,7 @@ contains
     ncall = 0
     if (.not.exans) then
        call date_and_time(date)
-       iret = nf90_create(lfname,NF90_SHARE,ncid)
+       iret = nf90_create(lfname,NF90_HDF5,ncid)
 
        iret = nf90_put_att(ncid,NF90_GLOBAL,'title',ename)
        iret = nf90_put_att(ncid,NF90_GLOBAL,'history','Created on '//date)
@@ -138,7 +138,7 @@ contains
              iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,ymID    ,VarID)
           case ('tttt')
              if (present(n2) .and. present(n3)) then
-                iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tttt,VarID)
+                iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tttt,VarID, deflate_level = deflate_level)
              else
                 iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tt,VarID)
              end if
@@ -339,7 +339,6 @@ contains
     end if
 
     if (isfctyp == 5) then
-       nvar0 = nvar0+1
        sanal(nvar0)=sbase(31)
        nvar0 = nvar0+1
        sanal(nvar0)=sbase(32)
@@ -547,7 +546,7 @@ contains
 !     end if
 
     if (myid==0) print "(//' ',12('-'),'   Record ',I3,' to: ',A60)",    &
-         nrec0,fname 
+         nrec0,fname
 
     iret  = nf90_sync(ncid0)
     nrec0 = nrec0+1
@@ -577,7 +576,7 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('time')
        if (itype==0) ncinfo = 'Time'
-       if (itype==1) ncinfo = 's'
+       if (itype==1) ncinfo = 'seconds since 2000-00-00 0000'
        if (itype==2) ncinfo = 'time'
     case('zt')
        if (itype==0) ncinfo = 'Vertical displacement of cell centers'
@@ -637,7 +636,6 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('q')
        if (itype==0) ncinfo = 'Total water mixing ratio'
-       !irina
        if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
     case('l')
@@ -647,6 +645,10 @@ contains
     case('r')
        if (itype==0) ncinfo = 'Rain-water mixing ratio'
        if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('RH')
+       if (itype==0) ncinfo = 'Relative Humidity'
+       if (itype==1) ncinfo = '-'
        if (itype==2) ncinfo = 'tttt'
     case('inuc')
        if (itype==0) ncinfo = 'Number of ice nuclei'
@@ -692,10 +694,6 @@ contains
        if (itype==0) ncinfo = 'Rain-drop number mixing ratio'
        if (itype==1) ncinfo = '#/kg'
        if (itype==2) ncinfo = 'tttt'
-    case('stke')
-       if (itype==0) ncinfo = 'Sub-filter scale TKE'
-       if (itype==1) ncinfo = 'J/kg'
-       if (itype==2) ncinfo = 'mttt'
     case('cfl')
        if (itype==0) ncinfo = 'Courant number'
        if (itype==1) ncinfo = '-'
@@ -994,59 +992,59 @@ contains
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
     case('rflx')
-       if (itype==0) ncinfo =  'Total Radiative flux'
+       if (itype==0) ncinfo = 'Total Radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
        !irina
     case('lflxu')
-       if (itype==0) ncinfo =  'Longwave Radiative flux UP'
+       if (itype==0) ncinfo = 'Longwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('lflxd')
-       if (itype==0) ncinfo =  'Longwave Radiative flux DW'
+       if (itype==0) ncinfo = 'Longwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('lwuca')
-       if (itype==0) ncinfo =  'Clear Air Longwave Radiative flux UP'
+       if (itype==0) ncinfo = 'Clear Air Longwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('lwdca')
-       if (itype==0) ncinfo =  'Clear Air Longwave Radiative flux DW'
+       if (itype==0) ncinfo = 'Clear Air Longwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('lflxut')
-       if (itype==0) ncinfo =  'Top of Atmosphere Longwave Radiative flux UP'
+       if (itype==0) ncinfo = 'Top of Atmosphere Longwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
     case('lflxdt')
-       if (itype==0) ncinfo =  'Top of Atmosphere Longwave Radiative flux DW'
+       if (itype==0) ncinfo = 'Top of Atmosphere Longwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
     case('rflx2')
        if (itype==0) ncinfo = 'Variance of total radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('sflx')
        if (itype==0) ncinfo = 'Shortwave radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
        !irina
     case('sflxu')
        if (itype==0) ncinfo = 'Shortwave radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('sflxd')
        if (itype==0) ncinfo = 'Shortwave radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('swuca')
-       if (itype==0) ncinfo =  'Clear Air Shortwave Radiative flux UP'
+       if (itype==0) ncinfo = 'Clear Air Shortwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('swdca')
-       if (itype==0) ncinfo =  'Clear Air Shortwave Radiative flux DW'
+       if (itype==0) ncinfo = 'Clear Air Shortwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
    case('sflxut')
        if (itype==0) ncinfo = 'Top of Atmosphere Shortwave radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
@@ -1058,7 +1056,7 @@ contains
     case('sflx2')
        if (itype==0) ncinfo = 'Variance of shortwave radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('l_2')
        if (itype==0) ncinfo = 'Variance of liquid'
        if (itype==1) ncinfo = 'kg^2/kg^2'

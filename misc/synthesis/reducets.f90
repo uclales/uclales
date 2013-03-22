@@ -21,6 +21,7 @@
         character(len=10) minnms(nmi)
         character(len=10) sumnms(nsu)
         character(len=100) namout(nv),lname(nv),uname(nv)
+        real fval(nv)
         real, dimension(:,:), allocatable ::  var,varout
         integer, dimension(:,:), allocatable :: cnt
         integer i,j,k,kk,l, ntr
@@ -143,6 +144,13 @@
              if (status.ne.nf90_noerr) print*,nf90_strerror(status)
             status=nf90_get_att(ncid,k,'units',uname(k))
              if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+                if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+            status=nf90_get_att(ncid,k,'_FillValue',fval(k))
+             if (status.ne.nf90_noerr) then 
+               print*,nf90_strerror(status)
+               fval(k) = -999.
+             end if
+          
             do kk=1,nma
               if (trim(name).eq.trim(maxnms(kk))) flag(k)=2
             end do
@@ -182,6 +190,7 @@
              end do
             else
              do l=1,ntr
+              varout(k,l) = -999.
               if ((varout(k,l).eq.0).or.((var(k,l).gt.-999).and.(var(k,l).lt.varout(k,l)))) varout(k,l)=var(k,l)
              end do
             endif
@@ -193,7 +202,12 @@
 !*End of looping over the files
   
        do k=1,nvar
-         if (flag(k).eq.0) varout(k,:)=varout(k,:)/cnt(k,:)
+         if (flag(k).eq.0) then
+           varout(k,:)=varout(k,:)/cnt(k,:)
+           where (cnt(k,:) == 0)
+             varout(k,:) = -999.
+           endwhere
+         end if
       end do
 
 !3 Write new variables in *.ts.nc
@@ -215,7 +229,7 @@
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
        status=nf90_put_att(ncidw,varid,'longname',trim(lname(k)))
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
-!       status=nf90_put_att(ncidw,varid,'_FillValue',-999.0)
+      status=nf90_put_att(ncidw,varid,'_FillValue',-999.0)
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
        status=nf90_put_att(ncidw,varid,'units',trim(uname(k)))
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)

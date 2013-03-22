@@ -233,7 +233,8 @@ contains
   end subroutine timedepz
 
   subroutine timedepsurf(time, sst)
-    use grid, only : psrf, wt_sfc, wq_sfc
+    use grid, only : psrf
+    use srfc, only : dthcon, drtcon
     
 !     use modglobal,   only : rtimee, lmoist
 !     use modsurfdata, only : wtsurf,wqsurf,thls,qts,ps
@@ -258,12 +259,10 @@ contains
     end if
 
     fac = ( time -timeflux(t) ) / ( timeflux(t+1)-timeflux(t))
-    wq_sfc   = wqsurft(t) + fac * ( wqsurft(t+1) - wqsurft(t)  )
-    wt_sfc   = wtsurft(t) + fac * ( wtsurft(t+1) - wtsurft(t)  )
+    drtcon   = wqsurft(t) + fac * ( wqsurft(t+1) - wqsurft(t)  )
+    dthcon   = wtsurft(t) + fac * ( wtsurft(t+1) - wtsurft(t)  )
     sst      = thlst(t)   + fac * ( thlst(t+1)   - thlst(t)    )
     psrf     = pst(t)     + fac * ( pst(t+1)   - pst(t)    )
-
-!     return
   end subroutine timedepsurf
 
 

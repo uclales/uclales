@@ -8,7 +8,7 @@
 ! Assume number of time steps nt smaller than 10000, number of levels nlev smaller than 150
 ! and number of variables nv smaller than 100 ! otherwise need to be changed
         integer, parameter :: nv=200,nma=7,nmi=2,nsu=28
-	integer :: nt, nlev, zid
+	      integer :: nt, nlev, zid
 
         character(100) stem,nm,nm2
         character(20) pref,name,dimname,cnx,cny
@@ -22,6 +22,7 @@
         character(len=10) minnms(nmi)
         character(len=10) sumnms(nsu)
         character(len=100) namout(nv),lname(nv),uname(nv)
+        real fval(nv)
         real, allocatable, dimension(:) :: time(:),zt(:),zm(:),dn0(:),u0(:),v0(:),fsttm(:),lsttm(:),nsmp(:)
         real, dimension(:,:,:), allocatable ::  var,varout
         integer, dimension(:,:,:), allocatable :: cnt
@@ -95,7 +96,7 @@
         status=nf90_close(ncid)
         print *, 'Number of timesteps ', nt
         allocate(var(nv,nlev,nt), varout(nv,nlev,nt), cnt(nv,nlev,nt))
-        allocate(time(nlev),zt(nlev),zm(nlev),dn0(nlev),u0(nlev),v0(nlev),fsttm(nlev),lsttm(nlev),nsmp(nlev))
+        allocate(time(nt),zt(nlev),zm(nlev),dn0(nlev),u0(nlev),v0(nlev),fsttm(nt),lsttm(nt),nsmp(nt))
         varout(:,:,:)=0.
         cnt(:,:,:)=0
         var(:,:,:)=0.
@@ -148,6 +149,11 @@
              if (status.ne.nf90_noerr) print*,nf90_strerror(status)
             status=nf90_get_att(ncid,k,'units',uname(k))
              if (status.ne.nf90_noerr) print*,nf90_strerror(status)
+            status=nf90_get_att(ncid,k,'_FillValue',fval(k))
+             if (status.ne.nf90_noerr) then 
+               print*,nf90_strerror(status)
+               fval(k) = -999.
+             end if
 !            print*,k,trim(namout(k)),' ',trim(lname(k)),' ',trim(uname(k))
             do kk=1,nma
               if (trim(name).eq.trim(maxnms(kk))) flag(k)=2
@@ -276,7 +282,7 @@
       end if
        status=nf90_put_att(ncidw,varid,'longname',trim(lname(k)))
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
-!       status=nf90_put_att(ncidw,varid,'_FillValue',-999.0)
+      status=nf90_put_att(ncidw,varid,'_FillValue',fval(k))
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)
        status=nf90_put_att(ncidw,varid,'units',trim(uname(k)))
         if (status.ne.nf90_noerr) print*,nf90_strerror(status)

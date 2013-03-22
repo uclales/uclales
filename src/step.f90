@@ -38,6 +38,7 @@ module step
   real    :: cntlat =  31.5 ! 30.0
   logical :: outflg = .true.
   logical :: statflg = .false.
+  real    :: tau = 900.
 !irina  
   real    :: sst=292.
   real    :: div = 3.75e-6
@@ -45,6 +46,9 @@ module step
   character (len=8) :: case_name = 'astex'
 
   integer :: istp
+
+  ! Flags for sampling, statistics output, etc.  
+  logical :: savgflg=.false.,anlflg=.false.,hisflg=.false.,crossflg=.false.,partdumpflg=.false.
 
 contains
   ! 
@@ -69,28 +73,24 @@ contains
 
     real    :: t1,t2,tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax
     integer :: iret
+
+    real    :: dt_prev
+
     !
     ! Timestep loop for program
     !
     begtime = time
-    istp = 0
-  !irina  
-  !  timrsm = timrsm + begtime
-   
-  ! print *, 'time timrsm',time, timrsm
-  !  timmax = min(timmax,timrsm)
-  ! print *, 'timmax',timmax
-    t2 = 0.
-    do while (time + 0.1*dt < timmax .and. t2 < wctime)
+    istp    = 0
+    t2      = 0.
+    do while (time < timmax .and. t2 < wctime)
        call cpu_time(t1)           !t1=timing()
+       istp = istp + 1
 
-       istp = istp+1
-       tplsdt = time + dt + 0.1*dt
-       statflg = (min(mod(tplsdt,ssam_intvl),mod(tplsdt,savg_intvl)) < dt  &
-            .or. tplsdt >= timmax .or. tplsdt < 2.*dt) 
+       call stathandling
+       !if(myid .eq. 0 .and. statflg) print*,'     sampling stat at t=',time+dt
 
        call t_step
-       time  = time + dt
+       time = time + dt
 
        call cfl(cflmax)
        call double_scalar_par_max(cflmax,gcflmax)
@@ -98,55 +98,31 @@ contains
        call peclet(pecletmax)
        call double_scalar_par_max(pecletmax,gpecletmax)
        pecletmax = gpecletmax
+       dt_prev = dt
        dt = min(dtlong,dt*peak_cfl/(cflmax+epsilon(1.)))
        !
        ! output control
        !
-       if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt) &
-       call write_ps(nzp,dn0,u0,v0,zm,zt,time)
-
-       if ((mod(tplsdt,frqhis) < dt .or. time >= timmax) .and. outflg)   &
-            call write_hist(2, time)
-       !irina     
-       !if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time>=timrsm .or. time==dt)   &
-       if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time==dt)   &
-            call write_hist(1, time)
-
-!irina more frequent outputs for certain hours in astex
-
-!       frqanl=3600.
-
-!       if (time>=7200 .and. time<=10800) then
-!       frqanl=300.
-!       end if
- 
-!       if (time>=25200 .and. time<=28800) then
-!       frqanl=300.
-!       end if
-
-!       if (time>=39600 .and. time<=43200) then
-!       frqanl=300.
-!       end if
-
-!       if (time>=68400 .and. time<=72000) then
-!       frqanl=300.
-!       end if
-
-!       if (time>=82800 .and. time<=86400) then
-!       frqanl=300.
-!       end if
-
-!       if (time>=126000 .and. time<=129600) then
-!       frqanl=300.
-!       end if
-
-       if ((mod(tplsdt,frqanl) < dt .or. time >= timmax) .and. outflg) then
-          call thermo(level)
-          call write_anal(time)
+       if(savgflg) then
+         !if(myid==0) print*,'     profiles at time=',time
+         call write_ps(nzp,dn0,u0,v0,zm,zt,time)
        end if
-       if ((mod(tplsdt,frqcross) < dt .or. time >= timmax) .and. outflg) then
-          call thermo(level)
-          call triggercross(time)
+
+       if (hisflg) then
+         !if(myid==0) print*,'     history at time=',time
+         call write_hist(2, time)
+       end if
+
+       if (anlflg) then
+         !if(myid==0) print*,'     analysis at time=',time
+         call thermo(level)
+         call write_anal(time)
+       end if
+
+       if (crossflg) then
+         !if(myid==0) print*,'     cross at time=',time
+         call thermo(level)
+         call triggercross(time)
        end if
 
        if(myid == 0) then
@@ -154,17 +130,16 @@ contains
           if (mod(istp,istpfl) == 0 ) then
               if (wctime.gt.1e9) then
                 print "('   Timestep # ',i5," //     &
-                       "'   Model time(sec)=',f10.2,3x,'CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2)",     &
-                       istp, time, t2-t1, t2*(timmax/time-1)
+                       "'   Model time(sec)=',f10.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2)",     &
+                       istp, time, dt_prev, t2-t1, t2*(timmax/time-1)
               else
                 print "('   Timestep # ',i5," //     &
-                       "'   Model time(sec)=',f10.2,3x,'CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2,'  WC Time left(sec) = ',f10.2)",     &
-                       istp, time, t2-t1, t2*(timmax/time-1),wctime-t2
+                       "'   Model time(sec)=',f10.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2,'  WC Time left(sec) = ',f10.2)",     &
+                       istp, time, dt_prev, t2-t1, t2*(timmax/time-1),wctime-t2
               end if
           end if
        endif
        call broadcast(t2, 0)
-
     enddo
 
     call write_hist(1, time)
@@ -176,6 +151,86 @@ contains
     if (time.ge.timmax .and. myid == 0) write(*,*) '  Max simulation time timmax reached. Finished simulation successfully'
 
   end subroutine stepper
+
+  !
+  ! -------------------------------------------
+  ! subroutine stathandling: Event handling statistics and output.
+  ! Changed dt when nextevent-time < dt to nextevent-time to end
+  ! up exactly at the required sampling or output time
+  ! EXPERIMENTAL!! BvS, Sep2012
+  ! 
+  subroutine stathandling
+    use grid, only      : dt   
+    use stat, only      : savg_intvl, ssam_intvl
+    use modcross, only  : lcross
+    use mpi_interface, only : myid
+
+    integer, parameter  :: long   = selected_int_kind(18)
+    integer(kind=long)  :: itnssam=1e16,itnsavg=1e16,itnanl=1e16,itnhist=1e16,itncross=1e16
+    integer(kind=long)  :: issam_intvl=1e16,isavg_intvl=1e16,ifrqanl=1e16,ifrqhis=1e16,ifrqcross=1e16
+    integer(kind=long)  :: itime,idt
+    real, parameter     :: tres = 1e9
+
+    ! Switch to integer microseconds
+    issam_intvl  = int(ssam_intvl*tres,long)
+    isavg_intvl  = int(savg_intvl*tres,long)
+    ifrqanl      = int(frqanl    *tres,long)
+    ifrqhis      = int(frqhis    *tres,long)
+    ifrqcross    = int(frqcross  *tres,long)
+
+    itime        = int(time * tres,long)  
+    idt          = int(dt   * tres,long)
+
+    ! Time next events
+    itnssam      = (floor(itime/(ssam_intvl*tres)) + 1) * issam_intvl
+    itnsavg      = (floor(itime/(savg_intvl*tres)) + 1) * isavg_intvl
+    itnanl       = (floor(itime/(frqanl*tres))     + 1) * ifrqanl
+    itnhist      = (floor(itime/(frqhis*tres))     + 1) * ifrqhis
+    if(lcross) then
+      itncross   = (floor(itime/(frqcross*tres))   + 1) * ifrqcross
+    else
+      itncross   = 1e16
+    end if 
+
+    ! Limit time step to first event
+    idt = min(itnssam-itime,itnsavg-itime,&                   ! Profile sampling and writing
+               itnanl-itime,itnhist-itime,itncross-itime,&     ! Analysis, history and cross-sections
+               int(timmax*tres,long)-itime,idt)                ! End of simulation, current dt
+
+    ! And back to normal seconds
+    dt   = idt  / tres 
+    time = itime / tres        ! This can be tricky.................
+ 
+    ! Set flags
+    statflg  = .false.
+    savgflg  = .false.
+    hisflg   = .false.
+    anlflg   = .false.
+    crossflg = .false.
+
+    if(mod(itime+idt,issam_intvl) .eq. 0) then
+      statflg    = .true.
+    end if
+    if(mod(itime+idt,isavg_intvl) .eq. 0) then
+      statflg    = .true.
+      savgflg    = .true.
+    end if
+    if(mod(itime+idt,ifrqanl)     .eq. 0) then
+      anlflg     = .true.
+    end if
+    if(mod(itime+idt,ifrqhis)     .eq. 0) then
+      hisflg     = .true.
+    end if 
+    if(mod(itime+idt,ifrqcross)   .eq. 0) then
+      crossflg   = .true.
+    end if
+
+    !if(myid.eq.0) print*,statflg,savgflg,anlflg,hisflg,crossflg
+    !stop
+    !if(myid.eq.0) print*,'dt old:new',itime/tres,idtt/tres,idt/tres,(itnssam-itime)/tres,statflg
+
+  end subroutine stathandling
+
   ! 
   !----------------------------------------------------------------------
   ! subroutine t_step: Called by driver to timestep through the LES
@@ -246,6 +301,7 @@ contains
        call corlos 
        call buoyancy
        call sponge
+       call decay
        call update (nstep)
        call poisson 
        call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
@@ -269,7 +325,8 @@ contains
                      a_ricet,a_nicet,a_rsnowt, a_rgrt,&
                      a_rhailt,a_nhailt,a_nsnowt, a_ngrt,&
                      a_xt1, a_xt2, nscl, nxyzp, level, &
-                     lwaterbudget, a_rct
+                     lwaterbudget, a_rct, &
+                     lcouvreux, a_cvrxt, ncvrx
     use util, only : azero
 
     integer, intent (in) :: nstep
@@ -288,6 +345,7 @@ contains
           a_npt =>a_xt1(:,:,:,7)
        end if
        if (lwaterbudget) a_rct =>a_xt1(:,:,:,8)
+       if (lcouvreux)    a_cvrxt =>a_xt1(:,:,:,ncvrx)
        if (level >= 4) then
           a_ricet  =>a_xt1(:,:,:, 8)
           a_nicet  =>a_xt1(:,:,:, 9)
@@ -313,6 +371,7 @@ contains
           a_npt =>a_xt2(:,:,:,7)
        end if
        if (lwaterbudget) a_rct =>a_xt2(:,:,:,8)
+       if (lcouvreux)    a_cvrxt =>a_xt2(:,:,:,ncvrx)
        if (level >= 4) then
           a_ricet  =>a_xt2(:,:,:, 8)
           a_nicet  =>a_xt2(:,:,:, 9)
@@ -620,6 +679,24 @@ contains
     end if
        
   end subroutine sponge
+  
+  subroutine decay
+    use grid, only : lcouvreux, a_cvrxp, a_cvrxt, nxp, nyp, nzp, dt
+    integer :: i, j, k
+    real    :: rate
+    if (lcouvreux) then
+      rate = 1./(max(tau, dt))    
+      do j = 3, nyp - 2
+        do i = 3, nxp - 2
+          do k = 2, nzp
+            a_cvrxt(k,i,j) = a_cvrxt(k,i,j) - a_cvrxp(k,i,j) * rate
+          end do
+        end do
+      end do
+    end if
+              
+  end subroutine
+
   !
   ! --------------------------------------------------------------------
   ! subroutine get_diverg: gets velocity tendency divergence and puts it 

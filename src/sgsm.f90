@@ -67,7 +67,7 @@ contains
          ,a_rp, a_tp, a_sp, a_st, vapor, a_pexnr, a_theta,a_km               &
          , a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7, nscl, nxp, nyp    &
          , nzp, nxyp, nxyzp, zm, dxi, dyi, dzi_t, dzi_m, dt, th00, dn0           &
-         , pi0, pi1, level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,liquid
+         , pi0, pi1, level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,liquid, a_cvrxp, trac_sfc
 
     use util, only         : atob, azero, get_avg3
     use mpi_interface, only: cyclics, cyclicc
@@ -136,6 +136,7 @@ contains
        call azero(nxyp,sxy2)
        if ( associated(a_tp,a_sp) ) call atob(nxyp,wt_sfc,sxy1)
        if ( associated(a_rp,a_sp) ) call atob(nxyp,wq_sfc,sxy1)
+       if ( associated(a_cvrxp,a_sp) ) call atob(nxyp,trac_sfc,sxy1)
 
        if (sflg) call azero(nxyzp,a_scr1)
 

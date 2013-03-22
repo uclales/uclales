@@ -42,13 +42,14 @@ contains
   subroutine initialize
 !irina use lsvarflg
     use step, only : time, outflg,lsvarflg
-    use stat, only : init_stat
+    use stat, only : init_stat, write_ps, statistics
     use grid, only : isfctyp
     use mpi_interface, only : appl_abort, myid
     use thrm, only : thermo
     use mcrp, only : initmcrp
     use modcross, only : initcross, triggercross
-
+    use grid, only : nzp, dn0, u0, v0, zm, zt, isfctyp
+    
     implicit none
 
     if (runtype == 'INITIAL') then
@@ -90,10 +91,13 @@ contains
           call write_anal(time)
           call initcross(time, filprf)
           call triggercross(time)
+          call statistics (time)
+          call write_ps(nzp,dn0,u0,v0,zm,zt,time)
        else
           call init_anal(time+dt)
-          call initcross(time+dt, filprf)
-          call triggercross(time+dt)
+          call initcross(time, filprf)
+          call thermo(level)
+          !call triggercross(time)
           call write_hist(0, time)
        end if
     end if
@@ -276,6 +280,8 @@ contains
             xs(ns)  = rts(ns)
             if (ns > 1) then
               rts(ns) = xs(ns)*rslf(ps(ns-1),tks(ns-1))  !cheat a tiny bit - fix it later.
+            else
+              rts(ns)  = xs(ns)*rslf(ps(ns)*100.,ts(ns))
             end if
           else
             rts(ns) = rts(ns)*1.e-3
@@ -299,12 +305,16 @@ contains
              hs(ns) = ps(ns)
              zold1=zold2
              zold2=ps(ns)
-             tavg=(ts(ns)*(1.+ep2*rts(ns))+ts(ns-1)*(1.+ep2*rts(ns-1))*(p00**rcp)             &
-                  /ps(ns-1)**rcp)*.5
-             ps(ns)=(ps(ns-1)**rcp-g*(zold2-zold1)*(p00**rcp)/(cp*tavg))**cpr
+             if ((itsflg==0).or.(itsflg==1)) then
+                tavg=(ts(ns)*(1.+ep2*rts(ns))+tks(ns-1)*(1.+ep2*rts(ns-1))*(p00**rcp)             &
+                     /ps(ns-1)**rcp)*.5
+                ps(ns)=(ps(ns-1)**rcp-g*(zold2-zold1)*(p00**rcp)/(cp*tavg))**cpr
+             else !itsflg=2
+                tavg=(ts(ns)*(1.+ep2*rts(ns))+tks(ns-1)*(1.+ep2*rts(ns-1)))*.5
+                ps(ns)=ps(ns-1)*exp(-g*(zold2-zold1)/(r*tavg))
+             end if
           end if
        end select
-
        !
        ! filling temperature array:
        ! itsflg = 0 :potential temperature in kelvin
@@ -336,35 +346,40 @@ contains
           call appl_abort(0)
        end select
        
-       do iterate1 = 1,1  
+       do iterate1 = 1,1
          if (irsflg == 0) then
            rts(ns) = xs(ns)*rslf(ps(ns),tks(ns))
          end if
          if (ipsflg == 1 .and. ns > 1) then
-              tavg=(ts(ns)*(1.+ep2*rts(ns))+ts(ns-1)*(1.+ep2*rts(ns-1))*(p00**rcp)             &
+            if ((itsflg==0).or.(itsflg==1))then
+               tavg=(ts(ns)*(1.+ep2*rts(ns))+tks(ns-1)*(1.+ep2*rts(ns-1))*(p00**rcp) &
                     /ps(ns-1)**rcp)*.5
-              ps(ns)=(ps(ns-1)**rcp-g*(hs(ns)-hs(ns-1))*(p00**rcp)/(cp*tavg))**cpr
+               ps(ns)=(ps(ns-1)**rcp-g*(hs(ns)-hs(ns-1))*(p00**rcp)/(cp*tavg))**cpr
+            else
+               tavg=(ts(ns)*(1.+ep2*rts(ns))+tks(ns-1)*(1.+ep2*rts(ns-1)))*.5
+               ps(ns)=ps(ns-1)*exp(-g*(zold2-zold1)/(r*tavg))
+            end if
          end if
-          select case (itsflg)
-          case (0)
-              tks(ns)=ts(ns)*(ps(ns)*p00i)**rcp
-          case (1)
-              til=ts(ns)*(ps(ns)*p00i)**rcp
-              xx=til
-              yy=rslf(ps(ns),xx)
-              zz=max(rts(ns)-yy,0.)
-              if (zz > 0.) then
-                do iterate=1,3
-                    x1=alvl/(cp*xx)
-                    xx=xx - (xx - til*(1.+x1*zz))/(1. + x1*til                &
-                        *(zz/xx+(1.+yy*ep)*yy*alvl/(Rm*xx*xx)))
-                    yy=rslf(ps(ns),xx)
-                    zz=max(rts(ns)-yy,0.)
-                enddo
-              endif
-              tks(ns)=xx
-          case default
-          end select
+         select case (itsflg)
+         case (0)
+            tks(ns)=ts(ns)*(ps(ns)*p00i)**rcp
+         case (1)
+            til=ts(ns)*(ps(ns)*p00i)**rcp
+            xx=til
+            yy=rslf(ps(ns),xx)
+            zz=max(rts(ns)-yy,0.)
+            if (zz > 0.) then
+               do iterate=1,3
+                  x1=alvl/(cp*xx)
+                  xx=xx - (xx - til*(1.+x1*zz))/(1. + x1*til                &
+                       *(zz/xx+(1.+yy*ep)*yy*alvl/(Rm*xx*xx)))
+                  yy=rslf(ps(ns),xx)
+                  zz=max(rts(ns)-yy,0.)
+               enddo
+            endif
+            tks(ns)=xx
+         case default
+         end select
          
        end do
        ns = ns+1
@@ -403,6 +418,10 @@ contains
        write(6,fm0)
        write(6,fm1)(ps(k),hs(k),tks(k),thds(k),us(k),vs(k),rts(k),xs(k),xsi(k),k=1,ns)
     endif
+    ! update ts for fldinit
+    do k=1,ns
+       ts(k)=tks(k)*(p00/ps(k))**rcp
+    end do
 
 604 format('    input sounding needs to go higher ! !', /,                &
          '      sounding top (m) = ',f12.2,'  model top (m) = ',f12.2)
@@ -650,6 +669,53 @@ contains
  
     return
   end subroutine lsvar_init
+
+!cgils
+  !----------------------------------------------------------------------
+  ! Lstend_init if lstendflg is true reads the lstend  from the respective
+  ! file lstend_in
+  ! 
+  subroutine lstend_init
+
+   use grid,only   : wfls,dqtdtls,dthldtls
+    use mpi_interface, only : myid
+   
+
+   implicit none
+   
+   real     :: lowdthldtls,highdthldtls,lowdqtdtls,highdqtdtls,lowwfls,highwfls,highheight,lowheight,fac
+   integer :: k
+
+    ! reads the time varying lscale forcings
+    !
+ !   print *, wfls
+    if (wfls(2) == 0.) then
+ !         print *, 'lstend_init '                 
+        open (1,file='lstend_in',status='old',form='formatted')
+        read (1,*,end=100) lowheight,lowwfls,lowdqtdtls,lowdthldtls
+        read (1,*,end=100) highheight,highwfls,highdqtdtls,highdthldtls
+        if(myid == 0)  print *, 'lstend_init read'                 
+        do  k=2,nzp-1
+          if (highheight<zt(k)) then
+            lowheight = highheight
+            lowwfls = highwfls
+            lowdqtdtls = highdqtdtls
+            lowdthldtls = highdthldtls
+            read (1,*) highheight,highwfls,highdqtdtls,highdthldtls
+          end if
+          fac = (highheight-zt(k))/(highheight - lowheight)
+          wfls(k) = fac*lowwfls + (1-fac)*highwfls
+          dqtdtls(k) = fac*lowdqtdtls + (1-fac)*highdqtdtls
+          dthldtls(k) = fac*lowdthldtls + (1-fac)*highdthldtls
+          if(myid == 0)  print *, k,wfls(k),dqtdtls(k),dthldtls(k)
+        end do
+       close (1)
+    end if
+100 continue
+ 
+    return
+  end subroutine lstend_init
+
 
  !-----------------------
  ! homo_surf read SHF LHF 

@@ -67,8 +67,8 @@ contains
     select case(isfctyp)
 
   !
-  ! ----------------------------------------------------------------------
-  ! Set surface gradients
+  ! use prescribed surface gradients dthcon, drton from NAMELIST
+  ! use then similarity theory to compute the fluxes 
   !
     case(1)
        call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,a_up,a_vp,umean,vmean)
@@ -85,8 +85,8 @@ contains
             ,uw_sfc,vw_sfc,wt_sfc,wq_sfc,ww_sfc)
 
   !
-  ! ----------------------------------------------------------------------
-  ! Get fluxes from profiles
+  ! use prescribed SST and assume qsurf=qsat (i.e. ocean) to compute
+  ! gradients. Then use similarity theory to predict the fluxes. 
   !
     case(2)
        call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,a_up,a_vp,umean,vmean)
@@ -109,8 +109,8 @@ contains
 
   !
   ! ----------------------------------------------------------------------
-  ! Get fluxes from bulk formulae with coefficients given by
-  ! dthcon and drtcon
+  ! drtcon (wq=Ch*u*dth, Garrat p.55) and using prescribed sst 
+  !  and qsurf=qsat (ocean); note that here zrough is not the roughness
   !
    case(3)
        call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,a_up,a_vp,umean,vmean)
@@ -189,7 +189,6 @@ contains
   ! Malte: Get surface fluxes using a land surface model (van Heerwarden)
   !
    case(5)
-
        !Initialize Land Surface 
        if (init_lsm) then
           call initlsm(sst,time_in)
@@ -213,16 +212,11 @@ contains
        call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,u0bar,v0bar,umean,vmean)
 
        ! a) Calculate Monin Obuhkov Length from surface scalars
-       do j=3,nyp-2
-          do i=3,nxp-2
              dtdz(i,j) = thetaav(i,j) - tskinav(i,j)
              drdz(i,j) = vaporav(i,j) - qskinav(i,j)
-          end do
-       end do
        tskinavg = sum(a_tskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
        sst = tskinavg*(psrf/p00)**(rcp)
        call srfcscls(nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,drdz,a_ustar,a_tstar,a_rstar,obl)
-
        ! b) Calculate Monin Obuhkov Length iteratively
        !call getobl
 
@@ -262,74 +256,55 @@ contains
                               *(a_up(2,i,j)+umean)/wspd(i,j)
              vw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j)                  &
                               *(a_vp(2,i,j)+vmean)/wspd(i,j)
-             ww_sfc(i,j)  = 0.
 
              a_rstar(i,j) = - wq_sfc(i,j)/a_ustar(i,j)
              a_tstar(i,j) = - wt_sfc(i,j)/a_ustar(i,j)
-
-          end do
+         end do
        end do
-
   !
   ! ----------------------------------------------------------------------
   ! fix thermodynamic fluxes at surface given values in energetic 
-  ! units and calculate momentum fluxes from winds
+  ! units and calculate  momentum fluxes from similarity theory
   !
-   case default
+    case default
+       ffact = 1.
+       wt_sfc(1,1)  = ffact* dthcon/(0.5*(dn0(1)+dn0(2))*cp)
+       wq_sfc(1,1)  = ffact* drtcon/(0.5*(dn0(1)+dn0(2))*alvl)
 
-      ffact = 1.
-
-      !homogeneous surface fluxes from nc file
-
-      if (.true.) then
-         times=time_in*86400.
-         if (times .lt. timels(1))then
-            tcnt = 1
-            tfrac = 0.
-         else
-            do l=1,1740
-               if ( (times .ge. timels(l)) .and. (times .lt. timels(l+1)) ) then
-                 tcnt = l
-                 go to 10
-               end if
-            end do
-            10 continue
-            tfrac = (times - timels(tcnt)) / (timels(tcnt+1)-timels(tcnt))
-         end if 
-      
-         wt_sfc(1,1)=(shls(tcnt)+(shls(tcnt+1)-shls(tcnt))*tfrac)/(0.5*(dn0(1)+dn0(2))*cp)
-         wq_sfc(1,1)=(lhls(tcnt)+(lhls(tcnt+1)-lhls(tcnt))*tfrac)/(0.5*(dn0(1)+dn0(2))*alvl)
-         a_ustar(1,1)=(usls(tcnt)+(usls(tcnt+1)-usls(tcnt))*tfrac) 
-      else
-         wt_sfc(1,1)  = ffact*dthcon/(0.5*(dn0(1)+dn0(2))*cp)
-         wq_sfc(1,1)  = ffact*drtcon/(0.5*(dn0(1)+dn0(2))*alvl)
-
-      end if
-
-      !homogeneous surface end
+       if (zrough <= 0.) then
+          usum = 0.
+          do j=3,nyp-2
+             do i=3,nxp-2
+                usum = usum + a_ustar(i,j)
+             end do
+          end do
+          usum = max(ubmin,usum/float((nxp-4)*(nyp-4)))
+          zs = max(0.0001,(0.016/g)*usum**2) !Charnock for flow over sea
+       else
+          zs = zrough
+       end if
 
        do j=3,nyp-2
           do i=3,nxp-2
              wt_sfc(i,j)=wt_sfc(1,1)
              wq_sfc(i,j)=wq_sfc(1,1)
-             a_ustar(i,j)=a_ustar(1,1)
 
              wspd(i,j)    = max(0.1,                                    &
                   sqrt((a_up(2,i,j)+umean)**2+(a_vp(2,i,j)+vmean)**2))
-             !if (ubmin > 0.) then
-             !   bflx = g*wt_sfc(1,1)/th00
-             !   if (level >= 2) bflx = bflx + g*ep2*wq_sfc(i,j)
-             !   a_ustar(i,j) = diag_ustar(zt(2),zs,bflx,wspd(i,j))
-             !else
-             !   a_ustar(i,j) = abs(ubmin)
-             !end if
+             if (ubmin > 0.) then
+                bflx = g*wt_sfc(1,1)/th00
+                if (level >= 2) bflx = bflx + g*ep2*wq_sfc(i,j)
+                a_ustar(i,j) = diag_ustar(zt(2),zs,bflx,wspd(i,j))
+             else
+                a_ustar(i,j) = abs(ubmin)
+             end if
 
              ffact = a_ustar(i,j)*a_ustar(i,j)/wspd(i,j)
              uw_sfc(i,j)  = -ffact*(a_up(2,i,j)+umean)
              vw_sfc(i,j)  = -ffact*(a_vp(2,i,j)+vmean)
              ww_sfc(i,j)  = 0.
-             a_rstar(i,j) = wq_sfc(i,j)/a_ustar(i,j)
-             a_tstar(i,j) = wt_sfc(i,j)/a_ustar(i,j)
+             a_rstar(i,j) = -wq_sfc(i,j)/a_ustar(i,j)
+             a_tstar(i,j) = -wt_sfc(i,j)/a_ustar(i,j)
           end do
        end do
 
@@ -338,6 +313,8 @@ contains
     if (sflg) call sfc_stat(nxp,nyp,wt_sfc,wq_sfc,a_ustar,sst)
 
     return
+
+          zs = max(0.0001,(0.016/g)*usum**2) !Charnock for flow over sea
   end subroutine surface
 
   !
