@@ -50,7 +50,7 @@ module stat
        'wvp_var','iwp_bar','iwp_var','swp_bar','swp_var','gwp_bar', & !37
        'gwp_var','hwp_bar','hwp_var','Qnet   ','G0     ','tndskin', & !43 
        'ra     ','rsurf  ','rsveg  ','rssoil ','tskinav','qskinav', & !49
-       'obl    ','cliq   ','a_Wl     '/),                           & !55-57
+       'obl    ','cliq   ','a_Wl   '/),                           & !55-57
        s2(nvar2)=(/                                                 &
        'time   ','zt     ','zm     ','dn0    ','u0     ','v0     ', & ! 1
        'fsttm  ','lsttm  ','nsmp   ','u      ','v      ','t      ', & ! 7
@@ -217,7 +217,7 @@ contains
     if (level >=2) call ts_lvl2(nzp, nxp, nyp, a_rp, a_scr2, zt)
 
     ! BvS: only when LSM initialized
-    if (isfctyp==5 .and. init_lsm .eq. .False.) call accum_lsm(nxp,nyp,a_Qnet,a_G0,tndskin,ra,rsurf,rsveg, &
+    if (isfctyp==5 .and. init_lsm .eqv. .False.) call accum_lsm(nxp,nyp,a_Qnet,a_G0,tndskin,ra,rsurf,rsveg, &
                                    rssoil,a_tskin,a_qskin,obl,cliq,a_Wl,Cskinav)
 
     if (debug) WRITE (0,*) 'statistics: set_ts ok,  myid=',myid
