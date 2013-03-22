@@ -105,11 +105,13 @@ module lsmdata
   real, allocatable :: z0h        (:,:) !<  Roughness length for heat [m]
   real              :: z0hav    = 0.025
 
-  !real, allocatable :: albedo     (:,:) !<  Surface albedo [-]
+  !real, allocatable :: albedo    (:,:) !<  Surface albedo [-]
 
   real, allocatable :: LAI        (:,:) !<  Leaf area index vegetation [-]
   real, allocatable :: LAIG       (:,:) !<  Global leaf area index vegetation [-]
-  real              :: LAIav    = 2.
+  real              :: LAIav    = 4.    !<  Average leaf area index [-]
+  real              :: LAImin   = 2.    !<  Minimum leaf area index [-]  
+  real              :: LAImax   = 6.    !<  Maximum leaf area index [-]
 
   real, allocatable :: Cskin      (:,:) !<  Heat capacity skin layer [J]
   real              :: Cskinav  = 20000.
@@ -205,7 +207,7 @@ module lsmdata
     !< Jarvis-Steward related variables
     rsminav, rssoilminav, LAIav, gDav, &
     !< Heterogeneity related variables
-    hetper
+    hetper, LAImin, LAImax
 
     open(17,file='SURFNAMELIST',status='old',iostat=ierr)
     read (17,SURFNAMELIST,iostat=ierr)
@@ -387,27 +389,27 @@ module lsmdata
 
              if (mod(yhet,2) .eq. 0) then 
                 if (mod(xhet,2) .eq. 0) then
-                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = 2.
+                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = LAImin
                 else if (mod(xhet,2) .ne. 0) then
-                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = 6.
+                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = LAImax
                 end if
              end if              
 
              if (mod(yhet,2) .ne. 0) then
                 if (mod(xhet,2) .eq. 0) then
-                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = 6.
+                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = LAImax
                 else if (mod(xhet,2) .ne. 0) then
-                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = 2.
+                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = LAImin
                 end if 
              end if   
 
           end do
        end do
 
-    end if
-
     LAI(3:(nxp-2),3:(nyp-2)) = LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
                                3+yoffset(wryid):nyp+yoffset(wryid)-2 )
+
+    end if
 
     deallocate(LAIG)
 
