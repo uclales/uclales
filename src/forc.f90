@@ -20,7 +20,7 @@
 module forc
 
   use defs, only      : cp
-  use radiation, only : d4stream
+  use radiation, only : d4stream,surfacerad 
   !irina
   use rad_gcss, only  : gcss_rad
   !cgils
@@ -124,7 +124,19 @@ contains
           if (myid == 0) print *, '  ABORTING: inproper call to radiation'
           call appl_abort(0)
        end if
-       
+
+    ! BvS: Simple parameterized surface radiation
+    ! Sw-up/down = f(lat,lon,doy,tUTC,albedo)
+    ! Lw-up/down = Boltzman
+    case (5)
+      if (present(time_in) .and. present(cntlat)) then
+        call surfacerad(cntlat,time_in)
+      else
+        print*,'improper call surfacrad, stopping'
+        stop
+      end if
+     
+
     end select 
 !cgils: Nudging
     call nudge(time_in)

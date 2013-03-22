@@ -369,8 +369,7 @@ module lsmdata
     gD         = gDav
     cveg       = cvegav
 
-
-    ! --------------------------------------------------------
+    ! --------------------------------------------------------http://journals.ametsoc.org/doi/abs/10.1175/2011MWR3599.1
     ! Static Heterogeneity of Vegetation
     ! 
     ! std:    LAI=4. albedo=0.20 z0mav=0.035 z0hav=0.035
@@ -380,34 +379,33 @@ module lsmdata
     ! hetper*2 is the number of patches in x or y direction
     
     if (hetero) then
-       hetlen = nxpg/(2*hetper)
+      hetlen = nxpg/(2*hetper)
 
-       do yhet=0,(hetper*2)
-          do xhet=0,(hetper*2) 
+      do yhet=0,(hetper*2)
+         do xhet=0,(hetper*2) 
 
-             if (mod(yhet,2) .eq. 0) then 
-                if (mod(xhet,2) .eq. 0) then
-                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = 2.
-                else if (mod(xhet,2) .ne. 0) then
-                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = 6.
-                end if
-             end if              
+            if (mod(yhet,2) .eq. 0) then 
+               if (mod(xhet,2) .eq. 0) then
+                  LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = 2.
+               else if (mod(xhet,2) .ne. 0) then
+                  LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = 6.
+               end if
+            end if              
 
-             if (mod(yhet,2) .ne. 0) then
-                if (mod(xhet,2) .eq. 0) then
-                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = 6.
-                else if (mod(xhet,2) .ne. 0) then
-                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = 2.
-                end if 
-             end if   
+            if (mod(yhet,2) .ne. 0) then
+               if (mod(xhet,2) .eq. 0) then
+                  LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = 6.
+               else if (mod(xhet,2) .ne. 0) then
+                  LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = 2.
+               end if 
+            end if   
 
-          end do
-       end do
+         end do
+      end do
 
+      LAI(3:(nxp-2),3:(nyp-2)) = LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
+                                  3+yoffset(wryid):nyp+yoffset(wryid)-2 )
     end if
-
-    LAI(3:(nxp-2),3:(nyp-2)) = LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
-                               3+yoffset(wryid):nyp+yoffset(wryid)-2 )
 
     deallocate(LAIG)
 

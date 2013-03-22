@@ -786,12 +786,14 @@ contains
     real     :: e, esat, qsat, desatdT, dqsatdT, Acoef, Bcoef
     real     :: fH, fLE, fLEveg, fLEsoil, fLEliq, LEveg, LEsoil, LEliq
     real     :: Wlmx, rk3coef=0
+    real :: oldv
 
 
     thetaavg  = sum(a_theta(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
     pair      = psrf*exp(-1.*g*(zt(2)-zt(1))/2/R/thetaavg)
     exner     = (psrf/p00)**rcp
     exnerair  = (pair/p00)**rcp   
+
 
     !"1.0 - Compute water content per layer
     do j = 3,nyp-2
@@ -814,7 +816,7 @@ contains
       do i = 3, nxp-2
 
         !" 1.1 - Calculate net radiation (average over nradtime)
-        if(iradtyp == 4) then
+        if((iradtyp .eq. 4) .or. (iradtyp .eq. 5)) then
             if(nstep == 1) then
 
               a_sflxd_avn(2:nradtime,i,j) = a_sflxd_avn(1:nradtime-1,i,j)
@@ -855,7 +857,7 @@ contains
         !" 2.1 - Calculate the surface resistance with vegetation
 
         !" a) Stomatal opening as a function of incoming short wave radiation
-        if (iradtyp == 4) then
+        if ((iradtyp .eq. 4) .or. (iradtyp .eq. 5)) then
           f1  = 1. /min(1., (0.004 * max(0.,sflxd_av) + 0.05) &
                    / (0.81 * (0.004 * max(0.,sflxd_av) + 1.)) )
         else
@@ -883,7 +885,6 @@ contains
         fsoil  = max(fsoil, 1.)
         fsoil  = min(1.e8, fsoil)
         rssoil(i,j) = rssoilmin(i,j) * fsoil
-
 
         !" 2.3 - Calculate the heat transport properties of the soil.
         !" Put in init function, as we don't have prognostic soil moisture atm.
@@ -1032,6 +1033,7 @@ contains
     end do
       
     call qtsurf
+
 
   end subroutine lsm
 

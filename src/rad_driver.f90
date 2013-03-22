@@ -191,6 +191,33 @@ module radiation
 
     end subroutine d4stream
 
+  !
+  ! ---------------------------------------------------------------------------
+  ! BvS: Simple parameterized surface radiation for LSM 
+  !
+  subroutine surfacerad(alat,time)
+    use grid, only   : sfc_albedo,a_theta,a_lflxu,a_lflxd,a_sflxu,a_sflxd,a_tskin,nxp,nyp,a_pexnr,pi0,pi1
+    use defs, only   : stefan, cp
+    real, intent(in) :: time, alat
+    integer          :: i,j
+    real             :: tr, exner
+
+    ! Assumes longitude = 0.
+    u0 = max(0.,zenith(alat,time))
+    tr = (0.6 + 0.2 * u0)
+
+    do j=3,nyp-2
+      do i=3,nxp-2
+        exner          = (pi0(2)+pi1(2)+a_pexnr(2,i,j))/cp
+        a_sflxd(2,i,j) = SolarConstant * tr * u0
+        a_sflxu(2,i,j) = sfc_albedo * a_sflxd(2,i,j)
+        a_lflxd(2,i,j) = 0.8 * stefan * (a_theta(2,i,j)*exner)**4.  
+        a_lflxu(2,i,j) = stefan * a_tskin(i,j)**4. 
+      end do
+    end do
+
+  end subroutine surfacerad
+
   ! ---------------------------------------------------------------------------
   ! sets up the input data to extend through an atmopshere of appreiciable
   ! depth using a background sounding specified as a parameter, match this to
@@ -283,20 +310,20 @@ module radiation
           ph(k) =  intrpl(sp(index),sh(index),sp(index+1),sh(index+1),pp(k))
           po(k) =  intrpl(sp(index),so(index),sp(index+1),so(index+1),pp(k))
        end do
-      ! !
-      ! ! set the ozone constant below the reference profile
-      ! !
-      ! do k=npts+1,nv
-      !    po(k) =  po(npts)
-      ! end do
+       !
+       ! set the ozone constant below the reference profile
+       !
+       do k=npts+1,nv
+          po(k) =  po(npts)
+       end do
 
       ! interpolate ozone profile
-       do k=npts+1,nv1
-            pp2 = (p00*(pi0(nv-k+2)/cp)**cpr) / 100.
-            index  = getindex(sp,ns,pp2)
-            po(k) =  intrpl(sp(index),so(index),sp(index+1),so(index+1),pp2)
-            print*,'ozone profile: ', po(k), pp2, sp (index), sp(index+1)
-         end do
+      ! do k=npts+1,nv1
+      !   pp2 = (p00*(pi0(nv-k+2)/cp)**cpr) / 100.
+      !   index  = getindex(sp,ns,pp2)
+      !   po(k) =  intrpl(sp(index),so(index),sp(index+1),so(index+1),pp2)
+      !   print*,'ozone profile: ', po(k), pp2, sp (index), sp(index+1)
+      ! end do
 
     end if
 
