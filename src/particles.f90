@@ -2160,7 +2160,7 @@ contains
     type (particle_record), pointer:: particle
     real               :: randnr(3), max_auto, sum_auto
     real               :: zmax = 1.                  ! Max height in grid coordinates
-    real               :: nppd = 1./10000.               ! number of particles per drops
+    real               :: nppd = 1./100000.               ! number of particles per drops
     real               :: xsizelocal, ysizelocal
     integer            :: nprocs,i,j,k,newp,np_old
 
@@ -2260,10 +2260,10 @@ contains
     end do
     end if
     
-    max_auto = MAXVAL(a_npauto)
-    write(*,*) 'myid:', myid,', max npauto: ', max_auto
-    sum_auto = sum(a_npauto)
-    write(*,*) 'myid:', myid,', sum npauto: ', sum_auto,', new part.:',npmyid-np_old
+    !max_auto = MAXVAL(a_npauto)
+    !write(*,*) 'myid:', myid,', max npauto: ', max_auto
+    !sum_auto = sum(a_npauto)
+    !write(*,*) 'myid:', myid,', sum npauto: ', sum_auto,', new part.:',npmyid-np_old
     
     call mpi_allreduce(npmyid,np,1,mpi_integer,mpi_sum,mpi_comm_world,ierror)
     if(myid==0) write(*,*) 'np (active or not):', np

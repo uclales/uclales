@@ -70,8 +70,8 @@ contains
     use thrm, only : thermo
     use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, &
          lpartstat, exitparticlestat, write_particle_hist, particlestat, &
-	 balanced_particledump,frqpartdump, deactivate_drops, activate_drops
-    use mcrp, only : lpartdrop
+	 balanced_particledump,frqpartdump
+
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
@@ -147,9 +147,7 @@ contains
        crossflg  = .false.
        lpdumpflg = .false.
        
-       if(lpartic .and. lpartdrop) call deactivate_drops(time)
-       if(lpartic .and. lpartdrop) call activate_drops(time)
-
+       
        ! REMOVE THIS?
        !irina
        !if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time>=timrsm .or. time==dt)   &
@@ -298,7 +296,7 @@ contains
     use srfc, only : surface
     !use srfc, only : surface,sst
     use thrm, only : thermo
-    use mcrp, only : micro
+    use mcrp, only : micro, lpartdrop
     use prss, only : poisson
     use advf, only : fadvect
     use advl, only : ladvect
@@ -306,7 +304,9 @@ contains
     use lsvar, only : varlscale
     use util, only : velset,get_avg
     use modtimedep, only : timedep
-    use modparticles, only : particles, lpartic, particlestat,lpartstat
+    use modparticles, only : particles, lpartic, particlestat,lpartstat, &
+         deactivate_drops, activate_drops
+
 
     logical, parameter :: debug = .false.
 !     integer :: k
@@ -358,6 +358,9 @@ contains
        call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
 
     end do
+
+    if(lpartic .and. lpartdrop) call deactivate_drops(time+dt)
+    if(lpartic .and. lpartdrop) call activate_drops(time+dt)
 
     if (statflg) then
        if (debug) WRITE (0,*) 't_step statflg thermo, myid=',myid
