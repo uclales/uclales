@@ -68,7 +68,7 @@ module modparticles
     type (particle_record), pointer :: next,prev
   end type
 
-  integer(kind=long) :: nplisted, npmyid = 0
+  integer(kind=long) :: nplisted, npmyid = 0, myac = 0
   type (particle_record), pointer :: head, tail
 
   integer            :: ipunique, ipx, ipy, ipz, ipzprev, ipxstart, ipystart, ipzstart, iptsart
@@ -1722,16 +1722,16 @@ contains
   subroutine balanced_particledump(time)
     use mpi_interface, only : mpi_comm_world, myid, mpi_integer, mpi_double_precision, ierror, nxprocs, nyprocs, mpi_status_size, wrxid, wryid, nxg, nyg, mpi_sum
     use grid,          only : tname, deltax, deltay, dzi_t, zm, umean, vmean
-    use modnetcdf,     only : writevar_nc, fillvalue_double, nchandle_error
-    use netcdf,        only : nf90_inq_dimid, nf90_inquire_dimension, nf90_noerr, nf90_sync
+    use modnetcdf,     only : writevar_nc, fillvalue_double !, nchandle_error
+    use netcdf,        only : nf90_sync !,nf90_inq_dimid, nf90_inquire_dimension, nf90_noerr,
     implicit none
 
     real, intent(in)                     :: time
     type (particle_record),       pointer:: particle
     integer                              :: status(mpi_status_size)
-    integer                              :: nprocs,p,nvar,start,end,nsr,isr,nvl,loc,ii,stat,partid,npart
+    integer                              :: nprocs,p,nvar,start,end,nsr,isr,nvl,loc,ii,stat !,partid,npart
     integer, allocatable, dimension(:)   :: tosend,toreceive,base,sendbase,receivebase
-    real, allocatable, dimension(:)      :: sendbuff,recvbuff,addnpart
+    real, allocatable, dimension(:)      :: sendbuff,recvbuff !,addnpart
     real, allocatable, dimension(:,:)    :: sb_sorted
     integer, allocatable, dimension(:,:) :: status_array
     integer, allocatable, dimension(:)   :: req
@@ -1877,7 +1877,7 @@ contains
       ! Sort particles
       allocate(sb_sorted(npmyid,nvar-1))
       !allocate(sb_sorted(size(recvbuff)/nvar,nvar-1))
-      if(myid==0) write(*,*) 'myid:', myid,', size sb_sorted: ', size(sb_sorted,1)  
+      !if(myid==0) write(*,*) 'myid:', myid,', size sb_sorted: ', size(sb_sorted,1)  
       !if(lpartdrop) write(*,*) 'myid:', myid,', recvbuff:', recvbuff  
       
       sb_sorted = fillvalue_double
@@ -1925,19 +1925,20 @@ contains
       ! Write to NetCDF
       call writevar_nc(ncpartid,tname,time,ncpartrec)
 
-      stat = nf90_inq_dimid(ncpartid, "particles", partid)
-      if (stat /= nf90_noerr) call nchandle_error(ncpartid, stat)
-      stat = nf90_inquire_dimension(ncpartid, partid, len = npart)
-      if (stat /= nf90_noerr) call nchandle_error(ncpartid, stat)
-      ! Write particle dimension again, if the particle number increased.
-      if(npmyid .gt. npart) then
-        allocate(addnpart(npmyid))
-        do p = 1,npmyid
-	  addnpart(p) = p
-	end do 
-        call writevar_nc(ncpartid,'particles',addnpart,ncpartrec)
-	deallocate(addnpart)
-      end if
+      !stat = nf90_inq_dimid(ncpartid, "particles", partid)
+      !if (stat /= nf90_noerr) call nchandle_error(ncpartid, stat)
+      !stat = nf90_inquire_dimension(ncpartid, partid, len = npart)
+      !if (stat /= nf90_noerr) call nchandle_error(ncpartid, stat)
+      !! Write particle dimension again, if the particle number increased.
+      !if(npmyid .gt. npart) then
+      !  if(myid==0) print*,' writing particle dimension: particle'
+      !  allocate(addnpart(npmyid))
+      !  do p = 1,npmyid
+      !   addnpart(p) = p
+      !  end do 
+      !  call writevar_nc(ncpartid,'particles',addnpart,ncpartrec)
+      ! deallocate(addnpart)
+      !end if
       
       call writevar_nc(ncpartid,'x',sb_sorted(:,1),ncpartrec)
       call writevar_nc(ncpartid,'y',sb_sorted(:,2),ncpartrec)
@@ -2134,7 +2135,7 @@ contains
         particle%sigma2_sgs     = -32678.
         particle%partstep       = -32678.
         particle%nd             = buffrecv(i+1)
-	!write(*,*) 'deactivate: unique',particle%unique,'nd',particle%nd
+	myac = myac - 1
       end if
       i = i + 2
     end do
@@ -2160,15 +2161,17 @@ contains
     type (particle_record), pointer:: particle
     real               :: randnr(3), max_auto, sum_auto
     real               :: zmax = 1.                  ! Max height in grid coordinates
-    real               :: nppd = 1./100000.               ! number of particles per drops
+    real               :: nppd = 1./(1.e7)               ! number of particles per drops
     real               :: xsizelocal, ysizelocal
-    integer            :: nprocs,i,j,k,newp,np_old
+    integer            :: nprocs,i,j,k,newp,np_old,cntp
+    integer(kind=long) :: npac
 
-    !if(myid==0) print*,' activate_drops  : Add particles proportional to a_npauto.'
     nprocs = nxprocs * nyprocs
     np_old = npmyid
+    
     if (time.ge.ldropstart) then
-
+    
+    cntp = 0
     particle => head
     
     do j=3,nyp-2
@@ -2217,47 +2220,18 @@ contains
 		particle => particle%next
 	      end do
 	      
-	        !if(newp.lt.floor(a_npauto(k,i,j)) then   
-	        !do newp=1,floor(a_npauto(k,i,j))
-	      do while (newp.lt.floor(a_npauto(k,i,j)))
-		call add_particle(particle)
-                npmyid = npmyid + 1
-	        call random_number(randnr)          ! Random seed has been called from init_particles...
-              
-	        particle%unique = real(npmyid) + real(myid)/real(nprocs)
-                particle%x              = real(i) + randnr(1)
-                particle%y              = real(j) + randnr(2)
-                particle%z              = real(k) + randnr(3)
-                particle%zprev          = particle%z
-                particle%xstart         = particle%x
-                particle%ystart         = particle%y
-                particle%zstart         = particle%z
-                particle%tstart         = time
-                particle%ures           = 0.
-                particle%vres           = 0.
-                particle%wres           = 0.
-                particle%ures_prev      = 0.
-                particle%vres_prev      = 0.
-                particle%wres_prev      = 0.
-                particle%usgs           = 0.
-                particle%vsgs           = 0.
-                particle%wsgs           = 0.
-                particle%usgs_prev      = 0.
-                particle%vsgs_prev      = 0.
-                particle%wsgs_prev      = 0.
-                particle%sigma2_sgs     = 0.
-                particle%partstep       = 0
-                particle%nd             = 1
-		newp = newp + 1
-	      end do
-	        !end if
-	      
+	      myac = myac + newp
+	      if (newp.lt.floor(a_npauto(k,i,j))) then
+	        cntp = cntp + floor(a_npauto(k,i,j)) - newp
+	      end if
+	        
 	    end if
 
 	  end if
 	end do
       end do
     end do
+    if(cntp.gt.0) write(*,*) 'myid:', myid,'Attention! Not enough particles:',cntp
     end if
     
     !max_auto = MAXVAL(a_npauto)
@@ -2265,8 +2239,8 @@ contains
     !sum_auto = sum(a_npauto)
     !write(*,*) 'myid:', myid,', sum npauto: ', sum_auto,', new part.:',npmyid-np_old
     
-    call mpi_allreduce(npmyid,np,1,mpi_integer,mpi_sum,mpi_comm_world,ierror)
-    if(myid==0) write(*,*) 'np (active or not):', np
+    call mpi_allreduce(myac,npac,1,mpi_integer,mpi_sum,mpi_comm_world,ierror)
+    if(myid==0) write(*,*) 'number of active particles:', npac
     
     deallocate(a_npauto)
     
@@ -2355,7 +2329,7 @@ contains
   !
   !--------------------------------------------------------------------------
   !
-  ! subroutine init_particles: gialize particles, reading initial position,
+  ! subroutine init_particles: initialize particles, reading initial position,
   ! etc. Called from subroutine initialize (init.f90)
   !--------------------------------------------------------------------------
   !
@@ -2366,7 +2340,7 @@ contains
 
     logical, intent(in) :: hot
     character (len=80), intent(in), optional :: hfilin
-    integer(kind=long) :: n, npart
+    integer(kind=long) :: n
     integer  :: k, kmax, io, nprocs
     logical  :: exans
     real     :: tstart, xstart, ystart, zstart, ysizelocal, xsizelocal, firststartl, firststart
@@ -2453,8 +2427,39 @@ contains
     
     if(lpartdrop) then
     ! ------------------------------------------------------
-    ! Cold start -> no startpositions in drop-mode
-      np = 0
+    ! Cold start -> start with deactivated particles in drop-mode
+      nprocs = nxprocs * nyprocs
+      npmyid = floor((nxp-4) * (nyp-4) * nzp * 2.)   ! use 2. particles per grid box
+      np = nprocs * npmyid               ! only valid if all proc use the same domainsize?!
+      if(myid==0) write(*,*) 'Number of Particles ',np
+      if(myid==0) write(*,*) 'Number of Particles on each proc ',npmyid
+      do n = 1, npmyid
+        call add_particle(particle)
+	particle%unique         = real(n) + real(myid)/real(nprocs)
+        particle%x              = -32678.
+        particle%y              = -32678.
+        particle%z              = -32678.
+        particle%zprev          = -32678.
+        particle%xstart         = -32678.
+        particle%ystart         = -32678.
+        particle%zstart         = -32678.
+        particle%tstart         = -32678.
+        particle%ures           = -32678.
+        particle%vres           = -32678.
+        particle%wres           = -32678.
+        particle%ures_prev      = -32678.
+        particle%vres_prev      = -32678.
+        particle%wres_prev      = -32678.
+        particle%usgs           = -32678.
+        particle%vsgs           = -32678.
+        particle%wsgs           = -32678.
+        particle%usgs_prev      = -32678.
+        particle%vsgs_prev      = -32678.
+        particle%wsgs_prev      = -32678.
+        particle%sigma2_sgs     = -32678.
+        particle%partstep       = -32678.
+        particle%nd             = 0
+      end do
       ! Set first dump times
       tnextdump = frqpartdump
       tnextrand = randint
@@ -2465,7 +2470,7 @@ contains
     ! Cold start -> load particle startpositions from txt
 
       np = 0
-      npart = 0
+      npmyid = 0
       nprocs = nxprocs * nyprocs
       if(myid==0) write(*,*) 'Number of Processors ',nprocs      
       startfile = 'partstartpos'
@@ -2486,9 +2491,9 @@ contains
         else
           if(floor(xstart / xsizelocal) == wrxid) then
             if(floor(ystart / ysizelocal) == wryid) then
-	      npart = npart + 1
+	      npmyid = npmyid + 1
               call add_particle(particle)
-              particle%unique         = real(npart) + real(myid)/real(nprocs)    
+              particle%unique         = real(npmyid) + real(myid)/real(nprocs)    
               particle%x              = (xstart - (float(wrxid) * xsizelocal)) / deltax + 3.  ! +3 here for ghost cells.
               particle%y              = (ystart - (float(wryid) * ysizelocal)) / deltay + 3.  ! +3 here for ghost cells.
               do k=kmax,1,1
@@ -2520,8 +2525,6 @@ contains
           end if
         end if
       end do
-
-      npmyid = npart
 
       ! Collect first start from other procs
       call mpi_allreduce(firststartl,firststart,1,mpi_double_precision,mpi_min,mpi_comm_world,ierror)
@@ -2716,7 +2719,7 @@ contains
     character (40), dimension(2)      :: dimname, dimlongname, dimunit
     real, allocatable, dimension(:,:) :: dimvalues
     integer, dimension(2)             :: dimsize
-    integer                           :: k
+    integer                           :: k,nlocal
     integer, parameter                :: precis = 0
     character (len=80)                :: hname
 
@@ -2726,19 +2729,20 @@ contains
     !if(myid .eq. nxprocs*nyprocs-1) then
     !  nlocal = np - (nxprocs*nyprocs-1) * nlocal
     !end if
+    nlocal = npmyid
 
-    !allocate(dimvalues(nlocal,2))
-    allocate(dimvalues(1,2))
+    allocate(dimvalues(nlocal,2))
+    !allocate(dimvalues(1,2))
 
     dimvalues      = 0
-    !do k=1,nlocal
-    !  dimvalues(k,1) = k
-    !end do
+    do k=1,nlocal
+      dimvalues(k,1) = k
+    end do
 
     dimname(1)     = 'particles'
     dimlongname(1) = 'ID of particle'
     dimunit(1)     = '-'
-    dimsize(1)     = 0 !nlocal
+    dimsize(1)     = nlocal
     dimname(2)     = tname
     dimlongname(2) = tlongname
     dimunit(2)     = tunit
