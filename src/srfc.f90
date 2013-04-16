@@ -20,7 +20,7 @@
 module srfc
 
   integer :: isfctyp = 0
- !irina 
+ !irina
  ! real    :: sst = 292.
   real    :: zrough =  0.1
   real    :: ubmin  =  0.20
@@ -29,7 +29,7 @@ module srfc
   real    :: rh_srf = 1.
   real    :: drag   = -1.
 
-contains 
+contains
   !
   ! --------------------------------------------------------------------------
   ! SURFACE: Calcualtes surface fluxes using an algorithm chosen by ISFCLYR
@@ -51,10 +51,10 @@ contains
     use mpi_interface, only : nypg, nxpg, double_array_par_sum
 
     implicit none
- 
+
  !irina
     real, optional, intent (inout) :: sst
- !   
+ !
     real :: dtdz(nxp,nyp), drdz(nxp,nyp), usfc(nxp,nyp), vsfc(nxp,nyp)       &
          ,wspd(nxp,nyp), bfct(nxp,nyp)
 
@@ -114,7 +114,7 @@ contains
        do j=3,nyp-2
           do i=3,nxp-2
              dtdz(i,j) = a_theta(2,i,j) - sst*(p00/psrf)**rcp
-             drdz(i,j) = vapor(2,i,j) - rslf(psrf,sst)
+             drdz(i,j) = vapor(2,i,j) - rh_srf*rslf(psrf,sst)
    !cgils
             ! drdz(i,j) = vapor(2,i,j) - 0.98*rslf(psrf,sst)
              if (ubmin > 0.) then
@@ -142,7 +142,7 @@ contains
        !
    case(4)
 
-       Vzt   = 10.* (log(zt(2)/zrough)/log(10./zrough))       
+       Vzt   = 10.* (log(zt(2)/zrough)/log(10./zrough))
        Vbulk = Vzt * (vonk/log(zt(2)/zrough))**2
 
        bfl(:) = 0.
@@ -183,7 +183,7 @@ contains
              a_rstar(i,j) = wq_sfc(i,j)/a_ustar(i,j)
              a_tstar(i,j) = wt_sfc(i,j)/a_ustar(i,j)
           end do
-       end do   
+       end do
 case(5)
        Vbulk = 0.01
 
@@ -225,11 +225,11 @@ case(5)
              a_rstar(i,j) = wq_sfc(i,j)/a_ustar(i,j)
              a_tstar(i,j) = wt_sfc(i,j)/a_ustar(i,j)
           end do
-       end do   
+       end do
 
 
        !
-       ! fix thermodynamic fluxes at surface given values in energetic 
+       ! fix thermodynamic fluxes at surface given values in energetic
        ! units and calculate  momentum fluxes from winds
        !
     case default
@@ -287,7 +287,7 @@ case(5)
   subroutine get_swnds(n1,n2,n3,usfc,vsfc,wspd,up,vp,umean,vmean)
 
     implicit none
-    
+
     integer, intent (in) :: n1, n2, n3
     real, intent (in)    :: up(n1,n2,n3), vp(n1,n2,n3), umean, vmean
     real, intent (out)   :: usfc(n2,n3), vsfc(n2,n3), wspd(n2,n3)
@@ -307,7 +307,7 @@ case(5)
   end subroutine get_swnds
   !
   ! ----------------------------------------------------------------------
-  ! FUNCTION GET_USTAR:  returns value of ustar using the below 
+  ! FUNCTION GET_USTAR:  returns value of ustar using the below
   ! similarity functions and a specified buoyancy flux (bflx) given in
   ! kinematic units
   !
@@ -316,7 +316,7 @@ case(5)
   !
   ! where zeta = z/lmo and lmo = (theta_rev/g*vonk) * (ustar^2/tstar)
   !
-  ! Ref: Businger, 1973, Turbulent Transfer in the Atmospheric Surface 
+  ! Ref: Businger, 1973, Turbulent Transfer in the Atmospheric Surface
   ! Layer, in Workshop on Micormeteorology, pages 67-100.
   !
   ! Code writen March, 1999 by Bjorn Stevens
@@ -339,12 +339,12 @@ case(5)
     integer :: iterate
     real    :: lnz, klnz, c1, x, psi1, zeta, lmo, ustar
 
-    lnz   = log(z/z0) 
-    klnz  = vonk/lnz              
+    lnz   = log(z/z0)
+    klnz  = vonk/lnz
     c1    = 3.14159/2. - 3.*log(2.)
 
     ustar =  wnd*klnz
-    if (bflx /= 0.0) then 
+    if (bflx /= 0.0) then
        do iterate=1,4
           lmo   = -(ustar**3)/(bflx*vonk + eps)
           zeta  = z/lmo
@@ -375,7 +375,7 @@ case(5)
   !
   ! where zeta = z/lmo and lmo = (theta_rev/g*vonk) * (ustar^2/tstar)
   !
-  ! Ref: Businger, 1973, Turbulent Transfer in the Atmospheric Surface 
+  ! Ref: Businger, 1973, Turbulent Transfer in the Atmospheric Surface
   ! Layer, in Workshop on Micormeteorology, pages 67-100.
   !
   ! Code writen March, 1999 by Bjorn Stevens
@@ -409,8 +409,8 @@ case(5)
     real    :: lnz, klnz, betg, cnst1, cnst2
     real    :: x, y, psi1, psi2, zeta, lmo, dtv
 
-    lnz   = log(z/z0) 
-    klnz  = vonk/lnz              
+    lnz   = log(z/z0)
+    klnz  = vonk/lnz
     betg  = th00/g
     cnst2 = -log(2.)
     cnst1 = 3.14159/2. + 3.*cnst2
@@ -433,15 +433,15 @@ case(5)
  !            print *,"stable", i,j, ustar(i,j), tstar(i,j), (lnz + am*zeta), (lnz + ah*zeta), pr
              !
              ! Neutral case
-             ! 
+             !
           elseif (dtv == 0.) then
              ustar =  vonk*u(i,j)  /lnz
              tstar =  vonk*dtv/(pr*lnz)
 !irina
  !            print *,"neutral", i,j, ustar, tstar, lnz , pr
              !
-             ! ustable case, start iterations from values at previous tstep, 
-             ! unless the sign has changed or if it is the first call, then 
+             ! ustable case, start iterations from values at previous tstep,
+             ! unless the sign has changed or if it is the first call, then
              ! use neutral values.
              !
           else
@@ -478,7 +478,7 @@ case(5)
   !
   ! ----------------------------------------------------------------------
   ! subroutine: sfcflxs:  this routine returns the surface fluxes based
-  ! on manton-cotton algebraic surface layer equations. 
+  ! on manton-cotton algebraic surface layer equations.
   !
   subroutine sfcflxs(n2,n3,vk,ubar,u,v,xx,us,ts,rs,uw,vw,tw,rw,ww)
     implicit none
