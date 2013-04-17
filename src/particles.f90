@@ -56,6 +56,8 @@ module modparticles
   real               :: tnextdump
   real               :: randint   = 20.
   real               :: tnextrand = 6e6
+  logical            :: lpartmass = .false.              ! hard code switch to turn on/off drop mass 
+                                                        ! use only in combination with lpartdrop = .true. (in namelist)
 
   ! Particle structure
   type :: particle_record
@@ -64,7 +66,7 @@ module modparticles
     real             :: x, xstart, ures, ures_prev, usgs, usgs_prev
     real             :: y, ystart, vres, vres_prev, vsgs, vsgs_prev
     real             :: z, zstart, wres, wres_prev, wsgs, wsgs_prev, zprev
-    real             :: sigma2_sgs
+    real             :: sigma2_sgs, mass
     type (particle_record), pointer :: next,prev
   end type
 
@@ -73,7 +75,7 @@ module modparticles
 
   integer            :: ipunique, ipx, ipy, ipz, ipzprev, ipxstart, ipystart, ipzstart, iptsart
   integer            :: ipures, ipvres, ipwres, ipures_prev, ipvres_prev, ipwres_prev, ipartstep, ipnd, nrpartvar
-  integer            :: ipusgs, ipvsgs, ipwsgs, ipusgs_prev, ipvsgs_prev, ipwsgs_prev, ipsigma2_sgs
+  integer            :: ipusgs, ipvsgs, ipwsgs, ipusgs_prev, ipvsgs_prev, ipwsgs_prev, ipsigma2_sgs, ipm
 
   ! Statistics and particle dump
   integer            :: ncpartid, ncpartrec             ! Particle dump
@@ -95,7 +97,8 @@ module modparticles
                                          rlprof,       rlprofl,     &
                                          ccprof,       ccprofl,     &
                                          sigma2prof,   sigma2profl, &
-                                         fsprof,       fsprofl
+                                         fsprof,       fsprofl,     &
+					 mprof,        mprofl
 
   integer (KIND=selected_int_kind(10)):: idum = -12345
 
@@ -1366,6 +1369,7 @@ contains
       buffer(n+iptsart)         = particle%tstart
       buffer(n+ipartstep)       = particle%partstep
       buffer(n+ipnd)            = particle%nd
+      buffer(n+ipm)             = particle%mass
     else
       particle%unique           = buffer(n+ipunique)
       particle%x                = buffer(n+ipx)
@@ -1391,6 +1395,7 @@ contains
       particle%tstart           = buffer(n+iptsart)
       particle%partstep         = int(buffer(n+ipartstep))
       particle%nd               = int(buffer(n+ipnd))
+      particle%mass             = buffer(n+ipm)
     end if
 
   end subroutine partbuffer
@@ -1494,6 +1499,9 @@ contains
             sigma2profl(k)        = sigma2profl(k) + particle%sigma2_sgs
             if(lfsloc) fsprofl(k) = fsprofl(k) + i3d(particle%x,particle%y,particle%z,fs_local)
           end if
+	  if(lpartdrop.and.lpartmass) then
+	    mprofl(k)     = mprofl(k)     + particle%mass
+	  end if
         end if
 	particle => particle%next
       end do
@@ -1520,6 +1528,9 @@ contains
         call mpi_allreduce(sigma2profl,sigma2prof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
         if(lfsloc) call mpi_allreduce(fsprofl,fsprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
       end if
+      if(lpartdrop.and.lpartmass) then
+        call mpi_allreduce(mprofl,mprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      end if
 
       ! Divide summed values by ntime and nparticle samples and
       ! correct for Galilean transformation
@@ -1543,6 +1554,9 @@ contains
             sigma2prof(k)  = 1.5 * sigma2prof(k)  / (nstatsamp * npartprof(k))
             if(lfsloc) fsprof(k) = fsprof(k)   / (nstatsamp * npartprof(k))
           end if
+          if(lpartdrop.and.lpartmass) then
+	    mprof(k)     = mprof(k)     / (nstatsamp * npartprof(k))
+	  end if
 	else
 	  uprof(k)     = -32678
 	  vprof(k)     = -32678
@@ -1561,6 +1575,9 @@ contains
             sigma2prof(k)  = -32678
             if(lfsloc) fsprof(k) = -32678
           end if
+          if(lpartdrop.and.lpartmass) then
+	    mprof(k)   = -32678
+	  end if
         end if
       end do
 
@@ -1582,7 +1599,10 @@ contains
         sigma2prof(1)   = -32678
         fsprof(1)       = -32678
       end if
-
+      if(lpartdrop.and.lpartmass) then
+        mprof(1)        = -32678
+      end if
+      
       ! Force highest level (ghost cell above domain) to fillvalue
       npartprof(nzp)    = -32678
       uprof(nzp)        = -32678
@@ -1600,6 +1620,9 @@ contains
       if(lpartsgs) then
         sigma2prof(nzp) = -32678
         fsprof(nzp)     = -32678
+      end if
+      if(lpartdrop.and.lpartmass) then
+        mprof(nzp)      = -32678
       end if
 
       !if(myid==0) print*,'particles 1-2-3-4:',npartprof(2),npartprof(3),npartprof(4),npartprof(5)
@@ -1627,6 +1650,9 @@ contains
           end if
           call writevar_nc(ncpartstatid,'sgstke',sigma2prof,ncpartstatrec)
         end if
+	if(lpartdrop.and.lpartmass) then
+	  call writevar_nc(ncpartstatid,'m',mprof,ncpartstatrec)
+	end if
       end if
 
       stat  = nf90_sync(ncpartstatid)
@@ -1662,6 +1688,10 @@ contains
         fsprofl     = 0
         sigma2prof  = 0.
         sigma2profl = 0.
+      end if
+      if(lpartdrop.and.lpartmass) then
+        mprof    = 0
+	mprofl   = 0
       end if
       nstatsamp  = 0
     end if
@@ -1739,12 +1769,13 @@ contains
     if (.not. lpartic) return
     if(time >= tnextdump) then
 
-      nvar = 4                             ! id,x,y,z
-      if(lpartdumpui)  nvar = nvar + 3     ! u,v,w
-      if(lpartsgs)     nvar = nvar + 3     ! us,vs,ws
-      if(lpartdumpth)  nvar = nvar + 2     ! thl,tvh
-      if(lpartdumpmr)  nvar = nvar + 2     ! rt,rl
-      if(lpartdrop)    nvar = nvar + 1     ! nd
+      nvar = 4                                         ! id,x,y,z
+      if(lpartdumpui)              nvar = nvar + 3     ! u,v,w
+      if(lpartsgs)                 nvar = nvar + 3     ! us,vs,ws
+      if(lpartdumpth)              nvar = nvar + 2     ! thl,tvh
+      if(lpartdumpmr)              nvar = nvar + 2     ! rt,rl
+      if(lpartdrop)                nvar = nvar + 1     ! nd
+      if(lpartdrop.and.lpartmass)  nvar = nvar + 1     ! mass
 
       nprocs = nxprocs * nyprocs
       allocate(tosend(0:nprocs-1),toreceive(0:nprocs-1),base(0:nprocs-1),sendbase(0:nprocs-1),receivebase(0:nprocs-1))
@@ -1828,6 +1859,9 @@ contains
           end if
 	  if(lpartdrop)  then
             sendbuff(base(p)+nvl+1)   = particle%nd
+	    if(lpartmass) then
+	      sendbuff(base(p)+nvl+2) = particle%mass
+	    end if
 	  end if
 
           base(p)             = base(p) + nvar
@@ -1916,6 +1950,9 @@ contains
         end if
 	if(lpartdrop) then
 	  sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
+	  if(lpartmass) then
+	    sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
+	  end if
 	end if
 
         ii = ii + nvar
@@ -1968,6 +2005,9 @@ contains
       end if
       if(lpartdrop) then
         call writevar_nc(ncpartid,'nd',sb_sorted(:,nvl+1),ncpartrec)
+	if(lpartmass) then
+	  call writevar_nc(ncpartid,'m',sb_sorted(:,nvl+2),ncpartrec)
+	end if
       end if
       stat  = nf90_sync(ncpartid)
 
@@ -2133,6 +2173,7 @@ contains
         particle%vsgs_prev      = -32678.
         particle%wsgs_prev      = -32678.
         particle%sigma2_sgs     = -32678.
+	particle%mass           = -32678.
         particle%partstep       = -32678.
         particle%nd             = buffrecv(i+1)
 	myac = myac - 1
@@ -2153,7 +2194,7 @@ contains
   !
   subroutine activate_drops(time)
     use mpi_interface, only : myid, nxg, nyg, wrxid, wryid, nyprocs, nxprocs, mpi_comm_world, mpi_integer, mpi_sum, ierror
-    use mcrp,          only : a_npauto
+    use mcrp,          only : a_npauto, rain
     use grid,          only : nxp, nyp, nzp, deltax, deltay, deltaz
     implicit none
 
@@ -2212,6 +2253,7 @@ contains
                   particle%vsgs_prev      = 0.
                   particle%wsgs_prev      = 0.
                   particle%sigma2_sgs     = 0.
+		  particle%mass           = rain%x_min
                   particle%partstep       = 0
                   particle%nd             = particle%nd + 1
 		  newp = newp + 1
@@ -2345,7 +2387,7 @@ contains
     logical  :: exans
     real     :: tstart, xstart, ystart, zstart, ysizelocal, xsizelocal, firststartl, firststart
     real     :: pu,pts,px,py,pz,pzp,pxs,pys,pzs,pur,pvr,pwr,purp,pvrp,pwrp
-    real     :: pus,pvs,pws,pusp,pvsp,pwsp,psg2
+    real     :: pus,pvs,pws,pusp,pvsp,pwsp,psg2,pm
     integer  :: pstp,pnd,idot
     type (particle_record), pointer:: particle
     character (len=80) :: hname,prefix,suffix
@@ -2383,7 +2425,7 @@ contains
         read (666,iostat=io) np,tnextdump
       end if
       do
-        read (666,iostat=io) pu,pts,pstp,pnd,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs,pzp,pwr,pwrp,pus,pvs,pws,pusp,pvsp,pwsp,psg2
+        read (666,iostat=io) pu,pts,pstp,pnd,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs,pzp,pwr,pwrp,pus,pvs,pws,pusp,pvsp,pwsp,psg2,pm
         if(io .ne. 0) exit
         call add_particle(particle)
         particle%unique         = pu
@@ -2408,6 +2450,7 @@ contains
         particle%vsgs_prev      = pvsp
         particle%wsgs_prev      = pwsp
         particle%sigma2_sgs     = psg2
+	particle%mass           = pm
         particle%partstep       = pstp
 	particle%nd             = pnd
         if(pts < firststartl) firststartl = pts
@@ -2457,6 +2500,7 @@ contains
         particle%vsgs_prev      = -32678.
         particle%wsgs_prev      = -32678.
         particle%sigma2_sgs     = -32678.
+	particle%mass           = -32678.
         particle%partstep       = -32678.
         particle%nd             = 0
       end do
@@ -2518,6 +2562,7 @@ contains
               particle%vsgs_prev      = 0.
               particle%wsgs_prev      = 0.
               particle%sigma2_sgs     = 0.
+	      particle%mass           = 0.
               particle%partstep       = 0
 	      particle%nd             = 1
               if(tstart < firststartl) firststartl = tstart
@@ -2561,7 +2606,8 @@ contains
     ipsigma2_sgs    = 22
     ipartstep       = 23
     ipnd            = 24
-    nrpartvar       = ipnd
+    ipm             = 25
+    nrpartvar       = ipm
 
     ! 1D arrays for online statistics
     if(lpartstat) then
@@ -2577,7 +2623,8 @@ contains
                    tvprof(nzp),   tvprofl(nzp),    &
                    rtprof(nzp),   rtprofl(nzp),    &
                    rlprof(nzp),   rlprofl(nzp),    &
-                   ccprof(nzp),   ccprofl(nzp))
+                   ccprof(nzp),   ccprofl(nzp),    &
+		   mprof(nzp),    mprofl(nzp))
 
       npartprof      = 0.
       npartprofl     = 0.
@@ -2605,6 +2652,7 @@ contains
       rtprofl        = 0.
       rlprofl        = 0.
       ccprofl        = 0.
+      mprofl         = 0.
 
       if(lpartsgs) then
         allocate(sigma2prof(nzp),sigma2profl(nzp), &
@@ -2695,7 +2743,7 @@ contains
         particle%z, particle%zstart, particle%zprev, particle%wres, particle%wres_prev, &
         particle%usgs,      particle%vsgs,      particle%wsgs, &
         particle%usgs_prev, particle%vsgs_prev, particle%wsgs_prev, &
-        particle%sigma2_sgs
+        particle%sigma2_sgs, particle%mass
       particle => particle%next
     end do
     close(666)
@@ -2776,6 +2824,9 @@ contains
       call addvar_nc(ncpartid,'rt','total water mixing ratio','kg/kg',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
       call addvar_nc(ncpartid,'rl','liquid water mixing ratio','kg/kg',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
     end if
+    if(lpartdrop.and.lpartmass) then
+      call addvar_nc(ncpartid,'m','drop mass','kg',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+    end if
 
   end subroutine initparticledump
 
@@ -2831,6 +2882,9 @@ contains
       if(lpartsgs) then
         call addvar_nc(ncpartstatid,'fs','fraction subgrid TKE','-',dimname,dimlongname,dimunit,dimsize,dimvalues)
         call addvar_nc(ncpartstatid,'sgstke','subgrid TKE of particle','m s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      end if
+      if(lpartdrop.and.lpartmass) then
+        call addvar_nc(ncpartstatid,'m','drop mass','kg',dimname,dimlongname,dimunit,dimsize,dimvalues)
       end if
     end if
 
