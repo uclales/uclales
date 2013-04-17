@@ -56,7 +56,7 @@ module modparticles
   real               :: tnextdump
   real               :: randint   = 20.
   real               :: tnextrand = 6e6
-  logical            :: lpartmass = .false.              ! hard code switch to turn on/off drop mass 
+  logical            :: lpartmass = .true.              ! hard code switch to turn on/off drop mass 
                                                         ! use only in combination with lpartdrop = .true. (in namelist)
 
   ! Particle structure
@@ -191,12 +191,25 @@ contains
           call rk3(particle)
           call checkbound(particle)
         end if
-      particle => particle%next
+        particle => particle%next
       end do
     end if
 
     ! Communicate particles to other procs
     call partcomm
+    
+    ! Let drops grow
+    if (lpartdrop.and.lpartmass) then
+      if (nstep==3) then
+        particle => head
+        do while( associated(particle))
+	  if ( time - particle%tstart >= 0 .and. particle%x.ne.-32678.) then
+            call drop_growth(particle)
+	  end if
+	  particle => particle%next
+	end do
+      end if
+    end if
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! Temporary hack, sync particle dump with statistics
@@ -2287,6 +2300,35 @@ contains
     deallocate(a_npauto)
     
   end subroutine activate_drops
+
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine drop_growth 
+  !--------------------------------------------------------------------------
+  !
+  subroutine drop_growth(particle)
+    use mpi_interface, only : myid
+    use defs,          only : pi,rowt
+    use grid,          only : dt,dn0
+    implicit none
+    
+    type (particle_record), pointer:: particle
+    real               :: a1, K
+    real               :: thl,thv,rt,rl
+        
+    a1 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! drop radius
+    
+    if (a1.le.50.e-6) then                          ! collection kernel (Long, 1974)
+      K = 1.1e16 * (particle%mass/rowt)**2.
+    else 
+      K = 6.33e3  * (particle%mass/rowt)
+    end if
+    
+    call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
+
+    particle%mass = particle%mass + rl * i1d(particle%z,dn0) * K * dt
+        
+  end subroutine drop_growth
 
   !
   !--------------------------------------------------------------------------
