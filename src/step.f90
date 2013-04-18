@@ -372,7 +372,7 @@ contains
                      a_ricet,a_nicet,a_rsnowt, a_rgrt,&
                      a_rhailt,a_nhailt,a_nsnowt, a_ngrt,&
                      a_xt1, a_xt2, nscl, nxyzp, level, &
-                     lwaterbudget, a_rct, &
+                     lwaterbudget, a_rct, ncld, &
                      lcouvreux, a_cvrxt, ncvrx
     use util, only : azero
 
@@ -391,7 +391,7 @@ contains
           a_rpt =>a_xt1(:,:,:,6)
           a_npt =>a_xt1(:,:,:,7)
        end if
-       if (lwaterbudget) a_rct =>a_xt1(:,:,:,8)
+       if (lwaterbudget) a_rct =>a_xt1(:,:,:,ncld)
        if (lcouvreux)    a_cvrxt =>a_xt1(:,:,:,ncvrx)
        if (level >= 4) then
           a_ricet  =>a_xt1(:,:,:, 8)
@@ -417,7 +417,7 @@ contains
           a_rpt =>a_xt2(:,:,:,6)
           a_npt =>a_xt2(:,:,:,7)
        end if
-       if (lwaterbudget) a_rct =>a_xt2(:,:,:,8)
+       if (lwaterbudget) a_rct =>a_xt2(:,:,:,ncld)
        if (lcouvreux)    a_cvrxt =>a_xt2(:,:,:,ncvrx)
        if (level >= 4) then
           a_ricet  =>a_xt2(:,:,:, 8)

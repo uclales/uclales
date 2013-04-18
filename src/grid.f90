@@ -51,6 +51,7 @@ module grid
   logical           :: lcouvreux = .false.  ! switch for 'radioactive' scalar
   logical           :: lwaterbudget = .false.  ! switch for liquid water budget diagnostics
   integer           :: ncvrx               ! Number of Couvreux scalar
+  integer           :: ncld               ! Number of Couvreux scalar
 
   integer           :: nfpt = 10           ! number of rayleigh friction points
   real              :: distim = 300.0      ! dissipation timescale
@@ -230,7 +231,10 @@ contains
     if (level   > 3) nscl = nscl+4  ! ni,qi,qs,qg
     if (level   > 4) nscl = nscl+4  ! ns,ng,qh,nh (for Axel's two-moment scheme)
 
-    if (lwaterbudget) nscl = nscl+1 ! additional cloud water a_cld in the tracer array
+    if (lwaterbudget) then 
+      nscl = nscl+1 ! additional cloud water a_cld in the tracer array
+      ncld = nscl
+    end if  
     if (lcouvreux) then
       nscl  = nscl+1 ! Additional radioactive scalar
       ncvrx = nscl
@@ -263,9 +267,9 @@ contains
     end if
     if (lwaterbudget) then
       ! for liquid water budget and precipitation efficiency diagnostic
-      a_cld=>a_xp(:,:,:,8)
+      a_cld=>a_xp(:,:,:,ncld)
       a_cld(:,:,:) = 0.
-      allocate (cnd_acc(nxp,nyp),cev_acc(nxp,nyp),rev_acc(nxp,nyp))
+      allocate (cnd_acc(nxp,nyp),cev_acc(nxp,nyp))
       cnd_acc(:,:) = 0.   ! accumulated condensation                 [kg/m2]
       cev_acc(:,:) = 0.   ! accumulated evaporation of cloud water   [kg/m2]
     else
