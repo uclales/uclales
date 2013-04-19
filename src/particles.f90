@@ -1417,10 +1417,10 @@ contains
   !--------------------------------------------------------------------------
   ! Subroutine thermo
   !> Calculates thermodynamic variables at particle position (thl, thv,
-  !> qt, qs)
+  !> qt, qs, tk, ev)
   !--------------------------------------------------------------------------
   !
-  subroutine thermo(px,py,pz,thl,thv,rt,rl)
+  subroutine thermo(px,py,pz,thl,thv,rt,rl,tk,ev)
     use thrm,         only : rslf
     use grid,         only : a_pexnr, a_rp, a_theta, a_tp, pi0, pi1,th00
     !use grid,         only : tname,nzp,dxi,dyi,dzi_t,nxp,nyp,umean,vmean, a_tp, a_rp, press, th00, a_pexnr, a_theta,pi0,pi1
@@ -1431,6 +1431,7 @@ contains
 
     real, intent(in)  :: px,py,pz
     real, intent(out) :: thl,thv,rt,rl
+    real, intent(out), optional :: tk,ev
     real, parameter   :: epsln = 1.e-4
     real              :: exner,ploc,tlloc,rsloc,dtx,tx,txi,tx1
     integer           :: iterate
@@ -1459,7 +1460,9 @@ contains
         rl         = max(rt-rsloc,0.)
       end do
     end if
-
+    
+    if(present(tk)) tk = tlloc + alvl/cp*rl
+    if(present(ev)) ev = (rt-rl)*ploc/(ep+rt-rl)
     thv = i3d(px,py,pz,a_theta) * (1.+ep2*(rt-rl))
 
   end subroutine thermo
@@ -2308,14 +2311,22 @@ contains
   !
   subroutine drop_growth(particle)
     use mpi_interface, only : myid
-    use defs,          only : pi,rowt
-    use grid,          only : dt,dn0
+    use defs,          only : pi,rowt,Rm,alvl
+    use grid,          only : dt,dn0,vapor,a_scr1,a_scr2,nxp,nyp,nzp,a_theta,a_pexnr,pi0,pi1
+    use mcrp,          only : Kt, Dv
+    use thrm,          only : fll_tkrs,esl
     implicit none
     
     type (particle_record), pointer:: particle
-    real               :: a1, K
-    real               :: thl,thv,rt,rl
-        
+    real               :: a1, K, Fk, Fd, S, es
+    real               :: thl,thv,rt,rl,tk,ev
+
+
+    call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl,tk=tk,ev=ev)
+           
+	    
+    ! drop growth by accretion
+    
     a1 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! drop radius
     
     if (a1.le.50.e-6) then                          ! collection kernel (Long, 1974)
@@ -2324,9 +2335,22 @@ contains
       K = 6.33e3  * (particle%mass/rowt)
     end if
     
-    call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
-
     particle%mass = particle%mass + rl * i1d(particle%z,dn0) * K * dt
+    
+    
+    ! drop evaporation (change drop deactivation accordingly!)
+    
+    a1 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! drop radius    
+    es = esl(tk)
+    
+    Fk = (alvl/(Rm*tk)-1)*alvl*rowt/(Kt*tk)
+    Fd = rowt*Rm*tk/(Dv*es)
+    S  = ev/es
+
+    particle%mass = particle%mass + 4*pi*a1*(S-1) / (rowt*(Fk+Fd)) * dt
+    
+    
+    !todo: drop breakup at 3mm to 6mm?! 
         
   end subroutine drop_growth
 
