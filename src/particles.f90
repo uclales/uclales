@@ -2109,6 +2109,7 @@ contains
   subroutine deactivate_drops(time)
     use mpi_interface, only : myid, nyprocs, nxprocs, mpi_integer, mpi_double_precision, &
                               mpi_comm_world, ierror
+    use mcrp,          only : rain
     implicit none
     
     real, intent(in)  :: time
@@ -2123,9 +2124,12 @@ contains
     ndel = 0    
     particle => head
     do while(associated(particle))
-      if(particle%x.ne.-32678.) then
-        call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
-        if(rl==0) ndel = ndel + 2
+      if(particle%x.ne.-32678..and.particle%mass.lt.(rain%x_min-1.e-20)) then
+      !if(particle%x.ne.-32678.) then
+        !call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
+        !if(rl==0) 
+          ndel = ndel + 2
+	!end if
       end if
       particle => particle%next
     end do 
@@ -2134,20 +2138,23 @@ contains
     ndel = 0
     particle => head
     do while(associated(particle))
-      if(particle%x.ne.-32678.) then
-        call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
-        if(rl==0) then
+      if(particle%x.ne.-32678..and.particle%mass.lt.(rain%x_min-1.e-20)) then
+      !if(particle%x.ne.-32678.) then
+        !call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
+        !if(rl==0) then
 	  ndel_n(ndel+1) = particle%unique
 	  ndel_n(ndel+2) = particle%nd
 	  ndel = ndel + 2
 	  call delete_particle(particle)
-	end if
+	!end if
       end if
       particle => particle%next
     end do 
   
     allocate(recvcount(nprocs))
     call mpi_allgather(ndel,1,mpi_integer,recvcount,1,mpi_integer,mpi_comm_world,ierror)
+    
+    if(myid==0) write(*,*) 'deactivate # particles:', sum(recvcount)
     
     if (sum(recvcount)>0) then
       ! Create array to receive unique-nd-combinations from other procs
