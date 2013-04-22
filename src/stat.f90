@@ -30,7 +30,7 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 47, nvar2 = 113 ! number of time series and profiles
+  integer, parameter :: nvar1 = 56, nvar2 = 113 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2, nv1=nvar1, nv2=nvar2
   real, save         :: fsttm, lsttm, nsmp = 0
 
@@ -40,7 +40,7 @@ module stat
   real               :: savg_intvl = 1800. ! statistical averaging interval
 
 !irina
-  character (len=7), save :: s1(nvar1)=(/                           & 
+  character (len=7), save :: s1(nvar1)=(/                           &
        'time   ','cfl    ','maxdiv ','zi1_bar','zi2_bar','zi3_bar', & ! 1
        'vtke   ','sfcbflx','wmax   ','tsrf   ','ustar  ','shf_bar', & ! 7
        'lhf_bar','zi_bar ','lwp_bar','lwp_var','zc     ','zb     ', & !13
@@ -48,7 +48,9 @@ module stat
        'CCN    ','nrain  ','nrcnt  ','zcmn   ','zbmn   ','tkeint ', & !25
        'lflxut ','lflxdt ','sflxut ','sflxdt ','thl_int','wvp_bar', & !31
        'wvp_var','iwp_bar','iwp_var','swp_bar','swp_var','gwp_bar', & !37
-       'gwp_var','hwp_bar','hwp_var','lflxutc','sflxutc'/),        & !43
+       'gwp_var','hwp_bar','hwp_var','lflxutc','sflxutc','tsair  ', & !43
+       'sflxds ','sflxus ','lflxds ','lflxus ','sflxdsc','sflxusc', & !49
+       'lflxdsc','lflxusc'/),        & !55
        s2(nvar2)=(/                                                 &
        'time   ','zt     ','zm     ','dn0    ','u0     ','v0     ', & ! 1
        'fsttm  ','lsttm  ','nsmp   ','u      ','v      ','t      ', & ! 7
@@ -63,7 +65,7 @@ module stat
        'l_3    ','tot_lw ','sed_lw ','cs1    ','cnt_cs1','w_cs1  ', & !61
        'tl_cs1 ','tv_cs1 ','rt_cs1 ','rl_cs1 ','wt_cs1 ','wv_cs1 ', & !67
        'wr_cs1 ','cs2    ','cnt_cs2','w_cs2  ','tl_cs2 ','tv_cs2 ', & !73
-       'rt_cs2 ','rl_cs2 ','wt_cs2 ','wv_cs2 ','wr_cs2 ','Nc     ', & !79  
+       'rt_cs2 ','rl_cs2 ','wt_cs2 ','wv_cs2 ','wr_cs2 ','Nc     ', & !79
        'Nr     ','rr     ','prc_r  ','evap   ','frc_prc','prc_prc', & !85
        'frc_ran','hst_srf','lflxu  ','lflxd  ','sflxu  ','sflxd  ',& !91
        'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel',& !97
@@ -78,13 +80,13 @@ module stat
        sgs_vel, comp_tke, get_zi
 
 contains
-  ! 
+  !
   ! ---------------------------------------------------------------------
   ! INIT_STAT:  This routine initializes the statistical arrays which
   ! are user/problem defined.  Note that svctr is given 100 elements, and
   ! elements 90 and above are used for computing the TKE budget. Hence
   ! if (nvar2 >= 90 the program stops
-  ! 
+  !
   subroutine init_stat(time, filprf, expnme, nzp)
 
     use grid, only : nxp, nyp, iradtyp
@@ -176,10 +178,10 @@ contains
 
     call accum_stat(nzp, nxp, nyp, zm, a_up, a_vp, a_wp, a_tp, press, umean    &
          ,vmean,th00)
-    !irina     
+    !irina
     if (iradtyp == 2 .and. level == 1) then
        call accum_rad(nzp, nxp, nyp, a_rflx)
-    end if 
+    end if
     if (iradtyp == 2 .and. level >1) then
        call accum_rad(nzp, nxp, nyp, a_rflx, sflx=a_sflx, alb=albedo)
     end if
@@ -226,7 +228,7 @@ contains
     if (debug) WRITE (0,*) 'statistics: end,        myid=',myid
 
   end subroutine statistics
-  ! 
+  !
   ! -----------------------------------------------------------------------
   ! subroutine set_ts: computes and writes time sequence stats
   !
@@ -244,9 +246,9 @@ contains
     ssclr(1) = time
     ssclr(4) = get_zi(n1, n2, n3, 2, th, dzi_m, zt, 1.)   ! maximum gradient
     ssclr(5) = get_zi(n1, n2, n3, 3, th, thvar, zt, 1.) ! maximum variance
-    ! 
+    !
     ! buoyancy flux statistics
-    ! 
+    !
     ssclr(7) = 0.
   !irina
     ssclr(30) = 0.
@@ -262,10 +264,10 @@ contains
     ssclr(8) = bf(2)
     ssclr(9) = maxval(w)
 
-    ssclr(12) = ssclr(12)*cp*(dn0(1)+dn0(2))*0.5 
+    ssclr(12) = ssclr(12)*cp*(dn0(1)+dn0(2))*0.5
 
   end subroutine set_ts
-  ! 
+  !
   ! -----------------------------------------------------------------------
   ! subroutine ts_lvl1: computes and writes time sequence stats; for the
   ! zi calculation setting itype=1 selects a concentration threshold
@@ -282,7 +284,7 @@ contains
     ssclr(14) = get_zi(n1, n2, n3, 1, q, dzi_m, zt, 0.5e-3)
 
   end subroutine ts_lvl1
-  ! 
+  !
   ! -----------------------------------------------------------------------
   ! subroutine ts_lvl2: computes and writes time sequence stats
   !
@@ -297,7 +299,7 @@ contains
     ssclr(18)  = zt(n1)
     ssclr(19)  = 0.
     ssclr(20)  = 0.
-!irina    
+!irina
     ssclr(17)  = 0.
     ssclr(28)  = 0.
     ssclr(29)  = 0.
@@ -309,16 +311,16 @@ contains
 !irina
         ct_tmp =0.
         cb_tmp =zt(n1)
-!        
+!
           do k=2,n1-2
              xaqua = rt(k,i,j) - rs(k,i,j)
              if (xaqua > 1.e-5) then
                 ssclr(17) = max(ssclr(17),zt(k))
                 ssclr(18) = min(ssclr(18),zt(k))
-!irina                
+!irina
                 ct_tmp = max(ct_tmp,zt(k))
                 cb_tmp = min(cb_tmp,zt(k))
-!irina                
+!irina
                 cpnt = unit
                 ssclr(20) = max(ssclr(20), xaqua)
              end if
@@ -346,7 +348,7 @@ contains
   end subroutine ts_lvl2
   !
   !---------------------------------------------------------------------
-  ! SUBROUTINE ACCUM_STAT: Accumulates various statistics over an 
+  ! SUBROUTINE ACCUM_STAT: Accumulates various statistics over an
   ! averaging period for base (level 0) version of model
   !
   subroutine accum_stat(n1,n2,n3,zm,u,v,w,t,p,um,vm,th00)
@@ -372,7 +374,7 @@ contains
        do i=3,n2-2
           do k=1,n1
              a3(k)=a3(k) + w(k,i,j)**3
-!irina             
+!irina
              !b3(k)=b3(k) + (t(k,i,j)-a1(k))**3
              b3(k)=b3(k) + (t(k,i,j)-c1(k))**3
           end do
@@ -398,18 +400,18 @@ contains
        end do
     end do
     ssclr(35) = get_avg(1,n2,n3,1,scr)
-
+    ssclr(48) = c1(2) + th00
   end subroutine accum_stat
   !
   !---------------------------------------------------------------------
-  ! SUBROUTINE ACCUM_STAT: Accumulates various statistics over an 
+  ! SUBROUTINE ACCUM_STAT: Accumulates various statistics over an
   ! averaging period for radiation variables
   !
   subroutine accum_rad(n1,n2,n3,rflx,sflx,alb,lflxu,lflxd,sflxu,sflxd,lflxu_ca,lflxd_ca,sflxu_ca,sflxd_ca,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa,sflxu_toa_ca,sflxd_toa_ca,lflxu_toa_ca,lflxd_toa_ca,dn0,dzt,pi0,pi1,sst,time_in,vapor,radtyp,a_pexnr,a_theta,CCN,cntlat)
     use radiation, only : d4stream
     integer, intent (in) :: n1,n2,n3
     real, intent (in)    :: rflx(n1,n2,n3)
- !irina   
+ !irina
     real, optional, intent (in) :: sflx(n1,n2,n3), alb(n2,n3), lflxu(n1,n2,n3),&
                                    lflxd(n1,n2,n3),sflxu(n1,n2,n3),sflxd(n1,n2,n3), lflxu_ca(n1,n2,n3),&
                                    lflxd_ca(n1,n2,n3),sflxu_ca(n1,n2,n3),sflxd_ca(n1,n2,n3) ,&
@@ -444,73 +446,81 @@ contains
     do k=1,n1
           svctr(k,93)=svctr(k,93) + a1(k)
     end do
+    ssclr(52) = -a1(2)
     end if
   if (present(lflxd)) then
     call get_avg3(n1,n2,n3,lflxd,a1)
     do k=1,n1
           svctr(k,94)=svctr(k,94) + a1(k)
     end do
+    ssclr(51) = -a1(2)
     end if
   if (present(sflxu)) then
     call get_avg3(n1,n2,n3,sflxu,a1)
     do k=1,n1
           svctr(k,95)=svctr(k,95) + a1(k)
     end do
+    ssclr(50) = a1(2)
   end if
   if (present(sflxd)) then
     call get_avg3(n1,n2,n3,sflxd,a1)
     do k=1,n1
           svctr(k,96)=svctr(k,96) + a1(k)
     end do
+    ssclr(49) = a1(2)
   end if
-    if (present(lflxu_toa)) then
-      ssclr(31) = get_avg(1,n2,n3,1,lflxu_toa)
-    end if
-    if (present(lflxd_toa)) then
-      ssclr(32) = get_avg(1,n2,n3,1,lflxd_toa)
-    end if
-    if (present(sflxu_toa)) then
-      ssclr(33) = get_avg(1,n2,n3,1,sflxu_toa)
-    end if
-    if (present(sflxd_toa)) then
-      ssclr(34) = get_avg(1,n2,n3,1,sflxd_toa)
-    end if
+  if (present(lflxu_toa)) then
+    ssclr(31) = get_avg(1,n2,n3,1,lflxu_toa)
+  end if
+  if (present(lflxd_toa)) then
+    ssclr(32) = get_avg(1,n2,n3,1,lflxd_toa)
+  end if
+  if (present(sflxu_toa)) then
+    ssclr(33) = get_avg(1,n2,n3,1,sflxu_toa)
+  end if
+  if (present(sflxd_toa)) then
+    ssclr(34) = get_avg(1,n2,n3,1,sflxd_toa)
+  end if
 
-    if (present(lflxu_toa_ca)) then
-      ssclr(46) = get_avg(1,n2,n3,1,lflxu_toa_ca)
-    end if
-    if (present(sflxu_toa_ca)) then
-      ssclr(47) = get_avg(1,n2,n3,1,sflxu_toa_ca)
-    end if
-    if (present(lflxu_ca)) then
-       call get_avg3(n1,n2,n3,lflxu_ca,a1)
-          do k=1,n1
-                svctr(k,110)=svctr(k,110) + a1(k)
-          end do
-    end if
-       if (present(lflxd_ca)) then
-          call get_avg3(n1,n2,n3,lflxd_ca,a1)
-          do k=1,n1
-                svctr(k,111)=svctr(k,111) + a1(k)
-          end do
-    end if
-        if (present(sflxu_ca)) then
-          call get_avg3(n1,n2,n3,sflxu_ca,a1)
-          do k=1,n1
-                svctr(k,112)=svctr(k,112) + a1(k)
-          end do
-    end if
-       if (present(sflxd_ca)) then
-          call get_avg3(n1,n2,n3,sflxd_ca,a1)
-          do k=1,n1
-                svctr(k,113)=svctr(k,113) + a1(k)
-          end do
-    end if
+  if (present(lflxu_toa_ca)) then
+    ssclr(46) = get_avg(1,n2,n3,1,lflxu_toa_ca)
+  end if
+  if (present(sflxu_toa_ca)) then
+    ssclr(47) = get_avg(1,n2,n3,1,sflxu_toa_ca)
+  end if
+  if (present(lflxu_ca)) then
+    call get_avg3(n1,n2,n3,lflxu_ca,a1)
+    do k=1,n1
+          svctr(k,110)=svctr(k,110) + a1(k)
+    end do
+    ssclr(56) = -a1(2)
+  end if
+  if (present(lflxd_ca)) then
+    call get_avg3(n1,n2,n3,lflxd_ca,a1)
+    do k=1,n1
+          svctr(k,111)=svctr(k,111) + a1(k)
+    end do
+    ssclr(55) = -a1(2)
+  end if
+  if (present(sflxu_ca)) then
+    call get_avg3(n1,n2,n3,sflxu_ca,a1)
+    do k=1,n1
+          svctr(k,112)=svctr(k,112) + a1(k)
+    end do
+    ssclr(54) = a1(2)
+  end if
+  if (present(sflxd_ca)) then
+    call get_avg3(n1,n2,n3,sflxd_ca,a1)
+    do k=1,n1
+          svctr(k,113)=svctr(k,113) + a1(k)
+    end do
+    ssclr(53) = a1(2)
+  end if
 
   end subroutine accum_rad
   !
   !---------------------------------------------------------------------
-  ! SUBROUTINE ACCUM_LVL1: Accumulates various statistics over an 
+  ! SUBROUTINE ACCUM_LVL1: Accumulates various statistics over an
   ! averaging period for moisture variable (smoke or total water)
   !
   subroutine accum_lvl1(n1,n2,n3,rt)
@@ -689,16 +699,16 @@ contains
 
     integer                :: k, i, j, km1
     real                   :: nrsum, nrcnt, rrsum, rrcnt, xrain, xaqua,convliq
-    real                   :: unit 
+    real                   :: unit
     real                   :: rmax, rmin
     real, dimension(n1)    :: a1
     real, dimension(n2,n3) :: scr1,scr2
     logical                :: aflg
-    
+
     !
     ! conditionally average rain numbers, and droplet concentrations
     !
-    
+
     call get_avg3(n1,n2,n3,rr,a1)
     nrsum = 0.
     nrcnt = 0.
@@ -812,7 +822,7 @@ contains
     real, dimension(n1)    :: a1
 !     real, dimension(n2,n3) :: scr1
 !     logical                :: aflg
- 
+
     !
     ! conditionally average ice numbers, and droplet concentrations
     !
@@ -827,7 +837,7 @@ contains
     !
     ! average snow and graupel profiles
     !
-    
+
     call get_avg3(n1,n2,n3,rsnow,a1)
     svctr(:,101)=svctr(:,101) + a1(:)*1000.
 
@@ -918,11 +928,11 @@ contains
 
   end subroutine accum_lvl4
 
-  ! 
+  !
   ! ---------------------------------------------------------------------
   ! subroutine comp_tke: calculates some components of the turbulent
   ! kinetic energy budgets and velocity statistics
-  ! 
+  !
   subroutine comp_tke(n1,n2,n3,dzi_m,th00,u,v,w,s,scr)
 
     integer, intent (in) :: n1,n2,n3
@@ -933,20 +943,20 @@ contains
     integer :: k,kp1,i,j
     real    :: x1(n1), x2(n1), xx
 
-    ! 
+    !
     ! ------
     ! Calculates buoyancy forcing
-    ! 
+    !
     call get_buoyancy(n1,n2,n3,s,w,th00)
-    ! 
+    !
     ! ------
     ! Estimates shear component of TKE budget
-    ! 
+    !
     call get_shear(n1,n2,n3,u,v,w,dzi_m)
-    ! 
+    !
     ! ------
     ! Calculates horizontal variances and resolved TKE
-    ! 
+    !
     do j=3,n3-2
        do i=3,n2-2
           do k=1,n1
@@ -994,10 +1004,10 @@ contains
     end do
 
   end subroutine comp_tke
-  ! 
+  !
   ! ---------------------------------------------------------------------
   ! get_buoyancy:  estimates buoyancy production term in tke budget
-  ! 
+  !
   subroutine get_buoyancy(n1,n2,n3,b,w,th00)
 
     use defs, only : g
@@ -1058,18 +1068,18 @@ contains
     end do
 
   end subroutine get_shear
-  ! 
+  !
   ! ----------------------------------------------------------------------
   ! Subroutine write_ts: writes the statistics file
-  ! 
+  !
   subroutine write_ts
 
     use netcdf
 
     integer :: iret, n, VarID
-    ! 
+    !
     ! define different dimensions
-    ! 
+    !
     do n=1,nv1
        iret = nf90_inq_varid(ncid1, s1(n), VarID)
        if(iret == 0) iret = nf90_put_var(ncid1, VarID, ssclr(n), start=(/nrec1/))
@@ -1079,11 +1089,11 @@ contains
     nrec1 = nrec1 + 1
 
   end subroutine write_ts
-  ! 
+  !
   ! ----------------------------------------------------------------------
-  ! Subroutine write_ps: writes the time averaged elements of the 
+  ! Subroutine write_ps: writes the time averaged elements of the
   ! statistics file
-  ! 
+  !
   subroutine  write_ps(n1,dn0,u0,v0,zm,zt,time)
 
     use netcdf
@@ -1109,7 +1119,7 @@ contains
        svctr(k,37) = svctr(k,44) + svctr(k,47) +(                         &
             +svctr(k,45) + svctr(kp1,45) + svctr(k,46) + svctr(kp1,46)    &
             +svctr(k,42) + svctr(kp1,42) + svctr(k,43) + svctr(kp1,43)    &
-            -svctr(k,36) - svctr(kp1,36)   )*0.5       
+            -svctr(k,36) - svctr(kp1,36)   )*0.5
        if (lsttm>fsttm) then
           svctr(k,49) = (tke_res(k) - tke0(k))/(lsttm-fsttm)
        else
@@ -1172,20 +1182,20 @@ contains
     if (level >= 1) ssclr(13) = get_avg(1,n2,n3,1,qflx)
 
   end subroutine sfc_stat
-  ! 
+  !
   ! ----------------------------------------------------------------------
   ! subroutine: fills scalar array based on index
   ! 1: cfl; 2 max divergence
-  ! 
+  !
   subroutine fill_scalar(index,xval)
 
     integer, intent(in) :: index
     real, intent (in)   :: xval
 
     select case(index)
-    case(1) 
+    case(1)
        ssclr(2) = xval
-    case(2) 
+    case(2)
        ssclr(3) = xval
     end select
 
@@ -1206,7 +1216,7 @@ contains
   end subroutine sgs_vel
   !
   ! --------------------------------------------------------------------------
-  ! SGSFLXS: estimates the sgs rl and tv flux from the sgs theta_l and sgs r_t 
+  ! SGSFLXS: estimates the sgs rl and tv flux from the sgs theta_l and sgs r_t
   ! fluxes
   !
   subroutine sgsflxs(n1,n2,n3,level,rl,rv,th,flx,type)
@@ -1263,7 +1273,7 @@ contains
        !
        ! calculate fluxes for dry thermodynamics, i.e., wrl_sgs is by def
        ! zero
-       !   
+       !
     else
        do k = 1,n1
           wrl_sgs(k) = 0.
@@ -1274,12 +1284,12 @@ contains
                 if ( level >= 1) then
                    select case (type)
                    case ('tl')
-                      fctt = rnpts * (1. + ep2*rv(k,i,j)) 
+                      fctt = rnpts * (1. + ep2*rv(k,i,j))
                    case ('rt')
                       fctt = rnpts * ep2*th(k,i,j)
                    end select
                 else
-                   fctt = rnpts 
+                   fctt = rnpts
                 end if
                 wtv_sgs(k) = wtv_sgs(k) + fctt*flx(k,i,j)
              end do
@@ -1302,7 +1312,7 @@ contains
 
     integer :: k,ii
     real    :: x1(n1),x2(n1),x3(n1)
-    
+
     call get_cor3(n1,n2,n3,f1,t1,x1)
     call get_cor3(n1,n2,n3,f2,t2,x2)
     call get_cor3(n1,n2,n3,f3,t3,x3)
@@ -1347,17 +1357,17 @@ contains
     select case (routine)
     case("sgs")
        select case (nfld)
-       case (-6)    
+       case (-6)
           nn = 31 ! dissipation length-scale
-       case (-5)   
+       case (-5)
           nn = 30 ! mixing length
-       case (-4)  
+       case (-4)
           nn = 29 ! eddy diffusivity
-       case (-3) 
+       case (-3)
           nn = 28 ! eddy viscosity
-       case (-2) 
+       case (-2)
           nn = 38 ! dissipation
-       case (-1)  
+       case (-1)
           nn = 32 ! estimated sgs energy
        case (1)
           nn = 21 ! sgs tl flux
@@ -1402,14 +1412,14 @@ contains
           nn = 88
        case (3)
           nn = 63
-       !irina   
+       !irina
        case (5)
           nn = 97  !cloud droplet sed flux
        case default
           nn = 0
        end select
     case default
-       nn = 0      
+       nn = 0
     end select
 
     if (nn > 0) then
@@ -1443,7 +1453,7 @@ contains
 
     get_zi = -999.
     select case(itype)
-    case (1) 
+    case (1)
        !
        ! find level at which sx=threshold (xx is one over grid spacing)
        !
@@ -1457,7 +1467,7 @@ contains
              if (k == n1-2) zibar = -999.
              if (zibar /= -999.) zibar = zibar + z(k-1) +  &
                   (threshold - sx(k-1,i,j))/xx(k-1)     /  &
-                  (sx(k,i,j) - sx(k-1,i,j) + epsilon(1.)) 
+                  (sx(k,i,j) - sx(k-1,i,j) + epsilon(1.))
           end do
        end do
        if (zibar /= -999.) get_zi = zibar/real((n3-4)*(n2-4))

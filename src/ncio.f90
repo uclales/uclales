@@ -14,7 +14,7 @@
   integer, save           :: ncid0,ncid_s, ncid_cross
   integer, save           :: crossx, crossy, crossz
   character (len=7), dimension(30) :: crossnames
-  character (len=7),  private :: v_snm='sxx    ' 
+  character (len=7),  private :: v_snm='sxx    '
   character (len=80), private :: fname
 
 contains
@@ -256,7 +256,7 @@ contains
     integer, parameter :: nnames = 31
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,&
-         'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,&  
+         'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,&
          'w      ','t      ','p      ','q      ','l      ','r      '   ,'n      ',&
          'rice   ','nice   ','rsnow  ','rgrp   ',&
          'nsnow  ','ngrp   ','rhail  ','nhail  ',          &
@@ -265,7 +265,7 @@ contains
     real, intent (in) :: time
     integer           :: nbeg, nend
 
-    nvar0 = nbase + naddsc    
+    nvar0 = nbase + naddsc
     if (level  >= 1) nvar0 = nvar0+1
     if (level  >= 2) nvar0 = nvar0+1
     if (level  >= 3) nvar0 = nvar0+2
@@ -370,7 +370,7 @@ contains
     integer :: iret, VarID, nn, n
     integer :: ibeg(4), icnt(4), i1, i2, j1, j2
 
-    !return 
+    !return
     icnt = (/nzp,nxp-4,nyp-4,1   /)
     ibeg = (/1  ,1  ,1  ,nrec0/)
     i1 = 3
@@ -434,13 +434,13 @@ contains
        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
             count=icnt)
       end do
-! 
+!
 !     if (iradtyp > 1)  then
 !        nn = nn+1
 !        iret = nf90_inq_varid(ncid0, 'rflx', VarID)
 !        iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
 !             count=icnt)
-!   !irina          
+!   !irina
 !        nn = nn+1
 !        iret = nf90_inq_varid(ncid0, 'lflxu', VarID)
 !        iret = nf90_put_var(ncid0, VarID, a_lflxu(:,i1:i2,j1:j2), start=ibeg, &
@@ -457,7 +457,7 @@ contains
 !     end if
 
     if (myid==0) print "(//' ',12('-'),'   Record ',I3,' to: ',A60)",    &
-         nrec0,fname 
+         nrec0,fname
 
     iret  = nf90_sync(ncid0)
     nrec0 = nrec0+1
@@ -645,6 +645,10 @@ contains
        if (itype==2) ncinfo = 'time'
     case('tsrf')
        if (itype==0) ncinfo = 'Surface temperature'
+       if (itype==1) ncinfo = 'K'
+       if (itype==2) ncinfo = 'time'
+    case('tsair')
+       if (itype==0) ncinfo = 'Surface air temperature'
        if (itype==1) ncinfo = 'K'
        if (itype==2) ncinfo = 'time'
     case('ustar')
@@ -937,6 +941,22 @@ contains
        if (itype==0) ncinfo =  'Clear AirTop of Atmosphere Longwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
+    case('lflxds')
+       if (itype==0) ncinfo =  'Surface Longwave Radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('lflxus')
+       if (itype==0) ncinfo =  'Surface Longwave Radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('lflxdsc')
+       if (itype==0) ncinfo =  'Clear AirSurface Longwave Radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('lflxusc')
+       if (itype==0) ncinfo =  'Clear AirSurface Longwave Radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
     case('rflx2')
        if (itype==0) ncinfo = 'Variance of total radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
@@ -974,10 +994,27 @@ contains
        if (itype==0) ncinfo = 'Clear Air Top of Atmosphere Shortwave radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
+    case('sflxds')
+       if (itype==0) ncinfo =  'Surface Shortwave Radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('sflxus')
+       if (itype==0) ncinfo =  'Surface Shortwave Radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('sflxdsc')
+       if (itype==0) ncinfo =  'Clear AirSurface Shortwave Radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('sflxusc')
+       if (itype==0) ncinfo =  'Clear AirSurface Shortwave Radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
     case('sflx2')
        if (itype==0) ncinfo = 'Variance of shortwave radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
+
     case('l_2')
        if (itype==0) ncinfo = 'Variance of liquid'
        if (itype==1) ncinfo = 'kg^2/kg^2'
