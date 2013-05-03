@@ -28,18 +28,18 @@ implicit none
   character(len=7), allocatable, dimension(:) :: crossname
   character(len=7),  dimension(10) :: hname
   character(len=80), dimension(10) :: hlname
-  integer, parameter :: nvar_all = 47
+  integer, parameter :: nvar_all = 48
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
-         'l      ','rp     ','tv     ','ricep  ','nicep  ', & !6-10
-         'rsnowp ','rgrpp  ','nsnowp ','ngrpp  ','rhailp ', & !11-15
-         'nhailp ','lwp    ','rwp    ','iwp    ','swp    ', & !16-20
-         'gwp    ','hwp    ','prc_acc','cnd_acc','cev_acc', & !21-25
-         'rev_acc','cldbase','cldtop ','rwpbase','rwptop ', & !26-30
-         'tracer ','trcpath','trcbase','trctop ','wdev_cl', & !31-35
-         'wdev_sc','w_cld  ','tdev_cl','tdev_sc','t_cld  ', & !36-40
-         'qdev_cl','qdev_sc','q_cld  ','tv_cl  ','tv_sc  ', & !41-45
-         'tv_cld ','core   '/)                                !46-47
+         'l      ','rp     ','np     ','tv     ','ricep  ', & !6-10
+         'nicep  ','rsnowp ','rgrpp  ','nsnowp ','ngrpp  ', & !11-15
+         'rhailp ','nhailp ','lwp    ','rwp    ','iwp    ', & !16-20
+         'swp    ','gwp    ','hwp    ','prc_acc','cnd_acc', & !21-25
+         'cev_acc','rev_acc','cldbase','cldtop ','rwpbase', & !26-30
+         'rwptop ','tracer ','trcpath','trcbase','trctop ', & !31-35
+         'wdev_cl','wdev_sc','w_cld  ','tdev_cl','tdev_sc', & !36-40
+         't_cld  ','qdev_cl','qdev_sc','q_cld  ','tv_cl  ', & !41-45
+         'tv_sc  ','tv_cld ','core   '/)                      !46-48
   integer :: nccrossxzid,nccrossyzid,nccrossxyid, nccrossrec, nvar
 
   interface writecross
