@@ -74,10 +74,10 @@ module grid
   !
   real, dimension (:,:), allocatable :: albedo, a_ustar, a_tstar, a_rstar,    &
        uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, trac_sfc, sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa, &
-       prc_acc, &  ! accumulated precipitation [kg/m2] (diagnostic for 2D output)
        cnd_acc, &  ! accumulated condensation  [kg/m2] (diagnostic for 2D output)
        cev_acc, &  ! accumulated evaporation of cloud water [kg/m2] (diagnostic for 2D output)
        rev_acc     ! accumulated evaporation of rainwater   [kg/m2] (diagnostic for 2D output)
+  integer, dimension(10) :: prc_lev = -1
   !
   ! 3D Arrays
   !irina
@@ -85,7 +85,10 @@ module grid
        a_theta, a_pexnr, press, vapor, a_rflx, a_sflx, liquid, rsi,           &
        a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7,                &
        a_lflxu, a_lflxd, a_sflxu, a_sflxd,a_km, &
-       prc_c, prc_r, prc_i, prc_s, prc_g, prc_h
+       prc_c, prc_r, prc_i, prc_s, prc_g, prc_h, prc_acc
+
+  real, dimension (:,:), allocatable :: svctr
+  real, dimension (:)  , allocatable :: ssclr
   !
   ! Named pointers (to 3D arrays)
   !
@@ -257,9 +260,9 @@ contains
     if (level >= 3) then
       a_rpp =>a_xp(:,:,:,6)
       a_npp =>a_xp(:,:,:,7)
-      allocate (prc_acc(nxp,nyp))
+      allocate (prc_acc(nxp,nyp,count( prc_lev>0)))
       allocate (rev_acc(nxp,nyp))
-      prc_acc(:,:) = 0.   ! accumulated precipitation for 2D output  [kg/m2]
+      prc_acc(:,:,:) = 0.   ! accumulated precipitation for 2D output  [kg/m2]
       rev_acc(:,:) = 0.   ! accumulated evaporation of rainwater     [kg/m2]
     else
       a_rpp => NULL()
@@ -589,7 +592,13 @@ contains
        call newvar(n)
        write(10) a_sp
     end do
-
+    if(level>=3) then
+      write(10) prc_acc, rev_acc
+    end if
+    if(lwaterbudget) then
+      write(10) cnd_acc, cev_acc
+    end if
+    write(10) svctr
     close(10)
 
     if (myid == 0 .and. htype < 0) then
@@ -645,6 +654,13 @@ contains
        do n=nscl+1,nsclx
           read (10)
        end do
+      if(level>=3) then
+        read(10) prc_acc, rev_acc
+      end if
+      if(lwaterbudget) then
+        read(10) cnd_acc, cev_acc
+      end if
+      read(10) svctr
 
        close(10)
        !

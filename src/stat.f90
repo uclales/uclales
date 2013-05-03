@@ -21,7 +21,7 @@ module stat
 
   use mpi_interface, only : myid
   use ncio, only : open_nc, define_nc
-  use grid, only : level
+  use grid, only : level, svctr, ssclr
   use util, only : get_avg, get_cor, get_avg3, get_cor3, get_var3, get_csum
 !irina
 !  use step, only: case_name
@@ -71,7 +71,7 @@ module stat
        'hail   ','qt_th  ','s_1    ','s_2    ','s_3    ','RH     '/) !109-113
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
-       wtv_res(:), wrl_sgs(:), thvar(:), svctr(:,:), ssclr(:)
+       wtv_res(:), wrl_sgs(:), thvar(:)
 
   public :: sflg, ssam_intvl, savg_intvl, statistics, init_stat, write_ps,   &
        acc_tend, updtst, sfc_stat, close_stat, fill_scalar, tke_sgs, sgsflxs,&

@@ -28,6 +28,7 @@ implicit none
   character(len=7), allocatable, dimension(:) :: crossname
   character(len=7),  dimension(10) :: hname
   character(len=80), dimension(10) :: hlname
+  character(len=7) :: hname_prc
   integer, parameter :: nvar_all = 48
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
@@ -142,7 +143,7 @@ contains
                             xname, xlongname, xunit, &
                             yname, ylongname, yunit, &
                             tname, tlongname, tunit, &
-                            lwaterbudget, lcouvreux
+                            lwaterbudget, lcouvreux, prc_lev
 
     character (*), intent(in)     :: name
     character (40), dimension(3) :: dimname, dimlongname, dimunit
@@ -263,7 +264,7 @@ contains
         longname = 'Hail water path'
         unit = 'kg/m2'
       case ('prc_acc')
-        if (.not.lwaterbudget) return
+        if (level < 3) return
         longname = 'acc. precip'
         unit = 'kg/m2'
       case ('cnd_acc')
@@ -275,7 +276,7 @@ contains
         longname = 'acc. evaporation of cloud water'
         unit = 'kg/m2'
       case ('rev_acc')
-        if (.not.lwaterbudget) return
+        if (level < 3) return
         longname = 'acc. evaporation of rain water'
         unit = 'kg/m2'
       case ('cldbase')
@@ -438,8 +439,16 @@ contains
         dimvalues(1:nyp-4,2)  = yt(3:nyp-2)
         dimname(2)            = yname
         dimlongname(2)        = ylongname
-        call addvar_nc(nccrossxyid, trim(name), trim(longname), &
-        unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
+        if (trim(name) == 'prc_acc') then
+          do n = 1, count(prc_lev>0)
+            write(hname_prc,'(i4.4)') nint(zt(prc_lev(n)))
+            call addvar_nc(nccrossxyid, trim(name)//'_'//trim(hname_prc), trim(longname), &
+            unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
+          end do
+        else
+          call addvar_nc(nccrossxyid, trim(name), trim(longname), &
+          unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
+        end if
         crossname(ncross) = name
       end if
     end if
@@ -449,7 +458,7 @@ contains
   subroutine triggercross(rtimee)
     use grid,      only : level,nxp, nyp, nzp, tname, zt, zm, dzi_m, dzi_t, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
-       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta
+       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta, prc_lev
     use modnetcdf, only : writevar_nc, fillvalue_double
     use util,      only : get_avg3, get_var3, calclevel
     use defs,      only : ep2
@@ -457,7 +466,7 @@ contains
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
     real, dimension(nzp,nxp,nyp) :: tracer, tv, interp
     real, dimension(nzp)         :: c1, thvar, tvbar, tvenv, tvcld
-    integer :: n, i, j, k, ct, cb, zi, lcl
+    integer :: n, nn, i, j, k, ct, cb, zi, lcl
 
     if (.not. lcross) return
 
@@ -616,9 +625,12 @@ contains
         call calcintpath(a_rhailp, tmp)
         call writecross(crossname(n), tmp)
       case('prc_acc')
-        tmp = prc_acc(3:nxp-2, 3:nyp-2)
-        call writecross(crossname(n), tmp)
-        prc_acc = 0.
+        do nn = 1,count(prc_lev>0)
+          write(hname_prc,'(i4.4)') nint(zt(prc_lev(nn)))
+          tmp = prc_acc(3:nxp-2, 3:nyp-2,nn)
+          call writecross(trim(crossname(n))//'_'//trim(hname_prc), tmp)
+          prc_acc(:,:,nn) = 0.
+        end do
       case('cnd_acc')
         tmp = cnd_acc(3:nxp-2, 3:nyp-2)
         call writecross(crossname(n), tmp)

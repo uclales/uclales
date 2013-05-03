@@ -40,7 +40,7 @@ module mcrp
        a_rhailp, a_rhailt,  & ! hail mass
        a_nhailp, a_nhailt,  & ! hail number
        prc_c, prc_r, prc_i, prc_s, prc_g, prc_h, & 
-       lwaterbudget, prc_acc, rev_acc, a_rct, cnd_acc, cev_acc, a_cld
+       lwaterbudget, prc_acc, rev_acc, a_rct, cnd_acc, cev_acc, a_cld,prc_lev
 
   USE parallele_umgebung, ONLY: isIO,double_global_maxval,global_maxval,global_minval,global_maxval_stdout,global_sumval_stdout
   USE modcross, ONLY: calcintpath
@@ -182,7 +182,7 @@ contains
          &          hlp1,hlp2,hlp3,hlp4,hlp5,hlp6,hlp7,hlp8,hsum
     integer, optional :: istp
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
-
+    integer :: n
 
     if (present(istp)) istep = istp
 
@@ -204,12 +204,15 @@ contains
        if (.not.lwaterbudget) then
           call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
                a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r)
-          prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)) * dt / 3.
+          do n =1,count(prc_lev>0)
+            prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(n,:,:)+prc_r(n,:,:)) * dt / 3.
+          end do
        else
           call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
                a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r,rct=a_rct)
-
-          prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)) * dt / 3.
+            do n =1,count(prc_lev>0)
+              prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(n,:,:)+prc_r(n,:,:)) * dt / 3.
+            end do
 
           if (debug.and.lwaterbudget.and. .false.) then
              ! standard output of liquid water budget
@@ -232,7 +235,7 @@ contains
              hsum = sum(cnd_acc) ; call double_scalar_par_sum(hsum,hlp1)
              hsum = sum(cev_acc) ; call double_scalar_par_sum(hsum,hlp2)
              hsum = sum(rev_acc) ; call double_scalar_par_sum(hsum,hlp3)
-             hsum = sum(prc_acc) ; call double_scalar_par_sum(hsum,hlp4)
+             hsum = sum(prc_acc(:,:,1)) ; call double_scalar_par_sum(hsum,hlp4)
              call calcintpath(liquid,tmp)
              hsum = sum(tmp)     ; call double_scalar_par_sum(hsum,hlp5)
              call calcintpath(a_rpp,tmp)       
@@ -255,7 +258,9 @@ contains
             a_npp,a_rt,a_rpt,a_npt,a_scr7, prc_r,rsi, a_ricet,a_nicet,a_rsnowt,a_rgrt,&
             a_ricep,a_nicep,a_rsnowp,a_rgrp, &
             prc_i, prc_s, prc_g)
-       prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)+prc_i(2,:,:)+prc_s(2,:,:)+prc_g(2,:,:)) * dt / 3.
+      do n =1,count(prc_lev>0)
+        prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(n,:,:)+prc_r(n,:,:)+prc_i(n,:,:)+prc_s(n,:,:)+prc_g(n,:,:)) * dt / 3.
+      end do
     case(5)
        call mcrph_sb(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,a_wp,vapor,liquid, &
             a_rpp,    a_npp    , & ! rain
@@ -270,9 +275,11 @@ contains
             a_rgrt,   a_ngrt,    & ! graupel
             a_rhailt, a_nhailt,  & ! hail
             prc_c, prc_r, prc_i, prc_s, prc_g, prc_h)
-       prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)+prc_i(2,:,:)          &
-                           +prc_s(2,:,:)+prc_g(2,:,:)+prc_h(2,:,:)) * dt / 3.
-    end select
+      do n =1,count(prc_lev>0)
+        prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(n,:,:)+prc_r(n,:,:)+prc_i(n,:,:)          &
+                           +prc_s(n,:,:)+prc_g(n,:,:)+prc_h(n,:,:)) * dt / 3.
+       end do
+   end select
 
   end subroutine micro
   !

@@ -92,7 +92,7 @@ contains
     use forc, only : lstendflg, sfc_albedo
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
-         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype, CCN, lwaterbudget, lcouvreux
+         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype, CCN, lwaterbudget, lcouvreux, prc_lev
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,irsflg, iseed, hfilin,   &
          zrand,lhomrestart
     use stat, only : ssam_intvl, savg_intvl
@@ -120,7 +120,7 @@ contains
          timmax , dtlong , istpfl , timrsm, wctime, & ! timestep control
          runtype, hfilin , filprf , & ! type of run (INITIAL or HISTORY)
          frqhis , frqanl, frqcross, outflg , & ! freq of history/anal writes, output flg
-         lsync, lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars,&
+         lsync, lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars,prc_lev,&
                   iradtyp, radfrq , strtim , sfc_albedo, & ! radiation type flag
          isfctyp, ubmin  , zrough , & ! surface parameterization type
          sst    , dthcon , drtcon , & ! SSTs, surface flx parameters
