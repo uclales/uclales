@@ -288,8 +288,7 @@ contains
          lwaterbudget
     use stat, only : sflg, statistics
     use sgsm, only : diffuse
-    use sgsm_dyn, only : calc_cs
-    !irina
+    !use sgsm_dyn, only : calc_cs
     use srfc, only : surface
     !use srfc, only : surface,sst
     use thrm, only : thermo
@@ -333,7 +332,7 @@ contains
        call surface(sst)
 
        ! BvS
-       call calc_cs(time)      ! calculated dynamic value Cs
+       !call calc_cs(time)      ! calculated dynamic value Cs
 
        call diffuse(time)
        call fadvect
