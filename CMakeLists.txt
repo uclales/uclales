@@ -98,10 +98,13 @@ elseif(PROFILER STREQUAL "MARMOT")
   set (COMPILER_WRAPPER marmotf90)
 endif()
 
+# Hack BvS
+#set (FFTW_INCLUDE_DIR /sw/squeeze-x64/numerics/fftw-3.3-openmp-gccsys/include)
+#set (FFTW_LIB /sw/squeeze-x64/numerics/fftw-3.3-openmp-gccsys/lib/libfftw3.a)
 
 find_package(NETCDF REQUIRED COMPONENTS F90)
-set (UCLALES_INCLUDE_DIRS ${NETCDF_INCLUDE_DIRS})
-set (UCLALES_LIBRARIES ${NETCDF_LIBRARIES} ${HDF5_LIBRARIES})
+set (UCLALES_INCLUDE_DIRS ${NETCDF_INCLUDE_DIRS} ${FFTW_INCLUDE_DIRS})
+set (UCLALES_LIBRARIES ${NETCDF_LIBRARIES} ${HDF5_LIBRARIES} ${FFTW_LIB})
 
 
 # Set the compiler name to the wrapper, if necessary
