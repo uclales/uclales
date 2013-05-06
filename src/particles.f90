@@ -2140,7 +2140,7 @@ contains
       if ( np < 1 ) return
       ! read particles from partstartpos, create linked list
       do n = 1, np
-      if (mod(n,10000000)==0) print *,n
+      !if (mod(n,10000000)==0) print *,n
         read(ifinput,*) tstart, xstart, ystart, zstart
         if(xstart < 0. .or. xstart > nxg*deltax .or. ystart < 0. .or. ystart > nyg*deltay .or. zstart < 0. .or. zstart > zm(nzp-1)) then
           if (myid == 0) then
