@@ -151,7 +151,7 @@ contains
     character (len=80) :: longname, unit
     real, allocatable, dimension(:,:) :: dimvalues
     integer, dimension(3)             :: loc, dimsize
-    integer :: n
+    integer :: n, k
     logical :: iscross
 
     if (lcross) then
@@ -441,6 +441,12 @@ contains
         dimlongname(2)        = ylongname
         if (trim(name) == 'prc_acc') then
           do n = 1, count(prc_lev>0)
+            do k = 2,nzp
+              if (zt(k) >= prc_lev(n)) then
+                prc_lev(n) = zt(k)
+                exit
+              end if
+            end do
             write(hname_prc,'(i4.4)') nint(zt(prc_lev(n)))
             call addvar_nc(nccrossxyid, trim(name)//'_'//trim(hname_prc), trim(longname), &
             unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
