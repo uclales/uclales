@@ -78,6 +78,7 @@ module grid
        cev_acc, &  ! accumulated evaporation of cloud water [kg/m2] (diagnostic for 2D output)
        rev_acc     ! accumulated evaporation of rainwater   [kg/m2] (diagnostic for 2D output)
   integer, dimension(10) :: prc_lev = -1
+  integer :: nv1, nv2
   !
   ! 3D Arrays
   !irina
@@ -598,6 +599,7 @@ contains
     if(lwaterbudget) then
       write(10) cnd_acc, cev_acc
     end if
+    write(10) nv2
     write(10) svctr
     close(10)
 
@@ -660,7 +662,10 @@ contains
       if(lwaterbudget) then
         read(10) cnd_acc, cev_acc
       end if
+      read(10), nv2
+      allocate (svctr(nzp,nv2))
       read(10) svctr
+print *, 'ustart', svctr(10,10)
 
        close(10)
        !

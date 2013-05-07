@@ -21,7 +21,7 @@ module stat
 
   use mpi_interface, only : myid
   use ncio, only : open_nc, define_nc
-  use grid, only : level, svctr, ssclr
+  use grid, only : level, svctr, ssclr, nv1, nv2
   use util, only : get_avg, get_cor, get_avg3, get_cor3, get_var3, get_csum
 !irina
 !  use step, only: case_name
@@ -31,7 +31,7 @@ module stat
 !irina
   ! axel, me too!
   integer, parameter :: nvar1 = 45, nvar2 = 114 ! number of time series and profiles
-  integer, save      :: nrec1, nrec2, ncid1, ncid2, nv1=nvar1, nv2=nvar2
+  integer, save      :: nrec1, nrec2, ncid1, ncid2
   real, save         :: fsttm, lsttm, nsmp = 0
 
   logical, parameter :: debug = .false.
@@ -96,20 +96,6 @@ contains
 
     character (len=80) :: fname
 
-    allocate (wtv_sgs(nzp),wtv_res(nzp),wrl_sgs(nzp))
-    allocate (tke_res(nzp),tke_sgs(nzp),tke0(nzp),thvar(nzp))
-    allocate (ssclr(nvar1),svctr(nzp,120))
-
-    wtv_sgs(:) = 0.
-    wtv_res(:) = 0.
-    wrl_sgs(:) = 0.
-    tke_res(:) = 0.
-    tke_sgs(:) = 0.
-    tke0(:)    = 0.
-
-    svctr(:,:) = 0.
-    ssclr(:)   = 0.                 ! changed from = -999. to = 0.
-
 !     select case(level)
 !     case (0)
 !        nv1 = 13
@@ -129,6 +115,24 @@ contains
        nv1 = nvar1
        nv2 = nvar2
 !     end select
+
+
+    allocate (wtv_sgs(nzp),wtv_res(nzp),wrl_sgs(nzp))
+    allocate (tke_res(nzp),tke_sgs(nzp),tke0(nzp),thvar(nzp))
+    allocate (ssclr(nv1))
+
+    wtv_sgs(:) = 0.
+    wtv_res(:) = 0.
+    wrl_sgs(:) = 0.
+    tke_res(:) = 0.
+    tke_sgs(:) = 0.
+    tke0(:)    = 0.
+
+    if (.not. allocated(svctr)) then
+      allocate(svctr(nzp, nv2))
+      svctr(:,:) = 0.
+    end if
+    ssclr(:)   = 0.                 ! changed from = -999. to = 0.
 
     fname =  trim(filprf)//'.ts'
     if(myid == 0) print                                                  &
@@ -392,7 +396,6 @@ contains
        end do
     end do
     ssclr(35) = get_avg(1,n2,n3,1,scr)
-
   end subroutine accum_stat
   !
   !---------------------------------------------------------------------

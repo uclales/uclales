@@ -443,7 +443,7 @@ contains
           do n = 1, count(prc_lev>0)
             do k = 2,nzp
               if (zt(k) >= prc_lev(n)) then
-                prc_lev(n) = zt(k)
+                prc_lev(n) = k
                 exit
               end if
             end do
