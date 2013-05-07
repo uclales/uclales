@@ -662,10 +662,9 @@ contains
       if(lwaterbudget) then
         read(10) cnd_acc, cev_acc
       end if
-      read(10), nv2
+      read(10) nv2
       allocate (svctr(nzp,nv2))
       read(10) svctr
-print *, 'ustart', svctr(10,10)
 
        close(10)
        !
