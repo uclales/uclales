@@ -17,8 +17,8 @@ $(LES_ARC)(rad_cldwtr.o) \
 $(LES_ARC)(rad_rndnmb.o) \
 $(LES_ARC)(rad_d4strm.o) \
 $(LES_ARC)(rad_driver.o) \
-$(LES_ARC)(util.o)   \
 $(LES_ARC)(grid.o)   \
+$(LES_ARC)(util.o)   \
 $(LES_ARC)(thrm.o)   \
 $(LES_ARC)(rad_gcss.o)   \
 $(LES_ARC)(modnetcdf.o)   \
@@ -88,7 +88,7 @@ rad_driver.o:	defs.o rad_d4strm.o
 forc.o: 	defs.o grid.o rad_gcss.o stat.o
 icemcrp.o: 	defs.o grid.o ice_sb.o
 util.o: 	defs.o grid.o ice_sb.o
-util.o: 	defs.o grid.o thrm.o
+particles.o: 	defs.o grid.o thrm.o
 step.o:		icemcrp.o mpi_interface.o
 init.o:		grid.o ncio.o step.o icemcrp.o
 ncio.o:		grid.o mpi_interface.o icemcrp.o
