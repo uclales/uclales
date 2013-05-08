@@ -46,6 +46,9 @@ contains
     use stat, only : init_stat, write_ps, statistics
     use mpi_interface, only : appl_abort, myid
     use thrm, only : thermo
+!cgils
+    use forc, only : lstendflg
+    
     use mcrp, only : initmcrp
     use modcross, only : initcross, triggercross
     use grid, only : nzp,dn0,u0,v0,zm,zt
@@ -77,6 +80,10 @@ contains
     !irina
        if (lsvarflg) then
        call lsvar_init
+       end if
+    !cgils
+       if (lstendflg) then
+       call lstend_init
        end if
     !
 
@@ -686,27 +693,27 @@ contains
   !----------------------------------------------------------------------
   ! Lstend_init if lstendflg is true reads the lstend  from the respective
   ! file lstend_in
-  !
+  ! 
   subroutine lstend_init
 
    use grid,only   : wfls,dqtdtls,dthldtls
     use mpi_interface, only : myid
-
+   
 
    implicit none
-
-   real     :: lowdthldtls,highdthldtls,lowdqtdtls,highdqtdtls,lowwfls,highwfls,highheight,lowheight,fac
+   
+   real     :: tmp1,lowdthldtls,highdthldtls,lowdqtdtls,highdqtdtls,lowwfls,highwfls,highheight,lowheight,fac
    integer :: k
 
     ! reads the time varying lscale forcings
     !
  !   print *, wfls
     if (wfls(2) == 0.) then
- !         print *, 'lstend_init '
+ !         print *, 'lstend_init '                 
         open (1,file='lstend_in',status='old',form='formatted')
         read (1,*,end=100) lowheight,lowwfls,lowdqtdtls,lowdthldtls
         read (1,*,end=100) highheight,highwfls,highdqtdtls,highdthldtls
-        if(myid == 0)  print *, 'lstend_init read'
+        if(myid == 0)  print *, 'lstend_init read'                 
         do  k=2,nzp-1
           if (highheight<zt(k)) then
             lowheight = highheight
@@ -719,12 +726,12 @@ contains
           wfls(k) = fac*lowwfls + (1-fac)*highwfls
           dqtdtls(k) = fac*lowdqtdtls + (1-fac)*highdqtdtls
           dthldtls(k) = fac*lowdthldtls + (1-fac)*highdthldtls
-          if(myid == 0)  print *, k,wfls(k),dqtdtls(k),dthldtls(k)
+          if(myid == 0)  print *, ns, tmp1,wfls(ns),dqtdtls(ns),dthldtls(ns)
         end do
        close (1)
     end if
 100 continue
-
+ 
     return
   end subroutine lstend_init
 

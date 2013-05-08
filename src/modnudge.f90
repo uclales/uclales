@@ -33,17 +33,17 @@ module modnudge
 
 implicit none
 PRIVATE
-PUBLIC :: nudge,lnudge,tnudgefac
+PUBLIC :: nudge,lnudge,tnudgefac, qfloor, zfloor  
 SAVE
   real, dimension(:,:), allocatable :: tnudge,unudge,vnudge,wnudge,thlnudge,qtnudge
   real, dimension(:)  , allocatable :: timenudge
-  real :: tnudgefac = 1.
+  real :: tnudgefac = 1., qfloor = -1.,  zfloor = 1200.
   logical :: lnudge,lunudge,lvnudge,lwnudge,lthlnudge,lqtnudge
   integer :: ntnudge = 100
   logical :: firsttime = .true.
 contains
   subroutine initnudge(time)
-    use grid, only : nzp,zt,th00
+    use grid, only : nzp,zt,th00,umean,vmean
     use mpi_interface, only : myid
     implicit none
 
@@ -63,7 +63,7 @@ contains
     thlnudge=0
     qtnudge=0
     timenudge=0
-
+    height = 0.
 
 
     if (.not. lnudge) return
@@ -103,7 +103,7 @@ contains
         end do
         if (myid == 0) then
           do k=nzp-1,1,-1
-            write (6,'(2f7.1,6e12.4)') &
+            write (6,'(2f10.1,6e12.4)') &
                   zt (k), &
                   height (k), &
                   tnudge (k,t), &
@@ -119,24 +119,29 @@ contains
       timenudge = timenudge/86400+time
       tnudge  = tnudgefac*tnudge
       thlnudge = thlnudge - th00
+      unudge = unudge - umean 
+      vnudge = vnudge - vmean
     lunudge = any(abs(unudge)>1e-8)
     lvnudge = any(abs(vnudge)>1e-8)
     lwnudge = any(abs(wnudge)>1e-8)
     lthlnudge = any(abs(thlnudge)>1e-8)
     lqtnudge  = any(abs(qtnudge)>1e-8)
-
+   
   end subroutine initnudge
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   subroutine nudge(time)
-!     use modglobal, only : rdt
-!     use modfields, only : u0av,v0av,qt0av,thl0av
     use grid, only : dt, nxp, nyp, nzp, a_ut, a_vt, a_wt, a_tt, a_rt, a_up,a_vp,a_tp,a_rp,zt,a_wp
+    use util, only : get_avg3
     implicit none
     real, intent (in) :: time
     integer k,t,i,j
-    real :: dtm,dtp,currtnudge
+    real :: dtm,dtp,currtnudge, nudgefac
+    real, dimension(nzp) :: uav, vav, tav, qav
+!CGILS
+    real :: u_tnudge !nudging time for horizontal winds that is applied over the entire height of the domain
+!     u_tnudge = 600.           !secs, constant with height for u and v
     if (firsttime) then
       firsttime = .false.
       call initnudge(time)
@@ -154,22 +159,43 @@ contains
 
     dtm = ( time-timenudge(t) ) / ( timenudge(t+1)-timenudge(t) )
     dtp = ( timenudge(t+1)-time)/ ( timenudge(t+1)-timenudge(t) )
+    currtnudge = max(dt,u_tnudge*dtp+u_tnudge*dtm)
+    call get_avg3(nzp, nxp, nyp,a_up,uav)
+    call get_avg3(nzp, nxp, nyp,a_vp,vav)
+    call get_avg3(nzp, nxp, nyp,a_tp,tav)
+    call get_avg3(nzp, nxp, nyp,a_rp,qav)
 
+    do j=3,nyp-2
+    do i=3,nxp-2
+    do k=2,nzp-1 
+     currtnudge = max(dt,tnudge(k,t)*dtp+tnudge(k,t+1)*dtm)
+!      currtnudge = 600.
+      if(lunudge  ) a_ut(k,i,j)=a_ut(k,i,j)-&
+          (uav(k)-(unudge  (k,t)*dtp+unudge  (k,t+1)*dtm))/currtnudge
+      if(lvnudge  ) a_vt(k,i,j)=a_vt(k,i,j)-&
+          (vav(k)-(vnudge  (k,t)*dtp+vnudge  (k,t+1)*dtm))/currtnudge
+    end do
+    end do
+    end do
     do j=3,nyp-2
     do i=3,nxp-2
     do k=2,nzp-1
       currtnudge = max(dt,tnudge(k,t)*dtp+tnudge(k,t+1)*dtm)
-      if(lunudge  ) a_ut(k,i,j)=a_ut(k,i,j)-&
-          (a_up(k,i,j)-(unudge  (k,t)*dtp+unudge  (k,t+1)*dtm))/currtnudge
-      if(lvnudge  ) a_vt(k,i,j)=a_vt(k,i,j)-&
-          (a_vp(k,i,j)-(vnudge  (k,t)*dtp+vnudge  (k,t+1)*dtm))/currtnudge
       if(lthlnudge  ) a_tt(k,i,j)=a_tt(k,i,j)-&
-          (a_tp(k,i,j)-(thlnudge  (k,t)*dtp+thlnudge  (k,t+1)*dtm))/currtnudge
-      if(lqtnudge  ) a_rt(k,i,j)=a_rt(k,i,j)-&
-          (a_rp(k,i,j)-(qtnudge  (k,t)*dtp+qtnudge  (k,t+1)*dtm))/currtnudge
+          (tav(k) - (thlnudge  (k,t)*dtp+thlnudge  (k,t+1)*dtm))/currtnudge
+      if(lqtnudge  ) then
+        if (qav(k) < qfloor .and. zt(k) < zfloor) then
+          nudgefac = qfloor
+!           currtnudge = 3600.
+        else
+          nudgefac = qtnudge  (k,t)*dtp+qtnudge  (k,t+1)*dtm
+        end if
+        a_rt(k,i,j)= a_rt(k,i,j) - (qav(k)-nudgefac)/currtnudge
+      end if
     end do
     end do
     end do
+
   end subroutine nudge
 
 

@@ -73,7 +73,7 @@ module grid
   ! 2D Arrays (surface fluxes)
   !
   real, dimension (:,:), allocatable :: albedo, a_ustar, a_tstar, a_rstar,    &
-       uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, trac_sfc, sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa, &
+       uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, trac_sfc, sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa, sflxu_toa_ca,sflxd_toa_ca,lflxu_toa_ca,lflxd_toa_ca, &
        cnd_acc, &  ! accumulated condensation  [kg/m2] (diagnostic for 2D output)
        cev_acc, &  ! accumulated evaporation of cloud water [kg/m2] (diagnostic for 2D output)
        rev_acc     ! accumulated evaporation of rainwater   [kg/m2] (diagnostic for 2D output)
@@ -86,7 +86,8 @@ module grid
        a_theta, a_pexnr, press, vapor, a_rflx, a_sflx, liquid, rsi,           &
        a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7,                &
        a_lflxu, a_lflxd, a_sflxu, a_sflxd,a_km, &
-       prc_c, prc_r, prc_i, prc_s, prc_g, prc_h, prc_acc
+       prc_c, prc_r, prc_i, prc_s, prc_g, prc_h , prc_acc,               &
+       a_lflxu_ca, a_lflxd_ca, a_sflxu_ca, a_sflxd_ca
 
   real, dimension (:,:), allocatable :: svctr
   real, dimension (:)  , allocatable :: ssclr
@@ -181,16 +182,26 @@ contains
        allocate (a_lflxd(nzp,nxp,nyp))
        a_lflxd(:,:,:) = 0.
        memsize = memsize + nxyzp
+       allocate (a_lflxu_ca(nzp,nxp,nyp))
+       a_lflxu_ca(:,:,:) = 0.
+       memsize = memsize + nxyzp
+       allocate (a_lflxd_ca(nzp,nxp,nyp))
+       a_lflxd_ca(:,:,:) = 0.
+       memsize = memsize + nxyzp
     end if
     !irina
     if (iradtyp == 2 .and. level > 1) then
-       allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp),sflxu_toa(nxp,nyp),sflxd_toa(nxp,nyp),lflxu_toa(nxp,nyp),lflxd_toa(nxp,nyp))
+       allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp),sflxu_toa(nxp,nyp),sflxd_toa(nxp,nyp),lflxu_toa(nxp,nyp),lflxd_toa(nxp,nyp),sflxu_toa_ca(nxp,nyp),sflxd_toa_ca(nxp,nyp),lflxu_toa_ca(nxp,nyp),lflxd_toa_ca(nxp,nyp))
        a_sflx(:,:,:) = 0.
        albedo(:,:) = 0.
        sflxu_toa(:,:) = 0.
        sflxd_toa(:,:) = 0.
        lflxu_toa(:,:) = 0.
        lflxd_toa(:,:) = 0.
+       sflxu_toa_ca(:,:) = 0.
+       sflxd_toa_ca(:,:) = 0.
+       lflxu_toa_ca(:,:) = 0.
+       lflxd_toa_ca(:,:) = 0.
        memsize = memsize + nxyzp + nxyp
        !irina
        allocate (a_sflxu(nzp,nxp,nyp))
@@ -199,13 +210,23 @@ contains
        allocate (a_sflxd(nzp,nxp,nyp))
        a_sflxd(:,:,:) = 0.
        memsize = memsize + nxyzp
+       allocate (a_sflxu_ca(nzp,nxp,nyp))
+       a_sflxu_ca(:,:,:) = 0.
+       memsize = memsize + nxyzp 
+       allocate (a_sflxd_ca(nzp,nxp,nyp))
+       a_sflxd_ca(:,:,:) = 0.
+       memsize = memsize + nxyzp 
     end if
     if (iradtyp > 2) then
-       allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp),sflxu_toa(nxp,nyp),sflxd_toa(nxp,nyp),lflxu_toa(nxp,nyp),lflxd_toa(nxp,nyp))
+       allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp),sflxu_toa(nxp,nyp),sflxd_toa(nxp,nyp),lflxu_toa(nxp,nyp),lflxd_toa(nxp,nyp),sflxu_toa_ca(nxp,nyp),sflxd_toa_ca(nxp,nyp),lflxu_toa_ca(nxp,nyp),lflxd_toa_ca(nxp,nyp))
        sflxu_toa(:,:) = 0.
        sflxd_toa(:,:) = 0.
        lflxu_toa(:,:) = 0.
        lflxd_toa(:,:) = 0.
+       sflxu_toa_ca(:,:) = 0.
+       sflxd_toa_ca(:,:) = 0.
+       lflxu_toa_ca(:,:) = 0.
+       lflxd_toa_ca(:,:) = 0.
        a_sflx(:,:,:) = 0.
        albedo(:,:) = 0.
        memsize = memsize + nxyzp + nxyp
@@ -215,6 +236,12 @@ contains
        memsize = memsize + nxyzp
        allocate (a_sflxd(nzp,nxp,nyp))
        a_sflxd(:,:,:) = 0.
+       memsize = memsize + nxyzp 
+       allocate (a_sflxu_ca(nzp,nxp,nyp))
+       a_sflxu_ca(:,:,:) = 0.
+       memsize = memsize + nxyzp 
+       allocate (a_sflxd_ca(nzp,nxp,nyp))
+       a_sflxd_ca(:,:,:) = 0.
        memsize = memsize + nxyzp
     end if
  !
