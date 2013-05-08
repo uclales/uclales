@@ -19,7 +19,7 @@
 !
 module radiation
 
-  use defs, only       : cp, rcp, cpr, rowt, p00, pi, nv1, nv, SolarConstant
+  use defs, only       : cp, rcp, cpr, rowt, roice, p00, pi, nv1, nv, SolarConstant
   use fuliou, only     : rad
   implicit none
  character (len=10), parameter :: background = 'backrad_in'
@@ -45,16 +45,16 @@ module radiation
       real, dimension (n1), intent (in)                 :: dn0, pi0, pi1, dzi_m
       real, dimension (n1,n2,n3), intent (in)           :: pip, th, rv, rc
       real, optional, dimension (n1,n2,n3), intent (in) :: rr,ice,nice,grp
-      real, dimension (n1,n2,n3), intent (inout)        :: tt, rflx, sflx, lflxu, lflxd, sflxu, sflxd 
+      real, dimension (n1,n2,n3), intent (inout)        :: tt, rflx, sflx, lflxu, lflxd, sflxu, sflxd
       real, dimension (n2,n3), intent (out),optional    :: albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa
 
       integer :: kk
-      real    :: xfact, prw, p0(n1), exner(n1), pres(n1)
+      real    :: xfact, prw, pri, p0(n1), exner(n1), pres(n1)
 
       if (first_time) then
          p0(n1) = (p00*(pi0(n1)/cp)**cpr) / 100.
          p0(n1-1) = (p00*(pi0(n1-1)/cp)**cpr) / 100.
-         call setup(background,n1,npts,nv1,nv,p0)
+         call setup(background,n1,npts,nv1,nv,p0,pi0)
          first_time = .False.
          if (allocated(pre))   pre(:) = 0.
          if (allocated(pde))   pde(:) = 0.
@@ -78,6 +78,7 @@ module radiation
       ! call the radiation 
       !
       prw = (4./3.)*pi*rowt
+      pri = (3.*sqrt(3.)/8.)*roice
       do j=3,n3-2
          do i=3,n2-2
             do k=1,n1
@@ -91,9 +92,10 @@ module radiation
                pt(kk) = th(k,i,j)*exner(k)
                !old
              !  pt(kk) = tk(k,i,j)
-               ph(kk) = rv(k,i,j)
+               ph(kk) = max(0.,rv(k,i,j))
                plwc(kk) = 1000.*dn0(k)*max(0.,rc(k,i,j))
                pre(kk)  = 1.e6*(plwc(kk)/(1000.*prw*CCN*dn0(k)))**(1./3.)
+               pre(kk)=min(max(pre(kk),4.18),31.23)
                if (plwc(kk).le.0.) pre(kk) = 0.
                if (present(rr)) then
                  prwc(kk) = 1000.*dn0(k)*rr(k,i,j)
@@ -102,9 +104,15 @@ module radiation
                end if
                if (present(ice)) then
                  piwc(kk) = 1000.*dn0(k)*ice(k,i,j)
-                 pde(kk)  = 1.e6*(piwc(kk)/(1000.*prw*nice(k,i,j)*dn0(k)))**(1./3.)
+                 if (nice(k,i,j).gt.0.0) then
+                    pde(kk)  = 1.e6*(piwc(kk)/(1000.*pri*nice(k,i,j)*dn0(k)))**(1./3.)
+                    pde(kk)=min(max(pde(kk),20.),180.)
+                 else
+                    pde(kk)  = 0.0
+                 endif
                else
                   piwc(kk) = 0.
+                  pde(kk) = 0.0
                end if
                if (present(grp)) then
                  pgwc(kk) = 1000.*dn0(k)*grp(k,i,j)
@@ -123,8 +131,13 @@ module radiation
             !print *, "pre",pre(:)
             !print *, "u0",u0
 
-            call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
-                 fds, fus, fdir, fuir, plwc=plwc, pre=pre, useMcICA=.True.)
+            if (present(ice).and.present(grp)) then
+               call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
+                    fds, fus, fdir, fuir, plwc=plwc, pre=pre, piwc=piwc, pde=pde, pgwc=pgwc, useMcICA=.true.)
+            else
+               call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
+                    fds, fus, fdir, fuir, plwc=plwc, pre=pre, useMcICA=.true.)
+            end if
 
             do k=1,n1
                kk = nv1 - (k-1)
@@ -142,7 +155,7 @@ module radiation
 
             if (present(albedo)) then
               if (u0 > 0.) then
-                albedo(i,j) = fus(1)/fds(1)
+                albedo(i,j) = fus(1)/(fds(1)+epsilon(fds(1)))!LINDA
               else
                 albedo(i,j) = -999.
               end if
@@ -169,9 +182,8 @@ module radiation
               lflxd_toa(i,j) = fdir(1)
             end if 
             do k=2,n1-3
-               xfact  = exner(k)*dzi_m(k)/(cp*dn0(k))
+               xfact  = dzi_m(k)/(cp*dn0(k)*exner(k))
                tt(k,i,j) = tt(k,i,j) - (rflx(k,i,j) - rflx(k-1,i,j))*xfact
-             !  print *, 'dt', k, rc(k,i,j),(rflx(k,i,j) - rflx(k-1,i,j))*xfact*3600.
             end do
 
          end do
@@ -179,24 +191,54 @@ module radiation
 
     end subroutine d4stream
 
+  !
+  ! ---------------------------------------------------------------------------
+  ! BvS: Simple parameterized surface radiation for LSM 
+  !
+  subroutine surfacerad(alat,time)
+    use grid, only   : sfc_albedo,a_theta,a_lflxu,a_lflxd,a_sflxu,a_sflxd,a_tskin,nxp,nyp,a_pexnr,pi0,pi1
+    use defs, only   : stefan, cp
+    real, intent(in) :: time, alat
+    integer          :: i,j
+    real             :: tr, exner
+
+    ! Assumes longitude = 0.
+    u0 = max(0.,zenith(alat,time))
+    tr = (0.6 + 0.2 * u0)
+
+    do j=3,nyp-2
+      do i=3,nxp-2
+        exner          = (pi0(2)+pi1(2)+a_pexnr(2,i,j))/cp
+        a_sflxd(2,i,j) = SolarConstant * tr * u0
+        a_sflxu(2,i,j) = sfc_albedo * a_sflxd(2,i,j)
+        a_lflxd(2,i,j) = 0.8 * stefan * (a_theta(2,i,j)*exner)**4.  
+        a_lflxu(2,i,j) = stefan * a_tskin(i,j)**4. 
+      end do
+    end do
+
+    !print*,'SEB:',a_sflxd(2,10,10),a_sflxu(2,10,10),a_lflxd(2,10,10),a_lflxu(2,10,10)
+    !print*,'NET:',a_sflxd(2,10,10)-a_sflxu(2,10,10)+a_lflxd(2,10,10)-a_lflxu(2,10,10)
+
+  end subroutine surfacerad
+
   ! ---------------------------------------------------------------------------
   ! sets up the input data to extend through an atmopshere of appreiciable
-  ! depth using a background souding specified as a paramter, match this to
+  ! depth using a background sounding specified as a parameter, match this to
   ! the original sounding using p0 as this does not depend on time and thus
   ! allows us to recompute the same background matching after a history start
   !
-  subroutine setup(background,n1,npts,nv1,nv,zp)
+  subroutine setup(background,n1,npts,nv1,nv,zp,pi0)
 
     character (len=10), intent (in) :: background
     integer, intent (in) :: n1
     integer, intent (out):: npts,nv1,nv
-    real, intent (in)    :: zp(n1)
+    real, intent (in)    :: zp(n1), pi0(n1)
 
     real, allocatable  :: sp(:), st(:), sh(:), so(:), sl(:)
 
     integer :: k, ns, norig, index
     logical :: blend
-    real    :: pa, pb, ptop, ptest, test, dp1, dp2, dp3, Tsurf
+    real    :: pa, pb, ptop, ptest, test, dp1, dp2, dp3, Tsurf, pp2
 
     open ( unit = 08, file = background, status = 'old' )
     print *, 'Reading Background Sounding: ',background
@@ -277,6 +319,15 @@ module radiation
        do k=npts+1,nv
           po(k) =  po(npts)
        end do
+
+      ! interpolate ozone profile
+      ! do k=npts+1,nv1
+      !   pp2 = (p00*(pi0(nv-k+2)/cp)**cpr) / 100.
+      !   index  = getindex(sp,ns,pp2)
+      !   po(k) =  intrpl(sp(index),so(index),sp(index+1),so(index+1),pp2)
+      !   print*,'ozone profile: ', po(k), pp2, sp (index), sp(index+1)
+      ! end do
+
     end if
 
   end subroutine setup

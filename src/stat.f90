@@ -21,7 +21,7 @@ module stat
 
   use mpi_interface, only : myid
   use ncio, only : open_nc, define_nc
-  use grid, only : level
+  use grid, only : level, isfctyp
   use util, only : get_avg, get_cor, get_avg3, get_cor3, get_var3, get_csum
 !irina
 !  use step, only: case_name
@@ -30,7 +30,7 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 45, nvar2 = 114 ! number of time series and profiles
+  integer, parameter :: nvar1 = 57, nvar2 = 114 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2, nv1=nvar1, nv2=nvar2
   real, save         :: fsttm, lsttm, nsmp = 0
 
@@ -48,7 +48,9 @@ module stat
        'CCN    ','nrain  ','nrcnt  ','zcmn   ','zbmn   ','tkeint ', & !25
        'lflxut ','lflxdt ','sflxut ','sflxdt ','thl_int','wvp_bar', & !31
        'wvp_var','iwp_bar','iwp_var','swp_bar','swp_var','gwp_bar', & !37
-       'gwp_var','hwp_bar','hwp_var'/),                             & !43
+       'gwp_var','hwp_bar','hwp_var','Qnet   ','G0     ','tndskin', & !43 
+       'ra     ','rsurf  ','rsveg  ','rssoil ','tskinav','qskinav', & !49
+       'obl    ','cliq   ','a_Wl   '/),                             & !55-57
        s2(nvar2)=(/                                                 &
        'time   ','zt     ','zm     ','dn0    ','u0     ','v0     ', & ! 1
        'fsttm  ','lsttm  ','nsmp   ','u      ','v      ','t      ', & ! 7
@@ -160,7 +162,8 @@ contains
          , vmean, dn0, prc_c,prc_g,prc_i,prc_r,prc_s, prc_h, a_rpp, a_npp, albedo, CCN, iradtyp, a_rflx    &
          , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa &
          , a_ricep, a_rsnowp, a_rgrp, a_rhailp, a_nicep, a_nsnowp, a_ngrp, a_nhailp &
-         , vapor
+         , vapor, a_Wl, isfctyp, a_tskin, a_qskin, a_Qnet, a_G0
+    use lsmdata, only: tndskin,ra,rsurf,rsveg,rssoil,obl,cliq,Cskinav,init_lsm
 
     real, intent (in) :: time
 
@@ -212,6 +215,11 @@ contains
     call set_ts(nzp, nxp, nyp, a_wp, a_theta, dn0, zt,zm,dzi_t,dzi_m,th00,time)
     if (level >=1) call ts_lvl1(nzp, nxp, nyp, dn0, zt, dzi_m, a_rp)
     if (level >=2) call ts_lvl2(nzp, nxp, nyp, a_rp, a_scr2, zt)
+
+    ! BvS: only when LSM initialized
+    if ((isfctyp == 5) .and. (init_lsm .eqv. .false.)) then
+      call accum_lsm(nxp,nyp,a_Qnet,a_G0,tndskin,ra,rsurf,rsveg,rssoil,a_tskin,a_qskin,obl,cliq,a_Wl,Cskinav)
+    end if
 
     if (debug) WRITE (0,*) 'statistics: set_ts ok,  myid=',myid
 
@@ -1534,6 +1542,44 @@ contains
     end select
 
   end function get_zi
+
+  !
+  !---------------------------------------------------------------------
+  ! SUBROUTINE ACCUM_LSM: Accumulates timeseries statistics  
+  ! for land surface variables (if isfctyp=5) 
+  !
+  subroutine accum_lsm(nxp, nyp, a_Qnet, a_G0, tndskin, ra, rsurf, rsveg, &
+                       rsoil, a_tskin,a_qskin, obl, cliq, a_Wl, Cskinav)
+
+    integer, intent (in)  :: nxp,nyp
+    real, intent (in)     :: a_Qnet(nxp,nyp)
+    real, intent (in)     :: a_G0(nxp,nyp)
+    real, intent (in)     :: tndskin(nxp,nyp)
+    real, intent (in)     :: ra(nxp,nyp)
+    real, intent (in)     :: rsurf(nxp,nyp)
+    real, intent (in)     :: rsveg(nxp,nyp)
+    real, intent (in)     :: rsoil(nxp,nyp)
+    real, intent (in)     :: a_tskin(nxp,nyp)
+    real, intent (in)     :: a_qskin(nxp,nyp)
+    real, intent (in)     :: obl(nxp,nyp)
+    real, intent (in)     :: cliq(nxp,nyp)
+    real, intent (in)     :: a_Wl(nxp,nyp)
+    real, intent (in)     :: Cskinav
+
+    ssclr(46) = sum(a_Qnet(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(47) = sum(a_G0(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(48) = sum(tndskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(49) = sum(ra(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(50) = sum(rsurf(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(51) = sum(rsveg(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(52) = sum(rsoil(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(53) = sum(a_tskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(54) = sum(a_qskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(55) = sum(obl(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(56) = sum(cliq(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(57) = sum(a_Wl(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+
+  end subroutine accum_lsm
 
 end module stat
 

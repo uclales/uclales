@@ -2040,7 +2040,7 @@ contains
     end if
 
     do k=n1-1,2,-1
-      if (rp(k) > rthres) then
+      if ((rp(k) > rthres).and.(np(k).ne.0.)) then
        Xp = rp(k) / np(k)
        xp = MIN(MAX(xp,meteor%x_min),meteor%x_max)
        lam = ( c_lam(metnr) * xp )**(meteor%b_vel)

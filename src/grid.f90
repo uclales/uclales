@@ -40,9 +40,11 @@ module grid
   real              :: th00   = 288.       ! basic state temperature
 
   real              :: CCN = 150.e6        ! Number of CCN per kg
-  real              :: umean = 0.           ! Galilean transformation
-  real              :: vmean = 0.           ! Galilean transformation
+  real              :: umean = 0.          ! Galilean transformation
+  real              :: vmean = 0.          ! Galilean transformation
+  real              :: sfc_albedo = 0.05   ! surface albedo
 
+  integer           :: isfctyp = 0         ! surface flux parameterization type
   integer           :: igrdtyp = 1         ! vertical grid type
   integer           :: iradtyp = 0         ! radiation model type
   integer           :: level   = 0         ! thermodynamic level
@@ -77,6 +79,15 @@ module grid
        cnd_acc, &  ! accumulated condensation  [kg/m2] (diagnostic for 2D output)
        cev_acc, &  ! accumulated evaporation of cloud water [kg/m2] (diagnostic for 2D output)
        rev_acc     ! accumulated evaporation of rainwater   [kg/m2] (diagnostic for 2D output)
+
+  !Malte: variables to restart the land surface
+  real, dimension (:,:,:),  allocatable :: a_tsoil, a_phiw,                   &
+                            a_sflxd_avn, a_sflxu_avn, a_lflxd_avn, a_lflxu_avn
+  real, dimension (:,:),    allocatable :: a_tskin, a_qskin, a_Wl, a_Qnet, a_G0
+
+  !Malte: variables to read homogeneous fluxes from nc file
+  real, dimension (:),      allocatable :: shls, lhls, usls, timels
+ 
   !
   ! 3D Arrays 
   !irina
@@ -135,7 +146,6 @@ contains
   subroutine define_vars
 
     use mpi_interface, only :myid
-
     integer :: memsize
 
     allocate (u0(nzp),v0(nzp),pi0(nzp),pi1(nzp),th0(nzp),dn0(nzp),rt0(nzp))
@@ -290,6 +300,33 @@ contains
     allocate (a_ustar(nxp,nyp),a_tstar(nxp,nyp),a_rstar(nxp,nyp))
     allocate (uw_sfc(nxp,nyp),vw_sfc(nxp,nyp),ww_sfc(nxp,nyp))
     allocate (wt_sfc(nxp,nyp),wq_sfc(nxp,nyp))
+
+
+    !Malte: allocate Land surface variables for restart
+    if (isfctyp == 5) then
+       allocate (a_tsoil(4,nxp,nyp))
+       allocate (a_phiw (4,nxp,nyp))
+       allocate (a_tskin (nxp,nyp))
+       allocate (a_qskin (nxp,nyp))
+       allocate (a_Wl    (nxp,nyp))
+       allocate (a_Qnet  (nxp,nyp))
+       allocate (a_G0    (nxp,nyp))
+       allocate (a_sflxd_avn(100,nxp,nyp))
+       allocate (a_sflxu_avn(100,nxp,nyp))
+       allocate (a_lflxd_avn(100,nxp,nyp))
+       allocate (a_lflxu_avn(100,nxp,nyp))
+       memsize = memsize + 2*nxp*nyp*4 + 5*nxp*nyp + 4*nxp*nyp*100
+    end if
+
+    !Malte: allocate variables for homogeneous fluxes (no lsm used)
+    if (isfctyp == 0) then
+       allocate(shls(1740))
+       allocate(lhls(1740))
+       allocate(usls(1740))
+       allocate(timels(1740))
+       memsize = memsize + 4*1740
+    end if
+    !End Malte
 
     if (level >= 2) then
        allocate(prc_c(nzp,nxp,nyp))
@@ -521,6 +558,7 @@ contains
   subroutine write_hist(htype, time)
 
     use mpi_interface, only : appl_abort, myid, wrxid, wryid
+
     integer :: errcode=-17
 
     integer, intent (in) :: htype
@@ -557,6 +595,25 @@ contains
     write(10) xt, xm, yt, ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf
     write(10) a_ustar, a_tstar, a_rstar
     write(10) a_pexnr
+
+    !Malte: Restart land surface
+    if (isfctyp == 5) then
+       write(10) a_tsoil
+       write(10) a_phiw
+       write(10) a_tskin
+       write(10) a_qskin
+       write(10) a_Wl
+       write(10) a_sflxd
+       write(10) a_sflxu
+       write(10) a_lflxd
+       write(10) a_lflxu
+       write(10) a_sflxd_avn
+       write(10) a_sflxu_avn
+       write(10) a_lflxd_avn
+       write(10) a_lflxu_avn
+    end if 
+    !End Malte
+
     do n=1,nscl
        call newvar(n)
        write(10) a_sp
@@ -609,6 +666,24 @@ contains
        read (10) xt, xm, yt, ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf
        read (10) a_ustar, a_tstar, a_rstar
        read (10) a_pexnr
+
+       !Malte: Restart land surface
+       if (isfctyp == 5) then
+          read(10) a_tsoil
+          read(10) a_phiw
+          read(10) a_tskin
+          read(10) a_qskin
+          read(10) a_Wl
+          read(10) a_sflxd
+          read(10) a_sflxu
+          read(10) a_lflxd
+          read(10) a_lflxu
+          read(10) a_sflxd_avn
+          read(10) a_sflxu_avn
+          read(10) a_lflxd_avn
+          read(10) a_lflxu_avn
+       end if 
+       !End Malte
 
        do n=1,nscl
           call newvar(n)

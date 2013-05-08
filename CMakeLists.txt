@@ -72,8 +72,8 @@ elseif (Fortran_COMPILER_NAME STREQUAL "Intel")
     set (COMPILER_WRAPPER mpif90)
   endif()
   set(CMAKE_Fortran_FLAGS "-r8 -ftz -extend_source")
-  set (CMAKE_Fortran_FLAGS_RELEASE "-O3 -no-prec-div -xAVX")
-  #set (CMAKE_Fortran_FLAGS_RELEASE "-O3 -no-prec-div -xHost")
+  #set (CMAKE_Fortran_FLAGS_RELEASE "-O3 -no-prec-div -xAVX")
+  set (CMAKE_Fortran_FLAGS_RELEASE "-O3 -no-prec-div -xHost")
   set (CMAKE_Fortran_FLAGS_DEBUG   " -traceback -fpe0 -O0 -g -check all -check noarg_temp_created")
   set (PROFILER_FLAG "-p")
 elseif (Fortran_COMPILER_NAME STREQUAL "XL")
@@ -104,6 +104,9 @@ endif()
 
 find_package(NETCDF REQUIRED COMPONENTS F90)
 set (UCLALES_INCLUDE_DIRS ${NETCDF_INCLUDE_DIRS} ${FFTW_INCLUDE_DIRS})
+set (UCLALES_LIBRARIES ${NETCDF_LIBRARIES} ${HDF5_LIBRARIES} ${FFTW_LIB})
+
+
 set (UCLALES_LIBRARIES ${NETCDF_LIBRARIES} ${HDF5_LIBRARIES} ${FFTW_LIB})
 
 

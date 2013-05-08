@@ -290,7 +290,6 @@ contains
     use sgsm, only : diffuse
     !use sgsm_dyn, only : calc_cs
     use srfc, only : surface
-    !use srfc, only : surface,sst
     use thrm, only : thermo
     use mcrp, only : micro
     use prss, only : poisson
@@ -303,9 +302,7 @@ contains
     use modparticles, only : particles, lpartic, particlestat,lpartstat
 
     logical, parameter :: debug = .false.
-!     integer :: k
     real :: xtime
-!     character (len=11)    :: fname = 'debugXX.dat'
 
     xtime = time/86400. + strtim
     call timedep(time,timmax, sst)
@@ -327,9 +324,12 @@ contains
        call thermo(level)
 
        if (lsvarflg) then
-          call varlscale(time,case_name,sst,div,u0,v0)
+         call varlscale(time,case_name,sst,div,u0,v0)
        end if
-       call surface(sst)
+
+       xtime = xtime - strtim
+       call surface(sst,xtime)      
+       xtime = xtime + strtim
 
        ! BvS
        !call calc_cs(time)      ! calculated dynamic value Cs
