@@ -1030,7 +1030,7 @@ contains
           else
             do k=2,nzp-1
               if (mask(k,i,j) > 0) then
-                varout(i,j) = varout(i,j) + varin(k,i,j) - mean(k)
+                varout(i,j) = varout(i,j) + varin(k,i,j) - mean(k) 
               end if
             end do
             varout(i,j) = varout(i,j)/real(nr)

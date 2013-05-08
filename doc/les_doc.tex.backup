@@ -64,7 +64,7 @@ temperature, $\theta_l;$ the total-water mixing ratio, $q_t;$ and, as
 the case may be, an arbitrary number of scalars, $\phi_m,$ in support
 of microphysical processes, more sophisticated sub-grid models, or
 studies of tracer transport or chemical processes. Grid-scale quantities
-are denoted by an overbar. Roughly speaking they can be thoughtof as
+are denoted by an overbar. Roughly speaking they can be thought of as
 grid-scale avaraged quantities where the exact term of the averaging
 operator is implicitly defined by the numerics, and unknown.
 
@@ -73,7 +73,7 @@ as follows:
 \begin{eqnarray}
 \frac{\partial \bar{u}_i}{\partial t} & = &- \bar{u}_j \,
 \frac{\partial \bar{u}_i}{\partial x_j} - c_p \Theta_0 \frac{\partial
-\bar{\pi}}{\partial x_i} + \, \frac{g \bar{\theta}_v ''}{\theta_0} \,
+\bar{\pi}}{\partial x_i} + \, \frac{g \bar{\theta}_v ''}{\Theta_0} \,
 \delta_{i3} \, + f_k (\bar{u}_j - V_{g,j}) \epsilon_{ijk} +
 \frac{1}{\rho_0} \, \frac{\partial (\rho_0 \, \tau_{ij})} {\partial
 x_j} ,
@@ -118,12 +118,11 @@ hydrostatic basic state of constant potential temperature, i.e.,
 \frac{d\pi_0}{dz} = -\frac{g}{c_p\Theta_0},
 \end{equation}
 where subscript $0$ denotes a basic state value, which depend only on
-$z$ ($\Theta_0$ being constant).  
+$z$ ($\Theta_0$ being constant). This follows the set of equation introduced by \cite{Ogura:1962}. Note that through the division by $\Theta_0$ in the buoyancy term, model results can be sensitive to the value chosen for $\Theta_0$.
 
 In equation (\ref{eq:FM}) $\bar{\theta}_v''$
-denotes the deviation of $\bar \theta_v$ from its horizontal average
-(rather than from the basic-state).  This ensures that no mean
-vertical accelerations arise.  For consistency this requires the
+denotes the deviation of $\bar \theta_v$ from the basic-state $\Theta_0$. Thus, a mean
+vertical acceleration can arise.  For consistency of the thermodynamic fields this requires the
 introduction of a second pressure, $\pi_1:$
 \begin{equation}
 \frac{d}{dz}(\pi_0 + \pi_1) = -\frac{g}{c_p\bar{\theta_v}},
@@ -133,7 +132,7 @@ reference state to the pressure.  This pressure depends on time, and
 is updated in the code by finding the pressure that balances the mean
 accelerations, such that
 \begin{equation}
-\frac{d\pi_1}{dz} = \Theta_0 \overline{w},
+\frac{d\pi_1}{dz} = \frac{\dot{\overline{w}}}{c_p \Theta_0} ,
 \end{equation}
 with $\pi_1(z=0)$ fixed at its initial value.
 
@@ -173,7 +172,7 @@ inversion of the Poisson equation:
 \tilde{\pi}}{\partial x_i} \right) = \frac{1}{c_p\Theta_0}
 \left[\frac{\partial }{\partial x_i} \left ( - \rho_0 \bar{u}_j \,
 \frac{\partial \bar{u}_i}{\partial x_j} + \, \frac{\rho_0 g
-\bar{\theta}_v ''}{\theta_0} \, \delta_{i3} \, + \rho_0 f_k (\bar{u}_j
+\bar{\theta}_v ''}{\Theta_0} \, \delta_{i3} \, + \rho_0 f_k (\bar{u}_j
 - u_{jg}) \epsilon_{ijk} + \frac{\partial (\rho_0 \, \tau_{ij})}
 {\partial x_j} \right ) \right],
 \label{eq:FP}
@@ -427,20 +426,20 @@ formulation are listed in Table \ref{tbl:surface}.
 
 \subsubsection{Radiation}
 The model allows for a range of different radiation types.
-The radiation type can be set by the variable iradtype in the
+The radiation type can be set by the variable iradtyp in the
 NAMELIST file. As a default, calculations are done without
-radiation (iradtype=1). One has the option of using either
-the simple radiation (iradtype=2) of gcss intercomparison or
-the full radiation (iradtype=4) of Prescas and Stevens.
+radiation (iradtyp=1). One has the option of using either
+the simple radiation (iradtyp=2) of gcss intercomparison or
+the full radiation (iradtyp=4) of Prescas and Stevens.
 Here, for simple radiation treatment, short- and longwave
 radiation will be computed as described in \emph{src/rad\_gcss.f90}.
 The full radiation approach makes use of \emph{bin/datafiles}
 to apply radiation values above 3km. A particular treatment
 of radiation is available for the smoke cloud and the bellon
 case. The radiation treatment for the smoke cloud case can be
-used by setting iradtype=2 and level=1. The bellon case has a
+used by setting iradtyp=2 and level=1. The bellon case has a
 specific radiation code as shown in the bellon\_rad routine
-and can be used by setting iradtype=3.
+and can be used by setting iradtyp=3.
 
 \section{Numerics}
 
@@ -476,7 +475,7 @@ to the new timestep is always 0.5.
 
 \subsection{Computational Grid}
 \begin{figure}[htb]
-\centering \leavevmode \includegraphics[width=12cm]{grid}
+\centering \leavevmode \includegraphics[width=12cm]{grid2}
 \caption{Schematic depiction of the model grid and where variables
 locate on it.}
 \label{fig:grid}
@@ -550,8 +549,6 @@ For $N_x = N_y = 2\sqrt{N_p} \gg 1$ this ratio approaches 7, although
 the communication overhead of such a large computation is more likely
 to be the bottleneck. I/O is currently handled by each processor.
 
-***ADD balance between efficiency and total computation time ? 
-
 \paragraph{Communication}
 With the current 2-D parallelization strategy global communications
 are needed to implement boundary conditions, compute domain
@@ -567,7 +564,6 @@ inverse FFT along the strips in the $x$-direction.  This strategy only
 requires four global communications per solve.
 
 \section{The Code}
-
 \subsection{Getting the Code}
 The UCLALES Code is free for all to use, distribute, and call their own,
 following the guidelines of the gnu public license (http://www.gnu.org/licenses/).
@@ -575,7 +571,7 @@ It is distributed through git, a free software source code management project.
 Subsequent developments of the code are available to its community here as well.
 The newest version of UCLALES will always be available at \textbf{http://git.gitorious.org/uclales}.
 To Download the newest UCLALES version make sure you have git installed on your system.
-Typing ``git clone  http://git.gitorious.org/uclales/uclales.git'' in the command line
+Typing ``git clone git@gitorious.org:uclales/uclales.git'' in the command line
 will download the sources. You may want to check for updates by typing ``git pull ''
 in the command line. To check what has been changed since the last commit use
 ``git status'' and ``git diff''. You can also insert your private UCLALES version into git.
@@ -675,7 +671,6 @@ active MPI calls.\\ \hline \hline
 \end{center}
 \end{table}
 
-
 \subsection{Compilation}
 To compile the model type ``make'' (``make mpi'' or ``make seq'' respectively) in the the 
 \emph{bin} directory. This will build the default version of the model using the default
@@ -735,7 +730,7 @@ without recompilation.  The full NAMELIST is defined in the LES.F90
 subroutine and is described, along with default parameter values, in
 Table \ref{tbl:namelist}. 
 \begin{longtable}[htb]{p{0.1\linewidth}p{0.1\linewidth}p{0.2\linewidth}p{0.5\linewidth}}
-\caption{NAMELIST variables and default values} \label{tbl:namelist}\\
+\caption{NAMELIST variables and default values}\\
 \hline
 \hline
 Variable & Module & Default Value & Comments \\ 
@@ -753,7 +748,7 @@ dzmax  & '' & 1200 m & height at which grid-stretching begins \\
 dtlong & '' & 10 s  & maximum timestep \\
 nfpt   & '' & 5      & number of levels in upper sponge layer \\
 distim & '' & 300 s  & minimum relaxation time in sponge layer \\
-th00   & '' & 288    & basic state potential temperature, $\Theta$ \\
+th00   & '' & 288    & basic state potential temperature, $\Theta_0$, set to mean of values encountered \\
 igrdtyp & '' & 1 & control parameter for selecting vertical grid \\
 isgstyp & '' & 1 & control parameter for selecting sgs model \\
 iradtyp & '' & 0 & control parameter for selecting radiation model \\
@@ -763,7 +758,8 @@ CCN     & '' & 150 $\times 10^{6}$ & cloud droplet mixing ratio \\
 expnme  & '' & Default & experiment name \\
 filprf  & '' & x & file prefix for use in constructing output files\\
 runtyp  & '' & INITIAL & type of run ('INITIAL' or 'HISTORY') \\ 
-level   & '' & 0 & 0=thermodynamic level, 1=dry cbl, 2=moist cbl (no rain), 3=moist cbl (with rain)\\
+level   & '' & 0 & 0=thermodynamic level, 1=dry cbl, 2=moist cbl (no rain), 3=moist cbl (with rain), 3=moist convection (with ice, snow, graupel, hail)\\
+cloud\_type&icemcrp&2403&set to 2403\\
 \hline
 ipsflg&  init  & 1   & control parameter for input sounding (0: pressure
 in hPa; 1: height in meters with ps(1)= $p_{sfc}$) \\
@@ -814,29 +810,32 @@ ssam\_intvl&  '' &  30 s  &  statistics sampling interval\\
 savg\_intvl& stat & 1800 s    &  statistics averaging interval \\
 \hline
 \hline
+\label{tbl:namelist}
 \end{longtable}
 To run a specific case one can copy the appropriate NAMELIST from
-\emph{misc/initfiles}. One may want to adjust parameters such as
-e.g. filprf, dtime, timmax, iradtype,level and others before
-running the model. Here the use of the NAMELIST allows to change
-properties without recompiling the model. As an example, the
-parameter case\_name in the NAMELIST file can be used to set
-large scale forcings for a specific case. Currently available
-case\_names are: rico, bomex and atex.
+\emph{misc/initfiles} (see list of available NAMELIST files below).
+One may want to adjust parameters such as e.g. filprf, dtime,
+timmax, iradtyp,level and others before running the model.
+Here the use of the NAMELIST allows to change properties
+without recompiling the model. As an example, the parameter
+case\_name in the NAMELIST file can be used to set large scale
+forcings for a specific case. Currently available case\_names
+are: rico, bomex and atex.
+
 \begin{itemize}
-\item namelist\_astex: The Astex case.
-\item namelist\_cumulus: Namelist to reproduce the idealized
+\item \textbf{namelist\_astex}: The Astex case.
+\item \textbf{namelist\_cumulus}: Namelist to reproduce the idealized
 cumulus cases reported in Stevens, JAS (2007). Requires the
 generation of a sound\_in file with bstate.f95.
-\item namelist\_drycbl: Idealized dry CBL consisting of a
+\item \textbf{namelist\_drycbl}: Idealized dry CBL consisting of a
 layer with initially uniform stratification and constant forcing.
-\item namelist\_dycm01: The DYCOMS GCSS RF01 case, requires
+\item \textbf{namelist\_dycm01}: The DYCOMS GCSS RF01 case, requires
 the generation of a sound\_in file with bstate.f95.
-\item namelist\_dycm02: The DYCOMS GCSS RF02 case, requires
+\item \textbf{namelist\_dycm02}: The DYCOMS GCSS RF02 case, requires
 the generation of a sound\_in file with bstate.f95, as well as the
 generation of zm\_grid\_in and zt\_grid\_in files uzing zgrid.gcss9.f.
-\item namelist\_rico: The RICO GCSS composite case.
-\item namelist\_smoke: The RICO GCSS smoke case.
+\item \textbf{namelist\_rico}: The RICO GCSS composite case.
+\item \textbf{namelist\_smoke}: The RICO GCSS smoke case.
 \end{itemize}
 
 \subsection{Output}
@@ -986,8 +985,8 @@ precip & '' &  Precipitation flux \\
 dn0    & 1D &  Basic state density, $\rho_0(z).$ \\
 xt, yt, zt & '' & Position of thermodynamic points \\
 xm, ym, zm & '' & position of momentum points \\
-dzt        & '' & $1/(z_m(k) - z_m(k-1)$ \\
-dzm        & '' & $1/(z_t(k+1) - z_t(k)$ \\
+dzi\_t        & '' & $1/(z_m(k) - z_m(k-1)$ \\
+dzi\_m        & '' & $1/(z_t(k+1) - z_t(k)$ \\
 \hline \hline
 \end{longtable}
 
@@ -1061,7 +1060,7 @@ propagation of the smoke layer into the overlying fluid, accompanied
 by the dilution of the smoke layer.  The slight instability at the top
 of the smoke layer ($\theta$ decreasing with height) is the signature
 of the radiative cooling active in this case.
-
+\newpage
 \begin{thebibliography}{8}
 \expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
 \expandafter\ifx\csname url\endcsname\relax
@@ -1086,6 +1085,9 @@ L\"upkes, C., K.~D. Beheng, and G.~Doms, 1989: A paraemeterization scheme
 Milbrandt, J.~A. and M.~Yau, 2005: A multimoment bulk microphysics
   parameterization. part {I}: analysis of the role of the spectral shape
   parameter. {\it J. Atmos. Sci.\/}, {\bf 62}, 3051--3064.
+
+\bibitem[{Ogura and Phillip(1962)}]{Ogura:1962}
+Ogura, Y.\ and  N.\ A.\ Phillips, 1962: Scale Analysis of Deep and Shallow Convection in the Atmosphere. {\it J.\ Atmos.\ Sci.\/}, {\bf 19}, 173--179.
 
 \bibitem[{Seifert and Beheng(2001)}]{Seife:2001}
 Seifert, A. and K.~D. Beheng, 2001: A double-moment parameterization for
