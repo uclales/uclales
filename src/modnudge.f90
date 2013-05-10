@@ -33,11 +33,11 @@ module modnudge
 
 implicit none
 PRIVATE
-PUBLIC :: nudge,lnudge,tnudgefac, qfloor, zfloor  
+PUBLIC :: nudge,lnudge,tnudgefac, qfloor, zfloor, znudgemin, znudgeplus
 SAVE
   real, dimension(:,:), allocatable :: tnudge,unudge,vnudge,wnudge,thlnudge,qtnudge
   real, dimension(:)  , allocatable :: timenudge
-  real :: tnudgefac = 1., qfloor = -1.,  zfloor = 1200.
+  real :: tnudgefac = 1., qfloor = -1.,  zfloor = 1200., znudgemin = -1., znudgeplus = -1.
   logical :: lnudge,lunudge,lvnudge,lwnudge,lthlnudge,lqtnudge
   integer :: ntnudge = 100
   logical :: firsttime = .true.
@@ -45,6 +45,7 @@ contains
   subroutine initnudge(time)
     use grid, only : nzp,zt,th00,umean,vmean
     use mpi_interface, only : myid
+    use defs, only : pi
     implicit none
 
     integer :: ierr,k,t,ifinput = 19
@@ -69,7 +70,7 @@ contains
     if (.not. lnudge) return
       t = 0
       open (ifinput,file='nudge_in')
-      ierr = 0 
+      ierr = 0
       readloop: do
         t = t + 1
         chmess1 = "#"
@@ -117,16 +118,28 @@ contains
       end do readloop
       close(ifinput)
       timenudge = timenudge/86400+time
-      tnudge  = tnudgefac*tnudge
+      if (znudgemin>0) then
+        do k = 1,nzp-1
+          if (zt(k)<=znudgemin) then
+            tnudge(k,:) = 1e10
+          else if (zt(k)<=znudgeplus) then
+            tnudge(k,:)  = 2.*tnudgefac/(1-cos(pi*(zt(k)-znudgemin)/(znudgeplus-znudgemin)))
+          else
+            tnudge(k,:) = tnudgefac
+          end if
+        end do
+      else
+        tnudge  = tnudgefac*tnudge
+      end if
       thlnudge = thlnudge - th00
-      unudge = unudge - umean 
+      unudge = unudge - umean
       vnudge = vnudge - vmean
     lunudge = any(abs(unudge)>1e-8)
     lvnudge = any(abs(vnudge)>1e-8)
     lwnudge = any(abs(wnudge)>1e-8)
     lthlnudge = any(abs(thlnudge)>1e-8)
     lqtnudge  = any(abs(qtnudge)>1e-8)
-   
+
   end subroutine initnudge
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -167,7 +180,7 @@ contains
 
     do j=3,nyp-2
     do i=3,nxp-2
-    do k=2,nzp-1 
+    do k=2,nzp-1
      currtnudge = max(dt,tnudge(k,t)*dtp+tnudge(k,t+1)*dtm)
 !      currtnudge = 600.
       if(lunudge  ) a_ut(k,i,j)=a_ut(k,i,j)-&

@@ -88,7 +88,7 @@ contains
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
     use radiation, only : u0, fixed_sun, rad_eff_radius
-    use modnudge, only : lnudge,tnudgefac, qfloor, zfloor
+    use modnudge, only : lnudge,tnudgefac, qfloor, zfloor, znudgemin, znudgeplus
     use modtimedep, only : ltimedep
     use mcrp, only : microseq,lrandommicro,timenuc,nin_set,cloud_type
     use modparticles, only : lpartic, lpartsgs,lrandsurf,lpartstat, lpartdump, lpartdumpui,lpartdumpth,lpartdumpmr, frqpartdump
@@ -125,7 +125,7 @@ contains
          lsvarflg,                  & ! irina:flag for time bvarying large scale forcing
          lstendflg,                  & !irina:flag for time large scale advective tendencies
          div,  &                       !irina: divergence
-         lnudge, tnudgefac, ltimedep, qfloor, zfloor,  &             !thijs: Nudging
+         lnudge, tnudgefac, ltimedep, qfloor, zfloor,znudgemin, znudgeplus,  &             !thijs: Nudging
          rh_srf, drag, &
          SolarConstant,u0,fixed_sun, rad_eff_radius, & ! SolarConstant (In case of prescribed TOA radiation
          lrandommicro, microseq,timenuc ,nin_set,cloud_type, &  !thijs: sequence of variables for microphysics

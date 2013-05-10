@@ -29,7 +29,7 @@ use lsmdata
   logical :: lhomflx = .false.
   real    :: rh_srf = 1.
   real    :: drag   = -1.
-contains 
+contains
   !
   ! --------------------------------------------------------------------------
   ! SURFACE: Calcualtes surface fluxes using an algorithm chosen by ISFCTYP
@@ -56,7 +56,7 @@ contains
     use mpi_interface, only: myid
 
     implicit none
- 
+
     real, optional, intent (inout) :: sst, time_in
     integer :: i, j, l, iterate 
     real :: zs, bflx0,bflx, ffact, sst1, bflx1, Vbulk, Vzt, usum
@@ -123,7 +123,7 @@ contains
        do j=3,nyp-2
          do i=3,nxp-2
            dtdz(i,j) = a_theta(2,i,j) - sst*(p00/psrf)**rcp
-           drdz(i,j) = vapor(2,i,j) - rslf(psrf,sst)
+             drdz(i,j) = vapor(2,i,j) - rh_srf*rslf(psrf,sst)
            if (ubmin > 0.) then
              a_ustar(i,j) = sqrt(zrough)* wspd(i,j)
            else
@@ -160,7 +160,7 @@ contains
        !
    case(4)
 
-       Vzt   = 10.* (log(zt(2)/zrough)/log(10./zrough))       
+       Vzt   = 10.* (log(zt(2)/zrough)/log(10./zrough))
        Vbulk = Vzt * (vonk/log(zt(2)/zrough))**2
 
        bfl(:) = 0.
@@ -346,7 +346,7 @@ contains
   subroutine get_swnds(n1,n2,n3,usfc,vsfc,wspd,up,vp,umean,vmean)
 
     implicit none
-    
+
     integer, intent (in) :: n1, n2, n3
     real, intent (in)    :: up(n1,n2,n3), vp(n1,n2,n3), umean, vmean
     real, intent (out)   :: usfc(n2,n3), vsfc(n2,n3), wspd(n2,n3)
@@ -367,7 +367,7 @@ contains
 
   !
   ! ----------------------------------------------------------------------
-  ! FUNCTION GET_USTAR:  returns value of ustar using the below 
+  ! FUNCTION GET_USTAR:  returns value of ustar using the below
   ! similarity functions and a specified buoyancy flux (bflx) given in
   ! kinematic units
   !
@@ -376,7 +376,7 @@ contains
   !
   ! where zeta = z/lmo and lmo = (theta_rev/g*vonk) * (ustar^2/tstar)
   !
-  ! Ref: Businger, 1973, Turbulent Transfer in the Atmospheric Surface 
+  ! Ref: Businger, 1973, Turbulent Transfer in the Atmospheric Surface
   ! Layer, in Workshop on Micormeteorology, pages 67-100.
   !
   ! Code writen March, 1999 by Bjorn Stevens
@@ -399,12 +399,12 @@ contains
     integer :: iterate
     real    :: lnz, klnz, c1, x, psi1, zeta, lmo, ustar
 
-    lnz   = log(z/z0) 
-    klnz  = vonk/lnz              
+    lnz   = log(z/z0)
+    klnz  = vonk/lnz
     c1    = 3.14159/2. - 3.*log(2.)
 
     ustar =  wnd*klnz
-    if (bflx /= 0.0) then 
+    if (bflx /= 0.0) then
        do iterate=1,4
           lmo   = -(ustar**3)/(bflx*vonk + eps)
           zeta  = z/lmo
@@ -436,7 +436,7 @@ contains
   !
   ! where zeta = z/lmo and lmo = (theta_rev/g*vonk) * (ustar^2/tstar)
   !
-  ! Ref: Businger, 1973, Turbulent Transfer in the Atmospheric Surface 
+  ! Ref: Businger, 1973, Turbulent Transfer in the Atmospheric Surface
   ! Layer, in Workshop on Micormeteorology, pages 67-100.
   !
   ! Code writen March, 1999 by Bjorn Stevens
@@ -476,8 +476,8 @@ contains
     real    :: lnz, klnz, betg
     real    :: x, y, zeta, lmo, dtv
 
-    lnz   = log(z/z0) 
-    klnz  = vonk/lnz              
+    lnz   = log(z/z0)
+    klnz  = vonk/lnz
     betg  = th00/g
     !cnst2 = -log(2.)
     !cnst1 = 3.14159/2. + 3.*cnst2
@@ -556,7 +556,7 @@ contains
   !
   ! ----------------------------------------------------------------------
   ! subroutine: sfcflxs:  this routine returns the surface fluxes based
-  ! on manton-cotton algebraic surface layer equations. 
+  ! on manton-cotton algebraic surface layer equations.
   !
   subroutine sfcflxs(n2,n3,vk,ubar,u,v,xx,us,ts,rstar,uw,vw,tw,rw,ww)
     implicit none
