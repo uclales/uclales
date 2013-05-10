@@ -20,50 +20,48 @@
 module forc
 
   use defs, only      : cp
-  use radiation, only : d4stream
+  use radiation, only : d4stream,surfacerad 
   !irina
-  use rad_gcss, only : gcss_rad
+  use rad_gcss, only  : gcss_rad
   !cgils
-  use grid, only : wfls,dthldtls,dqtdtls
+  use grid, only      : wfls, dthldtls, dqtdtls, sfc_albedo
   use modnudge, only : nudge 
   use stat, only : sflg
   implicit none
 
-   !character (len=5), parameter :: case_name = 'xxxx'
-   !irina
-   !initializes the large scale forcing
-   integer, parameter    :: nls = 500
-   real, dimension(nls)  :: t_ls=0.
-   real, dimension(nls)  :: div_ls=0.
-   real, dimension(nls)  :: sst_ls=0.
-   real, dimension(nls)  :: ugeo_ls=0.
-   real, dimension(nls)  :: vgeo_ls=0.
-   real :: sfc_albedo = 0.05
-!cgils
-   logical :: lstendflg=.false.
-
-
+  !character (len=5), parameter :: case_name = 'xxxx'
+  !irina
+  !initializes the large scale forcing
+  integer, parameter    :: nls = 500
+  real, dimension(nls)  :: t_ls=0.
+  real, dimension(nls)  :: div_ls=0.
+  real, dimension(nls)  :: sst_ls=0.
+  real, dimension(nls)  :: ugeo_ls=0.
+  real, dimension(nls)  :: vgeo_ls=0.
+  !cgils
+  logical :: lstendflg=.false.
     
 contains
   !
   ! -------------------------------------------------------------------
   ! subroutine forcings:  calls the appropriate large-scale forcings
   !irina
-  subroutine forcings(time_in, cntlat, sst,div, case_name)
+  subroutine forcings(time_in, cntlat, sst, div, case_name)
 
 !irina
-    use grid, only: nxp, nyp, nzp, zm, zt, dzi_t, dzi_m, dn0, iradtyp, liquid  &
+    use grid, only: nxp, nyp, nzp, zm, zt, dzi_t, dzi_m, dn0, iradtyp, isfctyp, liquid  &
          , a_rflx, a_sflx, albedo, a_tt, a_tp, a_rt, a_rp, a_pexnr, a_scr1 &
          , vapor, a_rpp,a_ricep,a_nicep,a_rgrp, CCN, pi0, pi1, level, a_ut, a_up, a_vt, a_vp,a_theta,&
           a_lflxu, a_lflxd, a_sflxu, a_sflxd,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa,a_lflxu_ca, a_lflxd_ca, a_sflxu_ca, a_sflxd_ca, lflxd_toa_ca, lflxu_toa_ca, sflxd_toa_ca, sflxu_toa_ca
 
     use mpi_interface, only : myid, appl_abort
+    use util, only : get_avg
 
 !irina
-    real, optional, intent (in) :: time_in, cntlat, sst,div
+    real, optional, intent (in) :: time_in, cntlat, sst, div
+    real, dimension (nzp):: um,vm
 
-   character (len=5), intent (in) :: case_name
-!irina
+    character (len=5), intent (in) :: case_name
     real :: xref1, xref2
     integer :: i, j, k, kp1
     real, dimension(nzp,nxp,nyp) :: dum0, dum1, dum2, dum3, dum4
@@ -102,7 +100,7 @@ contains
                   dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt,&
                   a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
                   rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
-                  lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
+                  lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa,ice=a_ricep,nice=a_nicep,grp=a_rgrp)
             !old      
             ! call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
             !      dn0, pi0, pi1, dzi_t, a_pexnr, a_scr1, vapor, liquid, a_tt,&
@@ -138,6 +136,23 @@ contains
           if (myid == 0) print *, '  ABORTING: inproper call to radiation'
           call appl_abort(0)
        end if
+
+    ! BvS: Simple parameterized surface radiation
+    ! Sw-up/down = f(lat,lon,doy,tUTC,albedo)
+    ! Lw-up/down = Boltzman
+    case (5)
+      if(isfctyp .ne. 5) then
+        print*,'surface rad only works with interactive land surface'
+        stop
+      end if
+      if (present(time_in) .and. present(cntlat)) then
+        call surfacerad(cntlat,time_in)
+      else
+        print*,'improper call surfacrad, stopping'
+        stop
+      end if
+     
+
     end select
 !irina 
           !

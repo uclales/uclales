@@ -61,7 +61,7 @@ contains
   ! SUBROUTINE DIFFUSE: Driver for calculating sub-grid fluxes (thus it
   ! includes call to surface routines) 
   !
-  subroutine diffuse
+  subroutine diffuse(timein)
 
     use grid, only : newvar, nstep, a_up, a_ut, a_vp, a_vt, a_wp, a_wt       &
          ,a_rp, a_tp, a_sp, a_st, vapor, a_pexnr, a_theta,a_km               &
@@ -73,7 +73,12 @@ contains
     use mpi_interface, only: cyclics, cyclicc
     use thrm, only         : bruvais, fll_tkrs
 
+    real, intent(in)       :: timein 
     integer :: n
+
+    ! Hack BvS: slowly increase smago constant...
+    !csx = min(timein*0.23/3600.,0.23)    
+
 
     if (.not.Initialized) call diffuse_init(nzp, nxp, nyp)
 
@@ -182,6 +187,7 @@ contains
     integer :: ip,im,jp,jm,kp
     real    :: y1a,y2a,y3a,y1b,y2b,y3b
     real    :: s11_wpt,s22_wpt,s33_wpt,s12_wpt,s13_wpt,s23_wpt
+
     !
     ! calculate components of the stress tensor at their natural locations
     !
@@ -257,7 +263,7 @@ contains
     real, intent(inout) :: ri(n1,n2,n3),kh(n1,n2,n3)
     real, intent(out)   :: km(n1,n2,n3),szxy(n1,n2,n3)
     integer             :: cb, ct
-    real    :: delta,pr
+    real    :: delta,pr,labn
 
     pr    = abs(prndtl)
     
@@ -273,13 +279,13 @@ contains
              ! variable kh represents strain rate factor S^2 (dummy variable)
              !
              
-             ! Original:
-             km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) &
-                  *0.5*(dn0(k)+dn0(k+1))/(1./(delta*csx)**2+1./(zm(k)*vonk)**2)
+             ! Original Bjorn:
+             !km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) &
+             !     *0.5*(dn0(k)+dn0(k+1))/(1./(delta*csx)**2+1./(zm(k)*vonk)**2)
 
-             ! Hack BvS: remove damping
-             !km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) * 0.5 * (dn0(k)+dn0(k+1)) * (csx * delta)**2. 
-
+             ! BvS: split out wall damping and stability correction 
+             labn      = 1./(delta*csx)**2+1./(zm(k)*vonk)**2
+             km(k,i,j) =  (dn0(k)+dn0(k+1))/2. * sqrt(max(0.,kh(k,i,j))) * sqrt(max(0.,(1.-ri(k,i,j)/pr))) / labn
              !
              ! after kh is multiplied with the factor (1-ri/pr), the product of kh 
              ! and km represents the dissipation rate epsilon 
@@ -293,6 +299,7 @@ contains
           km(n1-1,i,j) = km(n1-2,i,j)    
        enddo
     enddo
+
 
     !print*,sum(km(1,:,:))/1024.,sum(km(2,:,:))/1024.,sum(km(3,:,:))/1024.,sum(km(4,:,:))/1024.,sum(km(5,:,:))/1024.,sum(km(6,:,:))/1024.,sum(km(7,:,:))/1024.,sum(km(8,:,:))/1024.,sum(km(9,:,:))/1024.,sum(km(10,:,:))/1024.
 
