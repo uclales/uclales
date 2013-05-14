@@ -264,7 +264,7 @@ contains
     a_scr5(:,:,:) = 0.
     a_scr6(:,:,:) = 0.
     a_scr7(:,:,:) = 0.
-    memsize = memsize + 7.*nxyzp
+    memsize = memsize + 7*nxyzp
 
     nscl = nscl+naddsc
     if (level   > 0) nscl = nscl+1  ! qt only
@@ -625,7 +625,8 @@ contains
 
     character (len=80) :: hname
 
-    integer :: n, iblank
+    integer :: n, iblank, nseed
+    integer, allocatable, dimension(:) :: seed
     !
     ! create and open a new output file.
     !
@@ -643,6 +644,11 @@ contains
        iblank=index(hname,' ')
        write (hname(iblank:iblank+7),'(a1,i6.6,a1)') '.', int(time), 's'
     end select
+
+    call random_seed(size=nseed)
+    allocate (seed(nseed))
+    call random_seed(get=seed)
+
     !
     ! Write fields
     !
@@ -650,7 +656,7 @@ contains
          ,hname
     open(10,file=trim(hname), form='unformatted')
 
-    write(10) time,th00,umean,vmean,dt,level,iradtyp,nzp,nxp,nyp,nscl
+    write(10) time,th00,umean,vmean,dt,level,iradtyp,nzp,nxp,nyp,nscl,nseed, seed
     write(10) xt, xm, yt, ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf
     write(10) a_ustar, a_tstar, a_rstar
     write(10) a_pexnr
@@ -706,7 +712,8 @@ contains
     real, intent(out)             :: time
 
     character (len=80) :: hname
-    integer :: n, nxpx, nypx, nzpx, nsclx, iradx, lvlx
+    integer :: n, nseed, nxpx, nypx, nzpx, nsclx, iradx, lvlx
+    integer, dimension(:), allocatable :: seed
     logical :: exans
     real :: umx, vmx, thx
     !
@@ -722,8 +729,10 @@ contains
        call appl_abort(0)
     else
        open (10,file=trim(hname),status='old',form='unformatted')
-       read (10) time,thx,umx,vmx,dt,lvlx,iradx,nzpx,nxpx,nypx,nsclx
-
+       read (10) time,thx,umx,vmx,dt,lvlx,iradx,nzpx,nxpx,nypx,nsclx, nseed
+       allocate(seed(nseed))
+       read(10) seed
+       call random_seed(put=seed)
        if (nxpx /= nxp .or. nypx /= nyp .or. nzpx /= nzp)  then
           if (myid == 0) print *, nxp, nyp, nzp, nxpx, nypx, nzpx
           call appl_abort(-1)

@@ -22,6 +22,8 @@ module init
   use grid
   use ncio
 
+  implicit none
+
   integer, parameter    :: nns = 500
   integer               :: ns
   integer               :: iseed = 0
@@ -59,6 +61,7 @@ contains
 
     if (runtype == 'INITIAL') then
        time=0.
+       call random_init
        call arrsnd
        call basic_state
        call fldinit
@@ -607,7 +610,6 @@ contains
 
     use util, only : sclrset
     implicit none
-    integer, allocatable :: seed(:)
 
     integer, intent(in) :: n1,n2,n3,kmx
     real, intent(inout) :: fld(n1,n2,n3)
@@ -615,15 +617,10 @@ contains
 
     real (kind=8) :: rand(3:n2-2,3:n3-2),  xx, xxl
     real (kind=8), allocatable :: rand_temp(:,:)
-    integer :: i,j,k,n,n2g,n3g
+    integer :: i,j,k,n2g,n3g
 
     rand=0.0
 
-    call random_seed(size=n)
-    allocate (seed(n))
-    seed = iseed * (/ (i, i = 1, n) /)
-    call random_seed(put=seed)
-    deallocate (seed)
     ! seed must be a double precision odd whole number greater than
     ! or equal to 1.0 and less than 2**48.
     !seed(1) = iseed
@@ -668,6 +665,16 @@ contains
          /3x,'and a magnitude of: ',E12.5)
   end subroutine random_pert
 
+  subroutine random_init
+    use mpi_interface, only: myid
+    integer :: i, n
+    integer, allocatable, dimension(:) :: seed
+    call random_seed(size=n)
+    allocate (seed(n))
+    seed = iseed * (/ (i, i = 1, n) /) + myid
+    call random_seed(put=seed)
+    deallocate (seed)
+  end subroutine random_init
 !irina
   !----------------------------------------------------------------------
   ! Lsvar_init if lsvarflg is true reads the lsvar forcing from the respective

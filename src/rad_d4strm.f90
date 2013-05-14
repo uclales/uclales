@@ -23,13 +23,13 @@ module fuliou
   use cldwtr, only : init_cldwtr, cloud_water, init_cldice, cloud_ice, init_cldgrp, cloud_grp
   use solver, only : qft
   use mpi_interface, only : myid
-  use RandomNumbers
+!   use RandomNumbers
   use ckd
 
   implicit none
 
   logical, save :: Initialized = .False.
-  type(randomNumberSequence), save :: randoms
+!   type(randomNumberSequence), save :: randoms
   real, parameter :: minSolarZenithCosForVis = 1.e-4
 
 contains
@@ -42,7 +42,7 @@ contains
 
     if (.not.Initialized) then
        call init_ckd   
-       randoms = new_RandomNumberSequence(1+myid)
+!        randoms = new_RandomNumberSequence(1+myid)
        call init_cldwtr
        call init_cldice
        call init_cldgrp
@@ -174,7 +174,7 @@ contains
        ! Select a single band and g-point (ib, ig1) and use these as the limits
        !   in the loop through the spectrum below. 
        !
-       randomNumber = getRandomReal(randoms)
+       call random_number(randomNumber)
        call select_bandg(ir_bands, bandweights, randomNumber, ib, ig1) 
        ig2 = ig1
        iblimit = 1
@@ -307,7 +307,7 @@ contains
       call thicks(pp, pt, ph, dz) 
   
       if (McICA) then
-         randomNumber = getRandomReal(randoms)
+         call random_number(randomNumber)
          !
          ! Select a single band and g-point (ib, ig1) and use these as the 
          ! limits in the loop through the spectrum below. 

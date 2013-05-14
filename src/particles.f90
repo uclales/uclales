@@ -2067,7 +2067,7 @@ contains
     kmax = size(zm)
 
     firststartl = 1e9
-    call init_random_seed()
+!     call init_random_seed()
 
     ! clear pointers to head and tail
     nullify(head)
@@ -2274,7 +2274,7 @@ contains
     close(ifinput)
 
     if(lpartsgs)  allocate(sgse(nzp,nxp,nyp),rese(nzp,nxp,nyp),fs_local(nzp,nxp,nyp),fs(nzp))
-    call init_random_seed()
+!     call init_random_seed()
 
     ! Check interpolation option
     if(int_part .eq. 1) then
@@ -2586,19 +2586,19 @@ contains
     end if
 
   end subroutine delete_particle
-
-  subroutine init_random_seed()
-    integer :: i, n, clock
-    integer, dimension(:), allocatable :: seed
-
-    call random_seed(size = n)
-    allocate(seed(n))
-    call system_clock(count=clock)
-    seed = clock + 37 * (/ (i - 1, i = 1, n) /)
-    call random_seed(put = seed)
-
-    deallocate(seed)
-  end subroutine init_random_seed
+!
+!   subroutine init_random_seed()
+!     integer :: i, n, clock
+!     integer, dimension(:), allocatable :: seed
+!
+!     call random_seed(size = n)
+!     allocate(seed(n))
+!     call system_clock(count=clock)
+!     seed = clock + 37 * (/ (i - 1, i = 1, n) /)
+!     call random_seed(put = seed)
+!
+!     deallocate(seed)
+!   end subroutine init_random_seed
 
 
   !-------- ARCHIVE ---------------------
