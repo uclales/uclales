@@ -329,7 +329,6 @@ module radiation
             pp2 = (p00*(pi0(nv-k+2)/cp)**cpr) / 100.
             index  = getindex(sp,ns,pp2)
             po(k) =  intrpl(sp(index),so(index),sp(index+1),so(index+1),pp2)
-            print*,'ozone profile: ', po(k), pp2, sp (index), sp(index+1)
          end do
 
     end if
