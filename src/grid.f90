@@ -89,7 +89,7 @@ module grid
 
   !Malte: variables to read homogeneous fluxes from nc file
   real, dimension (:),      allocatable :: shls, lhls, usls, timels
- 
+
   !
   ! 3D Arrays
   !irina
@@ -222,10 +222,10 @@ contains
        memsize = memsize + nxyzp
        allocate (a_sflxu_ca(nzp,nxp,nyp))
        a_sflxu_ca(:,:,:) = 0.
-       memsize = memsize + nxyzp 
+       memsize = memsize + nxyzp
        allocate (a_sflxd_ca(nzp,nxp,nyp))
        a_sflxd_ca(:,:,:) = 0.
-       memsize = memsize + nxyzp 
+       memsize = memsize + nxyzp
     end if
     if (iradtyp > 2) then
        allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp),sflxu_toa(nxp,nyp),sflxd_toa(nxp,nyp),lflxu_toa(nxp,nyp),lflxd_toa(nxp,nyp),sflxu_toa_ca(nxp,nyp),sflxd_toa_ca(nxp,nyp),lflxu_toa_ca(nxp,nyp),lflxd_toa_ca(nxp,nyp))
@@ -246,10 +246,10 @@ contains
        memsize = memsize + nxyzp
        allocate (a_sflxd(nzp,nxp,nyp))
        a_sflxd(:,:,:) = 0.
-       memsize = memsize + nxyzp 
+       memsize = memsize + nxyzp
        allocate (a_sflxu_ca(nzp,nxp,nyp))
        a_sflxu_ca(:,:,:) = 0.
-       memsize = memsize + nxyzp 
+       memsize = memsize + nxyzp
        allocate (a_sflxd_ca(nzp,nxp,nyp))
        a_sflxd_ca(:,:,:) = 0.
        memsize = memsize + nxyzp
@@ -272,10 +272,10 @@ contains
     if (level   > 3) nscl = nscl+4  ! ni,qi,qs,qg
     if (level   > 4) nscl = nscl+4  ! ns,ng,qh,nh (for Axel's two-moment scheme)
 
-    if (lwaterbudget) then 
+    if (lwaterbudget) then
       nscl = nscl+1 ! additional cloud water a_cld in the tracer array
       ncld = nscl
-    end if  
+    end if
     if (lcouvreux) then
       nscl  = nscl+1 ! Additional radioactive scalar
       ncvrx = nscl
@@ -656,7 +656,9 @@ contains
          ,hname
     open(10,file=trim(hname), form='unformatted')
 
-    write(10) time,th00,umean,vmean,dt,level,iradtyp,nzp,nxp,nyp,nscl,nseed, seed
+    write(10) time,th00,umean,vmean,dt,level,iradtyp,nzp,nxp,nyp,nscl
+    write(10) nseed
+    write(10) seed
     write(10) xt, xm, yt, ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf
     write(10) a_ustar, a_tstar, a_rstar
     write(10) a_pexnr
@@ -676,7 +678,7 @@ contains
        write(10) a_sflxu_avn
        write(10) a_lflxd_avn
        write(10) a_lflxu_avn
-    end if 
+    end if
     !End Malte
 
     do n=1,nscl
@@ -729,7 +731,8 @@ contains
        call appl_abort(0)
     else
        open (10,file=trim(hname),status='old',form='unformatted')
-       read (10) time,thx,umx,vmx,dt,lvlx,iradx,nzpx,nxpx,nypx,nsclx, nseed
+       read (10) time,thx,umx,vmx,dt,lvlx,iradx,nzpx,nxpx,nypx,nsclx
+       read (10) nseed
        allocate(seed(nseed))
        read(10) seed
        call random_seed(put=seed)
@@ -757,7 +760,7 @@ contains
           read(10) a_sflxu_avn
           read(10) a_lflxd_avn
           read(10) a_lflxu_avn
-       end if 
+       end if
        !End Malte
 
        do n=1,nscl
