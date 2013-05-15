@@ -20,7 +20,7 @@
 module radiation
 
   use defs, only       : cp, rcp, cpr, rowt, roice, p00, pi, nv1, nv, SolarConstant
-  use fuliou, only     : rad
+  use fuliou, only     : rad, minSolarZenithCosForVis
   implicit none
  character (len=10), parameter :: background = 'backrad_in'
  ! character (len=19), parameter :: background = 'datafiles/s11.lay'
@@ -158,22 +158,22 @@ module radiation
             end do
 
             if (present(albedo)) then
-              if (u0 > 0.) then
-                albedo(i,j) = fus(1)/(fds(1)+epsilon(fds(1)))!LINDA
+              if (u0 > minSolarZenithCosForVis) then
+                albedo(i,j) = fus(1)/fds(1)
               else
                 albedo(i,j) = -999.
               end if
             end if
 
             if (present(sflxu_toa)) then
-              if (u0 > 0.) then
+              if (u0 > minSolarZenithCosForVis) then
                 sflxu_toa(i,j) = fus(1)
               else
                 sflxu_toa(i,j) = -999.
               end if
             end if
             if (present(sflxd_toa)) then
-              if (u0 > 0.) then
+              if (u0 > minSolarZenithCosForVis) then
                 sflxd_toa(i,j) = fds(1)
               else
                 sflxd_toa(i,j) = -999.
