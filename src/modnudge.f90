@@ -117,7 +117,6 @@ contains
         end if
       end do readloop
       close(ifinput)
-      timenudge = timenudge/86400+time
       if (znudgemin>0) then
         do k = 1,nzp-1
           if (zt(k)<=znudgemin) then
