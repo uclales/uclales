@@ -20,12 +20,12 @@
 module forc
 
   use defs, only      : cp
-  use radiation, only : d4stream,surfacerad 
+  use radiation, only : d4stream,surfacerad
   !irina
   use rad_gcss, only  : gcss_rad
   !cgils
   use grid, only      : wfls, dthldtls, dqtdtls, sfc_albedo
-  use modnudge, only : nudge 
+  use modnudge, only : nudge
   use stat, only : sflg
   implicit none
 
@@ -40,7 +40,7 @@ module forc
   real, dimension(nls)  :: vgeo_ls=0.
   !cgils
   logical :: lstendflg=.false.
-    
+
 contains
   !
   ! -------------------------------------------------------------------
@@ -62,7 +62,6 @@ contains
     real, dimension (nzp):: um,vm
 
     character (len=5), intent (in) :: case_name
-    real :: xref1, xref2
     integer :: i, j, k, kp1
     real, dimension(nzp,nxp,nyp) :: dum0, dum1, dum2, dum3, dum4
 
@@ -72,7 +71,7 @@ contains
         call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt)
     case (2)
        select case(level)
-       case(1) 
+       case(1)
           call smoke_rad(nzp, nxp, nyp, dn0, a_rflx, zm, dzi_t,a_tt,a_rp)
        case(2)
           call gcss_rad(nzp, nxp, nyp, cntlat, time_in, case_name, div, sst, liquid, dn0,   &
@@ -86,8 +85,8 @@ contains
             ,a_rt, a_rp, a_ut, a_up, a_vt, a_vp)
     case (4)
        if (present(time_in) .and. present(cntlat) .and. present(sst)) then
-          !irina 
-          !a_scr1 = a_theta/a_pexnr 
+          !irina
+          !a_scr1 = a_theta/a_pexnr
           select case (level)
           case(3)
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,   &
@@ -101,24 +100,12 @@ contains
                   a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
                   rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
                   lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa,ice=a_ricep,nice=a_nicep,grp=a_rgrp)
-            !old      
-            ! call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
-            !      dn0, pi0, pi1, dzi_t, a_pexnr, a_scr1, vapor, liquid, a_tt,&
-            !      a_rflx, a_sflx, albedo, rr=a_rpp)
           case default
-             xref1 = 0.
-             xref2 = 0.
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,    &
                   dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt, &
                   a_rflx, a_sflx,a_lflxu, a_lflxd,a_sflxu,a_sflxd,albedo, &
                   sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
                   lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
-             !call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,    &
-             !     dn0, pi0, pi1, dzi_t, a_pexnr, a_scr1, vapor, liquid, a_tt, &
-             !     a_rflx, a_sflx, albedo)
-             xref1 = xref1 + a_sflx(nzp,3,3)/albedo(3,3)
-             xref2 = xref2 + a_sflx(nzp,3,3)
-             albedo(3,3) = xref2/xref1
           end select
           if (sflg) then
             dum0 = 0.
@@ -151,14 +138,14 @@ contains
         print*,'improper call surfacrad, stopping'
         stop
       end if
-     
+
 
     end select
-!irina 
+!irina
           !
           ! subsidence
           !
-!cgils          
+!cgils
     if (lstendflg) then
 
       do j=3,nyp-2
@@ -178,11 +165,11 @@ contains
 !cgils: Nudging
     call nudge(time_in)
 
-    
+
   end subroutine forcings
   !
   ! -------------------------------------------------------------------
-  ! subroutine smoke_rad:  call simple radiative parameterization for 
+  ! subroutine smoke_rad:  call simple radiative parameterization for
   ! the smoke cloud
   !
   subroutine smoke_rad(n1,n2,n3,dn0,flx,zm,dzi_t,tt,rt)
@@ -240,7 +227,7 @@ contains
 
     select case (trim(case_name))
     case('rico')
-       
+
        !
        ! calculate subsidence factor (wsub / dz)
        !
@@ -248,7 +235,7 @@ contains
           if (zt(k) < zmx_sub) then
              sf(k) =  -0.005*zt(k)/zmx_sub
           else
-             sf(k) =  -0.005 
+             sf(k) =  -0.005
           end if
           sf(k) = sf(k)*dzi_t(k)
        end do
@@ -258,7 +245,7 @@ contains
              do k=2,n1-2
                 !
                 ! subsidence
-                ! 
+                !
                 kp1 = k+1
                 tt(k,i,j)  =  tt(k,i,j) - ( tl(kp1,i,j) - tl(k,i,j) )*sf(k)
                 rtt(k,i,j) = rtt(k,i,j) - ( rt(kp1,i,j) - rt(k,i,j) )*sf(k)
@@ -407,6 +394,6 @@ contains
     enddo
 
   end subroutine bellon
-  
+
 
 end module forc
