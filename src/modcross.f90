@@ -41,12 +41,12 @@ implicit none
          'qdev_cl','qdev_sc','q_cld  ','tv_cl  ','tv_sc  ', & !41-45
          'tv_cld ','core   '/)                                !46-47
   integer :: nccrossxzid,nccrossyzid,nccrossxyid, nccrossrec, nvar
-  
+
   interface writecross
     module procedure writecross_2D
     module procedure writecross_3D
   end interface writecross
-  
+
 
 contains
 
@@ -64,7 +64,7 @@ contains
     character(len=*), intent(in) :: expname
     integer :: i, j, k
     character(len=4) :: cmpicoordx, cmpicoordy
-    
+
 !     return
     write(cmpicoordx,'(i4.4)') wrxid
     write(cmpicoordy,'(i4.4)') wryid
@@ -124,6 +124,11 @@ contains
 
 !     if (.not.(lxy .or. lxz .or. lyz)) lcross = .false.
     if (lcross) call open_nc(trim(expname)//'.out.xy.'//cmpicoordx//'.'//cmpicoordy//'.nc', nccrossxyid, nccrossrec, rtimee)
+    do n=1,nkcross
+     if (zcross(n) < 0) then
+       call addvar_nc(nccrossxyid, trim(hname(n)),trim(hlname(n)), 'm', (/tname/), (/tlongname/), (/tunit/))
+      end if
+    end do
     do n=1,nvar_all
       call addcross(crossvars(n))
     end do
@@ -264,78 +269,78 @@ contains
       case ('cnd_acc')
         if (.not.lwaterbudget) return
         longname = 'acc. condensation'
-        unit = 'kg/m2'          
+        unit = 'kg/m2'
       case ('cev_acc')
         if (.not.lwaterbudget) return
         longname = 'acc. evaporation of cloud water'
-        unit = 'kg/m2'          
+        unit = 'kg/m2'
       case ('rev_acc')
         if (.not.lwaterbudget) return
         longname = 'acc. evaporation of rain water'
-        unit = 'kg/m2'          
+        unit = 'kg/m2'
       case ('cldbase')
         if (level < 2) return
         longname = 'Cloud base height'
-        unit = 'm'          
+        unit = 'm'
       case ('w_cld')
         if (level < 2) return
         longname = 'Av. In cloud vertical velocity'
-        unit = 'm/s'          
+        unit = 'm/s'
       case ('wdev_cl')
         longname = 'Av. Cloud layer vertical velocity'
-        unit = 'm/s'          
+        unit = 'm/s'
       case ('wdev_sc')
         if (level < 2) return
         longname = 'SubCloud layer vertical velocity'
-        unit = 'm/s'          
+        unit = 'm/s'
       case ('t_cld')
         if (level < 2) return
         longname = 'Av. In cloud temperature deviation'
-        unit = 'K'          
+        unit = 'K'
       case ('tdev_cl')
         if (level < 2) return
         longname = 'Av. Cloud layer temperature deviation'
-        unit = 'K'          
+        unit = 'K'
       case ('tdev_sc')
         if (level < 2) return
         longname = 'SubCloud layer temperature deviation'
-        unit = 'K'          
+        unit = 'K'
       case ('tv_cld')
         if (level < 2) return
         longname = 'Av. In cloud virt. pot. temperature deviation'
-        unit = 'K'          
+        unit = 'K'
       case ('tvdev_cl')
         if (level < 2) return
         longname = 'Av. Cloud layer virt. temperature deviation'
-        unit = 'K'          
+        unit = 'K'
       case ('tvdev_sc')
         if (level < 2) return
         longname = 'SubCloud layer virt. temperature deviation'
-        unit = 'K'          
+        unit = 'K'
       case ('q_cld')
         if (level < 2) return
         longname = 'Av. In cloud humidity deviation'
-        unit = 'kg/kg'          
+        unit = 'kg/kg'
       case ('qdev_cl')
         if (level < 2) return
         longname = 'Av. Cloud layer humidity deviation'
-        unit = 'kg/kg'          
+        unit = 'kg/kg'
       case ('qdev_sc')
         if (level < 2) return
         longname = 'SubCloud layer humidity deviation'
-        unit = 'kg/kg'          
+        unit = 'kg/kg'
       case ('cldtop')
         if (level < 2) return
         longname = 'Cloud top height'
-        unit = 'm'          
+        unit = 'm'
       case ('rwpbase')
-        if (level < 2) return
+        if (level < 3) return
         longname = 'Rain base height'
-        unit = 'm'          
+        unit = 'm'
       case ('rwptop')
-        if (level < 2) return
+        if (level < 3) return
         longname = 'Rain top height'
-        unit = 'm'          
+        unit = 'm'
       case ('trcpath')
         if (.not.lcouvreux) return
         longname = 'Tracer path'
@@ -343,12 +348,13 @@ contains
       case ('trcbase')
         if (.not.lcouvreux) return
         longname = 'Tracer base height'
-        unit = 'm'          
+        unit = 'm'
       case ('trctop')
         if (.not.lcouvreux) return
         longname = 'Tracer top height'
-        unit = 'm'          
+        unit = 'm'
       case ('core')
+        if (level < 2) return
         longname = 'Max. in cloud buoyancy'
         unit = 'K'
       case default
@@ -380,7 +386,7 @@ contains
           dimvalues(1:nzp-2,1)  = zt(2:nzp-1)
           dimname(1)            = zname
           dimlongname(1)        = zlongname
-          
+
           dimvalues(1:nxp-4,2)  = xt(3:nxp-2)
           dimname(2)            = xname
           dimlongname(2)        = xlongname
@@ -403,7 +409,7 @@ contains
           unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
           crossname(ncross) = name
         end if
-        
+
         if (lxy) then
           dimunit(1) = xunit
           dimunit(2) = yunit
@@ -420,7 +426,7 @@ contains
             unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
           end do
           crossname(ncross) = name
-        end if      
+        end if
       else
         dimunit(1) = xunit
         dimunit(2) = yunit
@@ -437,53 +443,52 @@ contains
         crossname(ncross) = name
       end if
     end if
-    
+
   end subroutine addcross
 
   subroutine triggercross(rtimee)
-    use grid,      only : nxp, nyp, nzp, tname, zt, zm, dzi_m, dzi_t, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
+    use grid,      only : level,nxp, nyp, nzp, tname, zt, zm, dzi_m, dzi_t, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
        prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta
     use modnetcdf, only : writevar_nc, fillvalue_double
-    use util,      only : get_avg3, get_var3
+    use util,      only : get_avg3, get_var3, calclevel
     use defs,      only : ep2
     real, intent(in) :: rtimee
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
     real, dimension(nzp,nxp,nyp) :: tracer, tv, interp
     real, dimension(nzp)         :: c1, thvar, tvbar, tvenv, tvcld
     integer :: n, i, j, k, ct, cb, zi, lcl
-    
+
     if (.not. lcross) return
-    
+
     call writevar_nc(nccrossxyid, tname, rtimee, nccrossrec)
-    if (lxz) then 
+    if (lxz) then
       nccrossrec = nccrossrec - 1
       call writevar_nc(nccrossxzid, tname, rtimee, nccrossrec)
     end if
-    if (lyz) then 
+    if (lyz) then
       nccrossrec = nccrossrec - 1
       call writevar_nc(nccrossyzid, tname, rtimee, nccrossrec)
     end if
-    do j=3,nyp-2
-       do i=3,nxp-2
-          do k=1,nzp
-             tv(k,i,j) = a_theta(k,i,j)*(1.+ep2*a_rp(k,i,j) - liquid(k,i,j))
-          end do
-       end do
-    end do
+    if (level < 2) then
+      do j=3,nyp-2
+        do i=3,nxp-2
+            do k=1,nzp
+              tv(k,i,j) = a_theta(k,i,j)*(1.+ep2*a_rp(k,i,j))
+            end do
+        end do
+      end do
+    else
+      do j=3,nyp-2
+        do i=3,nxp-2
+            do k=1,nzp
+              tv(k,i,j) = a_theta(k,i,j)*(1.+ep2*a_rp(k,i,j) - liquid(k,i,j))
+            end do
+        end do
+      end do
 
-!-------- calc lcl -------------------
-    call calcavg(tv, liquid, tvenv)
-    call calcavgcld(tv, liquid, tvcld)
+    end if
 
-    lcl=0
-    do k=1,nzp
-       if (tvcld(k)>tvenv(k)) then
-           lcl=k
-           exit
-       end if 
-    end do
-!-------------------------------------
 
     call get_avg3(nzp,nxp,nyp,tv,tvbar)
     do j=3,nyp-2
@@ -494,27 +499,37 @@ contains
        end do
     end do
 
-    
-    call calclevel(liquid, cb, 'base')
-    call calclevel(liquid, ct, 'top')
-    call get_avg3(nzp,nxp,nyp, tv,c1)
+
+    call get_avg3(nzp,nxp,nyp, tv, c1)
     call get_var3(nzp,nxp,nyp, tv, c1, thvar)
-    zi = maxloc(thvar,1)       
-    if (cb >= nzp-1) then
-      cb = zi
-    end if
-    if (lcl >= nzp-1) then
-      lcl = 0
+    zi = maxloc(thvar,1)
+    if (level > 1) then
+      call calclevel(liquid, cb, 'base')
+      call calclevel(liquid, ct, 'top')
+
+      if (cb >= nzp-1) then
+        cb = zi
+      end if
+
+  !-------- calc lcl -------------------
+      lcl=cb+nint(200.*dzi_m(cb))
+  !-------------------------------------
+      if (lcl >= nzp-1) then
+        lcl = 0
+      end if
     end if
 
     do n = 1, nkcross
       select case (nint(zcross(n)))
       case(-1)
         kcross(n) = zi
-  
+        call writevar_nc(nccrossxyid, trim(hname(n)), zt(zi), nccrossrec)
+
       case(-2)
+        call writevar_nc(nccrossxyid, trim(hname(n)), zt(cb), nccrossrec)
         kcross(n) = cb
       case(-3)
+        call writevar_nc(nccrossxyid, trim(hname(n)), zt(lcl), nccrossrec)
         kcross(n) = lcl
       case default
       end select
@@ -522,7 +537,7 @@ contains
     if (lcouvreux) then
       call scalexcess(a_cvrxp, tracer)
     end if
-    
+
     do n = 1, ncross
       select case(trim(crossname(n)))
       case('u')
@@ -546,7 +561,7 @@ contains
       case('w')
         do j=3,nyp-2
           do i=3,nxp-2
-              do k=1,nzp
+              do k=2,nzp
                 interp(k,i,j) = 0.5*dzi_t(k) * (a_wp(k-1,i,j) / dzi_m(k) + a_wp(k,i,j) / dzi_m(k-1))
               end do
           end do
@@ -626,13 +641,13 @@ contains
         call calcdepth(liquid, tmp)
         call writecross(crossname(n), tmp)
       case ('rwpbase')
-        call calcbase(liquid, tmp, thres_rw)
+        call calcbase(a_rpp, tmp, thres_rw)
         call writecross(crossname(n), tmp)
       case ('rwptop')
-        call calctop(liquid, tmp, thres_rw)
+        call calctop(a_rpp, tmp, thres_rw)
         call writecross(crossname(n), tmp)
       case ('rwpdept')
-        call calcdepth(liquid, tmp, thres_rw)
+        call calcdepth(a_rpp, tmp, thres_rw)
         call writecross(crossname(n), tmp)
       case('trcpath')
         call calcintpath(tracer, tmp)
@@ -725,7 +740,7 @@ contains
     end if
 
   end subroutine writecross_3D
-  
+
 
   subroutine writecross_2D(crossname, am)
     use grid,     only : nxp, nyp, nzp
@@ -736,7 +751,7 @@ contains
     call writevar_nc(nccrossxyid, trim(crossname), am, nccrossrec)
 
   end subroutine writecross_2D
-  
+
   subroutine exitcross
     use modnetcdf, only : close_nc
     if (lcross) call close_nc(nccrossxyid)
@@ -777,7 +792,7 @@ contains
     real, intent(in), dimension(:,:,:) :: varin, mask
     real, intent(out), dimension(3:,3:)  :: varout
     integer :: i, j, k, n
-    
+
     varout = fillvalue_double
     do j=3,nyp-2
       do i=3,nxp-2
@@ -810,7 +825,7 @@ contains
             varoutsum(k) = varoutsum(k)+varin(k,i,j)
             ncl(k) = ncl(k)+1
           else
-            varoutsum(k) = varoutsum(k) 
+            varoutsum(k) = varoutsum(k)
             ncl(k)= ncl(k)
           end if
         end do
@@ -899,7 +914,7 @@ contains
       end do
     end do
   end subroutine calcbase
-  
+
   subroutine calctop(varin, varout, threshold)
     use grid, only : nzp, nxp, nyp, zt
     use modnetcdf, only : fillvalue_double
@@ -925,7 +940,7 @@ contains
       end do
     end do
   end subroutine calctop
-  
+
   subroutine calcdepth(varin, varout, threshold)
     use grid, only : nzp, nxp, nyp, zm
     use modnetcdf, only : fillvalue_double
@@ -952,61 +967,7 @@ contains
       end do
     end do
   end subroutine calcdepth
-   
-  subroutine calclevel(varin,varout,location, threshold)
-    use grid, only : nzp, nxp, nyp, zt
-    use mpi_interface, only : double_scalar_par_max, double_scalar_par_min
-    real, intent(in), dimension(:,:,:) :: varin
-    real, intent(in), optional :: threshold
-    integer, intent(out) :: varout
-    integer :: klocal
-    real :: rlocal, rglobal
-    character(*), intent(in) :: location
-    integer :: i, j, k, km1
-    real :: thres
-    
 
-     if (present(threshold)) then
-      thres = threshold
-    else
-      thres = 0.0
-    end if
-   
-    select case(location)
-    case ('top')
-      klocal = 0
-      do j = 3, nyp - 2
-        do i = 3, nxp - 2
-          top:do k = nzp - 1, 2, -1
-            if (varin(k,i,j) > thres) then
-              klocal = max(klocal, k)
-              exit top
-            end if
-          end do top
-        end do
-      end do
-      rlocal = klocal
-      call double_scalar_par_max(rlocal,rglobal) 
-      varout = rglobal
-    case ('base')
-      klocal = nzp 
-      do j = 3, nyp - 2
-        do i = 3, nxp - 2
-          base:do k = 2, nzp - 1
-            if (varin(k,i,j) > thres) then
-              klocal = min(klocal, k)
-              exit base
-            end if
-          end do base
-        end do
-      end do
-      rlocal = klocal
-      call double_scalar_par_min(rlocal,rglobal) 
-      varout = rglobal
-
-    end select
-  end subroutine calclevel
-  
   subroutine calcdev(varin, base, top, varout)
     use grid, only : nzp, nxp, nyp, zm, zt, a_wp, dzi_t
     use util, only : get_avg3
@@ -1026,12 +987,12 @@ contains
       do j=3,nyp-2
         do i=3,nxp-2
           do k=base,top
-            varout(i,j) = varout(i,j) + (varin(k,i,j) - mean(k))/(dzi_t(k) * (zm(top) - zm(base-1))) 
+            varout(i,j) = varout(i,j) + (varin(k,i,j) - mean(k))/(dzi_t(k) * (zm(top) - zm(base-1)))
           end do
         end do
       end do
   end subroutine calcdev
-  
+
   subroutine calcdevmask(varin, mask, varout)
     use grid, only : nzp, nxp, nyp, zm, zt, a_wp, dzi_t
     use util, only : get_avg3
@@ -1050,14 +1011,16 @@ contains
             varout(i,j) = fillvalue_double
           else
             do k=2,nzp-1
-              varout(i,j) = varout(i,j) + varin(k,i,j) - mean(k) 
+              if (mask(k,i,j) > 0) then
+                varout(i,j) = varout(i,j) + varin(k,i,j) - mean(k) 
+              end if
             end do
             varout(i,j) = varout(i,j)/real(nr)
           end if
         end do
       end do
   end subroutine calcdevmask
-!The output is the number of std. deviations over 1 that the local value of the local value 
+!The output is the number of std. deviations over 1 that the local value of the local value
 !is larger than the slab average. Only for points with an upward positive velocity.
   subroutine scalexcess(varin, varout)
     use grid, only : nzp, nxp, nyp, zm, zt, a_wp
@@ -1071,7 +1034,7 @@ contains
     call get_avg3(nzp, nyp, nxp,varin,mean)
     call get_var3(nzp, nyp, nxp,varin,mean, div)
     div = sqrt(div)
-    
+
     do k = 2, nzp -1
       divmin(k:nzp-1) = divmin(k:nzp-1) + div(k) * 0.05 * (zm(k)-zm(k-1))/zt(k)
       div(k) = 1./max(1e-10, max(divmin(k), div(k)))
@@ -1087,7 +1050,7 @@ contains
       end do
     end do
   end subroutine scalexcess
-  
- 
+
+
 end module modcross
 

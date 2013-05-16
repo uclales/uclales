@@ -59,7 +59,7 @@
         sumnms(16)="w_cs2     "
         sumnms(17)="cnt_cs1   "
         sumnms(18)="cnt_cs2   "
-        sumnms(19)="nrain     "
+        sumnms(19)="Nr        "
         sumnms(20)="nrcnt     "
         sumnms(21)="hst_d1    "
         sumnms(22)="hst_d2    "
