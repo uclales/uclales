@@ -152,9 +152,7 @@ contains
     integer k,t,i,j
     real :: dtm,dtp,currtnudge, nudgefac
     real, dimension(nzp) :: uav, vav, tav, qav
-!CGILS
-    real :: u_tnudge !nudging time for horizontal winds that is applied over the entire height of the domain
-!     u_tnudge = 600.           !secs, constant with height for u and v
+
     if (firsttime) then
       firsttime = .false.
       call initnudge(time)
@@ -172,7 +170,6 @@ contains
 
     dtm = ( time-timenudge(t) ) / ( timenudge(t+1)-timenudge(t) )
     dtp = ( timenudge(t+1)-time)/ ( timenudge(t+1)-timenudge(t) )
-    currtnudge = max(dt,u_tnudge*dtp+u_tnudge*dtm)
     call get_avg3(nzp, nxp, nyp,a_up,uav)
     call get_avg3(nzp, nxp, nyp,a_vp,vav)
     call get_avg3(nzp, nxp, nyp,a_tp,tav)
@@ -182,7 +179,6 @@ contains
     do i=3,nxp-2
     do k=2,nzp-1
      currtnudge = max(dt,tnudge(k,t)*dtp+tnudge(k,t+1)*dtm)
-!      currtnudge = 600.
       if(lunudge  ) a_ut(k,i,j)=a_ut(k,i,j)-&
           (uav(k)-(unudge  (k,t)*dtp+unudge  (k,t+1)*dtm))/currtnudge
       if(lvnudge  ) a_vt(k,i,j)=a_vt(k,i,j)-&
