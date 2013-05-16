@@ -115,6 +115,7 @@ mu = zenith(alat,time)
   fact = div*cp*dn0(ki)
 
 !print *, 'astex rad before lw2'
+		flx(1,i,j)=flx(1,i,j)+fr0*exp(-1.*xka*lwp(i,j))
           do k=2,n1
              km1=max(2,k-1)
             lwp(i,j)=lwp(i,j)-max(0.,rc(k,i,j)*dn0(k)*(zm(k)-zm(k-1)))
