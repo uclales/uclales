@@ -283,7 +283,7 @@ contains
          "'  Sounding Input: ',//,7x,'ps',9x,'hs',7x,'ts',6x ,'thds',6x," // &
          "'us',7x,'vs',7x,'rts',5x,'rel hum',5x,'rhi'/,6x,'(Pa)',7X,'(m)',6X,'(K)'"// &
          ",6X,'(K)',6X,'(m/s)',4X,'(m/s)',3X,'(kg/kg)',5X,'(%)',5X,'(%)'/,1x/)"
-    character (len=37) :: fm1 = "(f11.1,f10.1,2f9.2,2f9.2,f10.5,2f9.1)"
+    character (len=37) :: fm1 = "(f11.2,f10.2,2f9.2,2f9.2,f10.5,2f9.1)"
     !
     ! arrange the input sounding
     !
@@ -324,6 +324,9 @@ contains
        select case (ipsflg)
        case (0)
           ps(ns)=ps(ns)*100.
+		  ! compute height levels of input sounding.
+          hs(k)=hs(k-1)-r*.5 *(tks(k)*(1.+ep2*rts(k))                      &
+               +tks(k-1)*(1.+ep2*rts(k-1)))*(log(ps(k))-log(ps(k-1)))/g
        case default
           if (ns == 1)then
              ps(ns)=ps(ns)*100.
@@ -374,70 +377,42 @@ contains
           call appl_abort(0)
        end select
 
-       do iterate1 = 1,1
-         if (irsflg == 0) then
-           rts(ns) = xs(ns)*rslf(ps(ns),tks(ns))
-         end if
-         if (ipsflg == 1 .and. ns > 1) then
-            if ((itsflg==0).or.(itsflg==1))then
-               tavg=(ts(ns)*(1.+ep2*rts(ns))+tks(ns-1)*(1.+ep2*rts(ns-1))*(p00**rcp) &
-                    /ps(ns-1)**rcp)*.5
-               ps(ns)=(ps(ns-1)**rcp-g*(hs(ns)-hs(ns-1))*(p00**rcp)/(cp*tavg))**cpr
-            else
-               tavg=(ts(ns)*(1.+ep2*rts(ns))+tks(ns-1)*(1.+ep2*rts(ns-1)))*.5
-               ps(ns)=ps(ns-1)*exp(-g*(zold2-zold1)/(r*tavg))
-            end if
-         end if
-         select case (itsflg)
-         case (0)
-            tks(ns)=ts(ns)*(ps(ns)*p00i)**rcp
-         case (1)
-            til=ts(ns)*(ps(ns)*p00i)**rcp
-            xx=til
-            yy=rslf(ps(ns),xx)
-            zz=max(rts(ns)-yy,0.)
-            if (zz > 0.) then
-               do iterate=1,3
-                  x1=alvl/(cp*xx)
-                  xx=xx - (xx - til*(1.+x1*zz))/(1. + x1*til                &
-                       *(zz/xx+(1.+yy*ep)*yy*alvl/(Rm*xx*xx)))
-                  yy=rslf(ps(ns),xx)
-                  zz=max(rts(ns)-yy,0.)
-               enddo
-            endif
-            tks(ns)=xx
-         case default
-         end select
-
-       end do
+       
        ns = ns+1
 
     end do
     ns=ns-1
 !
-    ! compute height levels of input sounding.
+    ! check if model top is below sounding top.
     !
-    if (ipsflg == 0) then
-       do k=2,ns
-          hs(k)=hs(k-1)-r*.5 *(tks(k)*(1.+ep2*rts(k))                      &
-               +tks(k-1)*(1.+ep2*rts(k-1)))*(log(ps(k))-log(ps(k-1)))/g
-       end do
-    end if
-
     if (hs(ns) < zt(nzp)) then
        if (myid == 0) print *, '  ABORTING: Model top above sounding top'
        if (myid == 0) print '(2F12.2)', hs(ns), zt(nzp)
        call appl_abort(0)
     end if
-
-    do k=1,ns
-       thds(k)=tks(k)*(p00/ps(k))**rcp
-    end do
-
+	
+	! calculate relative humidity 
     do k=1,ns
        xs(k)=100.*rts(k)/rslf(ps(k),tks(k))
     end do
-
+	
+	! recalculate ts so that it will liquid water potential temperature
+	! so it could be used for fldinit
+	if (itsflg == 0  .or. itsflg == 2 ) then
+		do k=1,ns
+			ts(k)=tks(k)*(p00/ps(k))**rcp
+			if (xs(k) > 100.) then
+				zz = (xs(k)-100)/xs(k)*rts(k)
+				ts(k)=ts(k)*exp(-zz*alvl/(cp*tks(k)))
+			end if
+		end do
+	end if
+	! thds is liquid water potential temperature
+	do k=1,ns
+       thds(k)=ts(k)
+    end do
+	
+	! xsi is relative humidity with respect to ice saturation
     do k=1,ns
        xsi(k)=100.*rts(k)/rsif(ps(k),tks(k))
     end do
@@ -446,10 +421,6 @@ contains
        write(6,fm0)
        write(6,fm1)(ps(k),hs(k),tks(k),thds(k),us(k),vs(k),rts(k),xs(k),xsi(k),k=1,ns)
     endif
-    ! update ts for fldinit
-    do k=1,ns
-       ts(k)=tks(k)*(p00/ps(k))**rcp
-    end do
 
 604 format('    input sounding needs to go higher ! !', /,                &
          '      sounding top (m) = ',f12.2,'  model top (m) = ',f12.2)
@@ -478,7 +449,7 @@ contains
          "'  Basic State: ',//,4X,'Z',6X,'U0',6X,'V0',6X,'DN0',6X,' P0'"   //&
          ",6X,'PRESS',4X,'TH0',6X,'THV',5X,'RT0',/,3X,'(m)',5X,'(m/s)'"     //&
          ",3X,'(m/s)',2X,'(kg/m3)',2X,'(J/kgK)',4X,'(Pa)',5X,'(K)',5X"      //&
-         ",'(K)',4X,'(g/kg)',//,(1X,F7.1,2F8.2,F8.3,2F10.2,2F8.2,F7.2))"
+         ",'(K)',4X,'(g/kg)',//,(1X,F7.2,2F8.2,F8.3,2F10.2,2F8.2,F7.2))"
 
     !
 
