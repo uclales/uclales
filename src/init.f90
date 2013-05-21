@@ -22,6 +22,8 @@ module init
   use grid
   use ncio
 
+  implicit none
+
   integer, parameter    :: nns = 500
   integer               :: ns
   integer               :: iseed = 0
@@ -49,7 +51,7 @@ contains
     use thrm, only : thermo
 !cgils
     use forc, only : lstendflg
-    
+
     use mcrp, only : initmcrp
     use modcross, only : initcross, triggercross
     use grid, only : nzp, dn0, u0, v0, zm, zt, isfctyp
@@ -59,6 +61,7 @@ contains
 
     if (runtype == 'INITIAL') then
        time=0.
+       call random_init
        call arrsnd
        call basic_state
        call fldinit
@@ -87,7 +90,7 @@ contains
        call lstend_init
        end if
 
-    
+
     if (isfctyp==0) then
         call homo_surf       !Malte: prescribe homogeneous surface fluxes
     end if
@@ -280,7 +283,7 @@ contains
          "'  Sounding Input: ',//,7x,'ps',9x,'hs',7x,'ts',6x ,'thds',6x," // &
          "'us',7x,'vs',7x,'rts',5x,'rel hum',5x,'rhi'/,6x,'(Pa)',7X,'(m)',6X,'(K)'"// &
          ",6X,'(K)',6X,'(m/s)',4X,'(m/s)',3X,'(kg/kg)',5X,'(%)',5X,'(%)'/,1x/)"
-    character (len=37) :: fm1 = "(f11.1,f10.1,2f9.2,2f9.2,f10.5,2f9.1)"
+    character (len=37) :: fm1 = "(f11.2,f10.2,2f9.2,2f9.2,f10.5,2f9.1)"
     !
     ! arrange the input sounding
     !
@@ -321,6 +324,9 @@ contains
        select case (ipsflg)
        case (0)
           ps(ns)=ps(ns)*100.
+		  ! compute height levels of input sounding.
+          hs(k)=hs(k-1)-r*.5 *(tks(k)*(1.+ep2*rts(k))                      &
+               +tks(k-1)*(1.+ep2*rts(k-1)))*(log(ps(k))-log(ps(k-1)))/g
        case default
           if (ns == 1)then
              ps(ns)=ps(ns)*100.
@@ -371,70 +377,42 @@ contains
           call appl_abort(0)
        end select
 
-       do iterate1 = 1,1
-         if (irsflg == 0) then
-           rts(ns) = xs(ns)*rslf(ps(ns),tks(ns))
-         end if
-         if (ipsflg == 1 .and. ns > 1) then
-            if ((itsflg==0).or.(itsflg==1))then
-               tavg=(ts(ns)*(1.+ep2*rts(ns))+tks(ns-1)*(1.+ep2*rts(ns-1))*(p00**rcp) &
-                    /ps(ns-1)**rcp)*.5
-               ps(ns)=(ps(ns-1)**rcp-g*(hs(ns)-hs(ns-1))*(p00**rcp)/(cp*tavg))**cpr
-            else
-               tavg=(ts(ns)*(1.+ep2*rts(ns))+tks(ns-1)*(1.+ep2*rts(ns-1)))*.5
-               ps(ns)=ps(ns-1)*exp(-g*(zold2-zold1)/(r*tavg))
-            end if
-         end if
-         select case (itsflg)
-         case (0)
-            tks(ns)=ts(ns)*(ps(ns)*p00i)**rcp
-         case (1)
-            til=ts(ns)*(ps(ns)*p00i)**rcp
-            xx=til
-            yy=rslf(ps(ns),xx)
-            zz=max(rts(ns)-yy,0.)
-            if (zz > 0.) then
-               do iterate=1,3
-                  x1=alvl/(cp*xx)
-                  xx=xx - (xx - til*(1.+x1*zz))/(1. + x1*til                &
-                       *(zz/xx+(1.+yy*ep)*yy*alvl/(Rm*xx*xx)))
-                  yy=rslf(ps(ns),xx)
-                  zz=max(rts(ns)-yy,0.)
-               enddo
-            endif
-            tks(ns)=xx
-         case default
-         end select
-
-       end do
+       
        ns = ns+1
 
     end do
     ns=ns-1
 !
-    ! compute height levels of input sounding.
+    ! check if model top is below sounding top.
     !
-    if (ipsflg == 0) then
-       do k=2,ns
-          hs(k)=hs(k-1)-r*.5 *(tks(k)*(1.+ep2*rts(k))                      &
-               +tks(k-1)*(1.+ep2*rts(k-1)))*(log(ps(k))-log(ps(k-1)))/g
-       end do
-    end if
-
     if (hs(ns) < zt(nzp)) then
        if (myid == 0) print *, '  ABORTING: Model top above sounding top'
        if (myid == 0) print '(2F12.2)', hs(ns), zt(nzp)
        call appl_abort(0)
     end if
-
-    do k=1,ns
-       thds(k)=tks(k)*(p00/ps(k))**rcp
-    end do
-
+	
+	! calculate relative humidity 
     do k=1,ns
        xs(k)=100.*rts(k)/rslf(ps(k),tks(k))
     end do
-
+	
+	! recalculate ts so that it will liquid water potential temperature
+	! so it could be used for fldinit
+	if (itsflg == 0  .or. itsflg == 2 ) then
+		do k=1,ns
+			ts(k)=tks(k)*(p00/ps(k))**rcp
+			if (xs(k) > 100.) then
+				zz = (xs(k)-100)/xs(k)*rts(k)
+				ts(k)=ts(k)*exp(-zz*alvl/(cp*tks(k)))
+			end if
+		end do
+	end if
+	! thds is liquid water potential temperature
+	do k=1,ns
+       thds(k)=ts(k)
+    end do
+	
+	! xsi is relative humidity with respect to ice saturation
     do k=1,ns
        xsi(k)=100.*rts(k)/rsif(ps(k),tks(k))
     end do
@@ -443,10 +421,6 @@ contains
        write(6,fm0)
        write(6,fm1)(ps(k),hs(k),tks(k),thds(k),us(k),vs(k),rts(k),xs(k),xsi(k),k=1,ns)
     endif
-    ! update ts for fldinit
-    do k=1,ns
-       ts(k)=tks(k)*(p00/ps(k))**rcp
-    end do
 
 604 format('    input sounding needs to go higher ! !', /,                &
          '      sounding top (m) = ',f12.2,'  model top (m) = ',f12.2)
@@ -475,7 +449,7 @@ contains
          "'  Basic State: ',//,4X,'Z',6X,'U0',6X,'V0',6X,'DN0',6X,' P0'"   //&
          ",6X,'PRESS',4X,'TH0',6X,'THV',5X,'RT0',/,3X,'(m)',5X,'(m/s)'"     //&
          ",3X,'(m/s)',2X,'(kg/m3)',2X,'(J/kgK)',4X,'(Pa)',5X,'(K)',5X"      //&
-         ",'(K)',4X,'(g/kg)',//,(1X,F7.1,2F8.2,F8.3,2F10.2,2F8.2,F7.2))"
+         ",'(K)',4X,'(g/kg)',//,(1X,F7.2,2F8.2,F8.3,2F10.2,2F8.2,F7.2))"
 
     !
 
@@ -607,7 +581,6 @@ contains
 
     use util, only : sclrset
     implicit none
-    integer, allocatable :: seed(:)
 
     integer, intent(in) :: n1,n2,n3,kmx
     real, intent(inout) :: fld(n1,n2,n3)
@@ -615,15 +588,10 @@ contains
 
     real (kind=8) :: rand(3:n2-2,3:n3-2),  xx, xxl
     real (kind=8), allocatable :: rand_temp(:,:)
-    integer :: i,j,k,n,n2g,n3g
+    integer :: i,j,k,n2g,n3g
 
     rand=0.0
 
-    call random_seed(size=n)
-    allocate (seed(n))
-    seed = iseed * (/ (i, i = 1, n) /)
-    call random_seed(put=seed)
-    deallocate (seed)
     ! seed must be a double precision odd whole number greater than
     ! or equal to 1.0 and less than 2**48.
     !seed(1) = iseed
@@ -668,6 +636,16 @@ contains
          /3x,'and a magnitude of: ',E12.5)
   end subroutine random_pert
 
+  subroutine random_init
+    use mpi_interface, only: myid
+    integer :: i, n
+    integer, allocatable, dimension(:) :: seed
+    call random_seed(size=n)
+    allocate (seed(n))
+    seed = iseed * (/ (i, i = 1, n) /) + myid
+    call random_seed(put=seed)
+    deallocate (seed)
+  end subroutine random_init
 !irina
   !----------------------------------------------------------------------
   ! Lsvar_init if lsvarflg is true reads the lsvar forcing from the respective
@@ -700,27 +678,27 @@ contains
   !----------------------------------------------------------------------
   ! Lstend_init if lstendflg is true reads the lstend  from the respective
   ! file lstend_in
-  ! 
+  !
   subroutine lstend_init
 
    use grid,only   : wfls,dqtdtls,dthldtls
     use mpi_interface, only : myid
-   
+
 
    implicit none
-   
-   real     :: tmp1,lowdthldtls,highdthldtls,lowdqtdtls,highdqtdtls,lowwfls,highwfls,highheight,lowheight,fac
+
+   real     :: lowdthldtls,highdthldtls,lowdqtdtls,highdqtdtls,lowwfls,highwfls,highheight,lowheight,fac
    integer :: k
 
     ! reads the time varying lscale forcings
     !
  !   print *, wfls
     if (wfls(2) == 0.) then
- !         print *, 'lstend_init '                 
+ !         print *, 'lstend_init '
         open (1,file='lstend_in',status='old',form='formatted')
         read (1,*,end=100) lowheight,lowwfls,lowdqtdtls,lowdthldtls
         read (1,*,end=100) highheight,highwfls,highdqtdtls,highdthldtls
-        if(myid == 0)  print *, 'lstend_init read'                 
+        if(myid == 0)  print *, 'lstend_init read'
         do  k=2,nzp-1
           if (highheight<zt(k)) then
             lowheight = highheight
@@ -733,12 +711,11 @@ contains
           wfls(k) = fac*lowwfls + (1-fac)*highwfls
           dqtdtls(k) = fac*lowdqtdtls + (1-fac)*highdqtdtls
           dthldtls(k) = fac*lowdthldtls + (1-fac)*highdthldtls
-          if(myid == 0)  print *, ns, tmp1,wfls(ns),dqtdtls(ns),dthldtls(ns)
         end do
        close (1)
     end if
 100 continue
- 
+
     return
   end subroutine lstend_init
 
@@ -792,7 +769,7 @@ contains
   end subroutine homogenize
 
  !-----------------------
- ! homo_surf read SHF LHF 
+ ! homo_surf read SHF LHF
  !
  subroutine homo_surf
 
@@ -829,7 +806,7 @@ contains
       if (status.ne.nf90_noerr) print*,nf90_strerror(status)
 !* Close
       status=nf90_close(ncid)
-      if (status.ne.nf90_noerr) print*,nf90_strerror(status)   
+      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
 
 return
  end subroutine homo_surf

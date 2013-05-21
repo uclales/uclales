@@ -89,7 +89,7 @@ module grid
 
   !Malte: variables to read homogeneous fluxes from nc file
   real, dimension (:),      allocatable :: shls, lhls, usls, timels
- 
+
   !
   ! 3D Arrays
   !irina
@@ -222,10 +222,10 @@ contains
        memsize = memsize + nxyzp
        allocate (a_sflxu_ca(nzp,nxp,nyp))
        a_sflxu_ca(:,:,:) = 0.
-       memsize = memsize + nxyzp 
+       memsize = memsize + nxyzp
        allocate (a_sflxd_ca(nzp,nxp,nyp))
        a_sflxd_ca(:,:,:) = 0.
-       memsize = memsize + nxyzp 
+       memsize = memsize + nxyzp
     end if
     if (iradtyp > 2) then
        allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp),sflxu_toa(nxp,nyp),sflxd_toa(nxp,nyp),lflxu_toa(nxp,nyp),lflxd_toa(nxp,nyp),sflxu_toa_ca(nxp,nyp),sflxd_toa_ca(nxp,nyp),lflxu_toa_ca(nxp,nyp),lflxd_toa_ca(nxp,nyp))
@@ -246,10 +246,10 @@ contains
        memsize = memsize + nxyzp
        allocate (a_sflxd(nzp,nxp,nyp))
        a_sflxd(:,:,:) = 0.
-       memsize = memsize + nxyzp 
+       memsize = memsize + nxyzp
        allocate (a_sflxu_ca(nzp,nxp,nyp))
        a_sflxu_ca(:,:,:) = 0.
-       memsize = memsize + nxyzp 
+       memsize = memsize + nxyzp
        allocate (a_sflxd_ca(nzp,nxp,nyp))
        a_sflxd_ca(:,:,:) = 0.
        memsize = memsize + nxyzp
@@ -264,7 +264,7 @@ contains
     a_scr5(:,:,:) = 0.
     a_scr6(:,:,:) = 0.
     a_scr7(:,:,:) = 0.
-    memsize = memsize + 7.*nxyzp
+    memsize = memsize + 7*nxyzp
 
     nscl = nscl+naddsc
     if (level   > 0) nscl = nscl+1  ! qt only
@@ -272,10 +272,10 @@ contains
     if (level   > 3) nscl = nscl+4  ! ni,qi,qs,qg
     if (level   > 4) nscl = nscl+4  ! ns,ng,qh,nh (for Axel's two-moment scheme)
 
-    if (lwaterbudget) then 
+    if (lwaterbudget) then
       nscl = nscl+1 ! additional cloud water a_cld in the tracer array
       ncld = nscl
-    end if  
+    end if
     if (lcouvreux) then
       nscl  = nscl+1 ! Additional radioactive scalar
       ncvrx = nscl
@@ -625,7 +625,8 @@ contains
 
     character (len=80) :: hname
 
-    integer :: n, iblank
+    integer :: n, iblank, nseed
+    integer, allocatable, dimension(:) :: seed
     !
     ! create and open a new output file.
     !
@@ -643,6 +644,11 @@ contains
        iblank=index(hname,' ')
        write (hname(iblank:iblank+7),'(a1,i6.6,a1)') '.', int(time), 's'
     end select
+
+    call random_seed(size=nseed)
+    allocate (seed(nseed))
+    call random_seed(get=seed)
+
     !
     ! Write fields
     !
@@ -651,6 +657,8 @@ contains
     open(10,file=trim(hname), form='unformatted')
 
     write(10) time,th00,umean,vmean,dt,level,iradtyp,nzp,nxp,nyp,nscl
+    write(10) nseed
+    write(10) seed
     write(10) xt, xm, yt, ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf
     write(10) a_ustar, a_tstar, a_rstar
     write(10) a_pexnr
@@ -670,7 +678,7 @@ contains
        write(10) a_sflxu_avn
        write(10) a_lflxd_avn
        write(10) a_lflxu_avn
-    end if 
+    end if
     !End Malte
 
     do n=1,nscl
@@ -706,7 +714,8 @@ contains
     real, intent(out)             :: time
 
     character (len=80) :: hname
-    integer :: n, nxpx, nypx, nzpx, nsclx, iradx, lvlx
+    integer :: n, nseed, nxpx, nypx, nzpx, nsclx, iradx, lvlx
+    integer, dimension(:), allocatable :: seed
     logical :: exans
     real :: umx, vmx, thx
     !
@@ -723,7 +732,10 @@ contains
     else
        open (10,file=trim(hname),status='old',form='unformatted')
        read (10) time,thx,umx,vmx,dt,lvlx,iradx,nzpx,nxpx,nypx,nsclx
-
+       read (10) nseed
+       allocate(seed(nseed))
+       read(10) seed
+       call random_seed(put=seed)
        if (nxpx /= nxp .or. nypx /= nyp .or. nzpx /= nzp)  then
           if (myid == 0) print *, nxp, nyp, nzp, nxpx, nypx, nzpx
           call appl_abort(-1)
@@ -748,7 +760,7 @@ contains
           read(10) a_sflxu_avn
           read(10) a_lflxd_avn
           read(10) a_lflxu_avn
-       end if 
+       end if
        !End Malte
 
        do n=1,nscl

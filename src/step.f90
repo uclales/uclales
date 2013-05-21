@@ -159,13 +159,13 @@ contains
           call mpi_get_time(t2)
           if (mod(istp,istpfl) == 0 ) then
               if (wctime.gt.1e9) then
-                print "('   Timestep # ',i5," //     &
-                       "'   Model time(sec)=',f10.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2)",     &
-                       istp, time, dt_prev, t2-t1, (t2-t0)*(timmax/time-1)
+                print "('   Timestep # ',i6," //     &
+                       "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3)",     &
+                       istp, time, dt_prev, t2-t1
               else
-                print "('   Timestep # ',i5," //     &
-                       "'   Model time(sec)=',f10.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2,'  WC Time left(sec) = ',f10.2)",     &
-                       istp, time, dt_prev, t2-t1, (t2-t0)*(timmax/time-1),wctime-t2+t0
+                print "('   Timestep # ',i6," //     &
+                       "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3'  WC Time left(sec) = ',f10.2)",     &
+                       istp, time, dt_prev, t2-t1, wctime-t2+t0
               end if
           end if
        endif
@@ -331,7 +331,7 @@ contains
        end if
 
        xtime = xtime - strtim
-       call surface(sst,xtime)      
+       call surface(sst,xtime)
        xtime = xtime + strtim
 
        ! BvS

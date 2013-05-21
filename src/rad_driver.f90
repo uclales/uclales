@@ -20,7 +20,7 @@
 module radiation
 
   use defs, only       : cp, rcp, cpr, rowt, roice, p00, pi, nv1, nv, SolarConstant
-  use fuliou, only     : rad
+  use fuliou, only     : rad, minSolarZenithCosForVis
   implicit none
  character (len=10), parameter :: background = 'backrad_in'
  ! character (len=19), parameter :: background = 'datafiles/s11.lay'
@@ -68,18 +68,18 @@ module radiation
       !
       ! initialize surface albedo, emissivity and skin temperature.
       !
-      ee = 1.0 
+      ee = 1.0
       !
-      ! determine the solar geometery, as measured by u0, the cosine of the 
+      ! determine the solar geometery, as measured by u0, the cosine of the
       ! solar zenith angle
       !
       if (.not. fixed_sun) then
         u0 = zenith(alat,time)
       end if
     !cgils
-      
+
       !
-      ! call the radiation 
+      ! call the radiation
       !
       prw = (4./3.)*pi*rowt
       pri = (3.*sqrt(3.)/8.)*roice
@@ -145,7 +145,7 @@ module radiation
 
             do k=1,n1
                kk = nv1 - (k-1)
-               sflx(k,i,j) = fus(kk)  - fds(kk) 
+               sflx(k,i,j) = fus(kk)  - fds(kk)
                !irina
                sflxu(k,i,j)=fus(kk)
                sflxd(k,i,j)=fds(kk)
@@ -158,22 +158,22 @@ module radiation
             end do
 
             if (present(albedo)) then
-              if (u0 > 0.) then
-                albedo(i,j) = fus(1)/(fds(1)+epsilon(fds(1)))!LINDA
+              if (u0 > minSolarZenithCosForVis) then
+                albedo(i,j) = fus(1)/fds(1)
               else
                 albedo(i,j) = -999.
               end if
             end if
 
             if (present(sflxu_toa)) then
-              if (u0 > 0.) then
+              if (u0 > minSolarZenithCosForVis) then
                 sflxu_toa(i,j) = fus(1)
               else
                 sflxu_toa(i,j) = -999.
               end if
             end if
             if (present(sflxd_toa)) then
-              if (u0 > 0.) then
+              if (u0 > minSolarZenithCosForVis) then
                 sflxd_toa(i,j) = fds(1)
               else
                 sflxd_toa(i,j) = -999.
@@ -184,7 +184,7 @@ module radiation
             end if
             if (present(lflxd_toa)) then
               lflxd_toa(i,j) = fdir(1)
-            end if 
+            end if
             do k=2,n1-3
                xfact  = dzi_m(k)/(cp*dn0(k)*exner(k))
                tt(k,i,j) = tt(k,i,j) - (rflx(k,i,j) - rflx(k-1,i,j))*xfact
@@ -197,7 +197,7 @@ module radiation
 
   !
   ! ---------------------------------------------------------------------------
-  ! BvS: Simple parameterized surface radiation for LSM 
+  ! BvS: Simple parameterized surface radiation for LSM
   !
   subroutine surfacerad(alat,time)
     use grid, only   : sfc_albedo,a_theta,a_lflxu,a_lflxd,a_sflxu,a_sflxd,a_tskin,nxp,nyp,a_pexnr,pi0,pi1
@@ -215,8 +215,8 @@ module radiation
         exner          = (pi0(2)+pi1(2)+a_pexnr(2,i,j))/cp
         a_sflxd(2,i,j) = SolarConstant * tr * u0
         a_sflxu(2,i,j) = sfc_albedo * a_sflxd(2,i,j)
-        a_lflxd(2,i,j) = 0.8 * stefan * (a_theta(2,i,j)*exner)**4.  
-        a_lflxu(2,i,j) = stefan * a_tskin(i,j)**4. 
+        a_lflxd(2,i,j) = 0.8 * stefan * (a_theta(2,i,j)*exner)**4.
+        a_lflxu(2,i,j) = stefan * a_tskin(i,j)**4.
       end do
     end do
 
@@ -257,7 +257,7 @@ module radiation
     ! identify what part, if any, of background sounding to use
     !
     ptop = zp(n1)
-    if (sp(2) < ptop) then 
+    if (sp(2) < ptop) then
        pa = sp(1)
        pb = sp(2)
        k = 3
@@ -267,13 +267,13 @@ module radiation
           k  = k+1
        end do
        k=k-1           ! identify first level above top of input
-       blend = .True. 
+       blend = .True.
     else
        blend = .False.
     end if
     !
     ! if blend is true then the free atmosphere above the sounding will be
-    ! specified based on the specified background climatology, here the 
+    ! specified based on the specified background climatology, here the
     ! pressure levels for this part of the sounding are determined
     !
     if (blend) then
@@ -296,9 +296,9 @@ module radiation
     end if
     nv = nv1-1
     !
-    ! allocate the arrays for the sounding data to be used in the radiation 
+    ! allocate the arrays for the sounding data to be used in the radiation
     ! profile and then fill them first with the sounding data, by afill, then
-    ! by interpolating the background profile at pressures less than the 
+    ! by interpolating the background profile at pressures less than the
     ! pressure at the top fo the sounding
     !
     allocate (pp(nv1),fds(nv1),fus(nv1),fdir(nv1),fuir(nv1))
@@ -325,11 +325,10 @@ module radiation
       ! end do
 
       ! interpolate ozone profile
-       do k=npts+1,nv1
+       do k=npts+1,nv
             pp2 = (p00*(pi0(nv-k+2)/cp)**cpr) / 100.
             index  = getindex(sp,ns,pp2)
             po(k) =  intrpl(sp(index),so(index),sp(index+1),so(index+1),pp2)
-            print*,'ozone profile: ', po(k), pp2, sp (index), sp(index+1)
          end do
 
     end if
@@ -366,7 +365,7 @@ module radiation
   end function getindex
 
   ! ---------------------------------------------------------------------------
-  ! linear interpolation between two points, 
+  ! linear interpolation between two points,
   !
   real function intrpl(x1,y1,x2,y2,x)
 
@@ -380,7 +379,7 @@ module radiation
   end function intrpl
 
   ! ---------------------------------------------------------------------------
-  ! Return the cosine of the solar zenith angle give the decimal day and 
+  ! Return the cosine of the solar zenith angle give the decimal day and
   ! the latitude
   !
   real function zenith(alat,time)
