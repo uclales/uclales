@@ -45,7 +45,7 @@ module modparticles
   logical            :: lpartdumpth    = .false.        !< Switch for writing temperatures (liquid water / virtual potential T) to dump
   logical            :: lpartdumpmr    = .false.        !< Switch for writing moisture (total / liquid (+rain if level==3) water mixing ratio) to dump
   real               :: frqpartdump    =  3600          !< Time interval for particle dump
-  integer            :: int_part       =  3             !< Interpolation scheme, 1=linear, 3=3rd order Lagrange
+  integer            :: int_part       =  1             !< Interpolation scheme, 1=linear, 3=3rd order Lagrange
 
   character(30)      :: startfile
   integer            :: ifinput        = 1
