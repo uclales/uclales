@@ -74,7 +74,7 @@ contains
     use srfc, only : zrough, ubmin, dthcon, drtcon, rh_srf, drag, lhomflx
     use step, only : timmax, timrsm, istpfl, corflg, outflg, frqanl, frqhis,          &
          frqcross , strtim, radfrq, cntlat,&
-         case_name,lsvarflg, sst, div, wctime , tau                  !irina
+         case_name,lsvarflg, sst, div, wctime , tau                 !irina
     use modnetcdf, only : lsync, deflate_level
     use ncio, only : deflev => deflate_level
     use modcross, only : lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars
@@ -90,8 +90,9 @@ contains
     use radiation, only : u0, fixed_sun, rad_eff_radius
     use modnudge, only : lnudge,tnudgefac, qfloor, zfloor, znudgemin, znudgeplus
     use modtimedep, only : ltimedep
-    use mcrp, only : microseq,lrandommicro,timenuc,nin_set,cloud_type
-    use modparticles, only : lpartic, lpartsgs,lrandsurf,lpartstat, lpartdump, lpartdumpui,lpartdumpth,lpartdumpmr, frqpartdump
+    use mcrp, only : microseq,lrandommicro,timenuc,nin_set,cloud_type, lpartdrop
+    use modparticles, only : lpartic, lpartsgs, lrandsurf, lpartstat, lpartdump, &
+         lpartdumpui, lpartdumpth, lpartdumpmr, frqpartdump, ldropstart
 
     implicit none
 
@@ -133,7 +134,10 @@ contains
          lcouvreux , tau , &                    ! The Couvreux 'radioactive' scalar
          deflate_level , lhomflx,lhomrestart, &                         !Compression of the crosssections
          clouddiff, &
-         lpartic,lpartsgs,lrandsurf,lpartstat,lpartdump,lpartdumpui,lpartdumpth,lpartdumpmr,frqpartdump           ! Particles
+         lpartic,lpartsgs,lrandsurf,lpartstat,lpartdump, &           ! Particles
+	 lpartdumpui,lpartdumpth,lpartdumpmr,frqpartdump,&           ! Particles
+         lpartdrop, ldropstart                                       ! Particles
+
 
     deflev = deflate_level
     ps       = 0.

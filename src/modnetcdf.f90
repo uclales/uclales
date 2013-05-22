@@ -454,6 +454,9 @@ contains
     iret = nf90_inquire_variable(ncid,varid,dimids=dimids)
     if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
     iret = nf90_inquire_dimension(ncid,dimids(1),len=dimsize(1))
+    !if(ncname .EQ. 'particles') then
+    !  dimsize(1) = size(var) 
+    !end if
     if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
     if (present(nrec)) then
       allocate(loc(2))

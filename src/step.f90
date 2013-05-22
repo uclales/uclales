@@ -68,7 +68,10 @@ contains
     use modcross, only : triggercross, exitcross, lcross
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
-    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, lpartstat, exitparticlestat, write_particle_hist, particlestat, balanced_particledump,frqpartdump
+    use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, &
+         lpartstat, exitparticlestat, write_particle_hist, particlestat, &
+	 balanced_particledump,frqpartdump, ldropstart
+
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
@@ -108,8 +111,8 @@ contains
        ! output control
        !
 
-       ! Sample particles; automatically samples when savgflg=.true., don't sample double...
-       if(lpartic .and. lpartstat .and. statflg .and. (savgflg .eqv. .false.)) call particlestat(.false.,time+dt)
+       !! Sample particles; automatically samples when savgflg=.true., don't sample double...
+       !if(lpartic .and. lpartstat .and. statflg .and. (savgflg .eqv. .false.)) call particlestat(.false.,time+dt)
 
        if(savgflg) then
          if(myid==0) print*,'     profiles at time=',time
@@ -135,7 +138,7 @@ contains
          call triggercross(time)
        end if
 
-       if (lpdumpflg) then
+       if (lpdumpflg.and.(time.ge.ldropstart)) then
          if(myid==0) print*,'     particle dump at time=',time
          call balanced_particledump(time)
        end if
@@ -146,7 +149,8 @@ contains
        anlflg    = .false.
        crossflg  = .false.
        lpdumpflg = .false.
-
+       
+       
        ! REMOVE THIS?
        !irina
        !if (mod(tplsdt,savg_intvl)<dt .or. time>=timmax .or. time>=timrsm .or. time==dt)   &
@@ -294,7 +298,7 @@ contains
     !use sgsm_dyn, only : calc_cs
     use srfc, only : surface
     use thrm, only : thermo
-    use mcrp, only : micro
+    use mcrp, only : micro, lpartdrop
     use prss, only : poisson
     use advf, only : fadvect
     use advl, only : ladvect
@@ -302,7 +306,9 @@ contains
     use lsvar, only : varlscale
     use util, only : velset,get_avg
     use modtimedep, only : timedep
-    use modparticles, only : particles, lpartic, particlestat,lpartstat
+    use modparticles, only : particles, lpartic, particlestat,lpartstat, &
+         deactivate_drops, activate_drops
+
 
     logical, parameter :: debug = .false.
     real :: xtime
@@ -358,6 +364,9 @@ contains
        call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
 
     end do
+
+    if(lpartic .and. lpartdrop) call deactivate_drops(time+dt)
+    if(lpartic .and. lpartdrop) call activate_drops(time+dt)
 
     if (statflg) then
        if (debug) WRITE (0,*) 't_step statflg thermo, myid=',myid

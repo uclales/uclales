@@ -49,7 +49,10 @@ module mcrp
   use util, only : get_avg3, azero, sclrset
   implicit none
 
-  logical, parameter :: droplet_sedim = .False., khairoutdinov = .False., turbulence = .False.,ice_multiplication = .TRUE.
+  logical            :: lpartdrop      = .false.        !< Switch for rain drop like particles
+
+  logical, parameter :: droplet_sedim = .False., khairoutdinov = .false., turbulence = .False., &
+                        ice_multiplication = .TRUE., kessler = .false., khairoutdinov_au = .false.
   integer            :: nprocess,nprocwarm=5,nprocice=18
 
   integer,parameter  :: iwtrdff = 3,iauto = 1,iaccr = 2,isedimrd = 4,isedimcd = 5, &
@@ -62,6 +65,7 @@ module mcrp
   logical :: lrandommicro = .false.
   real :: timenuc = 60
   real :: nin_set = 1.7e3
+  real, dimension(:,:,:),allocatable :: a_npauto
   !
   ! drop sizes definition is based on vanZanten (2005)
   ! cloud droplets' diameter: 2-50 e-6 m
@@ -322,6 +326,8 @@ contains
     !
 !as    if(firsttime) call initmcrp(level,firsttime)
     allocate(convice(n1),convliq(n1))
+    if(lpartdrop .and. nstep==3) allocate(a_npauto(nzp,nxp,nyp))
+    if(lpartdrop .and. nstep==3) a_npauto(:,:,:) = 0.
     do j=3,n3-2
        do i=3,n2-2
           call resetvar(rain,rp(1:n1,i,j),np(1:n1,i,j))
@@ -371,7 +377,7 @@ contains
              case(iauto)
                 call resetvar(cldw,rc)
                 call resetvar(rain,rrain,nrain)
-                call auto_SB(n1,dn0,rc,rrain,nrain,tl,dissip(1:n1,i,j))
+                call auto_SB(n1,dn0,rc,rrain,nrain,tl,dissip(1:n1,i,j),i,j)
              case(iaccr)
                 call resetvar(cldw,rc)
                 call resetvar(rain,rrain,nrain)
@@ -572,7 +578,7 @@ contains
     end do
 
   end subroutine wtr_dff_SB
-  subroutine auto_SB(n1,dn0,rc,rp,np,tl,diss)
+  subroutine auto_SB(n1,dn0,rc,rp,np,tl,diss,i,j)
     !
     ! ---------------------------------------------------------------------
     ! AUTO_SB:  calculates the evolution of mass- and number mxg-ratio for
@@ -581,8 +587,8 @@ contains
     ! be reformulated for f(x)=A*x**(nu_c)*exp(-Bx**(mu)), where formu=1/3
     ! one would get a gamma dist in drop diam -> faster rain formation.
     !
-
-    integer, intent (in) :: n1
+    
+    integer, intent (in) :: n1,i,j
     real, intent (in)    :: dn0(n1), diss(n1)
     real, intent (inout) :: rc(n1), rp(n1), np(n1),tl(n1)
 
@@ -607,6 +613,9 @@ contains
     real, parameter :: kc_bet = 0.00174
     real, parameter :: csx = 0.23
     real, parameter :: ce = 0.93
+    
+    real, parameter :: alpha = 1.e-3 ! s-1 Kessler scheme
+    real, parameter :: rc0 = 1.e-3   ! kg/kg Kessler scheme
 
     integer :: k
     real    :: k_au0,k_au, Xc, Dc, au, tau, phi, kc_alf, kc_rad, kc_sig, k_c, Re, epsilon, l
@@ -669,16 +678,26 @@ contains
           !
           ! Khairoutdinov and Kogan
           !
-          if (khairoutdinov) then
+          if (khairoutdinov_au) then
              Dc = ( Xc / prw )**(1./3.)
              au = Cau * (Dc * mmt / 2.)**Eau
           end if
+	  if (kessler) then
+	     if (rc(k) > rc0) then
+	        au = alpha * (rc(k) -rc0)
+	     else
+	        au = 0.
+	     end if
+	  end if
           au    = au * dt
           au    = min(au,rc(k))
           rp(k) = rp(k) + au
           rc(k) = rc(k) - au
           tl(k) = tl(k) + convliq(k)*au
           np(k) = np(k) + au/cldw%x_max
+	  
+	  ! For particles: a_npauto in #/(kg*dt)
+	  if(lpartdrop .and. nstep==3) a_npauto(k,i,j) = au/cldw%x_max*dn0(k)
        end if
     end do
 
