@@ -755,7 +755,7 @@ contains
 ! subroutine drop_vel
 ! > Calculates the drop velocity according to momentum equation
 ! > Euler implicit (iterative)
-! > use timestep <= 1 s
+! > use timestep <= 1 s ?
 ! > not working with SGS yet
 !---------------------------------------------------
   subroutine drop_vel(particle)
@@ -804,136 +804,6 @@ contains
     !print*,'v  ',particle%vdrop/dyi
     !print*,'w  ',particle%wdrop/dzi
   end subroutine drop_vel
-
-  ! !
-  ! !--------------------------------------------------------------------------
-  ! ! subroutine udrop
-  ! !> Calculation drop (u) velocity based on momentum equation
-  ! !--------------------------------------------------------------------------
-  ! !
-  ! function udrop(particle, C_d)
-  !   use grid, only : dxi,dyi, dzi_t, dt, dn0
-  !   use defs, only : rowt, pi
-  !   use mcrp, only : nu_l
-  !   implicit none
-
-  !   real :: udrop, a1, tau_p, C_d, dzi
-  !   TYPE (particle_record), POINTER:: particle
-  !   logical :: stokes=.false.
-    
-  !   dzi = dzi_t(floor(particle%z))
-  !   a1 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! drop radius
-
-  !   if (stokes) then
-  !     tau_p = 2.*rowt*a1**2./(9.*nu_l*i1d(particle%z,dn0)) ! Stokes limit
-  !     !print*,'tau_st:',tau_p
-  !     if (tau_p.lt.dt) tau_p = dt
-  !     !print*,'tau_st:',tau_p 
-  !     udrop = (particle%udrop / dxi) + (1/tau_p * (particle%ures - particle%udrop)/dxi) *dt
-  !   else
-  !     tau_p = 8.* a1*rowt / (3. * C_d*i1d(particle%z,dn0)) / sqrt( ((particle%ures - particle%udrop)/dxi)**2. & 
-  !            + ((particle%vres - particle%vdrop)/dyi)**2. + ((particle%wres - particle%wdrop)/dzi)**2. )
-  !     !print*,'tau_KC',tau_p,'dt',dt
-  !     if (tau_p.lt.dt) tau_p = dt                   ! mine
-  !     !print*,'tau_KC',tau_p
-  !     udrop = (particle%udrop / dxi) + (1/tau_p * (particle%ures - particle%udrop)/dxi) *dt
-  !   end if
-
-  !   !print*,'udrop alt:',particle%udrop/dxi
-  !   !print*,'ures      ',particle%ures/dxi
-  !   !print*,'udrop neu:',udrop
-
-  ! end function udrop
-
-  ! !
-  ! !--------------------------------------------------------------------------
-  ! ! subroutine vdrop
-  ! !> Calculation drop (v) velocity based on momentum equation
-  ! !--------------------------------------------------------------------------
-  ! !
-  ! function vdrop(particle, C_d)
-  !   use grid, only : dxi, dyi, dzi_t, dt, dn0
-  !   use defs, only : rowt, pi
-  !   use mcrp, only : nu_l
-  !   implicit none
-
-  !   real :: vdrop, a1, tau_p, C_d, dzi
-  !   TYPE (particle_record), POINTER:: particle
-  !   logical :: stokes=.false.
-
-  !   dzi = dzi_t(floor(particle%z))
-  !   a1 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! drop radius
-
-  !   if (stokes) then
-  !     tau_p = 2.*rowt*a1**2./(9.*nu_l*i1d(particle%z,dn0)) ! Stokes limit
-  !    ! print*,'tau_st:',tau_p
-  !     if (tau_p.lt.dt) tau_p = dt
-  !     !print*,'tau_st:',tau_p
-  !     vdrop = (particle%vdrop / dyi) + (1/tau_p * (particle%vres - particle%vdrop)/dyi) *dt
-  !   else
-  !     tau_p = 8.* a1*rowt / (3. * C_d*i1d(particle%z,dn0)) / sqrt( ((particle%ures - particle%udrop)/dxi)**2. & 
-  !             + ((particle%vres - particle%vdrop)/dyi)**2. + ((particle%wres - particle%wdrop)/dzi)**2. )
-  !     !tau_p = 8.* a1*rowt / (3. * C_d*i1d(particle%z,dn0))/abs((particle%vres - particle%vdrop)/dyi)
-  !     !print*,'tau_KC:',tau_p
-  !     if (tau_p.lt.dt) tau_p =dt                     ! mine
-  !     vdrop = (particle%vdrop / dyi) + (1/tau_p * (particle%vres - particle%vdrop)/dyi) *dt
-  !   end if
-
-  !   !print*,'vdrop alt:',particle%vdrop/dyi
-  !   !print*,'vres      ',particle%vres/dyi
-  !   !print*,'vdrop neu:',vdrop
- 
-  ! end function vdrop
-
-  ! !
-  ! !--------------------------------------------------------------------------
-  ! ! subroutine wdrop
-  ! !> Calculation drop (w) velocity based on momentum equation
-  ! !--------------------------------------------------------------------------
-  ! !
-  ! function wdrop(particle, C_d,vt)
-  !   use grid, only : dxi, dyi, dzi_t, dt, dn0
-  !   use defs, only : rowt, pi, g
-  !   use mcrp, only : nu_l
-  !   implicit none
-
-  !   real :: wdrop, dzi, a1, tau_p, C_d, vt
-  !   TYPE (particle_record), POINTER:: particle
-  !   logical :: stokes=.false.
-
-  !   dzi        = dzi_t(floor(particle%z))
-  !   a1 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! drop radius
-
-  !   if (stokes) then
-  !     tau_p = 2.*rowt*a1**2./(9.*nu_l*i1d(particle%z,dn0)) ! Stokes limit
-  !     if (tau_p.lt.dt) then
-  !       !print*,'tau_st too small'
-  !       wdrop = (particle%wres / dzi) - vt
-  !     else
-  !       !print*,'use tau_st:',tau_p
-  !       wdrop = (particle%wdrop / dzi) + (1/tau_p * ((particle%wres - particle%wdrop)/dzi) &
-  !               - g * (1-i1d(particle%z,dn0)/rowt)) *dt
-  !     end if
-  !   else
-  !     tau_p = 8.* a1*rowt / (3. * C_d*i1d(particle%z,dn0)) / sqrt( ((particle%ures - particle%udrop)/dxi)**2. & 
-  !             + ((particle%vres - particle%vdrop)/dyi)**2. + ((particle%wres - particle%wdrop)/dzi)**2. )
-  !     !tau_p = 8.* a1 *rowt / (3. * C_d*i1d(particle%z,dn0))/ abs((particle%wres - particle%wdrop)/dzi)
-  !     !print*,'tau_KC:',tau_p
-  !     if (tau_p.lt.dt) then
-  !       !print*,'tau_st too small'
-  !       wdrop = (particle%wres / dzi) - vt
-  !     else
-  !       !print*,'use tau_st:',tau_p
-  !       wdrop = (particle%wdrop / dzi) + (1/tau_p * ((particle%wres - particle%wdrop)/dzi) &
-  !               - g * (1-i1d(particle%z,dn0)/rowt)) *dt
-  !     end if
-  !   end if
-
-  !   !print*,'wdrop alt:',particle%wdrop/ dzi
-  !   !print*,'wres      ',particle%wres/ dzi
-  !   !print*,'wdrop neu:',wdrop
-
-  ! end function wdrop
 
   !
   !--------------------------------------------------------------------------
