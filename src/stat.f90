@@ -21,7 +21,7 @@ module stat
 
   use mpi_interface, only : myid
   use ncio, only : open_nc, define_nc
-  use grid, only : level, isfctyp, svctr, ssclr, nv1, nv2
+  use grid, only : level, isfctyp, svctr, ssclr, nv1, nv2, nsmp
   use util, only : get_avg, get_cor, get_avg3, get_cor3, get_var3, get_csum
 !irina
 !  use step, only: case_name
@@ -32,7 +32,7 @@ module stat
   ! axel, me too!
   integer, parameter :: nvar1 = 68, nvar2 = 118 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2
-  real, save         :: fsttm, lsttm, nsmp = 0
+  real, save         :: fsttm, lsttm
 
   logical, parameter :: debug = .false.
   logical            :: sflg = .false.
