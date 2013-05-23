@@ -17,6 +17,9 @@
 ! Copyright 1999-2007, Bjorn B. Stevens, Dep't Atmos and Ocean Sci, UCLA
 !----------------------------------------------------------------------------
 !
+! \todo CMake as in microhh
+! \todo Separate Surface Namelist?
+! \todo Separate Soil from 3D fields?
 program ucla_les
 
   implicit none
