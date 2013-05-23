@@ -669,7 +669,7 @@ contains
     do j=3,n3-2
        do i=3,n2-2
           do k=1,n1
-            svar(k,i,j)  = 1.+(rt(k,i,j) - rs(k,i,j))/rs(k,i,j)
+            svar(k,i,j)  = 1.+(rt(k,i,j) - rl(k,i,j) - rs(k,i,j))/rs(k,i,j)
           end do
        end do
     end do
