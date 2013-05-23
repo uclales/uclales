@@ -63,9 +63,9 @@ module modparticles
   type :: particle_record
     real             :: unique, tstart
     integer          :: partstep, nd
-    real             :: x, xstart, ures, ures_prev, usgs, usgs_prev
-    real             :: y, ystart, vres, vres_prev, vsgs, vsgs_prev
-    real             :: z, zstart, wres, wres_prev, wsgs, wsgs_prev, zprev
+    real             :: x, xstart, ures, ures_prev, usgs, usgs_prev, udrop, udrop_prev
+    real             :: y, ystart, vres, vres_prev, vsgs, vsgs_prev, vdrop, vdrop_prev
+    real             :: z, zstart, wres, wres_prev, wsgs, wsgs_prev, wdrop, wdrop_prev, zprev
     real             :: sigma2_sgs, mass
     type (particle_record), pointer :: next,prev
   end type
@@ -76,6 +76,7 @@ module modparticles
   integer            :: ipunique, ipx, ipy, ipz, ipzprev, ipxstart, ipystart, ipzstart, iptsart
   integer            :: ipures, ipvres, ipwres, ipures_prev, ipvres_prev, ipwres_prev, ipartstep, ipnd, nrpartvar
   integer            :: ipusgs, ipvsgs, ipwsgs, ipusgs_prev, ipvsgs_prev, ipwsgs_prev, ipsigma2_sgs, ipm
+  integer            :: ipudrop, ipudrop_prev, ipvdrop, ipvdrop_prev, ipwdrop, ipwdrop_prev
 
   ! Statistics and particle dump
   integer            :: ncpartid, ncpartrec             ! Particle dump
@@ -138,8 +139,11 @@ contains
     real, intent(in)               :: time          !< time of simulation, determines the timing of particle dumps to NetCDF
     real, intent(in)               :: timmax        !< end of simulation, required to write particle dump at last timestep
     type (particle_record), pointer:: particle
-    real :: u1,u2
-
+    !real :: u1,u2
+    real :: C_d,vt
+    
+    C_d = 1
+    vt=1
 
     if (lpartsgs .and. nstep == 1) then
       call calc_sgstke                ! Estimates SGS-TKE
@@ -151,7 +155,7 @@ contains
     end if
 
     ! Randomize particles lowest grid level
-    if (lrandsurf .and. nstep==1 .and. time > tnextrand) then
+    if (lrandsurf .and. .not. lpartdrop .and. nstep==1 .and. time > tnextrand) then
       call globalrandomize()
       tnextrand = tnextrand + randint
     end if
@@ -163,7 +167,8 @@ contains
       do while( associated(particle) )
         if ( (time - particle%tstart >= 0) .and. (particle%x.ne.-32678.)) then
           particle%partstep = particle%partstep + 1
-          ! Interpolation of the velocity field
+          
+	  ! Interpolation of the velocity field
           particle%ures = ui3d(particle%x,particle%y,particle%z) * dxi
           particle%vres = vi3d(particle%x,particle%y,particle%z) * dyi
           particle%wres = wi3d(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
@@ -174,12 +179,23 @@ contains
           !u2 = wi3d(particle%x,particle%y,particle%z)
           !print*,particle%z,u1,u2
 
-          if (lpartsgs .and. nstep == 1) then
-            call prep_sgs(particle)
+          if (lpartsgs .and. nstep == 1) then   ! subgridscale velocity
+            call prep_sgs(particle)  
             particle%usgs   = usgs(particle) * dxi
             particle%vsgs   = vsgs(particle) * dyi
             particle%wsgs   = wsgs(particle) * dzi_t(floor(particle%z))
           end if
+	  
+	  if (lpartdrop.and.lpartmass) then     ! drop velocity resulting from momentum equation
+            !print*,'myid: ',myid
+	    !call drag_coeff(particle,C_d,vt)    ! rather call in drop_vel
+            call drop_vel(particle)           
+            !particle%udrop  =  udrop(particle, C_d) * dxi
+	    !particle%vdrop  =  vdrop(particle, C_d) * dyi
+	    !particle%wdrop  =  wdrop(particle, C_d,vt) * dzi_t(floor(particle%z))
+	    !if(myid==0) 
+	  end if
+	  
         end if
       particle => particle%next
       end do
@@ -188,7 +204,11 @@ contains
       particle => head
       do while( associated(particle))
         if ( time - particle%tstart >= 0 .and. particle%x.ne.-32678.) then
-          call rk3(particle)
+	  if (lpartdrop.and.lpartmass) then
+	    call rk3_drop(particle)
+	  else
+	    call rk3(particle)
+	  end if
           call checkbound(particle)
         end if
         particle => particle%next
@@ -640,6 +660,280 @@ contains
     wsgs = (particle%wsgs / dzi) + (t1 + t2 + t3)
 
   end function wsgs
+
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine drag_coeff
+  !> Calculation of drag coefficient for momentum equation
+  !> from Khvorostyanov and Curry 2002, 2005
+  !> and Seifert et al. 2013
+  !--------------------------------------------------------------------------
+  !
+  subroutine drag_coeff(particle,C_d,vt)
+    use grid, only : dxi, dt, dn0
+    use defs, only : rowt, pi, g
+    use mcrp, only : nu_l
+    implicit none
+
+    TYPE (particle_record), POINTER:: particle
+    real, intent(out) :: C_d, vt
+    real :: D0, Dmax, dlam, xi_drop, alfa, xexp, Xbest, c1, c2, &
+            bracket, b1, a1, zk, bcorr, acorr, re, psi
+    real, parameter :: &
+         wr     = 33.,      &   ! S13
+         lambda = 4.7e-3,   &   ! from KC2002, Eq. 3.4
+	 d_o    = 9.06,     &
+	 c_o    = 0.292,    &
+	 Xturb  = 6.7e6,    &
+	 bet    = 3.0,      &   ! exponent  in mass-size relation
+	 gam    = pi/4.,    &   ! prefactor in area-size relation
+	 sig    = 2.0,      &   ! exponent  in area-size relation
+	 kturb  = 2.0,      &
+	 cturb  = 1.6
+    logical, parameter :: &
+         lturbulence   = .true.,   &  ! turbulence correction
+	 lnonspherical = .true.       ! correction for non-spherical drops
+
+
+    D0  = 2. *(3./(4.*pi) * particle%mass /rowt)**(1./3.)   ! equivalent diameter
+    Dmax = D0*exp(wr*D0)                                   ! max diameter S13
+
+    dlam = Dmax/lambda
+    xi_drop = exp(-dlam) + (1.0 - exp(-dlam)) * (1.0/(1.0+dlam))    ! aspect ratio KC2002, Eq. 3.4
+    
+    if (lnonspherical) then           ! alfa: prefactor in mass-size relation
+      alfa = pi/6.*rowt * xi_drop
+    else
+      alfa = pi/6.*rowt
+    end if
+    
+    ! Best number, Eq. (8) of MH05
+    xexp  = bet + 2.0 - sig
+    Xbest = 2.0 * alfa * g / ( gam * i1d(particle%z,dn0) * nu_l**2 ) * Dmax**xexp
+
+    ! two more coefficients
+    c1 = 4.0 / ( d_o**2 * sqrt(c_o) )
+    c2 = d_o**2 / 4.0
+
+    ! Eq (2.8) of KC05
+    bracket = sqrt(1.0 + c1*sqrt(Xbest)) - 1.0
+    b1 = c1*sqrt(Xbest) / ( 2.0*bracket * sqrt( 1.0 + c1*sqrt(Xbest)) )
+   
+    ! Eq (2.7) of KC05    
+    a1 = c2 * bracket**2 / Xbest**b1
+
+    ! Turbulence correction, Eqs. (3.4)-(3.7)
+    if (lturbulence) then
+      zk = (Xbest/Xturb)**kturb       
+      bcorr = kturb*(cturb-1.0)*zk / ( 2.*(1.+zk)*(1.+cturb*zk) )      
+      acorr = sqrt((1.+zk)/(1+cturb*zk)) / Xbest**bcorr       
+      a1    = a1 * acorr
+      b1    = b1 + bcorr
+    end if
+    
+    ! This is Eq. (2.11)-(2.14) of KC05: terminal fall velocity
+    vt = a1 * nu_l**(1.0-2.0*b1)                            &
+       &  * ( ( 2.0 * alfa * g ) / ( i1d(particle%z,dn0) * gam ) )**b1   &
+       &  * Dmax**( b1*xexp - 1.0 )
+
+    re = vt*Dmax/nu_l
+    C_d = c_o*(1.0 + d_o/sqrt(re))**2          ! Eq (2.2)
+    
+    ! tubulence correction
+    if(lturbulence) then
+      psi   = (1.0 + zk)/(1.0 + cturb*zk)               ! Eq (3.2)-
+      C_d = C_d / psi                     ! Eq (3.1)
+    end if
+  
+    !print*,'D0 ',D0
+    !print*,'vt ',vt
+    !print*,'Re ',re 
+    !print*,'Cd ',C_d 
+  end subroutine drag_coeff
+
+!-----------------------------------------------------
+! subroutine drop_vel
+! > Calculates the drop velocity according to momentum equation
+! > Euler implicit (iterative)
+! > use timestep <= 1 s
+! > not working with SGS yet
+!---------------------------------------------------
+  subroutine drop_vel(particle)
+    use grid, only : dxi, dyi, dzi_t, dt, dn0
+    use defs, only : rowt, pi, g
+    use mcrp, only : nu_l
+    implicit none
+
+    real :: C_d, vt, a1, dzi, deltav, tau
+    TYPE (particle_record), POINTER:: particle
+    logical :: stokes=.false.
+    integer :: j
+
+    call drag_coeff(particle, C_d, vt)
+    a1 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! drop radius
+    dzi = dzi_t(floor(particle%z))
+ 
+    !print*,'u old',particle%udrop/dxi
+    !print*,'v old',particle%vdrop/dyi
+    !print*,'w old',particle%wdrop/dzi
+ 
+    if (stokes) then
+      tau = 2.*rowt*a1**2./(9.*nu_l*i1d(particle%z,dn0)) ! Stokes limit
+      particle%udrop = (1+dt/tau)**(-1.) * (particle%udrop_prev/dxi + dt/tau * particle%ures/dxi) *dxi
+      particle%vdrop = (1+dt/tau)**(-1.) * (particle%vdrop_prev/dyi + dt/tau * particle%vres/dyi) *dyi 
+      particle%wdrop = (1+dt/tau)**(-1.) * (particle%wdrop_prev/dzi + dt/tau * particle%wres/dzi - &
+                       (1-i1d(particle%z,dn0)/rowt)*g*dt) *dzi
+    else
+      do j=1,100
+        deltav = sqrt( ((particle%ures-particle%udrop)/dxi)**2.  &
+                     + ((particle%vres-particle%vdrop)/dyi)**2. &
+                     + ((particle%wres-particle%wdrop)/dzi)**2. )
+        tau = 8.* a1*rowt / (3. * C_d*i1d(particle%z,dn0)) / deltav
+
+        particle%udrop = (1+dt/tau)**(-1.) * (particle%udrop_prev/dxi + dt/tau * particle%ures/dxi) *dxi
+        particle%vdrop = (1+dt/tau)**(-1.) * (particle%vdrop_prev/dyi + dt/tau * particle%vres/dyi) *dyi
+        particle%wdrop = (1+dt/tau)**(-1.) * (particle%wdrop_prev/dzi + dt/tau * particle%wres/dzi - &
+               (1-i1d(particle%z,dn0)/rowt)*g*dt) *dzi
+      end do
+    end if
+    !print*,'tau', tau
+    !print*,'ures',particle%ures/dxi
+    !print*,'vres',particle%vres/dyi
+    !print*,'wres',particle%wres/dzi
+    !print*,'u  ',particle%udrop/dxi
+    !print*,'v  ',particle%vdrop/dyi
+    !print*,'w  ',particle%wdrop/dzi
+  end subroutine drop_vel
+
+  ! !
+  ! !--------------------------------------------------------------------------
+  ! ! subroutine udrop
+  ! !> Calculation drop (u) velocity based on momentum equation
+  ! !--------------------------------------------------------------------------
+  ! !
+  ! function udrop(particle, C_d)
+  !   use grid, only : dxi,dyi, dzi_t, dt, dn0
+  !   use defs, only : rowt, pi
+  !   use mcrp, only : nu_l
+  !   implicit none
+
+  !   real :: udrop, a1, tau_p, C_d, dzi
+  !   TYPE (particle_record), POINTER:: particle
+  !   logical :: stokes=.false.
+    
+  !   dzi = dzi_t(floor(particle%z))
+  !   a1 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! drop radius
+
+  !   if (stokes) then
+  !     tau_p = 2.*rowt*a1**2./(9.*nu_l*i1d(particle%z,dn0)) ! Stokes limit
+  !     !print*,'tau_st:',tau_p
+  !     if (tau_p.lt.dt) tau_p = dt
+  !     !print*,'tau_st:',tau_p 
+  !     udrop = (particle%udrop / dxi) + (1/tau_p * (particle%ures - particle%udrop)/dxi) *dt
+  !   else
+  !     tau_p = 8.* a1*rowt / (3. * C_d*i1d(particle%z,dn0)) / sqrt( ((particle%ures - particle%udrop)/dxi)**2. & 
+  !            + ((particle%vres - particle%vdrop)/dyi)**2. + ((particle%wres - particle%wdrop)/dzi)**2. )
+  !     !print*,'tau_KC',tau_p,'dt',dt
+  !     if (tau_p.lt.dt) tau_p = dt                   ! mine
+  !     !print*,'tau_KC',tau_p
+  !     udrop = (particle%udrop / dxi) + (1/tau_p * (particle%ures - particle%udrop)/dxi) *dt
+  !   end if
+
+  !   !print*,'udrop alt:',particle%udrop/dxi
+  !   !print*,'ures      ',particle%ures/dxi
+  !   !print*,'udrop neu:',udrop
+
+  ! end function udrop
+
+  ! !
+  ! !--------------------------------------------------------------------------
+  ! ! subroutine vdrop
+  ! !> Calculation drop (v) velocity based on momentum equation
+  ! !--------------------------------------------------------------------------
+  ! !
+  ! function vdrop(particle, C_d)
+  !   use grid, only : dxi, dyi, dzi_t, dt, dn0
+  !   use defs, only : rowt, pi
+  !   use mcrp, only : nu_l
+  !   implicit none
+
+  !   real :: vdrop, a1, tau_p, C_d, dzi
+  !   TYPE (particle_record), POINTER:: particle
+  !   logical :: stokes=.false.
+
+  !   dzi = dzi_t(floor(particle%z))
+  !   a1 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! drop radius
+
+  !   if (stokes) then
+  !     tau_p = 2.*rowt*a1**2./(9.*nu_l*i1d(particle%z,dn0)) ! Stokes limit
+  !    ! print*,'tau_st:',tau_p
+  !     if (tau_p.lt.dt) tau_p = dt
+  !     !print*,'tau_st:',tau_p
+  !     vdrop = (particle%vdrop / dyi) + (1/tau_p * (particle%vres - particle%vdrop)/dyi) *dt
+  !   else
+  !     tau_p = 8.* a1*rowt / (3. * C_d*i1d(particle%z,dn0)) / sqrt( ((particle%ures - particle%udrop)/dxi)**2. & 
+  !             + ((particle%vres - particle%vdrop)/dyi)**2. + ((particle%wres - particle%wdrop)/dzi)**2. )
+  !     !tau_p = 8.* a1*rowt / (3. * C_d*i1d(particle%z,dn0))/abs((particle%vres - particle%vdrop)/dyi)
+  !     !print*,'tau_KC:',tau_p
+  !     if (tau_p.lt.dt) tau_p =dt                     ! mine
+  !     vdrop = (particle%vdrop / dyi) + (1/tau_p * (particle%vres - particle%vdrop)/dyi) *dt
+  !   end if
+
+  !   !print*,'vdrop alt:',particle%vdrop/dyi
+  !   !print*,'vres      ',particle%vres/dyi
+  !   !print*,'vdrop neu:',vdrop
+ 
+  ! end function vdrop
+
+  ! !
+  ! !--------------------------------------------------------------------------
+  ! ! subroutine wdrop
+  ! !> Calculation drop (w) velocity based on momentum equation
+  ! !--------------------------------------------------------------------------
+  ! !
+  ! function wdrop(particle, C_d,vt)
+  !   use grid, only : dxi, dyi, dzi_t, dt, dn0
+  !   use defs, only : rowt, pi, g
+  !   use mcrp, only : nu_l
+  !   implicit none
+
+  !   real :: wdrop, dzi, a1, tau_p, C_d, vt
+  !   TYPE (particle_record), POINTER:: particle
+  !   logical :: stokes=.false.
+
+  !   dzi        = dzi_t(floor(particle%z))
+  !   a1 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! drop radius
+
+  !   if (stokes) then
+  !     tau_p = 2.*rowt*a1**2./(9.*nu_l*i1d(particle%z,dn0)) ! Stokes limit
+  !     if (tau_p.lt.dt) then
+  !       !print*,'tau_st too small'
+  !       wdrop = (particle%wres / dzi) - vt
+  !     else
+  !       !print*,'use tau_st:',tau_p
+  !       wdrop = (particle%wdrop / dzi) + (1/tau_p * ((particle%wres - particle%wdrop)/dzi) &
+  !               - g * (1-i1d(particle%z,dn0)/rowt)) *dt
+  !     end if
+  !   else
+  !     tau_p = 8.* a1*rowt / (3. * C_d*i1d(particle%z,dn0)) / sqrt( ((particle%ures - particle%udrop)/dxi)**2. & 
+  !             + ((particle%vres - particle%vdrop)/dyi)**2. + ((particle%wres - particle%wdrop)/dzi)**2. )
+  !     !tau_p = 8.* a1 *rowt / (3. * C_d*i1d(particle%z,dn0))/ abs((particle%wres - particle%wdrop)/dzi)
+  !     !print*,'tau_KC:',tau_p
+  !     if (tau_p.lt.dt) then
+  !       !print*,'tau_st too small'
+  !       wdrop = (particle%wres / dzi) - vt
+  !     else
+  !       !print*,'use tau_st:',tau_p
+  !       wdrop = (particle%wdrop / dzi) + (1/tau_p * ((particle%wres - particle%wdrop)/dzi) &
+  !               - g * (1-i1d(particle%z,dn0)/rowt)) *dt
+  !     end if
+  !   end if
+
+  !   !print*,'wdrop alt:',particle%wdrop/ dzi
+  !   !print*,'wres      ',particle%wres/ dzi
+  !   !print*,'wdrop neu:',wdrop
+
+  ! end function wdrop
 
   !
   !--------------------------------------------------------------------------
@@ -1118,6 +1412,46 @@ contains
 
   !
   !--------------------------------------------------------------------------
+  ! Subroutine rk3_drop
+  !> Third-order Runge-Kutta scheme for spatial integration of the drop.
+  !--------------------------------------------------------------------------
+  !
+  subroutine rk3_drop(particle)
+    use grid, only : rkalpha, rkbeta, nstep, dt, dxi, dyi, dzi_t
+    implicit none
+    TYPE (particle_record), POINTER:: particle
+
+    particle%zprev = particle%z
+
+    particle%x     = particle%x + rkalpha(nstep) * (particle%udrop) * dt + rkbeta(nstep) * (particle%udrop_prev) * dt
+    particle%y     = particle%y + rkalpha(nstep) * (particle%vdrop) * dt + rkbeta(nstep) * (particle%vdrop_prev) * dt
+    particle%z     = particle%z + rkalpha(nstep) * (particle%wdrop) * dt + rkbeta(nstep) * (particle%wdrop_prev) * dt
+
+    particle%ures_prev = particle%ures
+    particle%vres_prev = particle%vres
+    particle%wres_prev = particle%wres
+
+    particle%usgs_prev = particle%usgs
+    particle%vsgs_prev = particle%vsgs
+    particle%wsgs_prev = particle%wsgs
+
+    particle%udrop_prev = particle%udrop
+    particle%vdrop_prev = particle%vdrop
+    particle%wdrop_prev = particle%wdrop
+
+   if ( nstep==3 ) then
+      particle%ures_prev   = 0.
+      particle%vres_prev   = 0.
+      particle%wres_prev   = 0.
+      particle%usgs_prev   = 0.
+      particle%vsgs_prev   = 0.
+      particle%wsgs_prev   = 0.
+    end if
+
+  end subroutine rk3_drop
+
+  !
+  !--------------------------------------------------------------------------
   ! Subroutine partcomm
   !> Handles the cyclic boundary conditions (through MPI) and sends
   !> particles from processor to processor
@@ -1383,6 +1717,12 @@ contains
       buffer(n+ipartstep)       = particle%partstep
       buffer(n+ipnd)            = particle%nd
       buffer(n+ipm)             = particle%mass
+      buffer(n+ipudrop)         = particle%udrop
+      buffer(n+ipvdrop)         = particle%vdrop
+      buffer(n+ipwdrop)         = particle%wdrop
+      buffer(n+ipudrop_prev)    = particle%udrop_prev
+      buffer(n+ipvdrop_prev)    = particle%vdrop_prev
+      buffer(n+ipwdrop_prev)    = particle%wdrop_prev
     else
       particle%unique           = buffer(n+ipunique)
       particle%x                = buffer(n+ipx)
@@ -1409,6 +1749,12 @@ contains
       particle%partstep         = int(buffer(n+ipartstep))
       particle%nd               = int(buffer(n+ipnd))
       particle%mass             = buffer(n+ipm)
+      particle%udrop            = buffer(n+ipudrop)
+      particle%vdrop            = buffer(n+ipvdrop)
+      particle%wdrop            = buffer(n+ipwdrop)
+      particle%udrop_prev       = buffer(n+ipudrop_prev)
+      particle%vdrop_prev       = buffer(n+ipvdrop_prev)
+      particle%wdrop_prev       = buffer(n+ipwdrop_prev)
     end if
 
   end subroutine partbuffer
@@ -2100,7 +2446,8 @@ contains
 
   !
   !--------------------------------------------------------------------------
-  ! subroutine deactivate_drops : deactivates drops when they leave the cloud
+  ! subroutine deactivate_drops : deactivates drops when they reach the ground 
+  !                               or shrink below a threshold
   !   - deactivated particles are send back to their home processor and 
   !     their properties are set to NaNs, so they can be activated again
   !     using activate_drops
@@ -2118,18 +2465,16 @@ contains
     integer           :: nprocs, ndel, i
     real, allocatable, dimension(:)    :: buffrecv,ndel_n
     integer, allocatable, dimension(:) :: recvcount,displacements
+    real, parameter :: zmax = 1.
 
     nprocs = nxprocs * nyprocs
     
     ndel = 0    
     particle => head
     do while(associated(particle))
-      if(particle%x.ne.-32678..and.particle%mass.lt.(rain%x_min-1.e-20)) then
-      !if(particle%x.ne.-32678.) then
-        !call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
-        !if(rl==0) 
-          ndel = ndel + 2
-	!end if
+      if(particle%x.ne.-32678..and. &
+      (particle%mass.lt.(rain%x_min-1.e-20).or.particle%z<=(1+zmax))) then
+        ndel = ndel + 2
       end if
       particle => particle%next
     end do 
@@ -2138,15 +2483,12 @@ contains
     ndel = 0
     particle => head
     do while(associated(particle))
-      if(particle%x.ne.-32678..and.particle%mass.lt.(rain%x_min-1.e-20)) then
-      !if(particle%x.ne.-32678.) then
-        !call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
-        !if(rl==0) then
-	  ndel_n(ndel+1) = particle%unique
-	  ndel_n(ndel+2) = particle%nd
-	  ndel = ndel + 2
-	  call delete_particle(particle)
-	!end if
+      if(particle%x.ne.-32678..and. &
+      (particle%mass.lt.(rain%x_min-1.e-20).or.particle%z<=(1+zmax))) then
+        ndel_n(ndel+1) = particle%unique
+	ndel_n(ndel+2) = particle%nd
+	ndel = ndel + 2
+	call delete_particle(particle)
       end if
       particle => particle%next
     end do 
@@ -2199,6 +2541,12 @@ contains
 	particle%mass           = -32678.
         particle%partstep       = -32678.
         particle%nd             = buffrecv(i+1)
+        particle%udrop          = -32678.
+        particle%vdrop          = -32678.
+        particle%wdrop          = -32678.
+        particle%udrop_prev     = -32678.
+        particle%vdrop_prev     = -32678.
+        particle%wdrop_prev     = -32678.
 	myac = myac - 1
       end if
       i = i + 2
@@ -2218,7 +2566,7 @@ contains
   subroutine activate_drops(time)
     use mpi_interface, only : myid, nxg, nyg, wrxid, wryid, nyprocs, nxprocs, mpi_comm_world, mpi_integer, mpi_sum, ierror
     use mcrp,          only : a_npauto, rain
-    use grid,          only : nxp, nyp, nzp, deltax, deltay, deltaz
+    use grid,          only : nxp, nyp, nzp, deltax, deltay, deltaz, dxi,dyi,dzi_t
     implicit none
 
     real, intent(in)  :: time
@@ -2227,6 +2575,7 @@ contains
     real               :: zmax = 1.                  ! Max height in grid coordinates
     real               :: nppd = 1./(1.e7)               ! number of particles per drops
     real               :: xsizelocal, ysizelocal
+    real               :: C_d=1.0, vt=1.0
     integer            :: nprocs,i,j,k,newp,np_old,cntp
     integer(kind=long) :: npac
 
@@ -2263,9 +2612,9 @@ contains
                   particle%ystart         = particle%y
                   particle%zstart         = particle%z
                   particle%tstart         = time
-                  particle%ures           = 0.
-                  particle%vres           = 0.
-                  particle%wres           = 0.
+                  particle%ures           = ui3d(particle%x,particle%y,particle%z) * dxi
+                  particle%vres           = vi3d(particle%x,particle%y,particle%z) * dyi
+                  particle%wres           = wi3d(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
                   particle%ures_prev      = 0.
                   particle%vres_prev      = 0.
                   particle%wres_prev      = 0.
@@ -2279,6 +2628,13 @@ contains
 		  particle%mass           = rain%x_min
                   particle%partstep       = 0
                   particle%nd             = particle%nd + 1
+                  call drag_coeff(particle,C_d,vt)
+                  particle%udrop          = 0. ! particle%ures
+                  particle%vdrop          = 0. ! particle%vres
+                  particle%wdrop          = 0. ! particle%wres - vt * dzi_t(floor(particle%z))
+                  particle%udrop_prev     = 0.
+                  particle%vdrop_prev     = 0.
+                  particle%wdrop_prev     = 0.
 		  newp = newp + 1
 	          !write(*,*) 're-activate: unique',particle%unique,'nd',particle%nd
 		end if
@@ -2339,13 +2695,13 @@ contains
     if (a1.le.50.e-6) then                          ! collection kernel (Long, 1974)
       K = 1.1e16 * (particle%mass/rowt)**2.
     else 
-      K = 6.33e3  * (particle%mass/rowt)
+      K = 6.33e3 * (particle%mass/rowt)
     end if
     
     particle%mass = particle%mass + rl * i1d(particle%z,dn0) * K * dt
     
     
-    ! drop evaporation (change drop deactivation accordingly!)
+    ! drop evaporation
     
     a1 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! drop radius    
     es = esl(tk)
@@ -2460,7 +2816,7 @@ contains
     logical  :: exans
     real     :: tstart, xstart, ystart, zstart, ysizelocal, xsizelocal, firststartl, firststart
     real     :: pu,pts,px,py,pz,pzp,pxs,pys,pzs,pur,pvr,pwr,purp,pvrp,pwrp
-    real     :: pus,pvs,pws,pusp,pvsp,pwsp,psg2,pm
+    real     :: pus,pvs,pws,pusp,pvsp,pwsp,psg2,pm,pud,pvd,pwd,pudp,pvdp,pwdp
     integer  :: pstp,pnd,idot
     type (particle_record), pointer:: particle
     character (len=80) :: hname,prefix,suffix
@@ -2498,7 +2854,7 @@ contains
         read (666,iostat=io) np,tnextdump
       end if
       do
-        read (666,iostat=io) pu,pts,pstp,pnd,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs,pzp,pwr,pwrp,pus,pvs,pws,pusp,pvsp,pwsp,psg2,pm
+        read (666,iostat=io) pu,pts,pstp,pnd,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs,pzp,pwr,pwrp,pus,pvs,pws,pusp,pvsp,pwsp,psg2,pm,pud,pvd,pwd,pudp,pvdp,pwdp
         if(io .ne. 0) exit
         call add_particle(particle)
         particle%unique         = pu
@@ -2526,6 +2882,12 @@ contains
 	particle%mass           = pm
         particle%partstep       = pstp
 	particle%nd             = pnd
+        particle%udrop          = pud
+        particle%vdrop          = pvd
+        particle%wdrop          = pwd
+        particle%udrop_prev     = pudp
+        particle%vdrop_prev     = pvdp
+        particle%wdrop_prev     = pwdp
         if(pts < firststartl) firststartl = pts
       end do
       close(666)
@@ -2576,6 +2938,12 @@ contains
 	particle%mass           = -32678.
         particle%partstep       = -32678.
         particle%nd             = 0
+        particle%udrop          = -32678.
+        particle%vdrop          = -32678.
+        particle%wdrop          = -32678.
+        particle%udrop_prev     = -32678.
+        particle%vdrop_prev     = -32678.
+        particle%wdrop_prev     = -32678.
       end do
       ! Set first dump times
       tnextdump = frqpartdump
@@ -2638,6 +3006,12 @@ contains
 	      particle%mass           = 0.
               particle%partstep       = 0
 	      particle%nd             = 1
+              particle%udrop          = 0.
+              particle%vdrop          = 0.
+              particle%wdrop          = 0.
+              particle%udrop_prev     = 0.
+              particle%vdrop_prev     = 0.
+              particle%wdrop_prev     = 0.
               if(tstart < firststartl) firststartl = tstart
             end if
           end if
@@ -2680,8 +3054,14 @@ contains
     ipartstep       = 23
     ipnd            = 24
     ipm             = 25
-    nrpartvar       = ipm
-
+    ipudrop         = 26
+    ipvdrop         = 27
+    ipwdrop         = 28
+    ipudrop_prev    = 29
+    ipvdrop_prev    = 30
+    ipwdrop_prev    = 31
+    nrpartvar       = ipwdrop_prev
+    
     ! 1D arrays for online statistics
     if(lpartstat) then
       allocate(npartprof(nzp),npartprofl(nzp),     &
@@ -2816,7 +3196,8 @@ contains
         particle%z, particle%zstart, particle%zprev, particle%wres, particle%wres_prev, &
         particle%usgs,      particle%vsgs,      particle%wsgs, &
         particle%usgs_prev, particle%vsgs_prev, particle%wsgs_prev, &
-        particle%sigma2_sgs, particle%mass
+        particle%sigma2_sgs, particle%mass, particle%ures, particle%ures_prev, &
+	particle%vres, particle%vres_prev, particle%wres, particle%wres_prev
       particle => particle%next
     end do
     close(666)
