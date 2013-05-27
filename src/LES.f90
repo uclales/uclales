@@ -20,6 +20,8 @@
 ! \todo CMake as in microhh
 ! \todo Separate Surface Namelist?
 ! \todo Separate Soil from 3D fields?
+! \todo Top level radiation hopping
+! \todo reduce nr of warnings when compiling with gfortran/NAG
 program ucla_les
 
   implicit none
