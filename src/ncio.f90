@@ -281,9 +281,10 @@ contains
     if (level  >= 2) nvar0 = nvar0+1
     if (level  >= 3) nvar0 = nvar0+2
     if (level  >= 4) nvar0 = nvar0+4
-    if (level  >= 5) nvar0 = nvar0+11
+    if (level  >= 5) nvar0 = nvar0+4
     if (iradtyp > 1) nvar0 = nvar0+3
     if (isfctyp == 5) nvar0 = nvar0+9
+    if (lmptend)      nvar0 = nvar0+7
 
     allocate (sanal(nvar0))
     sanal(1:nbase) = sbase(1:nbase)
@@ -359,7 +360,7 @@ contains
        nvar0 = nvar0+1
        sanal(nvar0)=sbase(39)
     end if
-    if (level >= 5) then
+    if (lmptend) then
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(40)
        nvar0 = nvar0+1
@@ -558,7 +559,7 @@ contains
     end if 
 
     
-    if (level >= 5)  then
+    if (lmptend)  then
          nn = nn+1
          iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
          iret = nf90_put_var(ncid0, VarID, mp_tlt(:,i1:i2,j1:j2), start=ibeg, &

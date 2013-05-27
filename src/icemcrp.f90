@@ -40,7 +40,7 @@ module mcrp
        a_rhailp, a_rhailt,  & ! hail mass
        a_nhailp, a_nhailt,  & ! hail number
        prc_c, prc_r, prc_i, prc_s, prc_g, prc_h, & 
-       lwaterbudget, prc_acc, rev_acc, a_rct, cnd_acc, cev_acc, a_cld,prc_lev
+       lwaterbudget, prc_acc, rev_acc, a_rct, cnd_acc, cev_acc, a_cld,prc_lev, lmptend
 
   USE parallele_umgebung, ONLY: isIO,double_global_maxval,global_maxval,global_minval,global_maxval_stdout,global_sumval_stdout
   USE modcross, ONLY: calcintpath
@@ -3314,10 +3314,12 @@ contains
                &      + convliq * (q_liq_new - q_liq_old) / dt
 
           ! LINDA, b, write out tendencies
-          if (nstep==1) mp_tlt(kk,jj,ii)=0.0
-          mp_tlt(kk,jj,ii) = mp_tlt(kk,jj,ii)                          & 
-                             - convice * (q_vap_new - q_vap_old) / dt  &
-                             + convliq * (q_liq_new - q_liq_old) / dt
+          if (lmptend) then
+            if (nstep==1) mp_tlt(kk,jj,ii)=0.0
+            mp_tlt(kk,jj,ii) = mp_tlt(kk,jj,ii)                          & 
+                              - convice * (q_vap_new - q_vap_old) / dt  &
+                              + convliq * (q_liq_new - q_liq_old) / dt
+          end if
           ! LINDA, e
           ! ... mass densities to mixing ratios with actual density:
           qv(kk,jj,ii) = q_v
@@ -3527,36 +3529,38 @@ contains
              qngtend(k,j,i) = qngtend(k,j,i) + (qng(k,j,i) - qngin(k,j,i))/dt
              qnhtend(k,j,i) = qnhtend(k,j,i) + (qnh(k,j,i) - qnhin(k,j,i))/dt
 ! LINDA, b, write out tendenties
-             if (nstep==1) then
-                mp_qt(k,j,i) = 0.0
-                mp_qr(k,j,i) = 0.0
-                mp_qi(k,j,i) = 0.0
-                mp_qs(k,j,i) = 0.0
-                mp_qg(k,j,i) = 0.0
-                mp_qh(k,j,i) = 0.0
+             if (lmptend) then
+                if (nstep==1) then
+                    mp_qt(k,j,i) = 0.0
+                    mp_qr(k,j,i) = 0.0
+                    mp_qi(k,j,i) = 0.0
+                    mp_qs(k,j,i) = 0.0
+                    mp_qg(k,j,i) = 0.0
+                    mp_qh(k,j,i) = 0.0
 
-                mp_nqr(k,j,i) = 0.0
-                mp_nqi(k,j,i) = 0.0
-                mp_nqs(k,j,i) = 0.0
-                mp_nqg(k,j,i) = 0.0
-                mp_nqh(k,j,i) = 0.0
-             endif
+                    mp_nqr(k,j,i) = 0.0
+                    mp_nqi(k,j,i) = 0.0
+                    mp_nqs(k,j,i) = 0.0
+                    mp_nqg(k,j,i) = 0.0
+                    mp_nqh(k,j,i) = 0.0
+                endif
 
-             mp_qt  (k,j,i) = mp_qt(k,j,i)                 &
-                            + (qv(k,j,i) - qvin(k,j,i))/dt &
-                            + (qc(k,j,i) - qcin(k,j,i))/dt
-             mp_qr  (k,j,i) = mp_qr(k,j,i) + (qr(k,j,i) - qrin(k,j,i))/dt
-             mp_qi  (k,j,i) = mp_qi(k,j,i) + (qi(k,j,i) - qiin(k,j,i))/dt
-             mp_qs  (k,j,i) = mp_qs(k,j,i) + (qs(k,j,i) - qsin(k,j,i))/dt
-             mp_qg  (k,j,i) = mp_qg(k,j,i) + (qg(k,j,i) - qgin(k,j,i))/dt
-             mp_qh  (k,j,i) = mp_qh(k,j,i) + (qh(k,j,i) - qhin(k,j,i))/dt
+                mp_qt  (k,j,i) = mp_qt(k,j,i)                 &
+                                + (qv(k,j,i) - qvin(k,j,i))/dt &
+                                + (qc(k,j,i) - qcin(k,j,i))/dt
+                mp_qr  (k,j,i) = mp_qr(k,j,i) + (qr(k,j,i) - qrin(k,j,i))/dt
+                mp_qi  (k,j,i) = mp_qi(k,j,i) + (qi(k,j,i) - qiin(k,j,i))/dt
+                mp_qs  (k,j,i) = mp_qs(k,j,i) + (qs(k,j,i) - qsin(k,j,i))/dt
+                mp_qg  (k,j,i) = mp_qg(k,j,i) + (qg(k,j,i) - qgin(k,j,i))/dt
+                mp_qh  (k,j,i) = mp_qh(k,j,i) + (qh(k,j,i) - qhin(k,j,i))/dt
 
-             mp_nqr (k,j,i) = mp_nqr(k,j,i) + (qnr(k,j,i) - qnrin(k,j,i))/dt
-             mp_nqi (k,j,i) = mp_nqi(k,j,i) + (qni(k,j,i) - qniin(k,j,i))/dt
-             mp_nqs (k,j,i) = mp_nqs(k,j,i) + (qns(k,j,i) - qnsin(k,j,i))/dt
-             mp_nqg (k,j,i) = mp_nqg(k,j,i) + (qng(k,j,i) - qngin(k,j,i))/dt
-             mp_nqh (k,j,i) = mp_nqh(k,j,i) + (qnh(k,j,i) - qnhin(k,j,i))/dt
-! LINDA, e
+                mp_nqr (k,j,i) = mp_nqr(k,j,i) + (qnr(k,j,i) - qnrin(k,j,i))/dt
+                mp_nqi (k,j,i) = mp_nqi(k,j,i) + (qni(k,j,i) - qniin(k,j,i))/dt
+                mp_nqs (k,j,i) = mp_nqs(k,j,i) + (qns(k,j,i) - qnsin(k,j,i))/dt
+                mp_nqg (k,j,i) = mp_nqg(k,j,i) + (qng(k,j,i) - qngin(k,j,i))/dt
+                mp_nqh (k,j,i) = mp_nqh(k,j,i) + (qnh(k,j,i) - qnhin(k,j,i))/dt
+              end if
+              ! LINDA, e
           END DO
        END DO
     END DO

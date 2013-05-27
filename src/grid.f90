@@ -50,6 +50,7 @@ module grid
   integer           :: level   = 0         ! thermodynamic level
   integer           :: naddsc  = 0         ! number of additional scalars
 
+  logical           :: lmptend = .false.   ! Write out microphysical 3D fields.
   logical           :: lrad_ca = .false.   ! Perform clear air radiation calculations
   logical           :: lcouvreux = .false.  ! switch for 'radioactive' scalar
   logical           :: lwaterbudget = .false.  ! switch for liquid water budget diagnostics
@@ -404,7 +405,7 @@ contains
 
 !linda,b
 
-    if (level >= 5) then
+    if (lmptend) then
        allocate(mp_qt(nzp,nxp,nyp))
        allocate(mp_qr(nzp,nxp,nyp))
        allocate(mp_qi(nzp,nxp,nyp))
