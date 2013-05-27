@@ -445,7 +445,7 @@ contains
         dimname(2)            = yname
         dimlongname(2)        = ylongname
         if (trim(name) == 'prc_acc') then
-          do n = 1, count(prc_lev>0)
+          do n = 1, count(prc_lev>=0)
             do k = 2,nzp
               if (zt(k) >= prc_lev(n)) then
                 prc_lev(n) = k

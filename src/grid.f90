@@ -283,7 +283,7 @@ contains
     if (level >= 3) then
       a_rpp =>a_xp(:,:,:,6)
       a_npp =>a_xp(:,:,:,7)
-      allocate (prc_acc(nxp,nyp,count( prc_lev>0)))
+      allocate (prc_acc(nxp,nyp,count( prc_lev>=0)))
       prc_acc(:,:,:) = 0.   ! accumulated precipitation for 2D output  [kg/m2]
       allocate (rev_acc(nxp,nyp))
       rev_acc(:,:) = 0.   ! accumulated evaporation of rain water    [kg/m2]
