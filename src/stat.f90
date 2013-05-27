@@ -170,14 +170,14 @@ contains
          , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa &
          , a_ricep, a_rsnowp, a_rgrp, a_rhailp, a_nicep, a_nsnowp, a_ngrp, a_nhailp &
          , vapor, a_Wl, isfctyp, a_tskin, a_qskin, a_Qnet, a_G0, a_lflxu_ca,a_lflxd_ca,a_sflxu_ca,a_sflxd_ca, a_pexnr, pi0, pi1 &
-          , lflxu_toa_ca, lflxd_toa_ca, sflxu_toa_ca, sflxd_toa_ca
+          , lflxu_toa_ca, lflxd_toa_ca, sflxu_toa_ca, sflxd_toa_ca, lrad_ca
     use lsmdata, only: tndskin,ra,rsurf,rsveg,rssoil,obl,cliq,Cskinav,init_lsm
 
     real, intent (in) :: time
     real, intent (in),optional :: cntlat,sst
 
     if (nsmp == 0.) fsttm = time
-    nsmp=nsmp+1.
+    nsmp=nsmp+1
     ssclr(14:nvar1) = -999
     !
     ! profile statistics
@@ -195,13 +195,21 @@ contains
        call accum_rad(nzp, nxp, nyp, a_rflx, sflx=a_sflx, alb=albedo)
     end if
     if (iradtyp >2) then
-       call accum_rad(nzp, nxp, nyp, a_rflx, sflx=a_sflx, alb=albedo,lflxu=a_lflxu,&
-       lflxd=a_lflxd,sflxu=a_sflxu, sflxd=a_sflxd,lflxu_ca=a_lflxu_ca,&
-       lflxd_ca=a_lflxd_ca,sflxu_ca=a_sflxu_ca, sflxd_ca=a_sflxd_ca,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
-       lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa,sflxu_toa_ca=sflxu_toa_ca,sflxd_toa_ca=sflxd_toa_ca,&
-       lflxu_toa_ca=lflxu_toa_ca,lflxd_toa_ca=lflxd_toa_ca,dn0=dn0,dzt=dzi_t,pi0=pi0,&
-       pi1=pi1,sst=sst,time_in=time,vapor=vapor,radtyp=iradtyp,&
-       a_pexnr=a_pexnr,a_theta=a_theta,CCN=CCN,cntlat=cntlat)
+      if (lrad_ca) then
+        call accum_rad(nzp, nxp, nyp, a_rflx, sflx=a_sflx, alb=albedo,lflxu=a_lflxu,&
+        lflxd=a_lflxd,sflxu=a_sflxu, sflxd=a_sflxd,lflxu_ca=a_lflxu_ca,&
+        lflxd_ca=a_lflxd_ca,sflxu_ca=a_sflxu_ca, sflxd_ca=a_sflxd_ca,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
+        lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa,sflxu_toa_ca=sflxu_toa_ca,sflxd_toa_ca=sflxd_toa_ca,&
+        lflxu_toa_ca=lflxu_toa_ca,lflxd_toa_ca=lflxd_toa_ca,dn0=dn0,dzt=dzi_t,pi0=pi0,&
+        pi1=pi1,sst=sst,time_in=time,vapor=vapor,radtyp=iradtyp,&
+        a_pexnr=a_pexnr,a_theta=a_theta,CCN=CCN,cntlat=cntlat)
+      else
+        call accum_rad(nzp, nxp, nyp, a_rflx, sflx=a_sflx, alb=albedo,lflxu=a_lflxu,&
+        lflxd=a_lflxd,sflxu=a_sflxu, sflxd=a_sflxd,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
+        lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa,dn0=dn0,dzt=dzi_t,pi0=pi0,&
+        pi1=pi1,sst=sst,time_in=time,vapor=vapor,radtyp=iradtyp,&
+        a_pexnr=a_pexnr,a_theta=a_theta,CCN=CCN,cntlat=cntlat)
+      end if
 
     end if
 
@@ -1233,7 +1241,7 @@ contains
 
       iret  = nf90_sync(ncid2)
       nrec2 = nrec2+1
-      nsmp  = 0.
+      nsmp  = 0
 
       do k=1,n1
          svctr(k,:) = 0.
