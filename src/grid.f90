@@ -50,6 +50,7 @@ module grid
   integer           :: level   = 0         ! thermodynamic level
   integer           :: naddsc  = 0         ! number of additional scalars
 
+  logical           :: lrad_ca = .false.   ! Perform clear air radiation calculations
   logical           :: lcouvreux = .false.  ! switch for 'radioactive' scalar
   logical           :: lwaterbudget = .false.  ! switch for liquid water budget diagnostics
   integer           :: ncvrx               ! Number of Couvreux scalar
@@ -197,26 +198,24 @@ contains
        allocate (a_lflxd(nzp,nxp,nyp))
        a_lflxd(:,:,:) = 0.
        memsize = memsize + nxyzp
-       allocate (a_lflxu_ca(nzp,nxp,nyp))
-       a_lflxu_ca(:,:,:) = 0.
-       memsize = memsize + nxyzp
-       allocate (a_lflxd_ca(nzp,nxp,nyp))
-       a_lflxd_ca(:,:,:) = 0.
-       memsize = memsize + nxyzp
+       if (lrad_ca) then
+        allocate (a_lflxu_ca(nzp,nxp,nyp))
+        a_lflxu_ca(:,:,:) = 0.
+        memsize = memsize + nxyzp
+        allocate (a_lflxd_ca(nzp,nxp,nyp))
+        a_lflxd_ca(:,:,:) = 0.
+        memsize = memsize + nxyzp
+       end if
     end if
     !irina
-    if (iradtyp == 2 .and. level > 1) then
-       allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp),sflxu_toa(nxp,nyp),sflxd_toa(nxp,nyp),lflxu_toa(nxp,nyp),lflxd_toa(nxp,nyp),sflxu_toa_ca(nxp,nyp),sflxd_toa_ca(nxp,nyp),lflxu_toa_ca(nxp,nyp),lflxd_toa_ca(nxp,nyp))
+    if (iradtyp > 2 .or. (iradtyp == 2 .and. level > 1)) then
+       allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp),sflxu_toa(nxp,nyp),sflxd_toa(nxp,nyp),lflxu_toa(nxp,nyp),lflxd_toa(nxp,nyp))
        a_sflx(:,:,:) = 0.
        albedo(:,:) = 0.
        sflxu_toa(:,:) = 0.
        sflxd_toa(:,:) = 0.
        lflxu_toa(:,:) = 0.
        lflxd_toa(:,:) = 0.
-       sflxu_toa_ca(:,:) = 0.
-       sflxd_toa_ca(:,:) = 0.
-       lflxu_toa_ca(:,:) = 0.
-       lflxd_toa_ca(:,:) = 0.
        memsize = memsize + nxyzp + nxyp
        !irina
        allocate (a_sflxu(nzp,nxp,nyp))
@@ -225,39 +224,19 @@ contains
        allocate (a_sflxd(nzp,nxp,nyp))
        a_sflxd(:,:,:) = 0.
        memsize = memsize + nxyzp
-       allocate (a_sflxu_ca(nzp,nxp,nyp))
-       a_sflxu_ca(:,:,:) = 0.
-       memsize = memsize + nxyzp
-       allocate (a_sflxd_ca(nzp,nxp,nyp))
-       a_sflxd_ca(:,:,:) = 0.
-       memsize = memsize + nxyzp
-    end if
-    if (iradtyp > 2) then
-       allocate (a_sflx(nzp,nxp,nyp),albedo(nxp,nyp),sflxu_toa(nxp,nyp),sflxd_toa(nxp,nyp),lflxu_toa(nxp,nyp),lflxd_toa(nxp,nyp),sflxu_toa_ca(nxp,nyp),sflxd_toa_ca(nxp,nyp),lflxu_toa_ca(nxp,nyp),lflxd_toa_ca(nxp,nyp))
-       sflxu_toa(:,:) = 0.
-       sflxd_toa(:,:) = 0.
-       lflxu_toa(:,:) = 0.
-       lflxd_toa(:,:) = 0.
-       sflxu_toa_ca(:,:) = 0.
-       sflxd_toa_ca(:,:) = 0.
-       lflxu_toa_ca(:,:) = 0.
-       lflxd_toa_ca(:,:) = 0.
-       a_sflx(:,:,:) = 0.
-       albedo(:,:) = 0.
-       memsize = memsize + nxyzp + nxyp
-        !irina
-       allocate (a_sflxu(nzp,nxp,nyp))
-       a_sflxu(:,:,:) = 0.
-       memsize = memsize + nxyzp
-       allocate (a_sflxd(nzp,nxp,nyp))
-       a_sflxd(:,:,:) = 0.
-       memsize = memsize + nxyzp
-       allocate (a_sflxu_ca(nzp,nxp,nyp))
-       a_sflxu_ca(:,:,:) = 0.
-       memsize = memsize + nxyzp
-       allocate (a_sflxd_ca(nzp,nxp,nyp))
-       a_sflxd_ca(:,:,:) = 0.
-       memsize = memsize + nxyzp
+       if (lrad_ca) then 
+        allocate (sflxu_toa_ca(nxp,nyp),sflxd_toa_ca(nxp,nyp),lflxu_toa_ca(nxp,nyp),lflxd_toa_ca(nxp,nyp))
+        sflxu_toa_ca(:,:) = 0.
+        sflxd_toa_ca(:,:) = 0.
+        lflxu_toa_ca(:,:) = 0.
+        lflxd_toa_ca(:,:) = 0.
+        allocate (a_sflxu_ca(nzp,nxp,nyp))
+        a_sflxu_ca(:,:,:) = 0.
+        memsize = memsize + nxyzp
+        allocate (a_sflxd_ca(nzp,nxp,nyp))
+        a_sflxd_ca(:,:,:) = 0.
+        memsize = memsize + nxyzp
+      end if
     end if
  !
     allocate (a_scr1(nzp,nxp,nyp),a_scr2(nzp,nxp,nyp),a_scr3(nzp,nxp,nyp))
@@ -440,7 +419,7 @@ contains
        allocate(mp_nqh(nzp,nxp,nyp))
        allocate(mp_tlt(nzp,nxp,nyp))
 
-       memsize = memsize + 13.*nxyzp
+       memsize = memsize + 13*nxyzp
 
        mp_qt(:,:,:) = 0.
        mp_qr(:,:,:) = 0.

@@ -24,7 +24,7 @@ module forc
   !irina
   use rad_gcss, only  : gcss_rad
   !cgils
-  use grid, only      : wfls, dthldtls, dqtdtls, sfc_albedo
+  use grid, only      : wfls, dthldtls, dqtdtls, sfc_albedo, lrad_ca
   use modnudge, only : nudge
   use stat, only : sflg
   implicit none
@@ -107,7 +107,7 @@ contains
                   sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
                   lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
           end select
-          if (sflg) then
+          if (sflg .and. lrad_ca) then
             dum0 = 0.
             dum1 = 0.
             dum2 = 0.
