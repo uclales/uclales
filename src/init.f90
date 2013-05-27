@@ -35,6 +35,8 @@ module init
   real                  :: zrand = 200.
   character  (len=80)   :: hfilin = 'test.'
   logical               :: lhomrestart = .false.
+  real                  :: mag_pert_q = 5.0e-5
+  real                  :: mag_pert_t = 0.2
 
 contains
   !
@@ -234,8 +236,7 @@ contains
     k=1
     do while( zt(k+1) <= zrand .and. k < nzp)
        k=k+1
-       xran(k) = 0.2*(zrand - zt(k))/zrand
-       !xran(k) = 0.05*(zrand - zt(k))/zrand
+       xran(k) = mag_pert_t*(zrand - zt(k))/zrand
     end do
 ! LINDA, b
     if (.not.lanom) call random_pert(nzp,nxp,nyp,zt,a_tp,xran,k) 
@@ -245,8 +246,7 @@ contains
        k=1
        do while( zt(k+1) <= zrand .and. k < nzp)
           k=k+1
-          xran(k) = 5.0e-5*(zrand - zt(k))/zrand
-          !xran(k) = 1.0e-5*(zrand - zt(k))/zrand
+          xran(k) = mag_pert_q*(zrand - zt(k))/zrand
        end do
 ! LINDA, b
     if (.not.lanom) call random_pert(nzp,nxp,nyp,zt,a_rp,xran,k) 
