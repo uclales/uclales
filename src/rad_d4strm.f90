@@ -22,7 +22,7 @@ module fuliou
   use defs, only   : nv, nv1, mb, pi, totalpower, g, R, ep2
   use cldwtr, only : init_cldwtr, cloud_water, init_cldice, cloud_ice, init_cldgrp, cloud_grp
   use solver, only : qft
-  use mpi_interface, only : myid
+!   use mpi_interface, only : myid
 !   use RandomNumbers
   use ckd
 
@@ -159,8 +159,6 @@ contains
     ! ----------------------------------------
 
     if (.not.Initialized) call rad_init
-       call init_cldice
-       call init_cldgrp
 
     if(.not. allocated(bandweights)) then 
       allocate(bandweights(size(ir_bands)))
