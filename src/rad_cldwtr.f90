@@ -178,15 +178,15 @@ contains
              wght = (pre(k)-re(j))/(re(j1)-re(j))
              tw(k) = dz(k) * cwmks * ( bz(j,ib) / fl(j) +   &
                   ( bz(j1,ib) / fl(j1) - bz(j,ib) / fl(j) ) /    &
-                  ( 1.0 / re(j1) - 1.0 / re(j) ) * ( 1.0 / pre(k) &
+                  ( 1.0 / re(j1) - 1.0 / re(j) ) * ( 1.0 / (pre(k)+epsilon(pre)) &
                   - 1.0 / re(j) ) )
              ww(k) = wz(j,ib) + (wz(j1,ib) - wz(j,ib) ) * wght
              gg    = gz(j,ib) + (gz(j1,ib) - gz(j,ib) ) * wght
           else
              j0 = max(j,1)
              tw(k) = dz(k) * cwmks * (bz(j0,ib)/fl(j0))
-             ww(k) = wz(j0,ib) 
-             gg    = gz(j0,ib)          
+             ww(k) = wz(j0,ib)
+             gg    = gz(j0,ib)
           end if
           www(k,1) = 3.0 * gg
           do j=2,4
@@ -199,6 +199,8 @@ contains
           ww(k) = 0.0
           gg    = 0.
        end if
+       if (ww(k).lt.0.) print*,'bad ww, ',ww(k),ib,k,cwmks
+       if (tw(k).lt.0.) print*,'bad tw, ',tw(k),ib,k,cwmks
     end do
 
     return

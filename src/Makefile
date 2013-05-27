@@ -34,6 +34,7 @@ $(LES_ARC)(srfc.o)   \
 $(LES_ARC)(prss.o)   \
 $(LES_ARC)(advf.o)   \
 $(LES_ARC)(advl.o)   \
+$(LES_ARC)(centered.o)   \
 $(LES_ARC)(forc.o)   \
 $(LES_ARC)(lsvar.o)  \
 $(LES_ARC)(modtimedep.o)   \
@@ -84,14 +85,16 @@ rad_rndnmb.o:	defs.o
 rad_solver.o:	defs.o
 rad_corkds.o:	defs.o mpi_interface.o
 rad_cldwtr.o:	defs.o rad_corkds.o
-rad_d4strm.o:	defs.o rad_solver.o rad_rndnmb.o rad_corkds.o rad_cldwtr.o
+rad_d4strm.o:	defs.o rad_solver.o rad_rndnmb.o rad_corkds.o rad_cldwtr.o  mpi_interface.o
 rad_driver.o:	defs.o rad_d4strm.o
 forc.o: 	defs.o grid.o rad_gcss.o stat.o
 icemcrp.o: 	defs.o grid.o ice_sb.o
 util.o: 	defs.o grid.o ice_sb.o
 particles.o: 	defs.o grid.o thrm.o
+step.o:		icemcrp.o mpi_interface.o centered.o srfc.o
 step.o:		icemcrp.o mpi_interface.o
 init.o:		grid.o ncio.o step.o icemcrp.o
 ncio.o:		grid.o mpi_interface.o icemcrp.o
 lsvar.o:	forc.o
+centered.o:	advf.o stat.o
 srfc.o: 	lsmdata.o

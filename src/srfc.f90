@@ -141,7 +141,7 @@ contains
        end do
        call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,a_rstar  &
             ,uw_sfc,vw_sfc,wt_sfc,wq_sfc,ww_sfc)
-       if (lhomflx) then
+      if (lhomflx) then
          flxarr(1,:,:) = uw_sfc
          flxarr(2,:,:) = vw_sfc
          flxarr(3,:,:) = ww_sfc

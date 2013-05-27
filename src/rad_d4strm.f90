@@ -151,7 +151,7 @@ contains
     real, dimension (nv,4) :: www, pfNoGas, pf
     real, dimension (nv,4) :: wwi
     real, dimension (nv,4) :: wwgr
-    
+  
     integer :: ib, ig, k, ig1, ig2, ibandloop, iblimit
     real :: fuq2, xir_norm
     real, dimension(:), allocatable, save :: bandWeights
@@ -159,6 +159,8 @@ contains
     ! ----------------------------------------
 
     if (.not.Initialized) call rad_init
+       call init_cldice
+       call init_cldgrp
 
     if(.not. allocated(bandweights)) then 
       allocate(bandweights(size(ir_bands)))
@@ -408,7 +410,8 @@ contains
 
     real :: cumulative
     
-    i=1; j=1 
+    i=1
+    j=1 
     ! The probability contained in the first g point of the first band
     cumulative = gPointWeight(bands(i), j) * bandweights(i)
 

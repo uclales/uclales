@@ -189,7 +189,6 @@ module radiation
                xfact  = dzi_m(k)/(cp*dn0(k)*exner(k))
                tt(k,i,j) = tt(k,i,j) - (rflx(k,i,j) - rflx(k-1,i,j))*xfact
             end do
-
          end do
       end do
 
@@ -325,14 +324,15 @@ module radiation
       ! end do
 
       ! interpolate ozone profile
-       do k=npts+1,nv
+       do k=npts+1,nv1
             pp2 = (p00*(pi0(nv-k+2)/cp)**cpr) / 100.
             index  = getindex(sp,ns,pp2)
             po(k) =  intrpl(sp(index),so(index),sp(index+1),so(index+1),pp2)
+!            print*,'ozone profile: ', po(k), pp2, sp (index), sp(index+1)
          end do
 
     end if
-
+  
   end subroutine setup
   ! ---------------------------------------------------------------------------
   !  locate the index closest to a value

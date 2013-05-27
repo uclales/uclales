@@ -21,15 +21,12 @@ module advf
 
   implicit none
 
-  integer :: lmtr = 3   !< Flux limiter, 0=none, 1=minmod, 2=superbee, 3=mc, 4=van Leer
-  integer :: advs = 1   !< advection scheme; 1=original upwind, 2=2nd(O) centered (without flux limiter)
-
-  real    :: CC    ! Used to disable flux limiter / upwind scheme
+  integer :: lmtr = 3
 
 contains
   !
   !----------------------------------------------------------------------
-  ! subroutine fadvect: This is the driver for scalar advection.  It
+  ! subroutine fadvect: This is the driver for scalar advection.  It 
   ! advects using the average of the velocities at the current and past
   ! times.
   !
@@ -44,14 +41,6 @@ contains
 
     real    :: v1da(nzp)
     integer :: n
-
-    ! Quick solution to disable flux limiters and go to a second order centered scheme
-    if(advs==2) then
-      CC = 0.
-    else
-      CC = 1.
-    end if
-
     !
     ! diagnose liquid water flux
     !
@@ -63,7 +52,7 @@ contains
        call updtst(nzp,'adv',0,v1da,1)
     end if
     !
-    ! loop through the scalar table, setting iscp and isct to the
+    ! loop through the scalar table, setting iscp and isct to the 
     ! appropriate scalar pointer and do the advection, also add large
     ! scale subsidence.  Don't advect TKE here since it resides at a
     ! w-point
@@ -113,10 +102,10 @@ contains
 
   end subroutine advtnd
   !
-  !----------------------------------------------------------------------
-  ! Subroutine mamaos: An alternative second order flux limited scheme
-  ! written by Verica and Christiana as part of the MAMAOS program.
-  !
+  !---------------------------------------------------------------------- 
+  ! Subroutine mamaos: An alternative second order flux limited scheme 
+  ! written by Verica and Christiana as part of the MAMAOS program.  
+  ! 
   ! July 21, 2003
   !
   subroutine mamaos(n1,n2,n3,w,scp0,scp,dzi_t,dzi_m,dn0,dt,lwpt)
@@ -134,7 +123,7 @@ contains
     real    :: dzi_t_local(n1) ! grid spacing for scalars
     real    :: dzi_m_local(n1) ! grid spacing for velocity
     real    :: cfl(n1)       ! cfl numbers at the interface (staggered)
-    real    :: C(n1)         ! limiter
+    real    :: C(n1)         ! limiter    
     real    :: r(n1)         ! slope ratio
     real    :: wpdn(n1)      ! momentum: wp*density
     integer :: i, j, k, kp1, k1, k2
@@ -211,11 +200,11 @@ contains
           w(n1-1,i,j) = 0.
           do k = 2, n1-2
              w(k,i,j) = 0.5 * wpdn(k) * (scp0(k+1,i,j)+scp0(k,i,j)) -  &
-                  CC * 0.5 * (scp0(k+1,i,j)-scp0(k,i,j)) *             &
+                  0.5 * (scp0(k+1,i,j)-scp0(k,i,j)) *                  &
                   ((1.-C(k))*abs(wpdn(k)) + wpdn(k)*cfl(k)*C(k))
           end do
           do k = 2,n1-1
-             scp(k,i,j) = scp(k,i,j) - ((w(k,i,j)-w(k-1,i,j)) -        &
+             scp(k,i,j) = scp(k,i,j) - ((w(k,i,j)-w(k-1,i,j)) -        & 
                   scp0(k,i,j)*(wpdn(k)-wpdn(k-1))) *                   &
                   dt*dzi_t_local(k)/dn0(k)
           enddo
@@ -225,10 +214,10 @@ contains
 
   end subroutine mamaos
   !
-  !----------------------------------------------------------------------
-  ! Subroutine mamaos_x: An alternative second order flux limited scheme
+  !---------------------------------------------------------------------- 
+  ! Subroutine mamaos_x: An alternative second order flux limited scheme 
   ! for advection in the x direction.  (adapted from mamaos)
-  !
+  ! 
   ! September 3, 2003
   !
   subroutine mamaos_x(n1,n2,n3,u,scp0,scp,dxi,dt)
@@ -241,7 +230,7 @@ contains
     real, intent (inout) :: scp(n1,n2,n3)
 
     real    :: cfl(n2,n1)       ! cfl numbers at the interface (staggered)
-    real    :: C(n2,n1)         ! limiter
+    real    :: C(n2,n1)         ! limiter    
     real    :: r(n2,n1)         ! slope ratio
     real    :: scr(n2,n1)       ! flux scratch array
     integer :: i, j, k, i1, i2
@@ -261,42 +250,84 @@ contains
                 call appl_abort(0)
              end if
           end do
-       end do
-          !
-          ! calculate the ratio of slopes
-          !
-       do k = 2, n1-1
-          do i = 2,n2-2
-             gamma = int(-sign(1.,cfl(i,k)))
-             if (abs(scr(i,k) - scp0(k,i,j)) > spacing(scr(i,k))) then
-                i2 = i+gamma
-                i1 = i+gamma+1
-                r(i,k) = (scp0(k,i1,j)-scp0(k,i2,j))/(scr(i,k)-scp0(k,i,j))
-             else
-                r(i,k) = 0.
-             endif
-
-             select case (lmtr)
-             case (1) ! minmod
+       end do     
+       !
+       ! calculate the ratio of slopes
+       !
+       select case (lmtr)
+       case (1) ! minmod
+          do k = 2, n1-1 
+             do i = 2,n2-2
+                gamma = int(-sign(1.,cfl(i,k)))
+                if (abs(scr(i,k) - scp0(k,i,j)) > spacing(scr(i,k))) then
+                   i2 = i+gamma
+                   i1 = i+gamma+1
+                   r(i,k) = (scp0(k,i1,j)-scp0(k,i2,j))/(scr(i,k)-scp0(k,i,j))
+                else
+                   r(i,k) = 0.
+                endif
                 C(i,k) = max(0., min(1., r(i,k)))
-             case(2)  ! superbee
+             enddo
+          enddo
+       case(2)  ! superbee
+          do k = 2, n1-1 
+             do i = 2,n2-2
+                gamma = int(-sign(1.,cfl(i,k)))
+                if (abs(scr(i,k) - scp0(k,i,j)) > spacing(scr(i,k))) then
+                   i2 = i+gamma
+                   i1 = i+gamma+1
+                   r(i,k) = (scp0(k,i1,j)-scp0(k,i2,j))/(scr(i,k)-scp0(k,i,j))
+                else
+                   r(i,k) = 0.
+                endif
                 C(i,k) = max(0., min(1., 2.*r(i,k)), min(2., r(i,k)))
-             case(3)  ! mc
+             enddo
+          enddo
+       case(3)  ! mc
+          do k = 2, n1-1 
+             do i = 2,n2-2
+                gamma = int(-sign(1.,cfl(i,k)))
+                if (abs(scr(i,k) - scp0(k,i,j)) > spacing(scr(i,k))) then
+                   i2 = i+gamma
+                   i1 = i+gamma+1
+                   r(i,k) = (scp0(k,i1,j)-scp0(k,i2,j))/(scr(i,k)-scp0(k,i,j))
+                else
+                   r(i,k) = 0.
+                endif
                 C(i,k) = max(0., min(2.*r(i,k),(1.+r(i,k))/2., 2.))
-             case(4)  ! van Leer
+             enddo
+          enddo
+       case(4)  ! van Leer
+          do k = 2, n1-1 
+             do i = 2,n2-2
+                gamma = int(-sign(1.,cfl(i,k)))
+                if (abs(scr(i,k) - scp0(k,i,j)) > spacing(scr(i,k))) then
+                   i2 = i+gamma
+                   i1 = i+gamma+1
+                   r(i,k) = (scp0(k,i1,j)-scp0(k,i2,j))/(scr(i,k)-scp0(k,i,j))
+                else
+                   r(i,k) = 0.
+                endif
                 C(i,k) = (r(i,k) + abs(r(i,k)))/(1. + abs(r(i,k)))
-             case default ! no limiter
+             enddo
+          enddo
+       case default ! no limiter
+          do k = 2, n1-1 
+             do i = 2,n2-2
                 C(i,k) = 1.0
-             end select
-
-             scr(i,k) = 0.5 * u(k,i,j) * (scr(i,k)+scp0(k,i,j)) -      &    ! 2nd order adv
-                  CC * 0.5 * (scr(i,k)-scp0(k,i,j)) *                  &    ! Flux lim
-                  ((1.-C(i,k))*abs(u(k,i,j)) + u(k,i,j)*cfl(i,k)*C(i,k))    ! Flux lim
+             enddo
+          enddo
+       end select
+       do k = 2, n1-1 
+          do i = 2,n2-2
+             scr(i,k) = 0.5 * u(k,i,j) * (scr(i,k)+scp0(k,i,j)) -      &
+                  0.5 * (scr(i,k)-scp0(k,i,j)) *                        &
+                  ((1.-C(i,k))*abs(u(k,i,j)) + u(k,i,j)*cfl(i,k)*C(i,k))
           end do
 
           do i = 3,n2-2
-             scp(k,i,j) = scp(k,i,j) - ((scr(i,k)-scr(i-1,k)) -        &
-                  scp0(k,i,j)*(u(k,i,j)-u(k,i-1,j)))*dt*dxi
+             scp(k,i,j) = scp(k,i,j) - ((scr(i,k)-scr(i-1,k)) -         &
+                     scp0(k,i,j)*(u(k,i,j)-u(k,i-1,j)))*dt*dxi
           enddo
        enddo
 
@@ -304,10 +335,10 @@ contains
 
   end subroutine mamaos_x
   !
-  !----------------------------------------------------------------------
-  ! Subroutine mamaos_y: An alternative second order flux limited scheme
+  !---------------------------------------------------------------------- 
+  ! Subroutine mamaos_y: An alternative second order flux limited scheme 
   ! for advection in the y direction.  (adapted from mamaos)
-  !
+  ! 
   ! September 3, 2003
   !
   subroutine mamaos_y(n1,n2,n3,v,scp0,scp,dyi,dt)
@@ -320,7 +351,7 @@ contains
     real, intent (inout) :: scp(n1,n2,n3)
 
     real    :: cfl(n3,n1)       ! cfl numbers at the interface (staggered)
-    real    :: C(n3,n1)         ! limiter
+    real    :: C(n3,n1)         ! limiter    
     real    :: r(n3,n1)         ! slope ratio
     real    :: scr(n3,n1)       ! flux scratch array
     integer :: i, j, k, j1, j2
@@ -344,32 +375,76 @@ contains
           !
           ! calculate the ratio of slopes
           !
-       do k = 2, n1-1
-          do j = 2,n3-2
-             gamma = int(-sign(1.,cfl(j,k)))
-             if (abs(scr(j,k) - scp0(k,i,j)) > spacing(scr(j,k))) then
-                j2 = j+gamma
-                j1 = j+gamma+1
-                r(j,k) = (scp0(k,i,j1)-scp0(k,i,j2))/(scr(j,k)-scp0(k,i,j))
-             else
-                r(j,k) = 0.
-             endif
-
-             select case (lmtr)
-             case (1) ! minmod
+       select case (lmtr)
+       case (1) ! minmod
+          do k = 2, n1-1 
+             do j = 2,n3-2
+                gamma = int(-sign(1.,cfl(j,k)))
+                if (abs(scr(j,k) - scp0(k,i,j)) > spacing(scr(j,k))) then
+                   j2 = j+gamma
+                   j1 = j+gamma+1
+                   r(j,k) = (scp0(k,i,j1)-scp0(k,i,j2))/(scr(j,k)-scp0(k,i,j))
+                else
+                   r(j,k) = 0.
+                endif
                 C(j,k) = max(0., min(1., r(j,k)))
-             case(2)  ! superbee
+             enddo
+           enddo
+       case(2)  ! superbee
+          do k = 2, n1-1 
+             do j = 2,n3-2
+                gamma = int(-sign(1.,cfl(j,k)))
+                if (abs(scr(j,k) - scp0(k,i,j)) > spacing(scr(j,k))) then
+                   j2 = j+gamma
+                   j1 = j+gamma+1
+                   r(j,k) = (scp0(k,i,j1)-scp0(k,i,j2))/(scr(j,k)-scp0(k,i,j))
+                else
+                   r(j,k) = 0.
+                endif
                 C(j,k) = max(0., min(1., 2.*r(j,k)), min(2., r(j,k)))
-             case(3)  ! mc
+             enddo
+          enddo
+       case(3)  ! mc
+          do k = 2, n1-1 
+             do j = 2,n3-2
+                gamma = int(-sign(1.,cfl(j,k)))
+                if (abs(scr(j,k) - scp0(k,i,j)) > spacing(scr(j,k))) then
+                   j2 = j+gamma
+                   j1 = j+gamma+1
+                   r(j,k) = (scp0(k,i,j1)-scp0(k,i,j2))/(scr(j,k)-scp0(k,i,j))
+                else
+                   r(j,k) = 0.
+                endif
                 C(j,k) = max(0., min(2.*r(j,k),(1.+r(j,k))/2., 2.))
-             case(4)  ! van Leer
+             enddo
+          enddo
+       case(4)  ! van Leer
+          do k = 2, n1-1 
+             do j = 2,n3-2
+                gamma = int(-sign(1.,cfl(j,k)))
+                if (abs(scr(j,k) - scp0(k,i,j)) > spacing(scr(j,k))) then
+                   j2 = j+gamma
+                   j1 = j+gamma+1
+                   r(j,k) = (scp0(k,i,j1)-scp0(k,i,j2))/(scr(j,k)-scp0(k,i,j))
+                else
+                   r(j,k) = 0.
+                endif
                 C(j,k) = (r(j,k) + abs(r(j,k)))/(1. + abs(r(j,k)))
-             case default ! no limiter
+             enddo
+          enddo
+       case default ! no limiter
+          do k = 2, n1-1 
+             do j = 2,n3-2
                 C(j,k) = 1.0
-             end select
+             enddo
+          enddo
+       end select
 
-             scr(j,k) = 0.5 * v(k,i,j) * (scr(j,k)+scp0(k,i,j)) -       &
-                  CC * 0.5 * (scr(j,k)-scp0(k,i,j)) *                   &
+       do k = 2, n1-1 
+          do j = 2,n3-2
+
+             scr(j,k) = 0.5 * v(k,i,j) * (scr(j,k)+scp0(k,i,j)) -      &
+                  0.5 * (scr(j,k)-scp0(k,i,j)) *                        &
                   ((1.-C(j,k))*abs(v(k,i,j)) + v(k,i,j)*cfl(j,k)*C(j,k))
           end do
 

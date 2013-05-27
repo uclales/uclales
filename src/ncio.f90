@@ -48,7 +48,7 @@ contains
     ncall = 0
     if (.not.exans) then
        call date_and_time(date)
-       iret = nf90_create(lfname,NF90_HDF5,ncid)
+       iret = nf90_create(lfname,NF90_SHARE,ncid)
 
        iret = nf90_put_att(ncid,NF90_GLOBAL,'title',ename)
        iret = nf90_put_att(ncid,NF90_GLOBAL,'history','Created on '//date)
@@ -138,7 +138,7 @@ contains
              iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,ymID    ,VarID)
           case ('tttt')
              if (present(n2) .and. present(n3)) then
-                iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tttt,VarID, deflate_level = deflate_level)
+                iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tttt,VarID)!, deflate_level = deflate_level)
              else
                 iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tt,VarID)
              end if
@@ -260,7 +260,7 @@ contains
 
     use mpi_interface, only :myid
 
-    integer, parameter :: nnames = 39
+    integer, parameter :: nnames = 46
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,& !1
          'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,& !7 
@@ -268,7 +268,9 @@ contains
          'n      ','rice   ','nice   ','rsnow  ','rgrp   ','nsnow  '   ,& !19
          'ngrp   ','rhail  ','nhail  ','rflx   ','lflxu  ','lflxd  '   ,& !25
          'shf    ','lhf    ','ustars ','a_tskin','a_qskin','tsoil  '   ,& !31
-         'phiw   ','a_Qnet ','a_G0   '/)                                                      !37
+         'phiw   ','a_Qnet ','a_G0   ','mp_tlt ','mp_qt  ','mp_qr  '   ,& !37
+         'mp_qi  ','mp_qs  ','mp_qg  ','mp_qh  '/)  !43-46
+
 
 
     real, intent (in) :: time
@@ -279,7 +281,7 @@ contains
     if (level  >= 2) nvar0 = nvar0+1
     if (level  >= 3) nvar0 = nvar0+2
     if (level  >= 4) nvar0 = nvar0+4
-    if (level  >= 5) nvar0 = nvar0+4
+    if (level  >= 5) nvar0 = nvar0+11
     if (iradtyp > 1) nvar0 = nvar0+3
     if (isfctyp == 5) nvar0 = nvar0+9
 
@@ -356,6 +358,22 @@ contains
        sanal(nvar0)=sbase(38)
        nvar0 = nvar0+1
        sanal(nvar0)=sbase(39)
+    end if
+    if (level >= 5) then
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(40)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(41)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(42)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(43)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(44)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(45)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(46)
     end if
 
     nbeg = nvar0+1
@@ -459,7 +477,7 @@ contains
     nn = nbase+2
 
     if (level >=3) then
-       do n = nbase+2, 18
+      do n = nbase+2, 18
         nn = nn+1
         call newvar(nn-12)
         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
@@ -467,7 +485,7 @@ contains
                count=icnt)
          !if (myid==0) print*,"sanal(nn):",sanal(nn),nn
        end do
-    endif
+    endif  
 
     if (level >=4) then
       do n = 20, 23
@@ -505,7 +523,6 @@ contains
        iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
             count=icnt)
     end if
-
     !Malte: Land Surface Output for isfctyp=5
     if (isfctyp == 5) then 
        iret = nf90_inq_varid(ncid0, sanal(nn+1), VarID)
@@ -539,6 +556,38 @@ contains
        !if (iret.ne.nf90_noerr) print*,myid,nf90_strerror(iret),nn+9
 
     end if 
+
+    
+    if (level >= 5)  then
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, mp_tlt(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, mp_qt(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, mp_qr(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, mp_qi(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, mp_qs(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, mp_qg(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, mp_qh(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+      end if
 
 !     if (nn /= nvar0) then
 !        if (myid == 0) print *, 'ABORTING:  Anal write error'
@@ -884,7 +933,7 @@ contains
        if (itype==1) ncinfo = 'm^2/s^2'
        if (itype==2) ncinfo = 'ttmt'
     case('tot_ww')
-       if (itype==0) ncinfo = 'Total vertical flux of v-wind'
+       if (itype==0) ncinfo = 'Total vertical flux of w-wind'
        if (itype==1) ncinfo = 'm^2/s^2'
        if (itype==2) ncinfo = 'ttmt'
     case('sfs_ww')
@@ -1007,6 +1056,34 @@ contains
     case('lflxd')
        if (itype==0) ncinfo = 'Longwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'tttt'
+    case('mp_tlt')
+       if (itype==0) ncinfo = 'T tendency from microphysics'
+       if (itype==1) ncinfo = 'K/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('mp_qt')
+       if (itype==0) ncinfo = 'Qt tendency from microphysics'
+       if (itype==1) ncinfo = 'kg/kg/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('mp_qr')
+       if (itype==0) ncinfo = 'Qr tendency from microphysics'
+       if (itype==1) ncinfo = 'kg/kg/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('mp_qi')
+       if (itype==0) ncinfo = 'Qi tendency from microphysics'
+       if (itype==1) ncinfo = 'kg/kg/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('mp_qs')
+       if (itype==0) ncinfo = 'Qs tendency from microphysics'
+       if (itype==1) ncinfo = 'kg/kg/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('mp_qg')
+       if (itype==0) ncinfo = 'Qg tendency from microphysics'
+       if (itype==1) ncinfo = 'kg/kg/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('mp_qh')
+       if (itype==0) ncinfo = 'Qh tendency from microphysics'
+       if (itype==1) ncinfo = 'kg/kg/s'
        if (itype==2) ncinfo = 'tttt'
     case('lwuca')
        if (itype==0) ncinfo = 'Clear Air Longwave Radiative flux UP'

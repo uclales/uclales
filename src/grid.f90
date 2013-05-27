@@ -115,7 +115,12 @@ module grid
        a_ngrp,   a_ngrt,    &
        a_rhailp, a_rhailt,  & ! hail
        a_nhailp, a_nhailt, a_rct, a_cld, a_cvrxp, a_cvrxt
-
+ ! linda,b, output of tendencies
+  real, dimension (:,:,:), allocatable :: &
+        mp_qt, mp_qr, mp_qi, mp_qs, mp_qg, mp_qh, &
+        mp_nqt, mp_nqr, mp_nqi, mp_nqs, mp_nqg, mp_nqh, &
+        mp_tlt
+! linda, e 
 
   character(40)      :: zname      = 'zt'
   character(40)      :: zhname     = 'zm'
@@ -277,7 +282,7 @@ contains
       ncld = nscl
     end if
     if (lcouvreux) then
-      nscl  = nscl+1 ! Additional radioactive scalar
+      nscl = nscl+1 ! Additional radioactive scalar
       ncvrx = nscl
     end if
 
@@ -299,9 +304,9 @@ contains
       a_rpp =>a_xp(:,:,:,6)
       a_npp =>a_xp(:,:,:,7)
       allocate (prc_acc(nxp,nyp,count( prc_lev>0)))
-      allocate (rev_acc(nxp,nyp))
       prc_acc(:,:,:) = 0.   ! accumulated precipitation for 2D output  [kg/m2]
-      rev_acc(:,:) = 0.   ! accumulated evaporation of rainwater     [kg/m2]
+      allocate (rev_acc(nxp,nyp))
+      rev_acc(:,:) = 0.   ! accumulated evaporation of rain water    [kg/m2]
     else
       a_rpp => NULL()
       a_npp => NULL()
@@ -418,6 +423,41 @@ contains
 
     memsize = memsize +  nxyzp*nscl*2 + 3*nxyp + nxyp*10
 
+!linda,b
+
+    if (level >= 5) then
+       allocate(mp_qt(nzp,nxp,nyp))
+       allocate(mp_qr(nzp,nxp,nyp))
+       allocate(mp_qi(nzp,nxp,nyp))
+       allocate(mp_qs(nzp,nxp,nyp))
+       allocate(mp_qg(nzp,nxp,nyp))
+       allocate(mp_qh(nzp,nxp,nyp))
+       allocate(mp_nqt(nzp,nxp,nyp))
+       allocate(mp_nqr(nzp,nxp,nyp))
+       allocate(mp_nqi(nzp,nxp,nyp))
+       allocate(mp_nqs(nzp,nxp,nyp))
+       allocate(mp_nqg(nzp,nxp,nyp))
+       allocate(mp_nqh(nzp,nxp,nyp))
+       allocate(mp_tlt(nzp,nxp,nyp))
+
+       memsize = memsize + 13.*nxyzp
+
+       mp_qt(:,:,:) = 0.
+       mp_qr(:,:,:) = 0.
+       mp_qi(:,:,:) = 0.
+       mp_qs(:,:,:) = 0.
+       mp_qh(:,:,:) = 0.
+       mp_qg(:,:,:) = 0.
+       mp_nqt(:,:,:) = 0.
+       mp_nqr(:,:,:) = 0.
+       mp_nqi(:,:,:) = 0.
+       mp_nqs(:,:,:) = 0.
+       mp_nqg(:,:,:) = 0.
+       mp_nqh(:,:,:) = 0.
+       mp_tlt(:,:,:) = 0.
+
+    end if
+!linda,e
     if(myid == 0) then
        print "(//' ',49('-')/,' ',/3x,i3.3,' prognostic scalars')", nscl
        print "('   memory to be allocated  -  ',f8.3,' mbytes')", &
@@ -431,7 +471,7 @@ contains
   subroutine define_grid
 
     use mpi_interface, only: xoffset, yoffset, wrxid, wryid, nxpg, nypg,   &
-         appl_abort, myid, nxg, nyg
+         appl_abort, myid
 
     integer :: i,j,k,kmax,nchby
     real    :: dzrfm,dz,zb,dzmin

@@ -318,7 +318,7 @@ contains
           fu(i,j) = aa(i,j,2)
        end do
     end do
-    do k = 2, nv    
+    do k = 2, nv
        wn = w(k)
        if ( w(k) .le. 1.0e-4 ) then
           call coefft0(solar,t(k-1),t(k),u0(k),f0(k),aa,zz,a1,z1,fk1(k),fk2(k))
@@ -630,7 +630,8 @@ contains
        tkm1 = 0.0
        do k = 1, nv
           f0a(k) = 2.0 * ( 1.0 - w(k) ) * bf(k)
-          u0a(k) = -(t(k)-tkm1) / ( alog( (bf(k+1)+epsilon(1.))/bf(k) ) + epsilon(1.))
+          u0a(k) = -(t(k)-tkm1) / ( alog( bf(k+1)/bf(k) ))
+          u0a(k) = sign(max(abs(u0a(k)),1.e-8),u0a(k))
           tkm1 = t(k)
        end do
     end if

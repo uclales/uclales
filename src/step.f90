@@ -24,7 +24,7 @@ module step
   integer :: istpfl = 1
   real    :: timmax = 18000.
   real    :: timrsm = 86400.
-  real    :: wctime = 1e10
+  real    :: wctime = 1.e10
   logical :: corflg = .false.
   logical :: rylflg = .true.
 
@@ -46,6 +46,9 @@ module step
   character (len=8) :: case_name = 'astex'
 
   integer :: istp
+! linda,b
+  logical ::lanom=.false.
+!linda,e
 
   ! Flags for sampling, statistics output, etc.
   logical :: savgflg=.false.,anlflg=.false.,hisflg=.false.,crossflg=.false.,lpdumpflg=.false.
@@ -289,7 +292,7 @@ contains
   !
   subroutine t_step
 
-    use mpi_interface, only : myid
+    use mpi_interface, only : myid, appl_abort
     use grid, only : level, dt, nstep, a_tt, a_up, a_vp, a_wp, dxi, dyi, dzi_t, &
          nxp, nyp, nzp, dn0,a_scr1, u0, v0, a_ut, a_vt, a_wt, zt, a_ricep, a_rct, a_rpt, &
          lwaterbudget
@@ -305,6 +308,7 @@ contains
     use forc, only : forcings
     use lsvar, only : varlscale
     use util, only : velset,get_avg
+    use centered, only:advection_scalars
     use modtimedep, only : timedep
     use modparticles, only : particles, lpartic, particlestat,lpartstat, &
          deactivate_drops, activate_drops
@@ -312,6 +316,7 @@ contains
 
     logical, parameter :: debug = .false.
     real :: xtime
+  character (len=8) :: adv='monotone'
 
     xtime = time/86400. + strtim
     call timedep(time,timmax, sst)
@@ -344,7 +349,14 @@ contains
        !call calc_cs(time)      ! calculated dynamic value Cs
 
        call diffuse(time)
-       call fadvect
+       if (adv=='monotone') then
+          call fadvect
+       elseif ((adv=='second').or.(adv=='fourth')) then
+          call advection_scalars(adv)
+       else 
+          print *, 'wrong specification for advection scheme'
+          call appl_abort(0)
+       endif
        call ladvect
        if (level >= 1) then
           if (lwaterbudget) then
@@ -477,6 +489,11 @@ contains
        !call sclrset('mixd',nzp,nxp,nyp,a_sp,dzi_t,n)
     end do
 
+    if (level >= 1) then
+       where (a_rp < 0.) 
+          a_rp=0.
+       end where
+    end if
     if (level >= 3) then
        a_rpp(1,:,:) = 0.
        a_npp(1,:,:) = 0.
