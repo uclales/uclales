@@ -22,6 +22,7 @@
 ! \todo Separate Soil from 3D fields?
 ! \todo Top level radiation hopping
 ! \todo reduce nr of warnings when compiling with gfortran/NAG
+! \todo Nicer version of accumelated precip
 program ucla_les
 
   implicit none
@@ -74,7 +75,7 @@ contains
     use util, only : fftinix,fftiniy
     use defs, only : SolarConstant
     use sgsm, only : csx, prndtl, clouddiff
-    use advf, only : lmtr,advs
+    use advf, only : lmtr !,advs
     use advl, only : advm
     use srfc, only : zrough, ubmin, dthcon, drtcon, rh_srf, drag, lhomflx
     use step, only : timmax, timrsm, istpfl, corflg, outflg, frqanl, frqhis,          &
@@ -127,7 +128,7 @@ contains
          us     , vs     , rts   ,  & ! sounding E/W winds, water vapor
          umean  , vmean  , th00  ,  & ! gallilean E/W wind, basic state
          case_name, lmtr,           & !irina:name of the case, i.e. astex, rico, etc
-         advs, advm,                & ! Advection scheme scalars, momentum
+         advm,                & ! Advection scheme scalars, momentum
          lsvarflg,                  & ! irina:flag for time bvarying large scale forcing
          lstendflg,                  & !irina:flag for time large scale advective tendencies
          div,  &                       !irina: divergence
