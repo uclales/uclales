@@ -324,7 +324,7 @@ module radiation
       ! end do
 
       ! interpolate ozone profile
-       do k=npts+1,nv1
+       do k=npts+1,nv
             pp2 = (p00*(pi0(nv-k+2)/cp)**cpr) / 100.
             index  = getindex(sp,ns,pp2)
             po(k) =  intrpl(sp(index),so(index),sp(index+1),so(index+1),pp2)
