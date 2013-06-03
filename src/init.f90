@@ -31,7 +31,7 @@ module init
   integer               :: itsflg = 1
   integer               :: irsflg = 1
 !  integer, dimension(1) :: seed
-  real, dimension(nns)  :: us,vs,ts,thds,ps,hs,rts,rss,tks,xs,xsi
+  real, dimension(nns)  :: us,vs,ts,thds,ps,hs,rts,rss,tks,xs,xsi,thl
   real                  :: zrand = 200.
   character  (len=80)   :: hfilin = 'test.'
   logical               :: lhomrestart = .false.
@@ -176,8 +176,10 @@ contains
 
     integer :: i,j,k
     real    :: exner, pres, tk, rc, xran(nzp), zc, dist, xc
+    real, dimension(nzp)  :: thli
 
     call htint(ns,ts,hs,nzp,th0,zt)
+    call htint(ns,thl,hs,nzp,thli,zt)
 
     do j=1,nyp
        do i=1,nxp
@@ -201,19 +203,10 @@ contains
              do k=1,nzp
                 exner = (pi0(k)+pi1(k))/cp
                 pres  = p00 * (exner)**cpr
-                if (itsflg == 0) then
-                   tk    = th0(k)*exner
-                   rc  = max(0.,a_rp(k,i,j)-rslf(pres,tk))
-                   a_tp(k,i,j) = a_theta(k,i,j)*exp(-(alvl/cp)*rc/tk) - th00
-                   vapor(k,i,j) = a_rp(k,i,j)-rc
-                end if
-                if (itsflg == 2) then
-                   tk    = th0(k)
-                   a_theta(k,i,j) = tk/exner
-                   rc  = max(0.,a_rp(k,i,j)-rslf(pres,tk))
-                   a_tp(k,i,j) = a_theta(k,i,j)*exp(-(alvl/cp)*rc/tk) - th00
-                   vapor(k,i,j) = a_rp(k,i,j)-rc
-                end if
+                tk    = th0(k)*exner
+                rc  = max(0.,a_rp(k,i,j)-rslf(pres,tk))
+                a_tp(k,i,j) = thli(k) - th00
+                vapor(k,i,j) = a_rp(k,i,j)-rc
              end do
           end do
        end do
@@ -314,7 +307,7 @@ contains
          "'  Sounding Input: ',//,7x,'ps',9x,'hs',7x,'ts',6x ,'thds',6x," // &
          "'us',7x,'vs',7x,'rts',5x,'rel hum',5x,'rhi'/,6x,'(Pa)',7X,'(m)',6X,'(K)'"// &
          ",6X,'(K)',6X,'(m/s)',4X,'(m/s)',3X,'(kg/kg)',5X,'(%)',5X,'(%)'/,1x/)"
-    character (len=37) :: fm1 = "(f11.1,f10.1,2f9.2,2f9.2,f10.5,2f9.1)"
+    character (len=37) :: fm1 = "(f11.2,f10.2,2f9.2,2f9.2,f10.5,2f9.1)"
     !
     ! arrange the input sounding
     !
@@ -364,9 +357,13 @@ contains
              hs(ns) = ps(ns)
              zold1=zold2
              zold2=ps(ns)
-             if ((itsflg==0).or.(itsflg==1)) then
-                tavg=(ts(ns)*(1.+ep2*rts(ns))+tks(ns-1)*(1.+ep2*rts(ns-1))*(p00**rcp)             &
-                     /ps(ns-1)**rcp)*.5
+             if ((itsflg==0)) then
+                tavg=(ts(ns)*(1.+ep2*rts(ns))+ts(ns-1)*(1.+ep2*rts(ns-1))*(p00**rcp)             &
+                  /ps(ns-1)**rcp)*.5
+                ps(ns)=(ps(ns-1)**rcp-g*(zold2-zold1)*(p00**rcp)/(cp*tavg))**cpr
+             elseif ((itsflg==1)) then
+                tavg=(ts(ns)*(1.+ep2*rts(ns))+ts(ns-1)*(1.+ep2*rts(ns-1))*(p00**rcp)             &
+                  /ps(ns-1)**rcp)*.5
                 ps(ns)=(ps(ns-1)**rcp-g*(zold2-zold1)*(p00**rcp)/(cp*tavg))**cpr
              else !itsflg=2
                 tavg=(ts(ns)*(1.+ep2*rts(ns))+tks(ns-1)*(1.+ep2*rts(ns-1)))*.5
@@ -384,12 +381,13 @@ contains
        case (0)
           tks(ns)=ts(ns)*(ps(ns)*p00i)**rcp
        case (1)
+          thl(ns) = ts(ns)
           til=ts(ns)*(ps(ns)*p00i)**rcp
           xx=til
           yy=rslf(ps(ns),xx)
           zz=max(rts(ns)-yy,0.)
           if (zz > 0.) then
-             do iterate=1,3
+             do iterate=1,1
                 x1=alvl/(cp*xx)
                 xx=xx - (xx - til*(1.+x1*zz))/(1. + x1*til                &
                      *(zz/xx+(1.+yy*ep)*yy*alvl/(Rm*xx*xx)))
@@ -405,19 +403,15 @@ contains
           call appl_abort(0)
        end select
 
-       do iterate1 = 1,1
+       ! at this point rts, ps and tks are approximately known for all cases
+
+       do iterate1 = 1,5
          if (irsflg == 0) then
-           rts(ns) = xs(ns)*rslf(ps(ns),tks(ns))
+            rts(ns) = xs(ns)*rslf(ps(ns),tks(ns))
          end if
          if (ipsflg == 1 .and. ns > 1) then
-            if ((itsflg==0).or.(itsflg==1))then
-               tavg=(ts(ns)*(1.+ep2*rts(ns))+tks(ns-1)*(1.+ep2*rts(ns-1))*(p00**rcp) &
-                    /ps(ns-1)**rcp)*.5
-               ps(ns)=(ps(ns-1)**rcp-g*(hs(ns)-hs(ns-1))*(p00**rcp)/(cp*tavg))**cpr
-            else
-               tavg=(ts(ns)*(1.+ep2*rts(ns))+tks(ns-1)*(1.+ep2*rts(ns-1)))*.5
-               ps(ns)=ps(ns-1)*exp(-g*(zold2-zold1)/(r*tavg))
-            end if
+            tavg=(tks(ns)*(1.+ep2*rts(ns))+tks(ns-1)*(1.+ep2*rts(ns-1)))*.5
+            ps(ns)=ps(ns-1)*exp(-g*(hs(ns)-hs(ns-1))/(r*tavg))
          end if
          select case (itsflg)
          case (0)
@@ -437,10 +431,15 @@ contains
                enddo
             endif
             tks(ns)=xx
+         case (2)
+            ts(ns)=tks(ns)*(p00/ps(ns))**rcp     ! update ts for fldinit
          case default
          end select
          
        end do
+       if (itsflg==1) then
+          ts(ns)=tks(ns)*(p00/ps(ns))**rcp     ! update ts for fldinit
+       end if
        ns = ns+1
 
     end do
@@ -464,7 +463,7 @@ contains
     end if
 
     do k=1,ns
-       thds(k)=tks(k)*(p00/ps(k))**rcp
+       thds(k)=tks(k)*(p00/ps(k))**rcp ! thds goes into the basic state
     end do
 
     do k=1,ns
@@ -474,15 +473,23 @@ contains
     do k=1,ns
        xsi(k)=100.*rts(k)/rsif(ps(k),tks(k))
     end do
+    ! calculate thl for fldinit for itsflg=0,2
+    if ((itsflg==0).or.(itsflg==2)) then
+       do k=1,ns
+            yy=rslf(ps(k),tks(k))
+            zz=max(rts(k)-yy,0.)
+            if (zz > 0.) then
+               thl(k)= ts(k)*exp(-(alvl/cp)*zz/tks(k))
+            else
+               thl(k)= ts(k)
+            end if
+         end do
+      end if
 
     if(myid == 0) then
        write(6,fm0)
        write(6,fm1)(ps(k),hs(k),tks(k),thds(k),us(k),vs(k),rts(k),xs(k),xsi(k),k=1,ns)
     endif
-    ! update ts for fldinit
-    do k=1,ns
-       ts(k)=tks(k)*(p00/ps(k))**rcp
-    end do
 
 604 format('    input sounding needs to go higher ! !', /,                &
          '      sounding top (m) = ',f12.2,'  model top (m) = ',f12.2)
