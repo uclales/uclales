@@ -7,7 +7,7 @@
 ! -I/sw/sles9-x64/netcdf-3.6.2-intel/include on tornado
 ! Assume number of time steps nt smaller than 10000 and number of variables nv smaller than 35 ! otherwise need to be changes
 
-        integer, parameter :: nv=50,nma=7,nmi=2,nsu=28
+        integer, parameter :: nv=100,nma=7,nmi=2,nsu=28
         integer :: nt
         character(100) stem,nm,nm2
         character(20) pref,name,dimname,cnx,cny

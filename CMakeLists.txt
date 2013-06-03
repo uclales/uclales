@@ -13,21 +13,32 @@
 # For daily use "cmake .. && make" should suffice to build the code, but a command line could look like:
 # export FC="gfortran" && cmake -D SYST=tornado -D MPI=TRUE -D PROFILER=SCALASCA -D CMAKE_BUILD_TYPE=DEBUG .. && make
 ############################
+set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/config)
+
 INCLUDE(CMakeForceCompiler) #Necessary to change between MPI/parallel/profiler compilers, without having to do a make clean
 cmake_minimum_required (VERSION 2.8.1)
-project (uclales Fortran)
-
-# Set the name of the executable, and build it into the build directory
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
-set(target_name uclales)
-set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/config)
+
 
 #  make sure that the default is a RELEASE
 if (NOT CMAKE_BUILD_TYPE)
-  MESSAGE(STATUS "CMAKE_BUILD_TYPE not specified, defaulting to RELEASE")
   set (CMAKE_BUILD_TYPE RELEASE CACHE STRING
       "Choose the type of build, options are: None Debug Release." FORCE )
+else()
+  string(TOUPPER ${CMAKE_BUILD_TYPE} TEMP)
+  set(CMAKE_BUILD_TYPE ${TEMP} CACHE STRING
+      "Choose the type of build, options are: None Debug Release."  FORCE)
 endif ()
+
+#Load system specific settings
+if (NOT SYST)
+  set (SYST default CACHE STRING
+      "Choose the location: mpipc thunder fedora archlinux supermuc jugene" FORCE )
+endif ()
+include (${SYST} OPTIONAL)
+
+#Start the project only after all the variables are set
+project (uclales Fortran)
 
 # Set MPI on or off. By default it is on.
 set (MPI TRUE CACHE BOOL "Choose to enable MPI or not.")
@@ -40,79 +51,27 @@ else()
 endif()
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different ${mpifile} ${CMAKE_CURRENT_SOURCE_DIR}/src/mpi_interface.f90)
 
-#READ in local settings (e.g. paths)
-set (FIND_LIBRARY_USE_LIB64_PATHS TRUE)
-
-set (SYST default CACHE STRING "Choose the platform we are on.")
-
-include (${SYST} OPTIONAL)
-######################
-# Retrieve the type of Fortran compiler. This is necassary to set the compiler options.
-######################
 get_filename_component (Fortran_COMPILER_NAME ${CMAKE_Fortran_COMPILER_ID} NAME)
-if (Fortran_COMPILER_NAME STREQUAL "GNU")
-  if(MPI)
-    set (COMPILER_WRAPPER mpif90)
-  endif()
-  set (CMAKE_Fortran_FLAGS "-fbacktrace -finit-real=nan -fdefault-real-8  -fno-f2c -ffree-line-length-none")
-  set (CMAKE_Fortran_FLAGS_RELEASE "-funroll-all-loops -O3")
-  set (CMAKE_Fortran_FLAGS_DEBUG   "-W -Wall -Wuninitialized -fcheck=all -fbacktrace -O0 -g -ffpe-trap=invalid,zero,overflow")
-  set (PROFILER_FLAG "-pg")
-elseif (Fortran_COMPILER_NAME STREQUAL "NAG")
-  if(MPI)
-    set (COMPILER_WRAPPER mpif90)
-  endif()
-  set (CMAKE_PREFIX_PATH "")
-  set (CMAKE_Fortran_FLAGS "-kind=byte -colour -C -f2003 -nan -r8 -free -w=x95 -wmismatch=mpi_allreduce ")
-  set (CMAKE_Fortran_FLAGS_RELEASE "-O4")
-  set (CMAKE_Fortran_FLAGS_DEBUG   "-O0 -gline -g")
-  set (PROFILER_FLAG "-pg")
-elseif (Fortran_COMPILER_NAME STREQUAL "Intel")
-  if(MPI)
-    set (COMPILER_WRAPPER mpif90)
-  endif()
-  set(CMAKE_Fortran_FLAGS "-r8 -ftz -extend_source")
-  set (CMAKE_Fortran_FLAGS_RELEASE " -traceback -O3 -no-prec-div -xAVX")
-  set (CMAKE_Fortran_FLAGS_DEBUG   " -traceback -fpe0 -O0 -g -check all -check nopointers -check noarg_temp_created")
-  set (PROFILER_FLAG "-p")
-elseif (Fortran_COMPILER_NAME STREQUAL "XL")
-  if(MPI)
-    set (COMPILER_WRAPPER mpxlf95)
-  endif()
-  #set(CMAKE_Fortran_FLAGS "-qthreaded -qsmp -qfree=F90 -qrealsize=8  -qwarn64 -qnosave -qinitauto=FFF00000 -qflttrap=en:ov:zero:inv:imp -qflag=w:e")
-  set(CMAKE_Fortran_FLAGS "-qfree=F90 -qrealsize=8  -qwarn64 -qnosave -qinitauto=FFF00000 -qflttrap=en:ov:zero:inv:imp -qflag=w:e")
-  set(CMAKE_Fortran_FLAGS_RELEASE "-O4 -qnoipa -qstrict=none:exceptions -qinitauto=ff -qsigtrap")
-  set(CMAKE_Fortran_FLAGS_DEBUG "-O2 -qfullpath -C -g -qflttrp=enable:inexact:invalid:nanq:overflow:zerodivide -qsigtrap -qinitauto")
-  set (PROFILER_FLAG "-pg")
+
+if (NOT ${Fortran_COMPILER_WRAPPER}  STREQUAL "")
+  CMAKE_FORCE_Fortran_COMPILER(${Fortran_COMPILER_WRAPPER} ${Fortran_COMPILER_NAME})
 endif ()
+MESSAGE(STATUS "Fortran Compiler " ${CMAKE_Fortran_COMPILER})
 
-
-# Set Profiler
-set (PROFILER CACHE STRING "Enable a profiler. Options: NONE, GPROF, SCALASCA or MARMOT")
-if(PROFILER STREQUAL "GPROF")
-  set (CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${PROFILER_FLAG}")
-elseif(PROFILER STREQUAL "SCALASCA")
-  set (COMPILER_WRAPPER scalf90)
-elseif(PROFILER STREQUAL "MARMOT")
-  set (COMPILER_WRAPPER marmotf90)
+set(CMAKE_Fortran_FLAGS ${USER_Fortran_FLAGS} )
+set(CMAKE_Fortran_FLAGS_RELEASE ${USER_Fortran_FLAGS_RELEASE} )
+set(CMAKE_Fortran_FLAGS_DEBUG ${USER_Fortran_FLAGS_DEBUG})
+MESSAGE(STATUS "Build Type " ${CMAKE_BUILD_TYPE})
+if (CMAKE_BUILD_TYPE STREQUAL "RELEASE")
+  MESSAGE(STATUS "Compiler Flags " ${CMAKE_Fortran_FLAGS} ${CMAKE_Fortran_FLAGS_RELEASE})
+else()
+  MESSAGE(STATUS "Compiler Flags " ${CMAKE_Fortran_FLAGS} ${CMAKE_Fortran_FLAGS_DEBUG})
 endif()
 
 
-find_package(NETCDF REQUIRED COMPONENTS F90)
-set (UCLALES_INCLUDE_DIRS ${NETCDF_INCLUDE_DIRS})
-set (UCLALES_LIBRARIES ${NETCDF_LIBRARIES} ${HDF5_LIBRARIES})
+set(INCLUDE_DIRS ${NETCDF_INCLUDE_DIR})
 
-
-# Set the compiler name to the wrapper, if necessary
-if (NOT ${COMPILER_WRAPPER}  STREQUAL "")
-  CMAKE_FORCE_Fortran_COMPILER(${COMPILER_WRAPPER} ${Fortran_COMPILER_NAME})
-endif ()
-MESSAGE(STATUS "Compiler " ${CMAKE_Fortran_COMPILER})
-
-#####################
-# COMPILE SRC DIR
-#####################
-ADD_SUBDIRECTORY( src)
+add_subdirectory(src)
 
 
 #####################
