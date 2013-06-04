@@ -171,12 +171,19 @@ contains
     use util, only : azero, atob
     use thrm, only : thermo, rslf
     use step, only : case_name, lanom
+    use mpi_interface, only : myid
 
     implicit none
 
     integer :: i,j,k
     real    :: exner, pres, tk, rc, xran(nzp), zc, dist, xc
     real, dimension(nzp)  :: thli
+! LINDA, b
+    real    :: qv, rh
+    real, allocatable :: f_xyz_3d(:,:,:)
+    allocate(f_xyz_3d(nzp,nxp,nyp))
+    f_xyz_3d = 0.0
+! LINDA, e
 
     call htint(ns,ts,hs,nzp,th0,zt)
     call htint(ns,thl,hs,nzp,thli,zt)
@@ -224,7 +231,38 @@ contains
           end do
         end do
       end do
+! LINDA, b
+    elseif (case_name == 'squall') then
+
+      CALL  squall3d_Morrison(f_xyz_3d)
+
+      do j=1,nyp
+        do i=1,nxp
+          do k=1,nzp
+             exner = (pi0(k)+pi1(k))/cp
+             pres  = p00 * (exner)**cpr
+             tk    = a_theta(k,i,j)*exner
+             rc    = max(0.,a_rp(k,i,j)-rslf(pres,tk))
+             rh    = vapor(k,i,j)/rslf(pres,tk)
+
+             ! add perturbation to theta
+             a_theta(k,i,j) = a_theta(k,i,j) + f_xyz_3d(k,i,j)
+
+             tk    = a_theta(k,i,j)*exner
+             qv    = rh*rslf(pres,tk)
+             a_tp(k,i,j)  = a_theta(k,i,j)*exp(-(alvl/cp)*rc/tk) - th00
+             vapor(k,i,j) = qv
+             a_rp(k,i,j)  = qv+rc
+
+          end do
+        end do
+      end do
+
+      WRITE (*,*) '=== SQUALL3D-Testcase: dTmax = ', &
+           MINVAL( f_xyz_3d(:,:,:) ),'myid=',myid
+
     end if
+! LINDA, e
 
     k=1
     do while( zt(k+1) <= zrand .and. k < nzp)
@@ -251,7 +289,7 @@ contains
     !
     call thermo (level)
     call atob(nxyzp,a_pexnr,press)
-
+    deallocate (f_xyz_3d)
     return
   end subroutine fldinit
   !----------------------------------------------------------------------
@@ -962,5 +1000,194 @@ return
  end subroutine larm_init_anom
 
 ! linda, e
+  !----------------------------------------------------------------------------
+  ! Shape function for the "Squall3D"-testcase temperature disturbance
+  ! of Hugh Morrison (NCAR) for the 8th WMO Cloud Modeling Workshop case #2
+  ! including updates from September, 2012
+  ! Linda Schlemmer, September 2012
+  !----------------------------------------------------------------------------
 
+  subroutine  squall3d_Morrison(f_xyz)
+
+    use mpi_interface, only: myid,nxpg,nypg
+    use defs, only : pi, cp, rcp, cpr, r, g, p00, p00i, ep2
+
+    implicit none
+
+    ! spatial shape function of the bubble:
+    real,       intent(out) :: f_xyz(nzp,nxp,nyp)
+
+    integer      :: i, j, k, n
+
+    ! variables for squallline initialization:
+    real   :: &
+         v_mag               ,&! max magnitude (K) of random variation
+         rndm_nmbr(10000000)       ! just some random numbers
+
+    real, allocatable :: noisedummy(:)
+
+    real::bub_radx,bub_radz,bub_centi,bub_centj,bub_centz
+
+
+    f_xyz(:,:,:) = 0.0
+    v_mag             =      0.04                  ! max. rel. magnitude of random variation.
+
+    CALL seed_random_number( 404 +myid)
+    ! on some compilers, the random series shows problems within the first few
+    ! hundred random numbers (the numbers are not really random, but
+    ! can be monotonic and reproducibly the same on all processors).
+    ! Only after some numbers, the series gets more random type.
+    ! Therefore, fetch 5000 dummy random numbers, before doing the
+    ! really needed random numbers:
+    ALLOCATE(noisedummy(5000))
+    CALL RANDOM_NUMBER(noisedummy)
+    DEALLOCATE(noisedummy)
+      
+    CALL RANDOM_NUMBER(rndm_nmbr)
+    
+    ! in order to initialize the squall line a cold pool with a horizontal extent of 200km 
+    ! with a maximum temperature disturbance of -5K at the surface, decreasing linearly 
+    ! to 0 at a height of 4.5 km is applied to theta.
+    ! since uclales does not have open boundaries and a sponge is used instead, I decided to
+    ! add 100km to the domain in the zonal direction. The cold pool starts at x=100km and stops
+    ! at x=300km. Between x=275km and x=300km random temperature perturbations are added up to
+    ! a height of 4.5 km
+
+    n=0
+    DO k = 1, nzp
+       DO i = 2, nxp-1
+          ! distance from the left boundary of the domain
+          IF (( xt(i)>-12500.).and.(xt(i)<12500.).and.(zt(k).le.4500.)) THEN
+             DO j = 2, nyp-1
+                n=n+1
+                f_xyz(k,i,j) = v_mag*(rndm_nmbr(n)-0.5)
+             ENDDO
+          ELSE
+             f_xyz(k,i,:) = 0.
+          END IF
+       ENDDO
+    ENDDO
+    
+    IF (myid == 0) THEN
+      WRITE (*,*) '=== Morrison SQUALL3D-Testcase:'
+    ENDIF
+    
+  END SUBROUTINE squall3d_Morrison
+  !==============================================================================
+  !==============================================================================
+  !
+  ! Initialisation of the random number generator on a parallel machine
+  ! with the following properties:
+  !
+  ! - if initialized with no "iseed_in" (optional integer parameter), then
+  !   the resulting random number series (RNS) will be different for each
+  !   model run, because seed is determined from the microseconds part of the actual date_and_time().
+  !   Additionally, the PE-number is blended into the seed to ensure
+  !   that the RNS is also different on each processor, even if called at the exact
+  !   same time.
+  !
+  ! - if "iseed_in" is provided, this is used to generate the same seed on 
+  !   a processor with a given PE-number each time the program runs, but
+  !   again different seeds on PEs with different PE-numbers.
+  !   This enables parallel generation of different random number series
+  !   on each processor, which are however the same at each successive program run on
+  !   each corresponding PE.
+  !
+  ! - NOTE: If you would like to, e.g., impose a random but reproducible noise on a 
+  !   model field (i.e., INDEPENDENT of the number of PEs) which stays the same for each
+  !   successive model run, then it is proposed that you calculate the noisy field
+  !   globally on one processor and distribute it afterwards to the single nodes using
+  !   the SR distribute_field() from parallel_utilities.f90.
+  !   THIS IS DONE IN SR gen_bubnoise() BELOW !
+  !
+  !==============================================================================
+  !==============================================================================
+
+  !.. PGI-friendly version:
+  subroutine seed_random_number(iseed_in) 
+    use mpi_interface, only: myid,nxprocs,nyprocs
+    
+    implicit none 
+    
+    !.. local vars
+    integer, optional, intent(in) :: iseed_in
+
+! LS2011b, for cscs, we do need the detailed type specifications, pgi will terminate
+! with floating point exceptions.
+
+!!! UB>> Older settings with detailed type specifications seem not
+!!!      to be necessary any more (aside from pgi-compiler, which
+!!!      cannot be tested at DWD!
+! LS, for cscs, we do need the detailed type specifications, pgi will terminate
+! with floating point exceptions.
+!    INTEGER*4 :: i
+!    INTEGER*4 :: k
+!    INTEGER*4 :: i1
+!    INTEGER :: zeit(8), i2, iseed,num_compute
+!    INTEGER*4, ALLOCATABLE :: seed(:)
+
+
+    INTEGER :: i
+    INTEGER :: k
+    INTEGER :: i1
+    INTEGER :: zeit(8), i2, iseed,num_compute
+    INTEGER, ALLOCATABLE :: seed(:)
+
+    num_compute=nxprocs*nyprocs
+!LS2011e
+    
+    ! for pgi-compiler, the system_clock starts at 0 when system_clock is first called during a program.
+    ! So by default, it measures a time *difference*, anticipating that the user
+    ! only wants to time his program. So, at the first call, the returned time is always 0.
+    ! Only for the subsequent calls, the time increases. What a nonsense!
+
+    ! Unfortunately, this is unusable for the purpose of initializing the random number generator with
+    ! a different seed for every program run, since this will all times lead
+    ! to the same result, independent of a certain
+    ! random or varying component.
+    ! This is different from other compilers, where system_clock() delivers the elapsed time
+    ! since 1.1.1970 in milliseconds, modulo HUGE(int).
+    !
+    ! So, we do it differently:
+    ! First, we use HUGE() to determine the maxint value i2:
+    i2 = HUGE(i1)
+    IF (.NOT.PRESENT(iseed_in)) THEN
+      ! and then we use DATE_AND_TIME() to get the milliseconds part of the actual time,
+      ! which later will serve as the varying component from program run to program run:
+      !CALL DATE_AND_TIME(values=zeit)
+      iseed=17!zeit(8)
+    ELSE
+      ! or, if it is desired, we use just iseed_in, which leeds to the same random numbers 
+      ! everytime:
+      iseed = iseed_in
+    END IF
+
+    ! get length of seed vector:
+    CALL RANDOM_SEED(SIZE=k)
+    ALLOCATE( seed(k) )
+    seed = 0
+
+    ! However, in any case we want to have a different random number series on each task,
+    ! so this is achieved by merging in my_cart_id into the seed.
+    ! The seed itself is constructed in a way that it is (multiply) folded into
+    ! the number range of integer*4 data type, in order to break somehow the monotonicity
+    ! in the seed vector. Monotonicity in the seed leads to a number series, from
+    ! which the first 100 elements or so are not random but very close to 0, and only
+    ! afterwards convert to more random behaviour.
+    DO i=1,k
+      seed(i) = myid+MOD(INT(i2/11*13*((MOD(i,5)+i)*i) + i2*int(real(iseed)/1000.0) + &
+          i2*int(0.95/real(myid+1)), kind=KIND(i2)), i2)
+    END DO
+    CALL RANDOM_SEED(PUT=seed)
+
+    IF (k >= 4) THEN
+      WRITE(*,'(a,i3,a,4(x,i14))') '    SEED_RANDOM_NUMBER (first 4 of ',k,'):', seed(1:4)
+    ELSE
+      WRITE(*,*) '    SEED_RANDOM_NUMBER : ', seed
+    END IF
+
+    DEALLOCATE( seed )    
+    RETURN
+  END SUBROUTINE seed_random_number
+! LINDA, e
 end module init
