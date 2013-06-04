@@ -351,7 +351,7 @@ contains
        call diffuse(time)
        if (adv=='monotone') then
           call fadvect
-       elseif ((adv=='second').or.(adv=='fourth')) then
+       elseif ((adv=='second').or.(adv=='third').or.(adv=='fourth')) then
           call advection_scalars(adv)
        else 
           print *, 'wrong specification for advection scheme'
