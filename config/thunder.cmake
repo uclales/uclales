@@ -3,7 +3,7 @@ set(CMAKE_Fortran_COMPILER "ifort")
 set(Fortran_COMPILER_WRAPPER mpif90)
 
 set(USER_Fortran_FLAGS "-traceback -r8 -ftz -extend_source")
-set(USER_Fortran_FLAGS_RELEASE "-O3 -no-prec-div -xAVX")
+set(USER_Fortran_FLAGS_RELEASE "-O3 -no-prec-div -xAVX -fp-model source")
 set(USER_Fortran_FLAGS_DEBUG "-fpe0 -O0 -g -check all -check nopointers -check noarg_temp_created")
 
 set(NETCDF_INCLUDE_DIR "/sw/squeeze-x64/netcdf_fortran-4.2-static-intel13/include")
