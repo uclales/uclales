@@ -33,7 +33,7 @@ module modnudge
 
 implicit none
 PRIVATE
-PUBLIC :: nudge,lnudge,tnudgefac, qfloor, zfloor, znudgemin, znudgeplus
+PUBLIC :: nudge,lnudge,tnudgefac, qfloor, zfloor, znudgemin, znudgeplus, nudge_bound, lnudge_bound
 SAVE
   real, dimension(:,:), allocatable :: tnudge,unudge,vnudge,wnudge,thlnudge,qtnudge
   real, dimension(:)  , allocatable :: timenudge
@@ -41,6 +41,17 @@ SAVE
   logical :: lnudge,lunudge,lvnudge,lwnudge,lthlnudge,lqtnudge
   integer :: ntnudge = 100
   logical :: firsttime = .true.
+! LINDA, b
+  ! arrays for nuding
+  logical :: lnudge_bound = .false.
+
+  ! arrays for initial values
+  real, dimension(:),allocatable::tn,rn,un,vn,wn
+
+  real, allocatable :: rlx(:,:)
+  real::coef=1./60.
+
+! LINDA, e
 contains
   subroutine initnudge(time)
     use grid, only : nzp,zt,th00,umean,vmean
@@ -206,5 +217,123 @@ contains
 
   end subroutine nudge
 
+! LINDA, b
+!--------------------------------------------------------------------------!
+!This routine nudges simulated values of temperature, humidity             !
+!and horizontal and vertical wind speed back to their initial state at a   !
+!time scale tau. The nudging is only done in a small zone at the Eastern   !
+!and Western edge of the domain.                                           !
+!The effect of the nudging is to obtain relaxation boundary conditions     !
+!which can e.g. be used to model the development of a squall line          !
+!                                                                          !
+! Linda Schlemmer, December 2011                                           !
+!--------------------------------------------------------------------------!
+  subroutine nudge_bound
+
+  use grid, only: nxp,nyp,nzp,a_tt,a_tp,a_rt,a_rp,&
+                  a_ut,a_up,a_vt,a_vp,a_wt,a_wp,liquid
+  use mpi_interface, only : myid
+
+  IMPLICIT NONE
+  integer:: k,t,i,j
+
+
+  if (firsttime) then
+     firsttime = .false.
+     allocate(rlx(nxp,nyp))
+     allocate(tn(nzp),rn(nzp),un(nzp),vn(nzp),wn(nzp))
+     rlx(:,:)=0.0
+     call initnudge_bound
+  end if
+
+! relax towards initial conditions
+
+  do k=1,nzp
+     do i=1,nxp
+        do j=1,nyp
+           a_tt(k,i,j)=a_tt(k,i,j)-(a_tp(k,i,j)-tn(k))*coef*rlx(i,j)
+           a_rt(k,i,j)=a_rt(k,i,j)-(a_rp(k,i,j)-rn(k))*coef*rlx(i,j)
+           a_ut(k,i,j)=a_ut(k,i,j)-(a_up(k,i,j)-un(k))*coef*rlx(i,j)
+           a_vt(k,i,j)=a_vt(k,i,j)-(a_vp(k,i,j)-vn(k))*coef*rlx(i,j)
+           a_wt(k,i,j)=a_wt(k,i,j)-(a_wp(k,i,j)-wn(k))*coef*rlx(i,j)
+        enddo
+     enddo
+  enddo
+
+  end subroutine nudge_bound
+!--------------------------------------------------------------------------
+
+
+  subroutine initnudge_bound
+
+  use mpi_interface, only : myid,nxprocs,nyprocs
+  use grid, only: nxp,nyp,nzp,a_tp,a_rp,a_up,a_vp,a_wp,deltax
+  use defs, only: pi
+
+  IMPLICIT NONE
+
+  integer k,t,i,j
+  real::eps=0.01
+  integer:: nnudge ! number of points where relaxation is done
+  real:: xnudge    ! relaxation zone [km], to be tested
+  real:: rnudge    ! relaxation zone [points]
+  logical::flg
+
+  flg=.false.
+
+  xnudge=10.0
+  rnudge=xnudge*1000.0/deltax
+  nnudge=int(rnudge)
+  if (nnudge>nxp) flg=.true.
+
+! western boundary
+  if (mod(myid,nxprocs)<eps) then
+     print*,'western boundary, myid=',myid
+     if (flg) nnudge=nxp
+     do i=1,nnudge
+!       rlx(i,:)=1.0 ! step function
+        rlx(i,:)=(cos(real(i)*pi/(rnudge*2)))**2!cos2-function
+     enddo
+  endif
+  ! relaxation zone extends over more than one processor
+  if ((myid>0).and.(mod(myid-1,nxprocs)<eps).and.(flg)) then
+     print*,'western boundary, 2nd proc, myid=',myid
+     do i=1,nnudge-nxp+4
+!       rlx(i,:)=1.0 ! step function
+        rlx(i,:)=(cos(real(i+nxp-4)*pi/(rnudge*2)))**2!cos2-function
+     enddo
+  endif
+
+! eastern boundary
+  if (mod(myid+1,nxprocs)<eps) then
+     print*,'eastern boundary, myid=',myid
+     if (flg) nnudge=nxp
+     do i=nxp-nnudge+1,nxp
+!       rlx(i,:)=1.0! step function
+        rlx(i,:)=(cos(real(nxp-i+1)*pi/(rnudge*2)))**2!cos2-function
+     enddo
+  endif
+  ! relaxation zone extends over more than one processor
+  if ((mod(myid+2,nxprocs)<eps).and.(flg)) then
+     print*,'eastern boundary, 2nd proc, myid=',myid
+     do i=2*nxp-nnudge+1-4,nxp
+!       rlx(i,:)=1.0 ! step function
+        rlx(i,:)=(cos(real(2*nxp-i+1-4)*pi/(rnudge*2)))**2!cos2-function
+     enddo
+  endif
+
+! read in/save initial conditions
+
+  do k=1,nzp
+     tn(k)=a_tp(k,3,3)
+     rn(k)=a_rp(k,3,3)
+     un(k)=a_up(k,3,3)
+     vn(k)=a_vp(k,3,3)
+     wn(k)=0.0
+  enddo
+
+
+  end subroutine initnudge_bound
+! LINDA, e
 
 end module

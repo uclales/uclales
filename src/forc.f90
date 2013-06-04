@@ -25,7 +25,7 @@ module forc
   use rad_gcss, only  : gcss_rad
   !cgils
   use grid, only      : wfls, dthldtls, dqtdtls, sfc_albedo, lrad_ca
-  use modnudge, only : nudge
+  use modnudge, only  : nudge, nudge_bound, lnudge_bound !LINDA 
   use stat, only : sflg
   implicit none
 
@@ -146,6 +146,9 @@ contains
           ! subsidence
           !
 !cgils
+! LINDA, b
+    if (lnudge_bound) call nudge_bound
+! LINDA, e
     if (lstendflg) then
 
       do j=3,nyp-2
