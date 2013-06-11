@@ -29,17 +29,18 @@ use lsmdata
   logical :: lhomflx = .false.
   real    :: rh_srf = 1.
   real    :: drag   = -1.
+
 contains
   !
   ! --------------------------------------------------------------------------
-  ! SURFACE: Calcualtes surface fluxes using an algorithm chosen by ISFCTYP
+  ! SURFACE: Calculates surface fluxes using an algorithm chosen by ISFCTYP
   ! and fills the appropriate 2D arrays
   !
   !   default: specified thermo-fluxes (drtcon, dthcon)
   !   isfctyp=1: specified surface layer gradients (drtcon, dthcon)
   !   isfctyp=2: fixed lower boundary of water at certain sst
-  !   isfctyp=3: bulk aerodynamic law with coefficeints (drtcon, dthcon)
-  !   isfctyp=4: fix surface temperature to yield a constant surface buoyancy flux
+  !   isfctyp=3: bulk aerodynamic law with coefficients (drtcon, dthcon)
+  !   isfctyp=4: regulate surface temperature to yield a constant surface buoyancy flux
   !   isfctyp=5: surface temperature and humidity determined using LSM (van Heerwaarden)
   !
   subroutine surface(sst,time_in)
@@ -48,7 +49,7 @@ contains
     use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, zt, psrf,   &
          th00, umean, vmean, dn0, level, a_ustar, a_tstar, a_rstar,        &
          uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, nstep, shls, lhls, usls,  &
-         timels, a_tskin, a_qskin, isfctyp, a_phiw, a_tsoil, a_Wl
+         timels, a_tskin, a_qskin, isfctyp, a_phiw, a_tsoil, a_Wl, deltax
     use thrm, only: rslf
     use stat, only: sfc_stat, sflg
     use util, only : get_avg3
@@ -58,15 +59,14 @@ contains
     implicit none
 
     real, optional, intent (inout) :: sst, time_in
-    integer :: i, j, l, iterate 
-    real :: zs, bflx0,bflx, ffact, sst1, bflx1, Vbulk, Vzt, usum
+    integer :: i, j, iterate 
+    real :: zs, bflx, ffact, sst1, bflx1, Vbulk, Vzt, usum
     real (kind=8) :: bfl(2), bfg(2)
 
     real :: dtdz(nxp,nyp), drdz(nxp,nyp), usfc(nxp,nyp), vsfc(nxp,nyp) &
-            ,wspd(nxp,nyp), bfct(nxp,nyp), ustar(nxp,nyp), mnflx(5), flxarr(5,nxp,nyp)
+            ,wspd(nxp,nyp), bfct(nxp,nyp), mnflx(5), flxarr(5,nxp,nyp)
 
-    real :: times,tfrac
-    integer:: tcnt
+    drdz(:,:) = 0.
 
     select case(isfctyp)
 
@@ -78,16 +78,15 @@ contains
        call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,a_up,a_vp,umean,vmean)
        do j=3,nyp-2
          do i=3,nxp-2
-           dtdz(i,j)=dthcon
-           drdz(i,j)=drtcon
+           dtdz(i,j) = dthcon
+           if(level>0) drdz(i,j)=drtcon
          end do
        end do
        zs = zrough
-
-       call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,drdz,a_ustar,a_tstar,     &
-                       a_rstar)
-       call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,a_rstar,  &
-                       uw_sfc,vw_sfc,wt_sfc,wq_sfc,ww_sfc)
+   
+       call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,a_ustar,a_tstar,drt=drdz,rstar=a_rstar)
+       call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,  &
+                       uw_sfc,vw_sfc,wt_sfc,ww_sfc,wq_sfc,a_rstar)
 
     !
     ! ----------------------------------------------------------------------
@@ -100,7 +99,7 @@ contains
        do j=3,nyp-2
          do i=3,nxp-2
            dtdz(i,j) = a_theta(2,i,j) - sst*(p00/psrf)**rcp
-           drdz(i,j) = vapor(2,i,j) - rslf(psrf,sst)
+           if(level>0) drdz(i,j) = vapor(2,i,j) - rslf(psrf,sst)
            bfct(i,j) = g*zt(2)/(a_theta(2,i,j)*wspd(i,j)**2)
            usum = usum + a_ustar(i,j)
          end do
@@ -108,22 +107,22 @@ contains
        usum = max(ubmin,usum/float((nxp-4)*(nyp-4)))
        zs = zrough
        if (zrough <= 0.) zs = max(0.0001,(0.016/g)*usum**2)
-       call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,drdz,a_ustar,a_tstar     &
-            ,a_rstar)
-       call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,a_rstar  &
-            ,uw_sfc,vw_sfc,wt_sfc,wq_sfc,ww_sfc)
+       call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,a_ustar,a_tstar,drt=drdz,rstar=a_rstar)
+       call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,  &
+                       uw_sfc,vw_sfc,wt_sfc,ww_sfc,wq_sfc,a_rstar)
+
 
     !
     ! ----------------------------------------------------------------------
     ! drtcon (wq=Ch*u*dth, Garrat p.55) and using prescribed sst 
-    !  and qsurf=qsat (ocean); note that here zrough is not the roughness
+    ! and qsurf=qsat (ocean); note that here zrough is not the roughness
     !
     case(3)
        call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,a_up,a_vp,umean,vmean)
        do j=3,nyp-2
          do i=3,nxp-2
            dtdz(i,j) = a_theta(2,i,j) - sst*(p00/psrf)**rcp
-             drdz(i,j) = vapor(2,i,j) - rh_srf*rslf(psrf,sst)
+           if(level>0) drdz(i,j) = vapor(2,i,j) - rh_srf*rslf(psrf,sst)
            if (ubmin > 0.) then
              a_ustar(i,j) = sqrt(zrough)* wspd(i,j)
            else
@@ -131,35 +130,42 @@ contains
            end if
              if (drag > 0) then
                a_tstar(i,j) =  drag*dtdz(i,j)/a_ustar(i,j)
-               a_rstar(i,j) =  drag*drdz(i,j)/a_ustar(i,j)
+               if(level>0) a_rstar(i,j) =  drag*drdz(i,j)/a_ustar(i,j)
              else
                a_tstar(i,j) =  dthcon * wspd(i,j)*dtdz(i,j)/a_ustar(i,j)
-               a_rstar(i,j) =  drtcon * wspd(i,j)*drdz(i,j)/a_ustar(i,j)
+               if(level>0) a_rstar(i,j) =  drtcon * wspd(i,j)*drdz(i,j)/a_ustar(i,j)
              endif
            bfct(i,j) = g*zt(2)/(a_theta(2,i,j)*wspd(i,j)**2)
          end do
        end do
-       call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,a_rstar  &
-            ,uw_sfc,vw_sfc,wt_sfc,wq_sfc,ww_sfc)
-      if (lhomflx) then
+
+       call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,  &
+                       uw_sfc,vw_sfc,wt_sfc,ww_sfc,wq_sfc,a_rstar)
+
+       if (lhomflx) then
          flxarr(1,:,:) = uw_sfc
          flxarr(2,:,:) = vw_sfc
          flxarr(3,:,:) = ww_sfc
          flxarr(4,:,:) = wt_sfc
-         flxarr(5,:,:) = wq_sfc
-         call get_avg3(5,nxp,nyp,flxarr,mnflx)
+         if(level>0) then
+           flxarr(5,:,:) = wq_sfc
+           call get_avg3(5,nxp,nyp,flxarr,mnflx)
+         else
+           call get_avg3(4,nxp,nyp,flxarr,mnflx)
+         end if 
          uw_sfc = mnflx(1)
          vw_sfc = mnflx(2)
          ww_sfc = mnflx(3)
          wt_sfc = mnflx(4)
-         wq_sfc = mnflx(5)
+         if(level>0) wq_sfc = mnflx(5)
        end if
-       !
-       ! fix surface temperature to yield a constant surface buoyancy flux
-       ! dthcon
-       !
-   case(4)
 
+    !
+    ! ----------------------------------------------------------------------
+    ! fix surface temperature to yield a constant surface buoyancy flux
+    ! dthcon
+    !
+    case(4)
        Vzt   = 10.* (log(zt(2)/zrough)/log(10./zrough))
        Vbulk = Vzt * (vonk/log(zt(2)/zrough))**2
 
@@ -240,7 +246,7 @@ contains
 
        tskinavg = sum(a_tskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
        sst      = tskinavg*(psrf/p00)**(rcp)
-       call srfcscls(nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,drdz,a_ustar,a_tstar,a_rstar,obl)
+       call srfcscls(nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,a_ustar,a_tstar,oblin=obl,drt=drdz,rstar=a_rstar)
 
        !Calculate the drag coefficients and aerodynamic resistance
        do j=3,nyp-2
@@ -292,7 +298,7 @@ contains
     case default
        ffact = 1.
        wt_sfc(1,1)  = ffact* dthcon/(0.5*(dn0(1)+dn0(2))*cp)
-       wq_sfc(1,1)  = ffact* drtcon/(0.5*(dn0(1)+dn0(2))*alvl)
+       if(level>0) wq_sfc(1,1)  = ffact* drtcon/(0.5*(dn0(1)+dn0(2))*alvl)
 
        if (zrough <= 0.) then
          usum = 0.
@@ -310,10 +316,12 @@ contains
 
        do j=3,nyp-2
          do i=3,nxp-2
-           wt_sfc(i,j)=wt_sfc(1,1)
-           wq_sfc(i,j)=wq_sfc(1,1)
+           wt_sfc(i,j) = wt_sfc(1,1) 
+           if(level>0) wq_sfc(i,j) = wq_sfc(1,1)
+
            wspd(i,j)    = max(0.1,                                    &
                           sqrt((a_up(2,i,j)+umean)**2+(a_vp(2,i,j)+vmean)**2))
+
            if (ubmin > 0.) then
              bflx = g*wt_sfc(1,1)/th00
            if (level >= 2) bflx = bflx + g*ep2*wq_sfc(i,j)
@@ -326,7 +334,7 @@ contains
            uw_sfc(i,j)  = -ffact*(a_up(2,i,j)+umean)
            vw_sfc(i,j)  = -ffact*(a_vp(2,i,j)+vmean)
            ww_sfc(i,j)  = 0.
-           a_rstar(i,j) = -wq_sfc(i,j)/a_ustar(i,j)
+           if(level>0) a_rstar(i,j) = -wq_sfc(i,j)/a_ustar(i,j)
            a_tstar(i,j) = -wt_sfc(i,j)/a_ustar(i,j)
          end do
        end do
@@ -441,17 +449,18 @@ contains
   !
   ! Code writen March, 1999 by Bjorn Stevens
   !
-  subroutine srfcscls(n2,n3,z,z0,th00,u,dth,drt,ustar,tstar,rstar,obl)
+  subroutine srfcscls(n2,n3,z,z0,th00,u,dth,ustar,tstar,oblin,drt,rstar)
 
     use defs, only : vonk, g, ep2
-    use grid ,only: nstep, runtype
+    use grid ,only: nstep, runtype, level
+    use mpi_interface, only : myid
 
     implicit none
 
-    real, parameter     :: ah   =  4.7   ! stability function parameter
-    real, parameter     :: bh   = 16.0   !   "          "         "
-    real, parameter     :: am   =  4.7   !   "          "         "
-    real, parameter     :: bm   = 16.0   !   "          "         "
+    !real, parameter     :: ah   =  4.7   ! stability function parameter
+    !real, parameter     :: bh   = 16.0   !   "          "         "
+    !real, parameter     :: am   =  4.7   !   "          "         "
+    !real, parameter     :: bm   = 16.0   !   "          "         "
     !real, parameter     :: ah   =  7.8   ! stability function parameter
     !real, parameter     :: bh   = 12.0   !   "          "         "
     !real, parameter     :: am   =  4.8   !   "          "         "
@@ -465,16 +474,17 @@ contains
     real, intent(in)    :: th00          ! reference temperature
     real, intent(in)    :: u(n2,n3)      ! velocities at z
     real, intent(in)    :: dth(n2,n3)    ! theta (th(z) - th(z0))
-    real, intent(in)    :: drt(n2,n3)    ! qt(z) - qt(z0)
     real, intent(inout) :: ustar(n2,n3)  ! scale velocity
     real, intent(inout) :: tstar(n2,n3)  ! scale temperature
-    real, intent(inout) :: rstar(n2,n3)  ! scale value of qt
-    real, intent(inout), optional :: obl(n2,n3)    ! Obukhov Length
+    real, intent(inout), optional :: oblin(n2,n3)    ! Obukhov Length
+    real, intent(in),optional     :: drt(n2,n3)    ! qt(z) - qt(z0)
+    real, intent(inout), optional :: rstar(n2,n3)  ! scale value of qt
 
     logical, save :: first_call=.True.
-    integer :: i,j,iterate
+    integer :: i,j,iterate,niter,max_niter
     real    :: lnz, klnz, betg
-    real    :: x, y, zeta, lmo, dtv
+    real    :: zeta, lmo, dtv
+    real    :: lmoold,lmodif
 
     lnz   = log(z/z0)
     klnz  = vonk/lnz
@@ -482,9 +492,15 @@ contains
     !cnst2 = -log(2.)
     !cnst1 = 3.14159/2. + 3.*cnst2
 
+    max_niter = 0
+
     do j=3,n3-2
        do i=3,n2-2
-          dtv = dth(i,j) + ep2*th00*drt(i,j)
+          if(level>0) then
+            dtv = dth(i,j) + ep2*th00*drt(i,j)
+          else
+            dtv = dth(i,j)
+          end if
 
           !
           ! OLD STABLE CASE
@@ -524,29 +540,40 @@ contains
                lmo        = -1.e10
              end if
 
-             do iterate = 1,10
-                lmo   = betg*ustar(i,j)**2/(vonk*tstar(i,j))
+             lmoold = 1e9
+             lmodif = 1e9
+             niter  = 0
+             !do iterate = 1,10
+             do while(abs(lmodif)>0.1)
+               lmo  = betg*ustar(i,j)**2/(vonk*tstar(i,j))
+               lmodif = lmo - lmoold
+               lmoold = lmo
 
-                if ((dtv < 0) .and. (lmo > -0.001) ) then
-                   lmo = -0.001999
-                end if
-                if ((dtv > 0) .and. (lmo < +0.001) ) then
-                   lmo = +0.001777
-                end if
+               if ((dtv < 0) .and. (lmo > -0.001)) lmo = -0.001999
+               if ((dtv > 0) .and. (lmo < +0.001)) lmo = +0.001777
 
-                zeta  = z/lmo
-                ustar(i,j) = u(i,j)*vonk/(lnz - psim(zeta))
-                tstar(i,j) = (dtv*vonk/pr)/(lnz - psih(zeta))
+               zeta  = z/lmo
+               ustar(i,j) = u(i,j)*vonk/(lnz - psim(zeta))
+               tstar(i,j) = (dtv*vonk/pr)/(lnz - psih(zeta))
+
+               niter = niter + 1
+               if(niter>1000) then
+                 print*,'Obukh. length not converged, myid=',myid,'i,j=',i,j
+                 stop
+               end if
+
              end do
+             max_niter = max(max_niter,niter)
           end if
-         
-          if(present(obl)) obl(i,j)   = lmo
-          rstar(i,j) = tstar(i,j)*drt(i,j)/(dtv + eps)
+        
+          if(present(oblin)) oblin(i,j) = lmo
+          if(present(rstar)) rstar(i,j) = tstar(i,j)*drt(i,j)/(dtv + eps)
           tstar(i,j) = tstar(i,j)*dth(i,j)/(dtv + eps)
 
        end do
     end do
 
+    !print*,'obl iters=',max_niter
     first_call = .False.
 
     return
@@ -558,25 +585,25 @@ contains
   ! subroutine: sfcflxs:  this routine returns the surface fluxes based
   ! on manton-cotton algebraic surface layer equations.
   !
-  subroutine sfcflxs(n2,n3,vk,ubar,u,v,xx,us,ts,rstar,uw,vw,tw,rw,ww)
+  subroutine sfcflxs(n2,n3,vk,ubar,u,v,xx,us,ts,uw,vw,tw,ww,rw,rstar)
     implicit none
-    real, parameter      :: cc=4.7,eps=1.e-20
-
-    integer, intent(in)  :: n2,n3
-    real, intent(in)     :: ubar(n2,n3),u(n2,n3),v(n2,n3),xx(n2,n3),vk
-    real, intent(in)     :: us(n2,n3),ts(n2,n3),rstar(n2,n3)
-    real, intent(out)    :: uw(n2,n3),vw(n2,n3),tw(n2,n3),rw(n2,n3),ww(n2,n3)
+    real, parameter             :: cc=4.7,eps=1.e-20
+    integer, intent(in)         :: n2,n3
+    real, intent(in)            :: ubar(n2,n3),u(n2,n3),v(n2,n3),xx(n2,n3),vk
+    real, intent(in)            :: us(n2,n3),ts(n2,n3)
+    real, intent(out)           :: uw(n2,n3),vw(n2,n3),tw(n2,n3),ww(n2,n3)
+    real, intent(in), optional  :: rstar(n2,n3)
+    real, intent(out), optional :: rw(n2,n3)
 
     real    :: x(n2,n3),y(n2,n3)
-    integer i,j
+    integer :: i,j
 
     do j=3,n3-2
        do i=3,n2-2
-
           uw(i,j)=-(u(i,j)/(ubar(i,j)+eps))*us(i,j)**2
           vw(i,j)=-(v(i,j)/(ubar(i,j)+eps))*us(i,j)**2
           tw(i,j)=-ts(i,j)*us(i,j)
-          rw(i,j)=-rstar(i,j)*us(i,j)
+          if(present(rw)) rw(i,j)=-rstar(i,j)*us(i,j)
 
           x(i,j) = xx(i,j)*vk*ts(i,j)*(ubar(i,j)/us(i,j))**2
           x(i,j) = x(i,j)*sqrt(sqrt(1.-15.*min(0.,x(i,j)))) &
@@ -588,6 +615,7 @@ contains
        enddo
     enddo
     return
+
   end subroutine sfcflxs
 
   !
@@ -601,7 +629,7 @@ contains
 
     integer        :: i,j,iter
     real           :: upcu, vpcv
-    real           :: thv,thvs, thvsl
+    !real           :: thv,thvs, thvsl
     real           :: L, Lstart, Lend, Lold
     real           :: Rib, fx, fxdif, wspd2
     real           :: thetavbar, tvskinbar
@@ -783,7 +811,7 @@ contains
     use defs, only: p00, stefan, rcp, cp, R, alvl, rowt, g
     use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, liquid, zt, &
                     psrf, th00, umean, vmean, dn0, iradtyp, dt, &
-		    a_lflxu, a_lflxd, a_sflxu, a_sflxd, nstep, press, &
+                    a_lflxu, a_lflxd, a_sflxu, a_sflxd, nstep, press, &
                     a_lflxu_avn, a_lflxd_avn, a_sflxu_avn, a_sflxd_avn, &
                     a_tsoil, a_phiw, a_tskin, a_Wl, a_qskin, a_Qnet, a_G0
     use mpi_interface, only: myid
@@ -795,7 +823,6 @@ contains
     real     :: e, esat, qsat, desatdT, dqsatdT, Acoef, Bcoef
     real     :: fH, fLE, fLEveg, fLEsoil, fLEliq, LEveg, LEsoil, LEliq
     real     :: Wlmx, rk3coef=0
-    real :: oldv
 
 
     thetaavg  = sum(a_theta(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
@@ -937,7 +964,7 @@ contains
         fLE     = fLEveg + fLEsoil + fLEliq
 
         !" Weighted timestep in runge-kutta scheme
-        rk3coef = dt / (4 - dble(nstep))
+        rk3coef = dt / (4 - float(nstep))
 
         !" Compute skin temperature from linarized surface energy balance
         Acoef   = a_Qnet(i,j) - stefan * (tskinm(i,j)*exner) **4. &

@@ -177,7 +177,7 @@ contains
     a_km(:,:,:) = 0.
     memsize = memsize + nxyzp*14 !
 
-    if (level >= 0) then
+    if (level > 0) then
        allocate (vapor(nzp,nxp,nyp))
        vapor(:,:,:) = 0.
        memsize = memsize + nxyzp
@@ -269,16 +269,17 @@ contains
     allocate (a_xp(nzp,nxp,nyp,nscl), a_xt1(nzp,nxp,nyp,nscl),        &
          a_xt2(nzp,nxp,nyp,nscl))
 
-    a_xp(:,:,:,:) = 0.
+    a_xp(:,:,:,:)  = 0.
     a_xt1(:,:,:,:) = 0.
     a_xt2(:,:,:,:) = 0.
 
     a_up =>a_xp (:,:,:,1)
     a_vp =>a_xp (:,:,:,2)
     a_wp =>a_xp (:,:,:,3)
-    a_tp =>a_xp(:,:,:,4)
+    a_tp =>a_xp (:,:,:,4)
 
-    if (level >= 0) a_rp =>a_xp (:,:,:,5)
+    if (level > 0) a_rp =>a_xp (:,:,:,5)
+
     ! warm rain with number and mass of rain
     if (level >= 3) then
       a_rpp =>a_xp(:,:,:,6)
@@ -334,10 +335,11 @@ contains
       a_cvrxp => NULL()
     end if
 
-    allocate (a_ustar(nxp,nyp),a_tstar(nxp,nyp),a_rstar(nxp,nyp))
+    allocate (a_ustar(nxp,nyp),a_tstar(nxp,nyp))
     allocate (uw_sfc(nxp,nyp),vw_sfc(nxp,nyp),ww_sfc(nxp,nyp))
-    allocate (wt_sfc(nxp,nyp),wq_sfc(nxp,nyp))
+    allocate (wt_sfc(nxp,nyp))
 
+    if (level > 0) allocate(wq_sfc(nxp,nyp),a_rstar(nxp,nyp))
 
     !Malte: allocate Land surface variables for restart
     if (isfctyp == 5) then
@@ -394,12 +396,15 @@ contains
 
     a_ustar(:,:) = 0.
     a_tstar(:,:) = 0.
-    a_rstar(:,:) = 0.
     uw_sfc(:,:)  = 0.
     vw_sfc(:,:)  = 0.
     ww_sfc(:,:)  = 0.
     wt_sfc(:,:) = 0.
-    wq_sfc(:,:) = 0.
+    
+    if (level > 0) then
+      wq_sfc(:,:) = 0.
+      a_rstar(:,:) = 0.
+    end if
 
     memsize = memsize +  nxyzp*nscl*2 + 3*nxyp + nxyp*10
 

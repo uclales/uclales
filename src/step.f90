@@ -162,20 +162,35 @@ contains
        !  if(lpartic) call write_particle_hist(1,time)
        !end if
 
+
        if(myid == 0) then
           call mpi_get_time(t2)
           if (mod(istp,istpfl) == 0 ) then
-              if (wctime.gt.1e9) then
-                print "('   Timestep # ',i6," //     &
-                       "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3)",     &
-                       istp, time, dt_prev, t2-t1
-              else
-                print "('   Timestep # ',i6," //     &
-                       "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3'  WC Time left(sec) = ',f10.2)",     &
-                       istp, time, dt_prev, t2-t1, wctime-t2+t0
-              end if
+              !if (wctime.gt.1e9) then
+                print "(i6,' | time=',f12.2,3x,' | dt=',f8.4,'(',f8.4,')',' | CPUdt=',f8.3,' | max(cfl=',f6.3,' pecl=',f6.3,')')",istp, time, dt_prev,dt, t2-t1,cflmax,pecletmax
+              !else
+              !  print "('   Timestep # ',i6," //     &
+              !         "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3'  WC Time left(sec) = ',f10.2)",     &
+              !         istp, time, dt_prev, t2-t1, wctime-t2+t0
+              !end if
           end if
        endif
+
+       !if(myid == 0) then
+       !   call mpi_get_time(t2)
+       !   if (mod(istp,istpfl) == 0 ) then
+       !       if (wctime.gt.1e9) then
+       !         print "('   Timestep # ',i6," //     &
+       !                "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3)",     &
+       !                istp, time, dt_prev, t2-t1
+       !       else
+       !         print "('   Timestep # ',i6," //     &
+       !                "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3'  WC Time left(sec) = ',f10.2)",     &
+       !                istp, time, dt_prev, t2-t1, wctime-t2+t0
+       !       end if
+       !   end if
+       !endif
+
        call broadcast_dbl(t2, 0)
     enddo
 
@@ -295,7 +310,7 @@ contains
     use mpi_interface, only : myid, appl_abort
     use grid, only : level, dt, nstep, a_tt, a_up, a_vp, a_wp, dxi, dyi, dzi_t, &
          nxp, nyp, nzp, dn0,a_scr1, u0, v0, a_ut, a_vt, a_wt, zt, a_ricep, a_rct, a_rpt, &
-         lwaterbudget
+         lwaterbudget, a_xt2
     use stat, only : sflg, statistics
     use sgsm, only : diffuse
     !use sgsm_dyn, only : calc_cs
@@ -316,7 +331,7 @@ contains
 
     logical, parameter :: debug = .false.
     real :: xtime
-  character (len=8) :: adv='monotone'
+    character (len=8) :: adv='monotone'
 
     xtime = time/86400. + strtim
     call timedep(time,timmax, sst)
@@ -345,10 +360,8 @@ contains
        call surface(sst,xtime)
        xtime = xtime + strtim
 
-       ! BvS
-       !call calc_cs(time)      ! calculated dynamic value Cs
-
        call diffuse(time)
+
        if (adv=='monotone') then
           call fadvect
        elseif ((adv=='second').or.(adv=='third').or.(adv=='fourth')) then
@@ -357,7 +370,9 @@ contains
           print *, 'wrong specification for advection scheme'
           call appl_abort(0)
        endif
+
        call ladvect
+
        if (level >= 1) then
           if (lwaterbudget) then
              call thermo(level,1)
@@ -367,6 +382,7 @@ contains
           call forcings(xtime,cntlat,sst,div,case_name)
           call micro(level,istp)
        end if
+
        call corlos
        call buoyancy
        call sponge
@@ -388,6 +404,7 @@ contains
        if(lpartic .and. lpartstat) call particlestat(.false.,time+dt)
        sflg = .False.
     end if
+
   end subroutine t_step
   !
   !----------------------------------------------------------------------
@@ -478,7 +495,11 @@ contains
 
     integer :: n
 
+    !print*,'old',a_xp(2,19,8,4),a_xt1(2,19,8,4),a_xt2(2,19,8,4)
+
     a_xp = a_xp + dt *(rkalpha(nstep)*a_xt1 + rkbeta(nstep)*a_xt2)
+
+    !print*,'new',a_xp(2,19,8,4),a_xt1(2,19,8,4),a_xt2(2,19,8,4)
 
     call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
 
@@ -652,8 +673,12 @@ contains
     if (level>3) rl = rl + a_ricep + a_rsnowp + a_rgrp
     if (level>4) rl = rl + a_rhailp
 
+    if(level>0) then
+      call boyanc(nzp,nxp,nyp,level,a_wt,a_theta,th00,a_scr1,vapor,rl)
+    else
+      call boyanc(nzp,nxp,nyp,level,a_wt,a_theta,th00,a_scr1)
+    end if
 
-    call boyanc(nzp,nxp,nyp,level,a_wt,a_theta,vapor,rl,th00,a_scr1)
     call ae1mm(nzp,nxp,nyp,a_wt,awtbar)
     call update_pi1(nzp,awtbar,pi1)
 
@@ -664,14 +689,15 @@ contains
   ! ----------------------------------------------------------------------
   ! subroutine boyanc:
   !
-  subroutine boyanc(n1,n2,n3,level,wt,th,rv,rl,th00,scr)
+  subroutine boyanc(n1,n2,n3,level,wt,th,th00,scr,rv,rl)
 
     use defs, only: g, ep2
 
     integer, intent(in) :: n1,n2,n3,level
-    real, intent(in)    :: th00,th(n1,n2,n3),rv(n1,n2,n3),rl(n1,n2,n3)
+    real, intent(in)    :: th00,th(n1,n2,n3)
     real, intent(inout) :: wt(n1,n2,n3)
     real, intent(out)   :: scr(n1,n2,n3)
+    real, intent(in), optional :: rv(n1,n2,n3),rl(n1,n2,n3)
 
     integer :: k, i, j
     real :: gover2

@@ -152,7 +152,7 @@ contains
              cfl(k)  = w(k,i,j) * dt * dzi_m_local(k)
              wpdn(k) = w(k,i,j) * density(k)
              if (abs(cfl(k)) > 1.0) then
-                if (myid == 0) print *, '  ABORTING: mamaos_z'
+                if (myid == 0) print *, '  ABORTING: mamaos_z @ kij=',k,i,j
                 call appl_abort (0)
              end if
           enddo
@@ -246,7 +246,7 @@ contains
              cfl(i,k)  = u(k,i,j) * dt * dxi
              scr(i,k)  = scp0(k,i+1,j)
              if (abs(cfl(i,k)) > 1.0) then
-                if (myid == 0) print *, '  ABORTING: mamaos_x'
+                if (myid == 0) print *, '  ABORTING: mamaos_x @ kij=',k,i,j
                 call appl_abort(0)
              end if
           end do
@@ -367,7 +367,7 @@ contains
              cfl(j,k)  = v(k,i,j) * dt * dyi
              scr(j,k)  = scp0(k,i,j+1)
              if (abs(cfl(j,k)) > 1.0) then
-                if (myid == 0) print *, '  ABORTING: mamaos_y'
+                if (myid == 0) print *, '  ABORTING: mamaos_y @ kij=',k,i,j
                 call appl_abort(0)
              end if
           end do

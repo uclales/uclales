@@ -89,8 +89,12 @@ contains
 
     call fll_tkrs(nzp,nxp,nyp,a_theta,a_pexnr,pi0,pi1,a_scr1,rs=a_scr2)
 
+    if(level>0) then
+      call bruvais(nzp,nxp,nyp,level,a_theta,a_tp,a_scr3,dzi_m,th00,a_rp,a_scr2)
+    else
+      call bruvais(nzp,nxp,nyp,level,a_theta,a_tp,a_scr3,dzi_m,th00)
+    end if
 
-    call bruvais(nzp,nxp,nyp,level,a_theta,a_tp,a_rp,a_scr2,a_scr3,dzi_m,th00)
     !
     !
     call deform(nzp,nxp,nyp,dzi_m,dzi_t,dxi,dyi,a_up,a_vp,a_wp,a_scr5,a_scr6     &
@@ -135,6 +139,7 @@ contains
     !
     ! Diffuse scalars
     !
+
     do n=4,nscl
        call newvar(n,istep=nstep)
        call azero(nxyp,sxy1)
@@ -676,14 +681,25 @@ contains
     ! Coefficients need only be calculated once and can be used repeatedly
     ! for other scalars
     !
+
     dti       = 1.0/dt
     do k=1,n1
        sz7(k)   = 0.
     end do
 
+
+    !a_xt2(2,19,8,4)
+
+
     do j=3,n3-2
        do i=2,n2-2
           do k=2,n1-1
+
+             !if(k==2 .and. j==8 .and. i==19) then
+             !   print*,scp(k,i,j)+310.
+             !end if
+
+
              szx1(k,i)=-(scp(k,i+1,j)-scp(k,i,j))*dxi*.25*(xkh(k,i,j)  +     &
                   xkh(k,i+1,j)+xkh(k-1,i,j)+xkh(k-1,i+1,j)) 
           enddo
