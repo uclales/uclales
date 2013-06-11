@@ -2,8 +2,10 @@
 module modnetcdf
   use netcdf
   implicit none
-  real(kind=4),    parameter :: fillvalue_r = -huge(1)
-  integer, parameter :: fillvalue_i = -huge(1)
+  real(kind=4),    parameter :: fillvalue_r = -1e9
+  integer, parameter :: fillvalue_i = -1000000000
+  integer(kind=8), parameter :: fillvalue_i64 = -1000000000
+  integer(kind=2), parameter :: fillvalue_i16 = -huge(1_2)
   integer :: deflate_level = 1
   type netcdfvar
      integer       :: id
@@ -20,17 +22,15 @@ module modnetcdf
     module procedure write_ncvar_1D_i
     module procedure write_ncvar_2D_i
     module procedure write_ncvar_3D_i
+    module procedure write_ncvar_1D_i64
+    module procedure write_ncvar_2D_i64
+    module procedure write_ncvar_3D_i64
   end interface write_ncvar
 
   interface read_ncvar
-    module procedure read_ncvar_1D_r
-    module procedure read_ncvar_2D_r
-    module procedure read_ncvar_3D_r
-    module procedure read_ncvar_4D_r
-    module procedure read_ncvar_1D_i
-    module procedure read_ncvar_2D_i
-    module procedure read_ncvar_3D_i
-    module procedure read_ncvar_4D_i
+    module procedure read_ncvar_1D
+    module procedure read_ncvar_2D
+    module procedure read_ncvar_3D
   end interface read_ncvar
 contains
 
@@ -58,229 +58,155 @@ contains
 
   end subroutine inquire_ncvar
 
-  subroutine read_ncvar_1D_r(fid,ncvar,array, dimstart, dimrange)
+  subroutine read_ncvar_1D(fid,ncvar,array,start,count)
     type(netcdfvar) :: ncvar
     real, dimension(:) :: array
+    integer,dimension(1), optional, intent(in) :: start,count
     integer         :: fid
-    integer, optional :: dimstart, dimrange
 
     !..open file and read data
     call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
-    if (present(dimstart)) then
-      call check ( nf90_get_var(fid,ncvar%id,array, start=(/dimstart/), count=(/dimrange/)) )
+    if (present(start)) then
+      call check ( nf90_get_var(fid,ncvar%id,array,start = start, count = count) )
     else
       call check ( nf90_get_var(fid,ncvar%id,array) )
     end if
 
-  end subroutine read_ncvar_1D_r
+  end subroutine read_ncvar_1D
 
-  subroutine read_ncvar_2D_r(fid,ncvar,array, dimstart, dimrange)
+  subroutine read_ncvar_2D(fid,ncvar,array,start,count)
     type(netcdfvar) :: ncvar
     real, dimension(:,:) :: array
+    integer,dimension(2), optional, intent(in) :: start,count
     integer         :: fid
-    integer, dimension(:), optional :: dimstart, dimrange
 
     !..open file and read data
     call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
-    if (present(dimstart)) then
-      call check ( nf90_get_var(fid,ncvar%id,array, start=dimstart(1:2), count=dimrange(1:2)) )
+    if (present(start)) then
+      call check ( nf90_get_var(fid,ncvar%id,array,start = start, count = count) )
     else
       call check ( nf90_get_var(fid,ncvar%id,array) )
     end if
 
-  end subroutine read_ncvar_2D_r
+  end subroutine read_ncvar_2D
 
-  subroutine read_ncvar_3D_r(fid,ncvar,array, dimstart, dimrange)
+  subroutine read_ncvar_3D(fid,ncvar,array,start,count)
     type(netcdfvar) :: ncvar
     real, dimension(:,:,:) :: array
+    integer,dimension(3), optional, intent(in) :: start,count
     integer         :: fid
-    integer, dimension(:),optional :: dimstart, dimrange
 
     !..open file and read data
     call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
-    if (present(dimstart)) then
-      call check ( nf90_get_var(fid,ncvar%id,array, start=dimstart(1:3), count=dimrange(1:3)) )
+    if (present(start)) then
+      call check ( nf90_get_var(fid,ncvar%id,array,start = start, count = count) )
     else
       call check ( nf90_get_var(fid,ncvar%id,array) )
     end if
+  end subroutine read_ncvar_3D
 
-  end subroutine read_ncvar_3D_r
-
-  subroutine read_ncvar_4D_r(fid,ncvar,array, dimstart, dimrange)
-    type(netcdfvar) :: ncvar
-    real, dimension(:,:,:,:) :: array
-    integer         :: fid
-    integer, dimension(:),optional :: dimstart, dimrange
-
-    !..open file and read data
-    call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
-    if (present(dimstart)) then
-      call check ( nf90_get_var(fid,ncvar%id,array, start=dimstart(1:4), count=dimrange(1:4)) )
-    else
-      call check ( nf90_get_var(fid,ncvar%id,array) )
-    end if
-
-  end subroutine read_ncvar_4D_r
-
-  subroutine read_ncvar_1D_i(fid,ncvar,array, dimstart, dimrange)
-    type(netcdfvar) :: ncvar
-    integer, dimension(:) :: array
-    integer         :: fid
-    integer, optional :: dimstart, dimrange
-
-    !..open file and read data
-    call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
-    if (present(dimstart)) then
-      call check ( nf90_get_var(fid,ncvar%id,array, start=(/dimstart/), count=(/dimrange/)) )
-    else
-      call check ( nf90_get_var(fid,ncvar%id,array) )
-    end if
-
-  end subroutine read_ncvar_1D_i
-
-  subroutine read_ncvar_2D_i(fid,ncvar,array, dimstart, dimrange)
-    type(netcdfvar) :: ncvar
-    integer, dimension(:,:) :: array
-    integer         :: fid
-    integer, dimension(:), optional :: dimstart, dimrange
-
-    !..open file and read data
-    call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
-    if (present(dimstart)) then
-      call check ( nf90_get_var(fid,ncvar%id,array, start=dimstart(1:2), count=dimrange(1:2)) )
-    else
-      call check ( nf90_get_var(fid,ncvar%id,array) )
-    end if
-
-  end subroutine read_ncvar_2D_i
-
-  subroutine read_ncvar_3D_i(fid,ncvar,array, dimstart, dimrange)
-    type(netcdfvar) :: ncvar
-    integer, dimension(:,:,:) :: array
-    integer         :: fid
-    integer, dimension(:),optional :: dimstart, dimrange
-
-    !..open file and read data
-    call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
-    if (present(dimstart)) then
-      call check ( nf90_get_var(fid,ncvar%id,array, start=dimstart(1:3), count=dimrange(1:3)) )
-    else
-      call check ( nf90_get_var(fid,ncvar%id,array) )
-    end if
-
-  end subroutine read_ncvar_3D_i
-
-  subroutine read_ncvar_4D_i(fid,ncvar,array, dimstart, dimrange)
-    type(netcdfvar) :: ncvar
-    integer, dimension(:,:,:,:) :: array
-    integer         :: fid
-    integer, dimension(:),optional :: dimstart, dimrange
-
-    !..open file and read data
-    call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
-    if (present(dimstart)) then
-      call check ( nf90_get_var(fid,ncvar%id,array, start=dimstart(1:4), count=dimrange(1:4)) )
-    else
-      call check ( nf90_get_var(fid,ncvar%id,array) )
-    end if
-
-  end subroutine read_ncvar_4D_i
-
-  subroutine write_ncvar_1D_r(fid,ncvar,array, dimstart)
+  subroutine write_ncvar_1D_r(fid,ncvar,array)
     type(netcdfvar) :: ncvar
     real, dimension(:) :: array
     integer         :: fid
-    integer, dimension(:),optional :: dimstart
+
     !..open file and read data
     call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
-    if (present(dimstart)) then
-      call check ( nf90_put_var(fid,ncvar%id,array, start=dimstart(1:1)) )
-    else
-      call check ( nf90_put_var(fid,ncvar%id,array) )
-    end if
+    call check ( nf90_put_var(fid,ncvar%id,array) )
   end subroutine write_ncvar_1D_r
 
-  subroutine write_ncvar_2D_r(fid,ncvar,array, dimstart)
+  subroutine write_ncvar_2D_r(fid,ncvar,array)
     type(netcdfvar) :: ncvar
     real, dimension(:,:) :: array
     integer         :: fid
-    integer, dimension(:),optional :: dimstart
 
     !..open file and read data
     call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
-    if (present(dimstart)) then
-      call check ( nf90_put_var(fid,ncvar%id,array, start=dimstart(1:2)) )
-    else
-      call check ( nf90_put_var(fid,ncvar%id,array) )
-    end if
+    call check ( nf90_put_var(fid,ncvar%id,real(array)) )
   end subroutine write_ncvar_2D_r
 
-  subroutine write_ncvar_3D_r(fid,ncvar,array, dimstart)
+  subroutine write_ncvar_3D_r(fid,ncvar,array)
     type(netcdfvar) :: ncvar
     real, dimension(:,:,:) :: array
     integer         :: fid
-    integer, dimension(:),optional :: dimstart
 
     !..open file and read data
     call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
-    if (present(dimstart)) then
-      call check ( nf90_put_var(fid,ncvar%id,array, start=dimstart(1:3)) )
-    else
-      call check ( nf90_put_var(fid,ncvar%id,array) )
-    end if
+    call check ( nf90_put_var(fid,ncvar%id,array) )
   end subroutine write_ncvar_3D_r
 
-  subroutine write_ncvar_1D_i(fid,ncvar,array, dimstart)
+  subroutine write_ncvar_1D_i(fid,ncvar,array)
     type(netcdfvar) :: ncvar
     integer, dimension(:) :: array
     integer         :: fid
-    integer, dimension(:),optional :: dimstart
 
     !..open file and read data
     call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
-    if (present(dimstart)) then
-      call check ( nf90_put_var(fid,ncvar%id,array, start=dimstart(1:1)) )
-    else
-      call check ( nf90_put_var(fid,ncvar%id,array) )
-    end if
+    call check ( nf90_put_var(fid,ncvar%id,array) )
   end subroutine write_ncvar_1D_i
 
-  subroutine write_ncvar_2D_i(fid,ncvar,array, dimstart)
+  subroutine write_ncvar_2D_i(fid,ncvar,array)
     type(netcdfvar) :: ncvar
     integer, dimension(:,:) :: array
     integer         :: fid
-    integer, dimension(:),optional :: dimstart
 
     !..open file and read data
     call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
-    if (present(dimstart)) then
-      call check ( nf90_put_var(fid,ncvar%id,array, start=dimstart(1:2)) )
-    else
-      call check ( nf90_put_var(fid,ncvar%id,array) )
-    end if
+    call check ( nf90_put_var(fid,ncvar%id,array) )
   end subroutine write_ncvar_2D_i
 
-  subroutine write_ncvar_3D_i(fid,ncvar,array, dimstart)
+  subroutine write_ncvar_3D_i(fid,ncvar,array)
     type(netcdfvar) :: ncvar
     integer, dimension(:,:,:) :: array
     integer         :: fid
-    integer, dimension(:),optional :: dimstart
 
     !..open file and read data
     call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
-    if (present(dimstart)) then
-      call check ( nf90_put_var(fid,ncvar%id,array, start=dimstart(1:3)) )
-    else
-      call check ( nf90_put_var(fid,ncvar%id,array) )
-    end if
+    call check ( nf90_put_var(fid,ncvar%id,array) )
   end subroutine write_ncvar_3D_i
 
-  subroutine define_ncdim(fid,ncvar)
+  subroutine write_ncvar_1D_i64(fid,ncvar,array)
     type(netcdfvar) :: ncvar
-    integer         :: fid, iret
+    integer(kind=8), dimension(:) :: array
+    integer         :: fid
 
     !..open file and read data
-    iret = nf90_redef(fid)
+    call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
+    call check ( nf90_put_var(fid,ncvar%id,array) )
+  end subroutine write_ncvar_1D_i64
+
+  subroutine write_ncvar_2D_i64(fid,ncvar,array)
+    type(netcdfvar) :: ncvar
+    integer(kind=8), dimension(:,:) :: array
+    integer         :: fid
+
+    !..open file and read data
+    call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
+    call check ( nf90_put_var(fid,ncvar%id,array) )
+  end subroutine write_ncvar_2D_i64
+
+  subroutine write_ncvar_3D_i64(fid,ncvar,array)
+    type(netcdfvar) :: ncvar
+    integer(kind=8), dimension(:,:,:) :: array
+    integer         :: fid
+
+    !..open file and read data
+    call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
+    call check ( nf90_put_var(fid,ncvar%id,array) )
+  end subroutine write_ncvar_3D_i64
+
+  subroutine define_ncdim(fid,ncvar, dimtype)
+    type(netcdfvar)   :: ncvar
+    integer           :: fid, iret, xtype
+    integer, optional :: dimtype
+
+    if (present(dimtype)) then
+      xtype = dimtype
+    else
+      xtype = nf90_float
+    end if
+    !..open file and read data
+    call check ( nf90_redef(fid))
     iret = nf90_def_dim(fid, trim(ncvar%name), ncvar%dim(1), ncvar%dimids(1))
     if (iret == nf90_enameinuse) then
       call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%dimids(1)) )
@@ -288,28 +214,32 @@ contains
       call check(iret)
     end if
     call check ( nf90_enddef(fid))
-    call define_ncvar(fid, ncvar, nf90_float)
+    call define_ncvar(fid, ncvar, xtype)
 
   end subroutine define_ncdim
 
   subroutine define_ncvar(fid,ncvar, xtype)
+         INCLUDE 'netcdf.inc'
     type(netcdfvar) :: ncvar
     integer         :: fid, iret, xtype
     !..open file and read data
     call check ( nf90_redef(fid))
-    iret =  nf90_def_var(fid, name = trim(ncvar%name), &
-            xtype=xtype, dimids = ncvar%dimids, varid = ncvar%id)
+    iret =  nf90_def_var(fid, name = trim(ncvar%name),xtype=xtype, dimids = ncvar%dimids, &
+                         varid = ncvar%id, deflate_level = deflate_level)
     if (iret == nf90_enameinuse) then
       call check ( nf90_inq_varid(fid,trim(ncvar%name),ncvar%id) )
     else
       call check(iret)
       call check ( nf90_put_att(fid, ncvar%id, 'longname', ncvar%longname))
       call check ( nf90_put_att(fid, ncvar%id, 'units', ncvar%units))
-      if (xtype == nf90_int) then
+      select case(xtype)
+      case(nf90_int)
         call check ( nf90_put_att(fid, ncvar%id, '_FillValue', fillvalue_i))
-      else
+      case(nf90_int64)
+        call check (nf_put_att_int(fid, ncvar%id, '_FillValue', nf90_int64, 1, (/fillvalue_i/)))
+      case(nf90_float)
         call check ( nf90_put_att(fid, ncvar%id, '_FillValue', fillvalue_r))
-      end if
+      end select
     end if
     call check ( nf90_enddef(fid))
 
@@ -336,10 +266,11 @@ program trackmapper
   integer :: ifid1, ifid2, i, j, t, nx, ny, nt, nr, tmax, nrmax
   real, allocatable, dimension(:,:,:) :: var1
   integer, allocatable, dimension(:) :: tt
+  real, allocatable, dimension(:) :: time
 
   real, allocatable, dimension(:,:,:) :: var2
   real, allocatable, dimension(:,:) :: ovar, npts
-  type(netcdfvar) :: ncvar1, ncvar2, ncvar3, ncovar
+  type(netcdfvar) :: ncvar1, ncvar2, ncvar3, ncovar, nctime
 
 
   !Read command line options
@@ -365,6 +296,10 @@ print *, ncvar2%name
   ny = ncvar1%dim(2)
   nt = ncvar1%dim(3)
 
+  call inquire_ncvar(ifid1, nctime)
+  allocate(time(nctime%dim(1)))
+  call read_ncvar(ifid1, nctime, time)
+  
   tmax  = ncvar3%dim(1)
   nrmax = ncvar3%dim(2)
   !Allocate and initializecldnrs
@@ -377,7 +312,7 @@ print *, ncvar2%name
   allocate(var1(nx,ny,nt))
   allocate(var2(nx,ny,nt))
   call read_ncvar(ifid1, ncvar1, var1)
-  call read_ncvar(ifid2, ncvar2, var2)
+  call read_ncvar(ifid2, ncvar2, var2,(/1,1,nint(time(1)/(time(2)-time(1)))/),(/nx,ny,nt/))
 !   !Time loop
 
   do t = 1,nt
