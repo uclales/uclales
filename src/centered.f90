@@ -420,8 +420,8 @@ contains
                flux4x = (7.0d0*(Z(k,i-1,j)+Z(k,i,j))-(Z(k,i-2,j)+Z(k,i+1,j)))*u(k,i-1,j)*0.0833333333d0
                flux4y = (7.0d0*(Z(k,i,j-1)+Z(k,i,j))-(Z(k,i,j-2)+Z(k,i,j+1)))*v(k,i,j-1)*0.0833333333d0
 
-               flux3x(k,i,j) = flux4x - dabs(u(k,i-1,j))/12.0d0*(3.0d0*(Z(k,i,j)-Z(k,i-1,j))-(Z(k,i+1,j)-Z(k,i-2,j)))
-               flux3y(k,i,j) = flux4y - dabs(v(k,i,j-1))/12.0d0*(3.0d0*(Z(k,i,j)-Z(k,i,j-1))-(Z(k,i,j+1)-Z(k,i,j-2)))
+               flux3x(k,i,j) = flux4x - abs(u(k,i-1,j))/12.0d0*(3.0d0*(Z(k,i,j)-Z(k,i-1,j))-(Z(k,i+1,j)-Z(k,i-2,j)))
+               flux3y(k,i,j) = flux4y - abs(v(k,i,j-1))/12.0d0*(3.0d0*(Z(k,i,j)-Z(k,i,j-1))-(Z(k,i,j+1)-Z(k,i,j-2)))
 
             end do
 

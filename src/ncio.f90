@@ -342,6 +342,7 @@ contains
     end if
 
     if (isfctyp == 5) then
+       nvar0 = nvar0+1
        sanal(nvar0)=sbase(31)
        nvar0 = nvar0+1
        sanal(nvar0)=sbase(32)
