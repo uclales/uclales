@@ -80,7 +80,8 @@ module grid
        uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, trac_sfc, sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa, sflxu_toa_ca,sflxd_toa_ca,lflxu_toa_ca,lflxd_toa_ca, &
        cnd_acc, &  ! accumulated condensation  [kg/m2] (diagnostic for 2D output)
        cev_acc, &  ! accumulated evaporation of cloud water [kg/m2] (diagnostic for 2D output)
-       rev_acc     ! accumulated evaporation of rainwater   [kg/m2] (diagnostic for 2D output)
+       rev_acc, &  ! accumulated evaporation of rainwater   [kg/m2] (diagnostic for 2D output)
+       obl         ! BvS : save obl for faster itertion
   integer, dimension(10) :: prc_lev = -1
   integer :: nv1, nv2, nsmp = 0
 
@@ -338,6 +339,7 @@ contains
     allocate (a_ustar(nxp,nyp),a_tstar(nxp,nyp))
     allocate (uw_sfc(nxp,nyp),vw_sfc(nxp,nyp),ww_sfc(nxp,nyp))
     allocate (wt_sfc(nxp,nyp))
+    allocate (obl(nxp,nyp))
 
     if (level > 0) allocate(wq_sfc(nxp,nyp),a_rstar(nxp,nyp))
 

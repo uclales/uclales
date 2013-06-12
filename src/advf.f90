@@ -368,6 +368,7 @@ contains
              scr(j,k)  = scp0(k,i,j+1)
              if (abs(cfl(j,k)) > 1.0) then
                 if (myid == 0) print *, '  ABORTING: mamaos_y @ kij=',k,i,j
+                print*,v(k,i,j),scp(k,i,j)
                 call appl_abort(0)
              end if
           end do

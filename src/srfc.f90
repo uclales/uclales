@@ -49,7 +49,7 @@ contains
     use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, zt, psrf,   &
          th00, umean, vmean, dn0, level, a_ustar, a_tstar, a_rstar,        &
          uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, nstep, shls, lhls, usls,  &
-         timels, a_tskin, a_qskin, isfctyp, a_phiw, a_tsoil, a_Wl, deltax
+         timels, a_tskin, a_qskin, isfctyp, a_phiw, a_tsoil, a_Wl, deltax, obl
     use thrm, only: rslf
     use stat, only: sfc_stat, sflg
     use util, only : get_avg3
@@ -84,7 +84,7 @@ contains
        end do
        zs = zrough
    
-       call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,a_ustar,a_tstar,drt=drdz,rstar=a_rstar)
+       call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,a_ustar,a_tstar,obl,drt=drdz,rstar=a_rstar)
        call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,  &
                        uw_sfc,vw_sfc,wt_sfc,ww_sfc,wq_sfc,a_rstar)
 
@@ -94,6 +94,7 @@ contains
     ! gradients. Then use similarity theory to predict the fluxes. 
     !
     case(2)
+
        call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,a_up,a_vp,umean,vmean)
        usum = 0.
        do j=3,nyp-2
@@ -107,10 +108,9 @@ contains
        usum = max(ubmin,usum/float((nxp-4)*(nyp-4)))
        zs = zrough
        if (zrough <= 0.) zs = max(0.0001,(0.016/g)*usum**2)
-       call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,a_ustar,a_tstar,drt=drdz,rstar=a_rstar)
+       call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,a_ustar,a_tstar,obl,drt=drdz,rstar=a_rstar)
        call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,  &
                        uw_sfc,vw_sfc,wt_sfc,ww_sfc,wq_sfc,a_rstar)
-
 
     !
     ! ----------------------------------------------------------------------
@@ -246,7 +246,7 @@ contains
 
        tskinavg = sum(a_tskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
        sst      = tskinavg*(psrf/p00)**(rcp)
-       call srfcscls(nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,a_ustar,a_tstar,oblin=obl,drt=drdz,rstar=a_rstar)
+       call srfcscls(nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,a_ustar,a_tstar,obl,drt=drdz,rstar=a_rstar)
 
        !Calculate the drag coefficients and aerodynamic resistance
        do j=3,nyp-2
@@ -449,10 +449,10 @@ contains
   !
   ! Code writen March, 1999 by Bjorn Stevens
   !
-  subroutine srfcscls(n2,n3,z,z0,th00,u,dth,ustar,tstar,oblin,drt,rstar)
+  subroutine srfcscls(n2,n3,z,z0,th00,u,dth,ustar,tstar,obl,drt,rstar)
 
     use defs, only : vonk, g, ep2
-    use grid ,only: nstep, runtype, level
+    use grid ,only: nstep, runtype, level, a_theta, vapor
     use mpi_interface, only : myid
 
     implicit none
@@ -476,23 +476,20 @@ contains
     real, intent(in)    :: dth(n2,n3)    ! theta (th(z) - th(z0))
     real, intent(inout) :: ustar(n2,n3)  ! scale velocity
     real, intent(inout) :: tstar(n2,n3)  ! scale temperature
-    real, intent(inout), optional :: oblin(n2,n3)    ! Obukhov Length
+    real, intent(inout) :: obl(n2,n3)    ! Obukhov Length
     real, intent(in),optional     :: drt(n2,n3)    ! qt(z) - qt(z0)
     real, intent(inout), optional :: rstar(n2,n3)  ! scale value of qt
 
     logical, save :: first_call=.True.
-    integer :: i,j,iterate,niter,max_niter
-    real    :: lnz, klnz, betg
-    real    :: zeta, lmo, dtv
-    real    :: lmoold,lmodif
+    integer       :: i,j,iterate,iter
+    real          :: lnz, klnz, betg
+    real          :: zeta, lmo, dtv
+    real          :: thv,Rib,Lstart,Lend,Lold,fx,fxdif,Ldif,zeff
+    logical       :: exititer
 
     lnz   = log(z/z0)
     klnz  = vonk/lnz
     betg  = th00/g
-    !cnst2 = -log(2.)
-    !cnst1 = 3.14159/2. + 3.*cnst2
-
-    max_niter = 0
 
     do j=3,n3-2
        do i=3,n2-2
@@ -503,22 +500,6 @@ contains
           end if
 
           !
-          ! OLD STABLE CASE
-          ! Replaced by new version below!!
-          !
-          !if (dtv > 0.) then
-          !   x     = pr*(betg*u(i,j)**2)/dtv
-          !   y     = (am*z - 0.5*x)/lnz
-          !   x     = (x*ah*z - am**2*z*z)/(lnz**2)
-          !   x     = pr*(betg*u(i,j)**2)/dtv
-          !   y     = (am*z - 0.5*x)/lnz
-          !   x     = (x*ah*z - am**2*z*z)/(lnz**2)
-          !   lmo   = -y + sqrt(x+y**2)
-          !   zeta  = z/lmo
-          !   ustar(i,j) =  vonk*u(i,j)  /(lnz + am*zeta)
-          !   tstar(i,j) = (vonk*dtv/(lnz + ah*zeta))/pr
-
-          !
           ! Neutral case
           ! 
           if (dtv == 0.) then
@@ -526,8 +507,6 @@ contains
             tstar(i,j) =  vonk*dtv/(pr*lnz)
             lmo        = -1.e10
 
-          !
-          ! stable or ustable case, start iterations from values at previous tstep, 
           !
           ! start iterations from values at previous tstep, 
           ! unless the sign has changed or if it is the first call, then 
@@ -540,40 +519,59 @@ contains
                lmo        = -1.e10
              end if
 
-             lmoold = 1e9
-             lmodif = 1e9
-             niter  = 0
-             !do iterate = 1,10
-             do while(abs(lmodif)>0.1)
-               lmo  = betg*ustar(i,j)**2/(vonk*tstar(i,j))
-               lmodif = lmo - lmoold
-               lmoold = lmo
+             if(ustar(i,j) == 0) ustar(i,j) = 0.1
+
+             Lold  = 1e9
+             Ldif  = 1e9
+             iter  = 0
+             exititer = .false.
+             !do iterate = 1,100
+             do while(abs(Ldif)>0.1)
+               lmo        = betg*ustar(i,j)**2/(vonk*tstar(i,j))
+               Ldif       = lmo - Lold
+               Lold       = lmo
 
                if ((dtv < 0) .and. (lmo > -0.001)) lmo = -0.001999
                if ((dtv > 0) .and. (lmo < +0.001)) lmo = +0.001777
 
-               zeta  = z/lmo
-               ustar(i,j) = u(i,j)*vonk/(lnz - psim(zeta))
-               tstar(i,j) = (dtv*vonk/pr)/(lnz - psih(zeta))
+               ! BvS : Following ECMWF, limit z/L for very stable conditions
+               if(z/lmo > 5.) then
+                 zeff = lmo * 5.
+                 exititer = .true.
+               else
+                 zeff = z
+               end if
 
-               niter = niter + 1
-               if(niter>1000) then
+               zeta       = zeff/lmo
+               ustar(i,j) = u(i,j)*vonk/(log(zeff/z0) - psim(zeta))
+               if(ustar(i,j)<0.) ustar(i,j) = 0.1
+               tstar(i,j) = (dtv*vonk/pr)/(log(zeff/z0) - psih(zeta))
+
+               if(exititer) then
+                 lmo        = zeff/5. 
+                 exit
+               end if
+
+               iter = iter + 1
+
+               ! Limit L for day/night transitions
+               if(lmo > 1e6)  lmo = 1e6
+               if(lmo < -1e6) lmo = -1e6 
+
+               if(iter>10000) then
                  print*,'Obukh. length not converged, myid=',myid,'i,j=',i,j
                  stop
                end if
-
              end do
-             max_niter = max(max_niter,niter)
           end if
-        
-          if(present(oblin)) oblin(i,j) = lmo
+ 
+          obl(i,j) = lmo
           if(present(rstar)) rstar(i,j) = tstar(i,j)*drt(i,j)/(dtv + eps)
           tstar(i,j) = tstar(i,j)*dth(i,j)/(dtv + eps)
 
        end do
     end do
 
-    !print*,'obl iters=',max_niter
     first_call = .False.
 
     return
@@ -624,7 +622,7 @@ contains
   !
   subroutine getobl
     use defs, only: g,ep2
-    use grid, only: nzp,nxp,nyp,a_up,a_vp,a_theta,umean,vmean,vapor,zt,u0,v0
+    use grid, only: nzp,nxp,nyp,a_up,a_vp,a_theta,umean,vmean,vapor,zt,u0,v0,obl
     implicit none
 
     integer        :: i,j,iter

@@ -161,7 +161,7 @@ module lsmdata
   real, allocatable :: tndskin  (:,:)   !<  Tendency of skin [W/m2]
 
   ! Turbulent exchange variables
-  real, allocatable :: obl     (:,:)    !<  local obuhkov length [m]
+  !real, allocatable :: obl     (:,:)    !<  local obuhkov length [m] BvS: moved to grid, used beyond lsm
   real              :: oblav            !<  Spatially averaged obukhov length [m]
   real, allocatable :: cm      (:,:)    !<  Drag coefficient for momentum [-]
   real, allocatable :: cs      (:,:)    !<  Drag coefficient for scalars [-]
@@ -224,7 +224,7 @@ module lsmdata
     ! 
 
     !Allocate surface scheme arrays
-    allocate(obl(nxp,nyp))
+    !allocate(obl(nxp,nyp))
     allocate(ra(nxp,nyp))
     allocate(rsurf(nxp,nyp))
     allocate(z0m(nxp,nyp))
