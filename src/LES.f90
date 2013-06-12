@@ -80,7 +80,8 @@ contains
     use srfc, only : zrough, ubmin, dthcon, drtcon, rh_srf, drag, lhomflx
     use step, only : timmax, timrsm, istpfl, corflg, outflg, frqanl, frqhis,          &
          frqcross , strtim, radfrq, cntlat,&
-         case_name,lsvarflg, sst, div, wctime , tau                 !irina
+         case_name,lsvarflg, sst, div, wctime , tau, &                !irina
+         lanom ! linda
     use modnetcdf, only : lsync, deflate_level
     use ncio, only : deflev => deflate_level
     use modcross, only : lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars
@@ -128,6 +129,7 @@ contains
          hs     , ps     , ts    ,  & ! sounding heights, pressure, temperature
          us     , vs     , rts   ,  & ! sounding E/W winds, water vapor
          umean  , vmean  , th00  ,  & ! gallilean E/W wind, basic state
+         lanom  ,                   & ! LINDA, start with anomalies
          case_name, lmtr,           & !irina:name of the case, i.e. astex, rico, etc
          advm,                & ! Advection scheme scalars, momentum
          lsvarflg,                  & ! irina:flag for time bvarying large scale forcing
