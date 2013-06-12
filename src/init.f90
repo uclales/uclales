@@ -921,6 +921,7 @@ return
 
 !--------------------------------------------------------------------------!
 ! routine to start the model with noise resulting from previous simulation !
+! use cdo script cdo_anomaly in misc/scripts/                              !
 !--------------------------------------------------------------------------!
  subroutine larm_init_anom (n1,n2,n3,t_ano,q_ano,u_ano,v_ano,w_ano)
 
