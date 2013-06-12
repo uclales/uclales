@@ -364,7 +364,7 @@ contains
           else
              call thermo(level)
           end if
-          call forcings(xtime,cntlat,sst,div,case_name)
+          call forcings(xtime,cntlat,sst,div,case_name,time)
           call micro(level,istp)
        end if
        call corlos
