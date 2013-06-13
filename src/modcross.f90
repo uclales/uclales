@@ -469,7 +469,7 @@ contains
   subroutine triggercross(rtimee)
     use grid,      only : level,nxp, nyp, nzp, tname, zt, zm, dzi_m, dzi_t, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
-       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta, pi0, pi1, a_pexnr, prc_lev
+       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta, pi0, pi1, a_pexnr, prc_lev, umean, vmean
     use modnetcdf, only : writevar_nc, fillvalue_double
     use util,      only : get_avg3, get_var3, calclevel
     use defs,      only : ep2,cp,cpr, p00
@@ -492,7 +492,15 @@ contains
       nccrossrec = nccrossrec - 1
       call writevar_nc(nccrossyzid, tname, rtimee, nccrossrec)
     end if
-    if (level < 2) then
+    if (level == 0) then
+      do j=3,nyp-2
+        do i=3,nxp-2
+            do k=1,nzp
+              tv(k,i,j) = a_theta(k,i,j)
+            end do
+        end do
+      end do
+    else if (level == 1) then
       do j=3,nyp-2
         do i=3,nxp-2
             do k=1,nzp
@@ -577,7 +585,7 @@ contains
         do j=3,nyp-2
           do i=3,nxp-2
               do k=1,nzp
-                interp(k,i,j) = 0.5*(a_up(k,i-1,j) + a_up(k,i,j))
+                interp(k,i,j) = 0.5*(a_up(k,i-1,j) + a_up(k,i,j)) + umean
               end do
           end do
         end do
@@ -586,7 +594,7 @@ contains
         do j=3,nyp-2
           do i=3,nxp-2
               do k=1,nzp
-                interp(k,i,j) = 0.5*(a_vp(k,i,j-1) + a_vp(k,i,j))
+                interp(k,i,j) = 0.5*(a_vp(k,i,j-1) + a_vp(k,i,j)) + vmean
               end do
           end do
         end do
