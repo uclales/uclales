@@ -91,9 +91,7 @@ contains
     dqtdtlst  = 0
     dthldtlst = 0
 
-
-!    --- load lsforcings---
-
+    ! load ls_flux_in
     open(ifinput,file='ls_flux_in')
     read(ifinput,'(a80)') chmess
     write(6,*) chmess
@@ -105,11 +103,8 @@ contains
     timeflux = 0
     timels   = 0
 
-
-!      --- load fluxes---
-
-    print*,'********************************',time_end
-
+    ! load surface conditions
+    print*,'*** Surface forcings: ***'
     t    = 0
     ierr = 0
     do while (timeflux(t) < (time_end))
@@ -121,19 +116,19 @@ contains
       end if
     end do
     if(timeflux(1)>(time_end)) then
-        write(6,*) 'Time dependent surface variables do not change before end of'
-        write(6,*) 'simulation. --> only large scale forcings'
-        ltimedepsurf=.false.
+       write(6,*) 'Time dependent surface variables do not change before end of'
+       write(6,*) 'simulation. --> only large scale forcings'
+       ltimedepsurf=.false.
     endif
-! flush to the end of fluxlist
+    ! flush to the end of fluxlist
     do while (ierr ==0)
       read (ifinput,*,iostat=ierr) dummyr
     end do
     backspace (ifinput)
-!     ---load large scale forcings----
 
+    ! ---load large scale forcings----
+    print*,'*** Vertical forcings: ***'
     t = 0
-
     do while (timels(t) < time_end)
       t = t + 1
       chmess1 = "#"
@@ -164,8 +159,8 @@ contains
     end do
 
     if ((timels(1) > time_end) .or. (timeflux(1) > time_end)) then
-      write(6,*) 'Time dependent large scale forcings sets in after end of simulation -->'
-      write(6,*) '--> only time dependent surface variables'
+      write(6,*) 'Time dependent large scale forcings sets in after end of simulation'
+      write(6,*) 'only time dependent surface variables'
       ltimedepz=.false.
     end if
 
@@ -206,18 +201,18 @@ contains
     call timedepsurf(time, sst)
   end subroutine timedep
 
+  !
+  ! Interpolates the vertical ls forcings from ls_flux_in 
+  !
   subroutine timedepz(time)
     use grid, only : wfls,dthldtls,dqtdtls
-!      use modfields,   only : ug, vg, dqtdtls,dqtdxls,dqtdyls, wfls,whls,thlprof,qtprof,thlpcar,dthldxls,dthldyls,dudxls,dudyls,dvdxls,dvdyls,dpdxl,dpdyl
-!     use modglobal,   only : rtimee,om23_gs,zf,dzf,dzh,nzp,nzp,grav,llsadv
     real, intent(in) :: time
-
-    integer t,k
-    real fac
+    integer          :: t,k
+    real             :: fac
 
     if(.not.(ltimedepz)) return
 
-    !---- interpolate ----
+    ! interpolate
     t=1
     do while(time>timels(t))
       t=t+1
@@ -226,31 +221,29 @@ contains
       t=t-1
     end if
 
-    fac = ( time-timels(t) ) / ( timels(t+1)-timels(t) )
+    fac      = (time-timels(t)) / (timels(t+1)-timels(t))
     wfls     = wflst    (:,t) + fac * ( wflst    (:,t+1) - wflst    (:,t) )
     dqtdtls  = dqtdtlst (:,t) + fac * ( dqtdtlst (:,t+1) - dqtdtlst (:,t) )
     dthldtls = dthldtlst(:,t) + fac * ( dthldtlst(:,t+1) - dthldtlst(:,t) )
 
   end subroutine timedepz
 
+  !
+  ! Interpolates the surface conditions from ls_flux_in
+  !
   subroutine timedepsurf(time, sst)
     use grid, only : psrf
     use srfc, only : dthcon, drtcon
-    
-!     use modglobal,   only : rtimee, lmoist
-!     use modsurfdata, only : wtsurf,wqsurf,thls,qts,ps
-!     use modsurface,  only : qtsurf
 
     implicit none
-    real, intent(in) :: time
+    real, intent(in)    :: time
     real, intent(inout) :: sst
-
-    integer t
-    real fac
-
+    integer             :: t
+    real                :: fac
 
     if(.not.(ltimedepsurf)) return
-  !     --- interpolate! ----
+
+    ! interpolate
     t=1
     do while(time>timeflux(t))
       t=t+1
@@ -264,8 +257,7 @@ contains
     dthcon   = wtsurft(t) + fac * ( wtsurft(t+1) - wtsurft(t)  )
     sst      = thlst(t)   + fac * ( thlst(t+1)   - thlst(t)    )
     psrf     = pst(t)     + fac * ( pst(t+1)   - pst(t)    )
+
   end subroutine timedepsurf
-
-
 
 end module modtimedep
