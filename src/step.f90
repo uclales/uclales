@@ -434,7 +434,7 @@ contains
        a_vt => a_xt1(:,:,:,2)
        a_wt => a_xt1(:,:,:,3)
        a_tt => a_xt1(:,:,:,4)
-       if (level >= 0) a_rt  =>a_xt1(:,:,:,5)
+       if (level > 0) a_rt  =>a_xt1(:,:,:,5)
        if (level >= 3) then
           a_rpt =>a_xt1(:,:,:,6)
           a_npt =>a_xt1(:,:,:,7)
@@ -460,7 +460,7 @@ contains
        a_vt => a_xt2(:,:,:,2)
        a_wt => a_xt2(:,:,:,3)
        a_tt => a_xt2(:,:,:,4)
-       if (level >= 0) a_rt  =>a_xt2(:,:,:,5)
+       if (level > 0) a_rt  =>a_xt2(:,:,:,5)
        if (level >= 3) then
           a_rpt =>a_xt2(:,:,:,6)
           a_npt =>a_xt2(:,:,:,7)
