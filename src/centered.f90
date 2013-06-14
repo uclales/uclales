@@ -39,7 +39,7 @@ contains
                      a_up, a_vp, a_wp, a_sp, a_st, newvar, dn0, &
                      a_scr1, a_scr2, nstep, dt
      
-    real, dimension(:,:,:), allocatable    :: rhow
+    real, dimension(:,:,:), allocatable   :: rhow
     real, dimension(:,:,:,:), allocatable :: flux
     integer :: ret
     integer :: n
@@ -60,7 +60,6 @@ contains
         print *, 'advect scalar second: auxiliary-vectors allocation failed'
         return
     endif
-     
      
     do n=4, nscl
         call newvar(n, istep=nstep)
@@ -89,6 +88,7 @@ contains
     end do
      
     deallocate(flux)
+    deallocate(rhow)
   
   end subroutine scalarSecond
 !------------------------------------------------------------------------------
@@ -164,7 +164,8 @@ contains
     deallocate(flux2z)
     deallocate(flux3x)
     deallocate(flux3y)
-  
+    deallocate(rhow) 
+ 
   end subroutine scalarThird
 
   subroutine scalarFourth
@@ -261,7 +262,8 @@ contains
     deallocate(flux3b)
     deallocate(flux3c)
 !    deallocate(flux3)
-  
+    deallocate(rhow) 
+ 
   end subroutine scalarFourth
 
   subroutine scalarFluxDifferencesSecond(nz, nx, ny, nghost, wx1, wy1, wz1, Zrhs, rho, flux)
