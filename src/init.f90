@@ -51,7 +51,7 @@ contains
     lanom
 !LINDA, e
     use stat, only : init_stat, write_ps, statistics
-    use grid, only : isfctyp
+    use grid, only : isfctyp,level
     use mpi_interface, only : appl_abort, myid
     use thrm, only : thermo
 !cgils
@@ -86,7 +86,7 @@ contains
             do i=3,nxp-2
               do j=3,nyp-2
                 a_tp(k,i,j) = a_tp(k,i,j) + t_ano(k,i-2,j-2)
-                a_rp(k,i,j) = a_rp(k,i,j) + q_ano(k,i-2,j-2)
+                if(level>0) a_rp(k,i,j) = a_rp(k,i,j) + q_ano(k,i-2,j-2)
                 a_up(k,i,j) = a_up(k,i,j) + u_ano(k,i-2,j-2)
                 a_vp(k,i,j) = a_vp(k,i,j) + v_ano(k,i-2,j-2)
                 a_wp(k,i,j) = a_wp(k,i,j) + w_ano(k,i-2,j-2)

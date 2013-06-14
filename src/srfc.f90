@@ -108,9 +108,15 @@ contains
        usum = max(ubmin,usum/float((nxp-4)*(nyp-4)))
        zs = zrough
        if (zrough <= 0.) zs = max(0.0001,(0.016/g)*usum**2)
-       call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,a_ustar,a_tstar,obl,drt=drdz,rstar=a_rstar)
-       call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,  &
+       if(level>0) then
+         call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,a_ustar,a_tstar,obl,drt=drdz,rstar=a_rstar)
+         call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,  &
                        uw_sfc,vw_sfc,wt_sfc,ww_sfc,wq_sfc,a_rstar)
+       else
+         call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,a_ustar,a_tstar,obl)
+         call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,  &
+                       uw_sfc,vw_sfc,wt_sfc,ww_sfc)
+       end if
 
     !
     ! ----------------------------------------------------------------------
@@ -513,6 +519,7 @@ contains
           ! use neutral values.
           !
           else
+
              if ((runtype=='INITIAL' .and. first_call) .or.( tstar(i,j)*dtv <= 0.)) then
                ustar(i,j) =  vonk*u(i,j)/lnz
                tstar(i,j) =  vonk*dtv/(pr*lnz)
