@@ -83,10 +83,16 @@ contains
          end do
        end do
        zs = zrough
-   
-       call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,a_ustar,a_tstar,obl,drt=drdz,rstar=a_rstar)
-       call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,  &
+  
+       if(level>0) then
+         call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,a_ustar,a_tstar,obl,drt=drdz,rstar=a_rstar)
+         call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,  &
                        uw_sfc,vw_sfc,wt_sfc,ww_sfc,wq_sfc,a_rstar)
+       else
+         call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,a_ustar,a_tstar,obl)
+         call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,  &
+                       uw_sfc,vw_sfc,wt_sfc,ww_sfc)
+       end if
 
     !
     ! ----------------------------------------------------------------------
@@ -108,6 +114,7 @@ contains
        usum = max(ubmin,usum/float((nxp-4)*(nyp-4)))
        zs = zrough
        if (zrough <= 0.) zs = max(0.0001,(0.016/g)*usum**2)
+
        if(level>0) then
          call srfcscls(nxp,nyp,zt(2),zs,th00,wspd,dtdz,a_ustar,a_tstar,obl,drt=drdz,rstar=a_rstar)
          call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,  &
@@ -129,24 +136,33 @@ contains
          do i=3,nxp-2
            dtdz(i,j) = a_theta(2,i,j) - sst*(p00/psrf)**rcp
            if(level>0) drdz(i,j) = vapor(2,i,j) - rh_srf*rslf(psrf,sst)
+
            if (ubmin > 0.) then
              a_ustar(i,j) = sqrt(zrough)* wspd(i,j)
            else
              a_ustar(i,j) = abs(ubmin)
            end if
-             if (drag > 0) then
-               a_tstar(i,j) =  drag*dtdz(i,j)/a_ustar(i,j)
-               if(level>0) a_rstar(i,j) =  drag*drdz(i,j)/a_ustar(i,j)
-             else
-               a_tstar(i,j) =  dthcon * wspd(i,j)*dtdz(i,j)/a_ustar(i,j)
-               if(level>0) a_rstar(i,j) =  drtcon * wspd(i,j)*drdz(i,j)/a_ustar(i,j)
-             endif
+
+           if (drag > 0) then
+             a_tstar(i,j) =  drag*dtdz(i,j)/a_ustar(i,j)
+             if(level>0) a_rstar(i,j) =  drag*drdz(i,j)/a_ustar(i,j)
+           else
+             a_tstar(i,j) =  dthcon * wspd(i,j)*dtdz(i,j)/a_ustar(i,j)
+             if(level>0) a_rstar(i,j) =  drtcon * wspd(i,j)*drdz(i,j)/a_ustar(i,j)
+           endif
+
            bfct(i,j) = g*zt(2)/(a_theta(2,i,j)*wspd(i,j)**2)
          end do
        end do
 
-       call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,  &
+
+       if(level>0) then
+         call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,  &
                        uw_sfc,vw_sfc,wt_sfc,ww_sfc,wq_sfc,a_rstar)
+       else
+         call sfcflxs(nxp,nyp,vonk,wspd,usfc,vsfc,bfct,a_ustar,a_tstar,  &
+                       uw_sfc,vw_sfc,wt_sfc,ww_sfc)
+       end if
 
        if (lhomflx) then
          flxarr(1,:,:) = uw_sfc

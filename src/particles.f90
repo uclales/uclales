@@ -238,7 +238,7 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine calc_sgstke
-    use grid, only             : nzp, zt, dxi, dyi, nxp, nyp, zm, a_rp, a_tp, dzi_t, dzi_m, a_up, a_vp, a_wp, th00
+    use grid, only             : nzp, zt, dxi, dyi, nxp, nyp, zm, a_rp, a_tp, dzi_t, dzi_m, a_up, a_vp, a_wp, th00, level
     use defs, only             : pi, vonk, g
     use mpi_interface, only    : nxg, nyg
     implicit none
@@ -273,8 +273,13 @@ contains
             km = k-1
 
             ! 1. Brunt-Vaisala^2
-            thvp = (0.5*(a_tp(k,i,j) + a_tp(kp,i,j))) * (1. + 0.61 * (0.5*(a_rp(k,i,j) + a_rp(kp,i,j))))
-            thvm = (0.5*(a_tp(k,i,j) + a_tp(km,i,j))) * (1. + 0.61 * (0.5*(a_rp(k,i,j) + a_rp(km,i,j))))
+            if(level > 0) then
+              thvp = (0.5*(a_tp(k,i,j) + a_tp(kp,i,j))) * (1. + 0.61 * (0.5*(a_rp(k,i,j) + a_rp(kp,i,j))))
+              thvm = (0.5*(a_tp(k,i,j) + a_tp(km,i,j))) * (1. + 0.61 * (0.5*(a_rp(k,i,j) + a_rp(km,i,j))))
+            else
+              thvp = 0.5*(a_tp(k,i,j) + a_tp(kp,i,j))
+              thvm = 0.5*(a_tp(k,i,j) + a_tp(km,i,j))
+            end if
             N2   = max((g/th00) * (thvp - thvm) * dzi_t(k),1e-15)
 
             ! 2. Calculate S^2 = 2xSijSij, prevents using scratch arrays in sgsm.f90
@@ -1409,7 +1414,7 @@ contains
   !
   subroutine thermo(px,py,pz,thl,thv,rt,rl,tk,ev)
     use thrm,         only : rslf
-    use grid,         only : a_pexnr, a_rp, a_theta, a_tp, pi0, pi1,th00
+    use grid,         only : a_pexnr, a_rp, a_theta, a_tp, pi0, pi1,th00, level
     !use grid,         only : tname,nzp,dxi,dyi,dzi_t,nxp,nyp,umean,vmean, a_tp, a_rp, press, th00, a_pexnr, a_theta,pi0,pi1
 
     use defs,         only : p00,cp,R,Rm,tmelt,alvl,cpr,ep2,ep
@@ -1417,40 +1422,49 @@ contains
     implicit none
 
     real, intent(in)  :: px,py,pz
-    real, intent(out) :: thl,thv,rt,rl
-    real, intent(out), optional :: tk,ev
+    real, intent(out) :: thl
+    real, intent(out), optional :: thv,rt,rl,tk,ev
     real, parameter   :: epsln = 1.e-4
     real              :: exner,ploc,tlloc,rsloc,dtx,tx,txi,tx1
     integer           :: iterate
 
     ! scalar interpolations and calculations
-    exner   = (i1d(pz,pi0)+i1d(pz,pi1)+i3d(px,py,pz,a_pexnr)) / cp
-    ploc    = p00 * exner**cpr               ! Pressure
-    thl     = i3d(px,py,pz,a_tp) + th00      ! Liquid water potential T
-    tlloc   = thl * exner                    ! Liquid water T
-    rsloc   = rslf(ploc,tlloc)               ! Saturation vapor mixing ratio
-    rt      = i3d(px,py,pz,a_rp)             ! Total water mixing ratio
-    rl      = max(rt-rsloc,0.)               ! Liquid water mixing ratio
+    if(level == 0) then       ! only heat
+      thl     = i3d(px,py,pz,a_tp) + th00            ! Liquid water potential T
 
-    if(rl > 0.) then
-      dtx          = 2. * epsln
-      iterate      = 1
-      tx           = tlloc
-      do while(dtx > epsln .and. iterate < 20)
-        txi        = alvl / (cp * tx)
-        tx1        = tx - (tx - tlloc * (1. + txi  * rl)) / &
-                       (1. + txi * tlloc * (rl / tx + (1. + rsloc * ep) * rsloc * alvl / (Rm * tx * tx)))
-        dtx        = abs(tx1 - tx)
-        tx         = tx1
-        iterate    = iterate + 1
-        rsloc      = rslf(ploc,tx)
-        rl         = max(rt-rsloc,0.)
-      end do
+    else if(level == 1) then   ! heat + WV 
+      thl     = i3d(px,py,pz,a_tp) + th00            ! Liquid water potential T
+      rt      = i3d(px,py,pz,a_rp)                   ! Total water mixing ratio
+      thv     = i3d(px,py,pz,a_theta) * (1.+ep2*rt)  ! Virtual potential temperature
+
+    else                      ! heat + WV + liquid, !NO ICE! 
+      exner   = (i1d(pz,pi0)+i1d(pz,pi1)+i3d(px,py,pz,a_pexnr)) / cp
+      ploc    = p00 * exner**cpr                     ! Pressure
+      tlloc   = thl * exner                          ! Liquid water T
+      rsloc   = rslf(ploc,tlloc)                     ! Saturation vapor mixing ratio
+      rt      = i3d(px,py,pz,a_rp)                   ! Total water mixing ratio
+      rl      = max(rt-rsloc,0.)                     ! Liquid water mixing ratio
+
+      if(rl > 0.) then
+        dtx          = 2. * epsln
+        iterate      = 1
+        tx           = tlloc
+        do while(dtx > epsln .and. iterate < 20)
+          txi        = alvl / (cp * tx)
+          tx1        = tx - (tx - tlloc * (1. + txi  * rl)) / &
+                         (1. + txi * tlloc * (rl / tx + (1. + rsloc * ep) * rsloc * alvl / (Rm * tx * tx)))
+          dtx        = abs(tx1 - tx)
+          tx         = tx1
+          iterate    = iterate + 1
+          rsloc      = rslf(ploc,tx)
+          rl         = max(rt-rsloc,0.)
+        end do
+      end if
+      
+      if(present(tk)) tk = tlloc + alvl/cp*rl
+      if(present(ev)) ev = (rt-rl)*ploc/(ep+rt-rl)
+      thv = i3d(px,py,pz,a_theta) * (1.+ep2*(rt-rl))
     end if
-    
-    if(present(tk)) tk = tlloc + alvl/cp*rl
-    if(present(ev)) ev = (rt-rl)*ploc/(ep+rt-rl)
-    thv = i3d(px,py,pz,a_theta) * (1.+ep2*(rt-rl))
 
   end subroutine thermo
 
@@ -1464,7 +1478,7 @@ contains
   subroutine particlestat(dowrite,time)
     use mpi_interface, only : mpi_comm_world, myid, mpi_double_precision, mpi_sum, ierror, nxprocs, nyprocs, nxg, nyg
     use modnetcdf,     only : writevar_nc, fillvalue_double
-    use grid,          only : tname,dxi,dyi,dzi_t,nzp,umean,vmean,nzp
+    use grid,          only : tname,dxi,dyi,dzi_t,nzp,umean,vmean,nzp,level
     use netcdf,        only : nf90_sync
     implicit none
 
@@ -1490,14 +1504,24 @@ contains
           v2profl(k)      = v2profl(k)    + (particle%vres / dyi)**2.
           w2profl(k)      = w2profl(k)    + (particle%wres / dzi_t(floor(particle%z)))**2.
 
-          call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
+          if(level==0) then
+            call thermo(particle%x,particle%y,particle%z,thl)
+          else if(level==1) then 
+            call thermo(particle%x,particle%y,particle%z,thl,thv=thv,rt=rt)
+          else  
+            call thermo(particle%x,particle%y,particle%z,thl,thv=thv,rt=rt,rl=rl)
+          end if
 
           ! scalar profiles
           tprofl(k)       = tprofl(k)     + thl
-          tvprofl(k)      = tvprofl(k)    + thv
-          rtprofl(k)      = rtprofl(k)    + rt
-          rlprofl(k)      = rlprofl(k)    + rl
-          if(rl > 0.)     ccprofl(k)      = ccprofl(k)     + 1
+          if(level > 0) then
+            tvprofl(k)    = tvprofl(k)    + thv
+            rtprofl(k)    = rtprofl(k)    + rt
+          end if
+          if(level > 1) then
+            rlprofl(k)    = rlprofl(k)    + rl
+            if(rl > 0.)   ccprofl(k)      = ccprofl(k)     + 1
+          end if
           if(lpartsgs) then
             sigma2profl(k)        = sigma2profl(k) + particle%sigma2_sgs
             if(lfsloc) fsprofl(k) = fsprofl(k) + i3d(particle%x,particle%y,particle%z,fs_local)
@@ -1523,10 +1547,10 @@ contains
       call mpi_allreduce(w2profl,w2prof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
       ! scalars
       call mpi_allreduce(tprofl,tprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-      call mpi_allreduce(tvprofl,tvprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-      call mpi_allreduce(rtprofl,rtprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-      call mpi_allreduce(rlprofl,rlprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-      call mpi_allreduce(ccprofl,ccprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      if(level > 0) call mpi_allreduce(tvprofl,tvprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      if(level > 0) call mpi_allreduce(rtprofl,rtprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      if(level > 1) call mpi_allreduce(rlprofl,rlprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      if(level > 1) call mpi_allreduce(ccprofl,ccprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
       if(lpartsgs) then
         call mpi_allreduce(sigma2profl,sigma2prof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
         if(lfsloc) call mpi_allreduce(fsprofl,fsprof,nzp,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
@@ -1549,10 +1573,12 @@ contains
           tkeprof(k)   = 0.5 * (u2prof(k) + v2prof(k) + w2prof(k))
           ! scalars
           tprof(k)     = tprof(k)     / (nstatsamp * npartprof(k))
-          tvprof(k)    = tvprof(k)    / (nstatsamp * npartprof(k))
-          rtprof(k)    = rtprof(k)    / (nstatsamp * npartprof(k))
-          rlprof(k)    = rlprof(k)    / (nstatsamp * npartprof(k))
-          ccprof(k)    = ccprof(k)    / (nstatsamp * npartprof(k))
+
+          if(level > 0) tvprof(k)    = tvprof(k)    / (nstatsamp * npartprof(k))
+          if(level > 0) rtprof(k)    = rtprof(k)    / (nstatsamp * npartprof(k))
+          if(level > 1) rlprof(k)    = rlprof(k)    / (nstatsamp * npartprof(k))
+          if(level > 1) ccprof(k)    = ccprof(k)    / (nstatsamp * npartprof(k))
+
           if(lpartsgs) then
             sigma2prof(k)  = 1.5 * sigma2prof(k)  / (nstatsamp * npartprof(k))
             if(lfsloc) fsprof(k) = fsprof(k)   / (nstatsamp * npartprof(k))
@@ -1641,10 +1667,10 @@ contains
         call writevar_nc(ncpartstatid,'w_2',w2prof,ncpartstatrec)
         call writevar_nc(ncpartstatid,'tke',tkeprof,ncpartstatrec)
         call writevar_nc(ncpartstatid,'t',tprof,ncpartstatrec)
-        call writevar_nc(ncpartstatid,'tv',tvprof,ncpartstatrec)
-        call writevar_nc(ncpartstatid,'rt',rtprof,ncpartstatrec)
-        call writevar_nc(ncpartstatid,'rl',rlprof,ncpartstatrec)
-        call writevar_nc(ncpartstatid,'cc',ccprof,ncpartstatrec)
+        if(level > 0) call writevar_nc(ncpartstatid,'tv',tvprof,ncpartstatrec)
+        if(level > 0) call writevar_nc(ncpartstatid,'rt',rtprof,ncpartstatrec)
+        if(level > 1) call writevar_nc(ncpartstatid,'rl',rlprof,ncpartstatrec)
+        if(level > 1) call writevar_nc(ncpartstatid,'cc',ccprof,ncpartstatrec)
         if(lpartsgs) then
           if(lfsloc) then
             call writevar_nc(ncpartstatid,'fs',fsprof,ncpartstatrec)
@@ -1729,7 +1755,7 @@ contains
     ! Loop through particles
     particle => head
     do while( associated(particle) )
-      call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
+      call thermo(particle%x,particle%y,particle%z,thl,thv=thv,rt=rt,rl=rl)
       ploc = particle%unique
       px = (wrxid * (nxg / nxprocs) + particle%x - 3) * deltax
       py = (wryid * (nyg / nyprocs) + particle%y - 3) * deltay
@@ -1754,7 +1780,7 @@ contains
   !
   subroutine balanced_particledump(time)
     use mpi_interface, only : mpi_comm_world, myid, mpi_integer, mpi_double_precision, ierror, nxprocs, nyprocs, mpi_status_size, wrxid, wryid, nxg, nyg, mpi_sum
-    use grid,          only : tname, deltax, deltay, dzi_t, zm, umean, vmean
+    use grid,          only : tname, deltax, deltay, dzi_t, zm, umean, vmean,level
     use modnetcdf,     only : writevar_nc, fillvalue_double !, nchandle_error
     use netcdf,        only : nf90_sync !,nf90_inq_dimid, nf90_inquire_dimension, nf90_noerr,
     implicit none
@@ -1773,12 +1799,14 @@ contains
     if(time >= tnextdump) then
 
       nvar = 4                                         ! id,x,y,z
-      if(lpartdumpui)              nvar = nvar + 3     ! u,v,w
-      if(lpartsgs)                 nvar = nvar + 3     ! us,vs,ws
-      if(lpartdumpth)              nvar = nvar + 2     ! thl,tvh
-      if(lpartdumpmr)              nvar = nvar + 2     ! rt,rl
-      if(lpartdrop)                nvar = nvar + 1     ! nd
-      if(lpartdrop.and.lpartmass)  nvar = nvar + 1     ! mass
+      if(lpartdumpui)                nvar = nvar + 3     ! u,v,w
+      if(lpartdumpui .and. lpartsgs) nvar = nvar + 3     ! us,vs,ws
+      if(lpartdumpth)                nvar = nvar + 1     ! thl -> always
+      if(lpartdumpth .and. level>0)  nvar = nvar + 1     ! thv
+      if(lpartdumpmr .and. level>0)  nvar = nvar + 1     ! rt
+      if(lpartdumpmr .and. level>1)  nvar = nvar + 1     ! rl
+      if(lpartdrop)                  nvar = nvar + 1     ! nd
+      if(lpartdrop .and. lpartmass)  nvar = nvar + 1     ! mass
 
       nprocs = nxprocs * nyprocs
       allocate(tosend(0:nprocs-1),toreceive(0:nprocs-1),base(0:nprocs-1),sendbase(0:nprocs-1),receivebase(0:nprocs-1))
@@ -1829,8 +1857,15 @@ contains
           p = (particle%unique - floor(particle%unique)) * nprocs
           !if(p .gt. nprocs-1) p = nprocs-1              ! Last proc gets remaining particles
    
-
-          if((lpartdumpth .or. lpartdumpmr)) call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
+          if((lpartdumpth .or. lpartdumpmr)) then
+            if(level==0) then
+              call thermo(particle%x,particle%y,particle%z,thl)
+            else if(level==1) then 
+              call thermo(particle%x,particle%y,particle%z,thl,thv=thv,rt=rt)
+            else  
+              call thermo(particle%x,particle%y,particle%z,thl,thv=thv,rt=rt,rl=rl)
+            end if
+          end if
 
           sendbuff(base(p))           =  particle%unique
           sendbuff(base(p)+1)         = (wrxid * (nxg / nxprocs) + particle%x - 3) * deltax
@@ -1852,15 +1887,21 @@ contains
           end if
           if(lpartdumpth) then
             sendbuff(base(p)+nvl+1)   = thl
-            sendbuff(base(p)+nvl+2)   = thv
-            nvl = nvl + 2
+            nvl = nvl + 1
+            if(level>0) then
+              sendbuff(base(p)+nvl+1) = thv
+              nvl = nvl + 1
+            end if
           end if
-          if(lpartdumpmr) then
+          if(lpartdumpmr .and. level>0) then
             sendbuff(base(p)+nvl+1)   = rt
-            sendbuff(base(p)+nvl+2)   = rl
-            nvl = nvl + 2
+            nvl = nvl + 1
+            if(level>1) then
+              sendbuff(base(p)+nvl+1) = rl
+              nvl = nvl + 1
+            end if
           end if
-          if(lpartdrop)  then
+          if(lpartdrop) then
             sendbuff(base(p)+nvl+1)   = particle%nd
             if(lpartmass) then
               sendbuff(base(p)+nvl+2) = particle%mass
@@ -1943,13 +1984,19 @@ contains
         end if
         if(lpartdumpth) then
           sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
-          sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
-          nvl = nvl + 2
+          nvl = nvl + 1
+          if(level>0) then
+            sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+2)
+            nvl = nvl + 1
+          end if
         end if
-        if(lpartdumpmr) then
+        if(lpartdumpmr .and. level>0) then
           sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
-          sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
-          nvl = nvl + 2
+          nvl = nvl + 1
+          if(level>1) then
+            sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+2)
+            nvl = nvl + 1
+          end if
         end if
         if(lpartdrop) then
           sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
@@ -1998,19 +2045,25 @@ contains
       end if
       if(lpartdumpth) then
         call writevar_nc(ncpartid,'t', sb_sorted(:,nvl+1),ncpartrec)
-        call writevar_nc(ncpartid,'tv',sb_sorted(:,nvl+2),ncpartrec)
-        nvl = nvl + 2
+        nvl = nvl +1
+        if(level>0) then
+          call writevar_nc(ncpartid,'tv',sb_sorted(:,nvl+2),ncpartrec)
+          nvl = nvl + 1
+        end if
       end if
-      if(lpartdumpmr) then
+      if(lpartdumpmr .and. level>0) then
         call writevar_nc(ncpartid,'rt',sb_sorted(:,nvl+1),ncpartrec)
-        call writevar_nc(ncpartid,'rl',sb_sorted(:,nvl+2),ncpartrec)
-        nvl = nvl + 2
+        nvl = nvl + 1
+        if(level>1) then
+          call writevar_nc(ncpartid,'rl',sb_sorted(:,nvl+2),ncpartrec)
+          nvl = nvl + 1
+        end if
       end if
       if(lpartdrop) then
         call writevar_nc(ncpartid,'nd',sb_sorted(:,nvl+1),ncpartrec)
-      if(lpartmass) then
-        call writevar_nc(ncpartid,'m',sb_sorted(:,nvl+2),ncpartrec)
-      end if
+        if(lpartmass) then
+          call writevar_nc(ncpartid,'m',sb_sorted(:,nvl+2),ncpartrec)
+        end if
       end if
       stat  = nf90_sync(ncpartid)
 
@@ -2021,7 +2074,6 @@ contains
       deallocate(status_array,req)
 
     end if
-    
     
   end subroutine balanced_particledump
 
@@ -2313,7 +2365,7 @@ contains
     real               :: thl,thv,rt,rl,tk,ev
 
 
-    call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl,tk=tk,ev=ev)
+    call thermo(particle%x,particle%y,particle%z,thl,thv=thv,rt=rt,rl=rl,tk=tk,ev=ev)
            
   
     ! drop growth by accretion
@@ -2815,7 +2867,7 @@ contains
   !
   subroutine initparticledump(time)
     use modnetcdf,       only : open_nc, addvar_nc
-    use grid,            only : nzp, tname, tlongname, tunit, filprf
+    use grid,            only : nzp, tname, tlongname, tunit, filprf, level
     use mpi_interface,   only : myid, nxprocs, nyprocs, wrxid, wryid
     use grid,            only : tname, tlongname, tunit, filprf
     implicit none
@@ -2875,11 +2927,11 @@ contains
     end if
     if(lpartdumpth) then
       call addvar_nc(ncpartid,'t','liquid water potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-      call addvar_nc(ncpartid,'tv','virtual potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      if(level > 0) call addvar_nc(ncpartid,'tv','virtual potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
     end if
     if(lpartdumpmr) then
-      call addvar_nc(ncpartid,'rt','total water mixing ratio','kg/kg',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-      call addvar_nc(ncpartid,'rl','liquid water mixing ratio','kg/kg',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      if(level > 0) call addvar_nc(ncpartid,'rt','total water mixing ratio','kg/kg',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      if(level > 1) call addvar_nc(ncpartid,'rl','liquid water mixing ratio','kg/kg',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
     end if
     if(lpartdrop.and.lpartmass) then
       call addvar_nc(ncpartid,'m','drop mass','kg',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
@@ -2896,7 +2948,7 @@ contains
   !
   subroutine initparticlestat(time)
     use modnetcdf,       only : open_nc, addvar_nc
-    use grid,            only : nzp, tname, tlongname, tunit, filprf
+    use grid,            only : nzp, tname, tlongname, tunit, filprf, level
     use mpi_interface,   only : myid
     use grid,            only : tname, tlongname, tunit, zname, zlongname, zunit, zt
     implicit none
@@ -2932,10 +2984,14 @@ contains
       call addvar_nc(ncpartstatid,'w_2','resolved w-velocity variance of particle','m2 s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
       call addvar_nc(ncpartstatid,'tke','resolved TKE of particle','m s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
       call addvar_nc(ncpartstatid,'t','liquid water potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues)
-      call addvar_nc(ncpartstatid,'tv','virtual potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues)
-      call addvar_nc(ncpartstatid,'rt','total water mixing ratio','kg kg-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
-      call addvar_nc(ncpartstatid,'rl','liquid water mixing ratio','kg kg-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
-      call addvar_nc(ncpartstatid,'cc','cloud fraction','-',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      if(level > 0) then
+        call addvar_nc(ncpartstatid,'tv','virtual potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues)
+        call addvar_nc(ncpartstatid,'rt','total water mixing ratio','kg kg-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
+        end if
+      if(level > 1) then
+        call addvar_nc(ncpartstatid,'rl','liquid water mixing ratio','kg kg-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
+        call addvar_nc(ncpartstatid,'cc','cloud fraction','-',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      end if
       if(lpartsgs) then
         call addvar_nc(ncpartstatid,'fs','fraction subgrid TKE','-',dimname,dimlongname,dimunit,dimsize,dimvalues)
         call addvar_nc(ncpartstatid,'sgstke','subgrid TKE of particle','m s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
