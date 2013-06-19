@@ -98,7 +98,7 @@ module modparticles
                                          ccprof,       ccprofl,     &
                                          sigma2prof,   sigma2profl, &
                                          fsprof,       fsprofl,     &
-					 mprof,        mprofl
+                                         mprof,        mprofl
 
   integer (KIND=selected_int_kind(10)):: idum = -12345
 
@@ -203,11 +203,11 @@ contains
       if (nstep==3) then
         particle => head
         do while( associated(particle))
-	  if ( time - particle%tstart >= 0 .and. particle%x.ne.-32678.) then
+          if ( time - particle%tstart >= 0 .and. particle%x.ne.-32678.) then
             call drop_growth(particle)
-	  end if
-	  particle => particle%next
-	end do
+          end if
+          particle => particle%next
+        end do
       end if
     end if
 
@@ -480,19 +480,6 @@ contains
       e_res(1)    = -e_res(2)                   ! e_res -> 0 at surface
       fs(1)       = fs(2) - (fs(3) - fs(2))     ! fs    -> extrapolate to surface
       !fs(1)       = 1. + (1.-fs(2))            ! fs    -> 1 at surface
-
-      !Raw statistics dump
-      !CAUTION:	NEEDS TO BE FIXED, STAT TIMEKEEPING NO LONGER IN PARTICLES.F90
-      !if((time + dt > tnextstat) .and. lpartstat .and. nstep==1) then
-      !  open(ifoutput,file='rawstat',position='append',action='write')
-      !  write(ifoutput,'(A2,F10.2)') '# ',time
-      !
-      !  do k=1, nzp
-      !    write(ifoutput,'(I10,9E15.6)') k,zt(k),u_av(k),u2_av(k),v_av(k),v2_av(k),w2_av(k),e_res(k),sgse_av(k),fs(k)
-      !  end do
-
-      !  close(ifoutput)
-      !end if
 
       deallocate(u_avl,v_avl,u2_avl,v2_avl,w2_avl,sgse_avl,u_av,v_av,u2_av,v2_av,w2_av,sgse_av,e_res)
     end if
@@ -1515,11 +1502,11 @@ contains
             sigma2profl(k)        = sigma2profl(k) + particle%sigma2_sgs
             if(lfsloc) fsprofl(k) = fsprofl(k) + i3d(particle%x,particle%y,particle%z,fs_local)
           end if
-	  if(lpartdrop.and.lpartmass) then
-	    mprofl(k)     = mprofl(k)     + particle%mass
-	  end if
+          if(lpartdrop.and.lpartmass) then
+            mprofl(k)     = mprofl(k)     + particle%mass
+          end if
         end if
-	particle => particle%next
+        particle => particle%next
       end do
 
       nstatsamp = nstatsamp + 1
@@ -1571,11 +1558,11 @@ contains
             if(lfsloc) fsprof(k) = fsprof(k)   / (nstatsamp * npartprof(k))
           end if
           if(lpartdrop.and.lpartmass) then
-	    mprof(k)     = mprof(k)     / (nstatsamp * npartprof(k))
-	  end if
-	else
-	  uprof(k)     = -32678
-	  vprof(k)     = -32678
+            mprof(k)     = mprof(k)     / (nstatsamp * npartprof(k))
+          end if
+        else
+          uprof(k)     = -32678
+          vprof(k)     = -32678
           wprof(k)     = -32678
           u2prof(k)    = -32678
           v2prof(k)    = -32678
@@ -1592,8 +1579,8 @@ contains
             if(lfsloc) fsprof(k) = -32678
           end if
           if(lpartdrop.and.lpartmass) then
-	    mprof(k)   = -32678
-	  end if
+            mprof(k)   = -32678
+          end if
         end if
       end do
 
@@ -1666,9 +1653,9 @@ contains
           end if
           call writevar_nc(ncpartstatid,'sgstke',sigma2prof,ncpartstatrec)
         end if
-	if(lpartdrop.and.lpartmass) then
-	  call writevar_nc(ncpartstatid,'m',mprof,ncpartstatrec)
-	end if
+        if(lpartdrop.and.lpartmass) then
+          call writevar_nc(ncpartstatid,'m',mprof,ncpartstatrec)
+        end if
       end if
 
       stat  = nf90_sync(ncpartstatid)
@@ -1707,7 +1694,7 @@ contains
       end if
       if(lpartdrop.and.lpartmass) then
         mprof    = 0
-	mprofl   = 0
+        mprofl   = 0
       end if
       nstatsamp  = 0
     end if
@@ -1807,7 +1794,7 @@ contains
           !p = floor((particle%unique-1) / nlocal)       ! Which proc to send to
           !if(p .gt. nprocs-1) p = nprocs - 1            ! Last proc gets remaining particles
           p = (particle%unique - floor(particle%unique)) * nprocs
-	  tosend(p) = tosend(p) + 1
+          tosend(p) = tosend(p) + 1
         end if
         particle => particle%next
       end do
@@ -1824,9 +1811,9 @@ contains
         else
           sendbase(p)    = sendbase(p-1)    + (tosend(p-1)    * nvar)
           receivebase(p) = receivebase(p-1) + (toreceive(p-1) * nvar)
-        end if	
-	!if(myid==0) write(*,*) 'myid:', myid,', tosend   ',tosend(p)
-	!if(myid==0) write(*,*) 'myid:', myid,', toreceive',toreceive(p)
+        end if
+        !if(myid==0) write(*,*) 'myid:', myid,', tosend   ',tosend(p)
+        !if(myid==0) write(*,*) 'myid:', myid,', toreceive',toreceive(p)
       end do
 
       base = sendbase  ! will be changed during filling send buffer
@@ -1866,19 +1853,19 @@ contains
           if(lpartdumpth) then
             sendbuff(base(p)+nvl+1)   = thl
             sendbuff(base(p)+nvl+2)   = thv
-	    nvl = nvl + 2
+            nvl = nvl + 2
           end if
           if(lpartdumpmr) then
             sendbuff(base(p)+nvl+1)   = rt
             sendbuff(base(p)+nvl+2)   = rl
-	    nvl = nvl + 2
+            nvl = nvl + 2
           end if
-	  if(lpartdrop)  then
+          if(lpartdrop)  then
             sendbuff(base(p)+nvl+1)   = particle%nd
-	    if(lpartmass) then
-	      sendbuff(base(p)+nvl+2) = particle%mass
-	    end if
-	  end if
+            if(lpartmass) then
+              sendbuff(base(p)+nvl+2) = particle%mass
+            end if
+          end if
 
           base(p)             = base(p) + nvar
       
@@ -1936,8 +1923,8 @@ contains
       do p = 1, size(recvbuff)/nvar
 
         !loc = recvbuff(ii)-bloc+1
-	loc = floor(recvbuff(ii))
-	!if(myid==0) write(*,*) 'myid:', myid,', npmyid: ', recvbuff(ii)
+        loc = floor(recvbuff(ii))
+        !if(myid==0) write(*,*) 'myid:', myid,', npmyid: ', recvbuff(ii)
         sb_sorted(loc,1) = recvbuff(ii+1)
         sb_sorted(loc,2) = recvbuff(ii+2)
         sb_sorted(loc,3) = recvbuff(ii+3)
@@ -1962,14 +1949,14 @@ contains
         if(lpartdumpmr) then
           sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
           sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
-	  nvl = nvl + 2
+          nvl = nvl + 2
         end if
-	if(lpartdrop) then
-	  sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
-	  if(lpartmass) then
-	    sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
-	  end if
-	end if
+        if(lpartdrop) then
+          sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
+          if(lpartmass) then
+            sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
+          end if
+        end if
 
         ii = ii + nvar
 
@@ -2017,13 +2004,13 @@ contains
       if(lpartdumpmr) then
         call writevar_nc(ncpartid,'rt',sb_sorted(:,nvl+1),ncpartrec)
         call writevar_nc(ncpartid,'rl',sb_sorted(:,nvl+2),ncpartrec)
-	nvl = nvl + 2
+        nvl = nvl + 2
       end if
       if(lpartdrop) then
         call writevar_nc(ncpartid,'nd',sb_sorted(:,nvl+1),ncpartrec)
-	if(lpartmass) then
-	  call writevar_nc(ncpartid,'m',sb_sorted(:,nvl+2),ncpartrec)
-	end if
+      if(lpartmass) then
+        call writevar_nc(ncpartid,'m',sb_sorted(:,nvl+2),ncpartrec)
+      end if
       end if
       stat  = nf90_sync(ncpartid)
 
@@ -2129,7 +2116,7 @@ contains
         !call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
         !if(rl==0) 
           ndel = ndel + 2
-	!end if
+      !end if
       end if
       particle => particle%next
     end do 
@@ -2142,11 +2129,11 @@ contains
       !if(particle%x.ne.-32678.) then
         !call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl)
         !if(rl==0) then
-	  ndel_n(ndel+1) = particle%unique
-	  ndel_n(ndel+2) = particle%nd
-	  ndel = ndel + 2
-	  call delete_particle(particle)
-	!end if
+    ndel_n(ndel+1) = particle%unique
+    ndel_n(ndel+2) = particle%nd
+    ndel = ndel + 2
+    call delete_particle(particle)
+  !end if
       end if
       particle => particle%next
     end do 
@@ -2174,7 +2161,7 @@ contains
       !only fetch particles that belong to this processor
       if ((buffrecv(i)-floor(buffrecv(i))).eq.(real(myid)/real(nprocs))) then
         call add_particle(particle)
-	particle%unique         = buffrecv(i)
+        particle%unique         = buffrecv(i)
         particle%x              = -32678.
         particle%y              = -32678.
         particle%z              = -32678.
@@ -2196,10 +2183,10 @@ contains
         particle%vsgs_prev      = -32678.
         particle%wsgs_prev      = -32678.
         particle%sigma2_sgs     = -32678.
-	particle%mass           = -32678.
+        particle%mass           = -32678.
         particle%partstep       = -32678.
         particle%nd             = buffrecv(i+1)
-	myac = myac - 1
+        myac = myac - 1
       end if
       i = i + 2
     end do
@@ -2241,21 +2228,20 @@ contains
     do j=3,nyp-2
       do i=3,nxp-2
         do k=2,nzp-2
-	  if (a_npauto(k,i,j)>0) then
-	    
-	    a_npauto(k,i,j) = a_npauto(k,i,j)*deltax*deltay*deltaz*nppd
-	    call random_number(randnr)          ! Random seed has been called from init_particles...
-	    if(randnr(1)<(a_npauto(k,i,j)-floor(a_npauto(k,i,j)))) then
-	      a_npauto(k,i,j) = a_npauto(k,i,j) + 1.
-	    end if
-	    
-	    if (floor(a_npauto(k,i,j))>0) then
-	      
-	      newp = 0
+          if (a_npauto(k,i,j)>0) then
+            
+            a_npauto(k,i,j) = a_npauto(k,i,j)*deltax*deltay*deltaz*nppd
+            call random_number(randnr)          ! Random seed has been called from init_particles...
+            if(randnr(1)<(a_npauto(k,i,j)-floor(a_npauto(k,i,j)))) then
+              a_npauto(k,i,j) = a_npauto(k,i,j) + 1.
+            end if
+            
+            if (floor(a_npauto(k,i,j))>0) then
+              newp = 0
               do while(associated(particle).and.(newp.lt.floor(a_npauto(k,i,j))))
-	        if(particle%x.eq.-32678.) then
-		  call random_number(randnr)          ! Random seed has been called from init_particles...
-		  particle%x              = real(i) + randnr(1)
+                if(particle%x.eq.-32678.) then
+                  call random_number(randnr)          ! Random seed has been called from init_particles...
+                  particle%x              = real(i) + randnr(1)
                   particle%y              = real(j) + randnr(2)
                   particle%z              = real(k) + randnr(3)
                   particle%zprev          = particle%z
@@ -2276,24 +2262,22 @@ contains
                   particle%vsgs_prev      = 0.
                   particle%wsgs_prev      = 0.
                   particle%sigma2_sgs     = 0.
-		  particle%mass           = rain%x_min
+                  particle%mass           = rain%x_min
                   particle%partstep       = 0
                   particle%nd             = particle%nd + 1
-		  newp = newp + 1
-	          !write(*,*) 're-activate: unique',particle%unique,'nd',particle%nd
-		end if
-		particle => particle%next
-	      end do
-	      
-	      myac = myac + newp
-	      if (newp.lt.floor(a_npauto(k,i,j))) then
-	        cntp = cntp + floor(a_npauto(k,i,j)) - newp
-	      end if
-	        
-	    end if
-
-	  end if
-	end do
+                  newp = newp + 1
+                  !write(*,*) 're-activate: unique',particle%unique,'nd',particle%nd
+                end if
+                particle => particle%next
+              end do
+  
+              myac = myac + newp
+              if (newp.lt.floor(a_npauto(k,i,j))) then
+                cntp = cntp + floor(a_npauto(k,i,j)) - newp
+              end if
+            end if
+          end if
+        end do
       end do
     end do
     if(cntp.gt.0) write(*,*) 'myid:', myid,'Attention! Not enough particles:',cntp
@@ -2331,7 +2315,7 @@ contains
 
     call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl,tk=tk,ev=ev)
            
-	    
+  
     ! drop growth by accretion
     
     a1 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! drop radius
@@ -2523,9 +2507,9 @@ contains
         particle%vsgs_prev      = pvsp
         particle%wsgs_prev      = pwsp
         particle%sigma2_sgs     = psg2
-	particle%mass           = pm
+        particle%mass           = pm
         particle%partstep       = pstp
-	particle%nd             = pnd
+        particle%nd             = pnd
         if(pts < firststartl) firststartl = pts
       end do
       close(666)
@@ -2551,7 +2535,7 @@ contains
       if(myid==0) write(*,*) 'Number of Particles on each proc ',npmyid
       do n = 1, npmyid
         call add_particle(particle)
-	particle%unique         = real(n) + real(myid)/real(nprocs)
+        particle%unique         = real(n) + real(myid)/real(nprocs)
         particle%x              = -32678.
         particle%y              = -32678.
         particle%z              = -32678.
@@ -2573,7 +2557,7 @@ contains
         particle%vsgs_prev      = -32678.
         particle%wsgs_prev      = -32678.
         particle%sigma2_sgs     = -32678.
-	particle%mass           = -32678.
+        particle%mass           = -32678.
         particle%partstep       = -32678.
         particle%nd             = 0
       end do
@@ -2608,7 +2592,7 @@ contains
         else
           if(floor(xstart / xsizelocal) == wrxid) then
             if(floor(ystart / ysizelocal) == wryid) then
-	      npmyid = npmyid + 1
+              npmyid = npmyid + 1
               call add_particle(particle)
               particle%unique         = real(npmyid) + real(myid)/real(nprocs)    
               particle%x              = (xstart - (float(wrxid) * xsizelocal)) / deltax + 3.  ! +3 here for ghost cells.
@@ -2635,9 +2619,9 @@ contains
               particle%vsgs_prev      = 0.
               particle%wsgs_prev      = 0.
               particle%sigma2_sgs     = 0.
-	      particle%mass           = 0.
+              particle%mass           = 0.
               particle%partstep       = 0
-	      particle%nd             = 1
+              particle%nd             = 1
               if(tstart < firststartl) firststartl = tstart
             end if
           end if
@@ -2697,7 +2681,7 @@ contains
                    rtprof(nzp),   rtprofl(nzp),    &
                    rlprof(nzp),   rlprofl(nzp),    &
                    ccprof(nzp),   ccprofl(nzp),    &
-		   mprof(nzp),    mprofl(nzp))
+                   mprof(nzp),    mprofl(nzp))
 
       npartprof      = 0.
       npartprofl     = 0.
