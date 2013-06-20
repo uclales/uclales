@@ -67,7 +67,6 @@ contains
             ,wspd(nxp,nyp), bfct(nxp,nyp), mnflx(5), flxarr(5,nxp,nyp)
 
     drdz(:,:)   = 0.
-    wq_sfc(:,:) = 0.
 
     select case(isfctyp)
 
