@@ -66,7 +66,8 @@ contains
     real :: dtdz(nxp,nyp), drdz(nxp,nyp), usfc(nxp,nyp), vsfc(nxp,nyp) &
             ,wspd(nxp,nyp), bfct(nxp,nyp), mnflx(5), flxarr(5,nxp,nyp)
 
-    drdz(:,:) = 0.
+    drdz(:,:)   = 0.
+    wq_sfc(:,:) = 0.
 
     select case(isfctyp)
 

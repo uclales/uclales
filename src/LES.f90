@@ -192,6 +192,18 @@ contains
           if (myid == 0) print *, '  ABORTING: central latitude out of bounds.'
           call appl_abort(0)
        endif
+
+       if(isfctyp == 4 .and. level == 0) then 
+          if (myid == 0) print *, ' Fixed buoyancy flux (isfctyp=4, Stevens, 2007, JAS) without moisture (level=0) not supported'
+          call appl_abort(0)
+       endif
+
+       if(isfctyp == 5 .and. level == 0) then 
+          if (myid == 0) print *, ' Land surface scheme (isfctyp=5) without moisture (level=0) not supported'
+          call appl_abort(0)
+       endif
+
+
     end if
 
 600 format(//' ',49('-')/,' ',/,'  Initial Experiment: ',A50 &
