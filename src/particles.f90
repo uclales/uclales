@@ -55,9 +55,9 @@ module modparticles
   integer(kind=long) :: np
   real               :: tnextdump
   real               :: randint   = 20.
-  real               :: tnextrand = 6e6
+  real               :: tnextrand = 6e6 
   logical            :: lpartmass = .true.              ! hard code switch to turn on/off drop mass 
-                                                        ! use only in combination with lpartdrop = .true. (in namelist)
+                                                        ! used only in combination with lpartdrop = .true. (namelist)
 
   ! Particle structure
   type :: particle_record
@@ -70,7 +70,7 @@ module modparticles
     type (particle_record), pointer :: next,prev
   end type
 
-  integer(kind=long) :: nplisted, npmyid = 0, myac = 0
+  integer(kind=long) :: nplisted, npmyid = 0
   type (particle_record), pointer :: head, tail
 
   integer            :: ipunique, ipx, ipy, ipz, ipzprev, ipxstart, ipystart, ipzstart, iptsart
@@ -187,13 +187,7 @@ contains
           end if
 	  
 	  if (lpartdrop.and.lpartmass) then     ! drop velocity resulting from momentum equation
-            !print*,'myid: ',myid
-	    !call drag_coeff(particle,C_d,vt)    ! rather call in drop_vel
             call drop_vel(particle)           
-            !particle%udrop  =  udrop(particle, C_d) * dxi
-	    !particle%vdrop  =  vdrop(particle, C_d) * dyi
-	    !particle%wdrop  =  wdrop(particle, C_d,vt) * dzi_t(floor(particle%z))
-	    !if(myid==0) 
 	  end if
 	  
         end if
@@ -666,10 +660,10 @@ contains
   ! subroutine drag_coeff
   !> Calculation of drag coefficient for momentum equation
   !> from Khvorostyanov and Curry 2002, 2005
-  !> and Seifert et al. 2013
   !--------------------------------------------------------------------------
   !
-  subroutine drag_coeff(particle,C_d,vt)
+  subroutine drag_coeff(particle,C_d,vt,tau)
+    use mpi_interface, only : myid
     use grid, only : dxi, dt, dn0
     use defs, only : rowt, pi, g
     use mcrp, only : nu_l
@@ -677,8 +671,10 @@ contains
 
     TYPE (particle_record), POINTER:: particle
     real, intent(out) :: C_d, vt
+    real, intent(out), optional :: tau
     real :: D0, Dmax, dlam, xi_drop, alfa, xexp, Xbest, c1, c2, &
-            bracket, b1, a1, zk, bcorr, acorr, re, psi
+            bracket, b1, a1, zk, bcorr, acorr, re, psi,Dold
+    integer :: j
     real, parameter :: &
          wr     = 33.,      &   ! S13
          lambda = 4.7e-3,   &   ! from KC2002, Eq. 3.4
@@ -692,18 +688,38 @@ contains
 	 cturb  = 1.6
     logical, parameter :: &
          lturbulence   = .true.,   &  ! turbulence correction
-	 lnonspherical = .true.       ! correction for non-spherical drops
+	 lnonspherical = .true.,   &  ! correction for non-spherical drops
+	 ldmaxiter     = .true.       ! find dmax iterative
 
 
     D0  = 2. *(3./(4.*pi) * particle%mass /rowt)**(1./3.)   ! equivalent diameter
-    Dmax = D0*exp(wr*D0)                                   ! max diameter S13
-
-    dlam = Dmax/lambda
-    xi_drop = exp(-dlam) + (1.0 - exp(-dlam)) * (1.0/(1.0+dlam))    ! aspect ratio KC2002, Eq. 3.4
     
     if (lnonspherical) then           ! alfa: prefactor in mass-size relation
+      if (ldmaxiter) then             ! find Dmax iterative (Eq 3.4 in KC02)
+        xi_drop   = 1.0
+        Dmax = 9999.
+        Dold = 999.
+        j=0
+        ! simple fixpoint iteration
+        do while (abs(Dold-Dmax)>1.e-19.and.j.lt.20)   
+          j=j+1
+          Dold = Dmax
+          Dmax = ( particle%mass / (pi/6.*rowt *xi_drop) )**(1./3.)
+          dlam = Dmax/lambda
+          xi_drop = exp(-dlam) + (1.0 - exp(-dlam)) * (1.0/(1.0+dlam))
+        end do
+        if (j.gt.10) print*,'j=',j
+        if (j.gt.10) print*,'DD  =',Dmax-Dold
+	if (j.gt.10) print*,'D0  =',D0
+	if (j.gt.10) print*,'Dmax=',Dmax
+      else                            ! approximate solution for Dmax (Eq. 2 in Seifert et al. 2013)
+        Dmax = D0*exp(wr*D0)                                   
+        dlam = Dmax/lambda
+        xi_drop = exp(-dlam) + (1.0 - exp(-dlam)) * (1.0/(1.0+dlam))    ! aspect ratio KC2002, Eq. 3.4
+      end if
       alfa = pi/6.*rowt * xi_drop
     else
+      Dmax = D0
       alfa = pi/6.*rowt
     end if
     
@@ -733,8 +749,8 @@ contains
     
     ! This is Eq. (2.11)-(2.14) of KC05: terminal fall velocity
     vt = a1 * nu_l**(1.0-2.0*b1)                            &
-       &  * ( ( 2.0 * alfa * g ) / ( i1d(particle%z,dn0) * gam ) )**b1   &
-       &  * Dmax**( b1*xexp - 1.0 )
+         * ( ( 2.0 * alfa * g ) / ( i1d(particle%z,dn0) * gam ) )**b1   &
+         * Dmax**( b1*xexp - 1.0 )
 
     re = vt*Dmax/nu_l
     C_d = c_o*(1.0 + d_o/sqrt(re))**2          ! Eq (2.2)
@@ -744,24 +760,22 @@ contains
       psi   = (1.0 + zk)/(1.0 + cturb*zk)               ! Eq (3.2)-
       C_d = C_d / psi                     ! Eq (3.1)
     end if
-  
-    !print*,'D0 ',D0
-    !print*,'vt ',vt
-    !print*,'Re ',re 
-    !print*,'Cd ',C_d 
+    
+    if(present(tau)) tau = 8.* (D0/2.)**3. *rowt / (3. * C_d *i1d(particle%z,dn0) * (Dmax/2.)**2.) / vt 
+    
   end subroutine drag_coeff
 
 !-----------------------------------------------------
 ! subroutine drop_vel
 ! > Calculates the drop velocity according to momentum equation
-! > Euler implicit (iterative)
-! > use timestep <= 1 s ?
-! > not working with SGS yet
+! > 
+! > not working with SGS yet ?
 !---------------------------------------------------
   subroutine drop_vel(particle)
     use grid, only : dxi, dyi, dzi_t, dt, dn0
     use defs, only : rowt, pi, g
     use mcrp, only : nu_l
+    use mpi_interface, only : myid
     implicit none
 
     real :: C_d, vt, a1, dzi, deltav, tau
@@ -769,40 +783,37 @@ contains
     logical :: stokes=.false.
     integer :: j
 
-    call drag_coeff(particle, C_d, vt)
     a1 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! drop radius
     dzi = dzi_t(floor(particle%z))
- 
-    !print*,'u old',particle%udrop/dxi
-    !print*,'v old',particle%vdrop/dyi
-    !print*,'w old',particle%wdrop/dzi
- 
-    if (stokes) then
+  
+    if (stokes) then                     !use Stokes drag
       tau = 2.*rowt*a1**2./(9.*nu_l*i1d(particle%z,dn0)) ! Stokes limit
       particle%udrop = (1+dt/tau)**(-1.) * (particle%udrop_prev/dxi + dt/tau * particle%ures/dxi) *dxi
       particle%vdrop = (1+dt/tau)**(-1.) * (particle%vdrop_prev/dyi + dt/tau * particle%vres/dyi) *dyi 
       particle%wdrop = (1+dt/tau)**(-1.) * (particle%wdrop_prev/dzi + dt/tau * particle%wres/dzi - &
                        (1-i1d(particle%z,dn0)/rowt)*g*dt) *dzi
-    else
-      do j=1,100
-        deltav = sqrt( ((particle%ures-particle%udrop)/dxi)**2.  &
-                     + ((particle%vres-particle%vdrop)/dyi)**2. &
-                     + ((particle%wres-particle%wdrop)/dzi)**2. )
-        tau = 8.* a1*rowt / (3. * C_d*i1d(particle%z,dn0)) / deltav
-
-        particle%udrop = (1+dt/tau)**(-1.) * (particle%udrop_prev/dxi + dt/tau * particle%ures/dxi) *dxi
-        particle%vdrop = (1+dt/tau)**(-1.) * (particle%vdrop_prev/dyi + dt/tau * particle%vres/dyi) *dyi
-        particle%wdrop = (1+dt/tau)**(-1.) * (particle%wdrop_prev/dzi + dt/tau * particle%wres/dzi - &
-               (1-i1d(particle%z,dn0)/rowt)*g*dt) *dzi
-      end do
+    else                                 ! direct solution of momentum equation (with tau=f(mass))
+      call drag_coeff(particle, C_d, vt, tau)
+      particle%udrop = ((particle%udrop/dxi - particle%ures/dxi     ) * exp(-dt/tau) &
+                        + particle%ures/dxi)      *dxi
+      particle%vdrop = ((particle%vdrop/dyi - particle%vres/dyi     ) * exp(-dt/tau) &
+                        + particle%vres/dyi)      *dyi
+      particle%wdrop = ((particle%wdrop/dzi - particle%wres/dzi + vt) * exp(-dt/tau) &
+                        + particle%wres/dzi - vt) *dzi
+      
+      !not used: iterative implicit 
+      !do j=1,100
+      !  deltav = sqrt( ((particle%ures-particle%udrop)/dxi)**2.  &
+      !               + ((particle%vres-particle%vdrop)/dyi)**2. &
+      !               + ((particle%wres-particle%wdrop)/dzi)**2. )
+      !  tau = 8.* a1*rowt / (3. * C_d*i1d(particle%z,dn0)) / deltav
+      ! 
+      !  particle%udrop = (1+dt/tau)**(-1.) * (particle%udrop_prev/dxi + dt/tau * particle%ures/dxi) *dxi
+      !  particle%vdrop = (1+dt/tau)**(-1.) * (particle%vdrop_prev/dyi + dt/tau * particle%vres/dyi) *dyi
+      !  particle%wdrop = (1+dt/tau)**(-1.) * (particle%wdrop_prev/dzi + dt/tau * particle%wres/dzi - &
+      !         (1-i1d(particle%z,dn0)/rowt)*g*dt) *dzi
+      !end do
     end if
-    !print*,'tau', tau
-    !print*,'ures',particle%ures/dxi
-    !print*,'vres',particle%vres/dyi
-    !print*,'wres',particle%wres/dzi
-    !print*,'u  ',particle%udrop/dxi
-    !print*,'v  ',particle%vdrop/dyi
-    !print*,'w  ',particle%wdrop/dzi
   end subroutine drop_vel
 
   !
@@ -2366,7 +2377,7 @@ contains
     allocate(recvcount(nprocs))
     call mpi_allgather(ndel,1,mpi_integer,recvcount,1,mpi_integer,mpi_comm_world,ierror)
     
-    if(myid==0) write(*,*) 'deactivate # particles:', sum(recvcount)
+    !if(myid==0) write(*,*) 'deactivate # particles:', sum(recvcount)
     
     if (sum(recvcount)>0) then
       ! Create array to receive unique-nd-combinations from other procs
@@ -2417,7 +2428,6 @@ contains
         particle%udrop_prev     = -32678.
         particle%vdrop_prev     = -32678.
         particle%wdrop_prev     = -32678.
-	myac = myac - 1
       end if
       i = i + 2
     end do
@@ -2442,7 +2452,7 @@ contains
     real, intent(in)  :: time
     type (particle_record), pointer:: particle
     real               :: randnr(3), max_auto, sum_auto
-    real               :: zmax = 1.                  ! Max height in grid coordinates
+    !real               :: zmax = 1.                  ! Max height in grid coordinates
     real               :: nppd = 1./(1.e7)               ! number of particles per drops
     real               :: xsizelocal, ysizelocal
     real               :: C_d=1.0, vt=1.0
@@ -2499,9 +2509,9 @@ contains
                   particle%partstep       = 0
                   particle%nd             = particle%nd + 1
                   call drag_coeff(particle,C_d,vt)
-                  particle%udrop          = 0. ! particle%ures
-                  particle%vdrop          = 0. ! particle%vres
-                  particle%wdrop          = 0. ! particle%wres - vt * dzi_t(floor(particle%z))
+                  particle%udrop          = particle%ures
+                  particle%vdrop          = particle%vres
+                  particle%wdrop          = particle%wres - vt * dzi_t(floor(particle%z))
                   particle%udrop_prev     = 0.
                   particle%vdrop_prev     = 0.
                   particle%wdrop_prev     = 0.
@@ -2511,7 +2521,6 @@ contains
 		particle => particle%next
 	      end do
 	      
-	      myac = myac + newp
 	      if (newp.lt.floor(a_npauto(k,i,j))) then
 	        cntp = cntp + floor(a_npauto(k,i,j)) - newp
 	      end if
@@ -2524,15 +2533,7 @@ contains
     end do
     if(cntp.gt.0) write(*,*) 'myid:', myid,'Attention! Not enough particles:',cntp
     end if
-    
-    !max_auto = MAXVAL(a_npauto)
-    !write(*,*) 'myid:', myid,', max npauto: ', max_auto
-    !sum_auto = sum(a_npauto)
-    !write(*,*) 'myid:', myid,', sum npauto: ', sum_auto,', new part.:',npmyid-np_old
-    
-    call mpi_allreduce(myac,npac,1,mpi_integer,mpi_sum,mpi_comm_world,ierror)
-    if(myid==0) write(*,*) 'number of active particles:', npac
-    
+        
     deallocate(a_npauto)
     
   end subroutine activate_drops
@@ -2545,45 +2546,77 @@ contains
   subroutine drop_growth(particle)
     use mpi_interface, only : myid
     use defs,          only : pi,rowt,Rm,alvl
-    use grid,          only : dt,dn0,vapor,a_scr1,a_scr2,nxp,nyp,nzp,a_theta,a_pexnr,pi0,pi1
-    use mcrp,          only : Kt, Dv
+    use grid,          only : dt,dn0,vapor,a_scr1,a_scr2,nxp,nyp,nzp, &
+                              a_theta,a_pexnr,pi0,pi1, dxi, dyi, dzi_t
+    use mcrp,          only : Kt, Dv, nu_l
     use thrm,          only : fll_tkrs,esl
     implicit none
     
     type (particle_record), pointer:: particle
     real               :: a1, K, Fk, Fd, S, es
     real               :: thl,thv,rt,rl,tk,ev
+    real               :: v_rel, a1max, f_v, X_ven, dzi
+    logical            :: longkernel=.true.
+    real, parameter :: &
+         wr     = 33.,      &   ! S13
+	 E_c     = 1.
 
+    dzi = dzi_t(floor(particle%z))
 
     call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl,tk=tk,ev=ev)
-           
+    !if (myid==0) write(*,*) 'mass old: ',particle%mass
 	    
     ! drop growth by accretion
     
     a1 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! drop radius
+    a1max = a1*exp(wr*2.*a1)                                   ! max diameter (from subr. drag_coeff)
+    v_rel = sqrt( (particle%ures/dxi - particle%udrop/dxi)**2. + &
+                  (particle%vres/dyi - particle%vdrop/dyi)**2. + &
+                  (particle%wres/dzi - particle%wdrop/dzi)**2. )
     
-    if (a1.le.50.e-6) then                          ! collection kernel (Long, 1974)
-      K = 1.1e16 * (particle%mass/rowt)**2.
-    else 
-      K = 6.33e3 * (particle%mass/rowt)
+    if (longkernel) then
+      if (a1.le.50.e-6) then                          ! collection kernel (Long, 1974)
+        K = 1.1e16 * (particle%mass/rowt)**2.
+      else 
+        K = 6.33e3 * (particle%mass/rowt)
+      end if
+    else
+      K = E_c * pi * a1max**2. * v_rel
     end if
     
     particle%mass = particle%mass + rl * i1d(particle%z,dn0) * K * dt
+    !if (myid==0) write(*,*) 'mass acc: ',particle%mass
     
     
     ! drop evaporation
-    
-    a1 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! drop radius    
+     
     es = esl(tk)
     
     Fk = (alvl/(Rm*tk)-1)*alvl*rowt/(Kt*tk)
     Fd = rowt*Rm*tk/(Dv*es)
     S  = ev/es
-
-    particle%mass = particle%mass + 4*pi*a1*(S-1) / (rowt*(Fk+Fd)) * dt
+    
+    X_ven = (nu_l/Dv)**(1./3.) * (2. *a1 * v_rel / nu_l)**(1./2.)
+    if (X_ven.lt.1.4) then           !ventilation effect PK97 (eq.13.60/61)
+      f_v = 1.0  + 0.108*X_ven**2.
+    else
+      f_v = 0.78 + 0.308*X_ven
+    end if
+    !if (myid==0.and.S.lt.0.9) then
+    !  write(*,*) 'S  : ',S
+    !  write(*,*) 'a1 : ',a1
+    !  write(*,*) 'NSc: ',(nu_l/Dv)**(1./3.)
+    !  write(*,*) 'NRe: ',(2. *a1 * v_rel / nu_l)**(1./2.)
+    !  write(*,*) 'vr : ',v_rel
+    !  write(*,*) 'X  : ',X_ven
+    !  write(*,*) 'fv : ',f_v
+    !end if
+    
+    particle%mass = particle%mass + f_v* 4*pi*a1*(S-1) / (rowt*(Fk+Fd)) * dt
+    !if (myid==0) write(*,*) 'mass eva: ',particle%mass
     
     
-    !todo: drop breakup at 3mm to 6mm?! 
+    !add drop breakup at 3mm to 6mm?! 
         
   end subroutine drop_growth
 
