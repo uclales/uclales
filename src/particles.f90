@@ -2556,7 +2556,7 @@ contains
     real               :: a1, K, Fk, Fd, S, es
     real               :: thl,thv,rt,rl,tk,ev
     real               :: v_rel, a1max, f_v, X_ven, dzi
-    logical            :: longkernel=.true.
+    logical            :: longkernel=.false.
     real, parameter :: &
          wr     = 33.,      &   ! S13
 	 E_c     = 1.
@@ -2612,7 +2612,7 @@ contains
     !  write(*,*) 'fv : ',f_v
     !end if
     
-    particle%mass = particle%mass + f_v* 4*pi*a1*(S-1) / (rowt*(Fk+Fd)) * dt
+    particle%mass = particle%mass + f_v* 4*pi*a1* rowt*(S-1) / ((Fk+Fd)) * dt
     !if (myid==0) write(*,*) 'mass eva: ',particle%mass
     
     
