@@ -47,7 +47,7 @@ module modparticles
   logical            :: lpartdumpth    = .false.        !< Switch for writing temperatures (liquid water / virtual potential T) to dump
   logical            :: lpartdumpmr    = .false.        !< Switch for writing moisture (total / liquid (+rain if level==3) water mixing ratio) to dump
   real               :: frqpartdump    =  3600          !< Time interval for particle dump
-  integer            :: int_part       =  3             !< Interpolation scheme, 1=linear, 3=3rd order Lagrange
+  integer            :: int_part       =  1             !< Interpolation scheme, 1=linear, 3=3rd order Lagrange
   real               :: ldropstart     = 0.             !< Earliest time to start drops
 
   character(30)      :: startfile
@@ -2729,7 +2729,7 @@ contains
     kmax = size(zm)
 
     firststartl = 1e9
-    call init_random_seed()
+!     call init_random_seed()
 
     ! clear pointers to head and tail
     nullify(head)
@@ -2868,7 +2868,7 @@ contains
       if ( np < 1 ) return
       ! read particles from partstartpos, create linked list
       do n = 1, np
-      if (mod(n,10000000)==0) print *,n
+      !if (mod(n,10000000)==0) print *,n
         read(ifinput,*) tstart, xstart, ystart, zstart
         if(xstart < 0. .or. xstart > nxg*deltax .or. ystart < 0. .or. ystart > nyg*deltay .or. zstart < 0. .or. zstart > zm(nzp-1)) then
           if (myid == 0) then
@@ -3022,7 +3022,7 @@ contains
     close(ifinput)
 
     if(lpartsgs)  allocate(sgse(nzp,nxp,nyp),rese(nzp,nxp,nyp),fs_local(nzp,nxp,nyp),fs(nzp))
-    call init_random_seed()
+!     call init_random_seed()
 
     ! Check interpolation option
     if(int_part .eq. 1) then
@@ -3350,19 +3350,19 @@ contains
     end if
 
   end subroutine delete_particle
-
-  subroutine init_random_seed()
-    integer :: i, n, clock
-    integer, dimension(:), allocatable :: seed
-
-    call random_seed(size = n)
-    allocate(seed(n))
-    call system_clock(count=clock)
-    seed = clock + 37 * (/ (i - 1, i = 1, n) /)
-    call random_seed(put = seed)
-
-    deallocate(seed)
-  end subroutine init_random_seed
+!
+!   subroutine init_random_seed()
+!     integer :: i, n, clock
+!     integer, dimension(:), allocatable :: seed
+!
+!     call random_seed(size = n)
+!     allocate(seed(n))
+!     call system_clock(count=clock)
+!     seed = clock + 37 * (/ (i - 1, i = 1, n) /)
+!     call random_seed(put = seed)
+!
+!     deallocate(seed)
+!   end subroutine init_random_seed
 
 
   !-------- ARCHIVE ---------------------

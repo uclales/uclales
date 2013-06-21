@@ -17,6 +17,12 @@
 ! Copyright 1999-2007, Bjorn B. Stevens, Dep't Atmos and Ocean Sci, UCLA
 !----------------------------------------------------------------------------
 !
+! \todo CMake as in microhh
+! \todo Separate Surface Namelist?
+! \todo Separate Soil from 3D fields?
+! \todo Top level radiation hopping
+! \todo reduce nr of warnings when compiling with gfortran/NAG
+! \todo Nicer version of accumelated precip
 program ucla_les
 
   implicit none
@@ -44,26 +50,17 @@ contains
     use step, only          : stepper
     use mpi_interface, only : init_mpi, define_decomp,                    &
          init_alltoall_reorder, appl_finalize
-
     implicit none
-
     integer ierror
 
     call init_mpi
-
     call define_parm
-
     call define_decomp(nxp, nyp, nxpart)
-
     call define_grid
-
     call init_alltoall_reorder(nxp, nyp, nzp)
-
     call define_vars
-
     call initialize
     call stepper
-
     call appl_finalize(ierror)
 
     return
@@ -78,26 +75,28 @@ contains
     use util, only : fftinix,fftiniy
     use defs, only : SolarConstant
     use sgsm, only : csx, prndtl, clouddiff
-    use advf, only : lmtr
-    !irina
-    use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon,lhomflx
-    !use srfc, only : isfctyp, zrough, ubmin, dthcon, drtcon, sst
+    use advf, only : lmtr !,advs
+    use advl, only : advm
+    use srfc, only : zrough, ubmin, dthcon, drtcon, rh_srf, drag, lhomflx
     use step, only : timmax, timrsm, istpfl, corflg, outflg, frqanl, frqhis,          &
          frqcross , strtim, radfrq, cntlat,&
-         case_name,lsvarflg, sst, div, wctime , tau                 !irina
-!cgils
+         case_name,lsvarflg, sst, div, wctime , tau, &                !irina
+         lanom ! linda
     use modnetcdf, only : lsync, deflate_level
     use ncio, only : deflev => deflate_level
     use modcross, only : lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars
     use forc, only : lstendflg, sfc_albedo
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
-         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype, CCN, lwaterbudget, lcouvreux
+         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype,             &
+         CCN, lwaterbudget, lcouvreux, prc_lev, isfctyp, sfc_albedo, lrad_ca
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,irsflg, iseed, hfilin,   &
          zrand,lhomrestart
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
-    use modnudge, only : lnudge,tnudgefac
+    use radiation, only : u0, fixed_sun, rad_eff_radius
+    use modnudge, only : lnudge,tnudgefac, qfloor, zfloor, znudgemin, znudgeplus, &
+         lnudge_bound
     use modtimedep, only : ltimedep
     use mcrp, only : microseq,lrandommicro,timenuc,nin_set,cloud_type, lpartdrop
     use modparticles, only : lpartic, lpartsgs, lrandsurf, lpartstat, lpartdump, &
@@ -121,7 +120,7 @@ contains
          timmax , dtlong , istpfl , timrsm, wctime, & ! timestep control
          runtype, hfilin , filprf , & ! type of run (INITIAL or HISTORY)
          frqhis , frqanl, frqcross, outflg , & ! freq of history/anal writes, output flg
-         lsync, lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars,&
+         lsync, lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars,prc_lev,&
                   iradtyp, radfrq , strtim , sfc_albedo, & ! radiation type flag
          isfctyp, ubmin  , zrough , & ! surface parameterization type
          sst    , dthcon , drtcon , & ! SSTs, surface flx parameters
@@ -130,15 +129,20 @@ contains
          hs     , ps     , ts    ,  & ! sounding heights, pressure, temperature
          us     , vs     , rts   ,  & ! sounding E/W winds, water vapor
          umean  , vmean  , th00  ,  & ! gallilean E/W wind, basic state
+         lanom  ,                   & ! LINDA, start with anomalies
          case_name, lmtr,           & !irina:name of the case, i.e. astex, rico, etc
-         lsvarflg,                  & !irina:flag for time bvarying large scale forcing
+         advm,                & ! Advection scheme scalars, momentum
+         lsvarflg,                  & ! irina:flag for time bvarying large scale forcing
          lstendflg,                  & !irina:flag for time large scale advective tendencies
          div,  &                       !irina: divergence
-         lnudge, tnudgefac, ltimedep, &             !thijs: Nudging
-         SolarConstant, & ! SolarConstant (In case of prescribed TOA radiation
+         lnudge, tnudgefac, ltimedep, qfloor, zfloor,znudgemin, znudgeplus,  &             !thijs: Nudging
+         lnudge_bound, &               ! LINDA, relaxation boundaries
+         rh_srf, drag, &
+         SolarConstant,u0,fixed_sun, rad_eff_radius, & ! SolarConstant (In case of prescribed TOA radiation
          lrandommicro, microseq,timenuc ,nin_set,cloud_type, &  !thijs: sequence of variables for microphysics
          lwaterbudget, &                 ! axel: flag for liquid water budget diagnostics (only level=3)
          lcouvreux , tau , &                    ! The Couvreux 'radioactive' scalar
+         lrad_ca, &                        ! Clear air radiation statistics
          deflate_level , lhomflx,lhomrestart, &                         !Compression of the crosssections
          clouddiff, &
          lpartic,lpartsgs,lrandsurf,lpartstat,lpartdump, &           ! Particles

@@ -1,0 +1,119 @@
+#!/bin/bash
+
+fstem=$1
+dir=$2
+timestep=$3
+#varnames=$4
+
+#$(pwd)
+nn=$( ls -l ${dir}"/"${fstem}.????????.nc | wc -l )
+nx=$( ls -l ${dir}"/"${fstem}.0000????.nc | wc -l )
+ny=$( ls -l ${dir}"/"${fstem}.????0000.nc | wc -l )
+
+echo " cdo_gather_vol for $fstem dataset for timestep $timestep"
+echo " Looking for files in dir=$dir"
+echo " Found nn=$nn files from nx=$nx ny=$ny proc"
+cd $dir
+
+nx=$(( $nx - 1 ))
+ny=$(( $ny - 1 ))
+
+nxx=$(ncdump -h ${fstem}.00000000.nc | grep 'xt =' | cut -d " " -f3 )
+nyy=$(ncdump -h ${fstem}.00000000.nc | grep 'yt =' | cut -d " " -f3 )
+echo " $nxx points in the zonal direction"
+echo " $nyy points in the meridional direction"
+
+#varnames=$( cdo showname $fstem.00000000.nc )
+varnames=(q t u v w)
+#varnames=(t)
+#varnames[0]=t
+
+echo " Found the following variables: ${varnames[*]}"
+
+for var in ${varnames[*]}; do
+
+  if [ -s $fstem.out.vol.$var.$timestep.nc ]; then
+    echo " File $fstem.out.vol.$var.$timestep.nc exists already, skipping this variable"
+  else
+    echo " Do cdo gather for var=$var"
+
+    for n in $(seq 0 $ny); do
+      echo "n= $n" 
+      nstring=$(printf %04d $n)
+      if [ -s gather.vol.$nstring.$var.$timestep.nc ]; then
+        echo " File gather.vol.$nstring.$var.$timestep.nc exists already, using this file"
+      else
+        echo " Do cdo gather for n=$nstring for all var=$var"
+        for m in $(seq 0 $nx); do
+        echo "m= $m" 
+          mstring=$(printf %04d $m)
+          cdo -P 8 seltimestep,$timestep -selname,$var $fstem.${nstring}${mstring}.nc selname.vol.$nstring.$mstring.$var.nc
+        done
+        cdo -P 8 gather selname.vol.$nstring.????.$var.nc gather.vol.$nstring.$var.$timestep.nc 
+        /bin/rm selname.vol.$nstring.????.$var.nc
+      fi
+    done
+
+    echo "cdo gather for gathered slices of var=$var"
+    cdo -P 8 gather gather.vol.????.$var.$timestep.nc $fstem.out.vol.$var.$timestep.nc
+
+    /bin/rm gather.vol.????.$var.$timestep.nc
+  fi
+
+  if [ -s $fstem.anom.$var.$timestep.nc ]; then
+    echo " File $fstem.anom.$var.$timestep.xy.nc exists already, skipping this variable"
+  else
+    if [ $var != u -a $var != v ];  then
+      ncwa -a xt $fstem.out.vol.$var.$timestep.nc $fstem.out.vol.$var.$timestep.x.nc
+      ncwa -a yt $fstem.out.vol.$var.$timestep.x.nc $fstem.out.vol.$var.$timestep.xy.nc
+    fi
+    if [ $var == u ]; then
+      ncwa -a xm $fstem.out.vol.$var.$timestep.nc $fstem.out.vol.$var.$timestep.x.nc 
+      ncwa -a yt $fstem.out.vol.$var.$timestep.x.nc $fstem.out.vol.$var.$timestep.xy.nc 
+    fi
+    if [ $var == v ]; then
+      ncwa -a xt $fstem.out.vol.$var.$timestep.nc $fstem.out.vol.$var.$timestep.x.nc 
+      ncwa -a ym $fstem.out.vol.$var.$timestep.x.nc $fstem.out.vol.$var.$timestep.xy.nc 
+    fi
+
+    ncbo --op_typ=- $fstem.out.vol.$var.$timestep.nc $fstem.out.vol.$var.$timestep.xy.nc $fstem.anom.$var.$timestep.nc
+
+    /bin/rm $fstem.out.vol.$var.$timestep.x.nc $fstem.out.vol.$var.$timestep.xy.nc
+  fi
+
+for n in $(seq 0 $ny); do
+    echo "n= $n" 
+    nstring=$(printf %04d $n)
+    echo " Do cdo cut for n=$nstring for var=$var"
+        for m in $(seq 0 $nx); do
+        echo "m= $m" 
+          mstring=$(printf %04d $m)
+	  let xind1=$n*$nxx+1
+          let xind2=($n+1)*$nxx
+          let yind1=$m*$nyy+1
+          let yind2=($m+1)*$nyy
+          cdo selindexbox,$xind1,$xind2,$yind1,$yind2 $fstem.anom.$var.$timestep.nc $fstem.anom.$var.${nstring}${mstring}.nc
+        done
+    done
+done
+for n in $(seq 0 $ny); do
+    echo "n= $n" 
+    nstring=$(printf %04d $n)
+    echo " Do cdo merge for n=$nstring for all variable"
+    for m in $(seq 0 $nx); do
+        echo "m= $m" 
+        mstring=$(printf %04d $m)
+
+        cdo -O merge $fstem.anom.?.${nstring}${mstring}.nc $fstem.anom.${nstring}${mstring}.nc
+
+        ncpdq -O -a time,yt,xt,zt $fstem.anom.${nstring}${mstring}.nc  $fstem.anom.${nstring}${mstring}.nc
+        ncpdq -O -a time,yt,xm,zt $fstem.anom.${nstring}${mstring}.nc  $fstem.anom.${nstring}${mstring}.nc
+        ncpdq -O -a time,ym,xt,zt $fstem.anom.${nstring}${mstring}.nc  $fstem.anom.${nstring}${mstring}.nc
+        ncpdq -O -a time,yt,xt,zm $fstem.anom.${nstring}${mstring}.nc  $fstem.anom.${nstring}${mstring}.nc
+
+        /bin/rm -f $fstem.anom.?.${nstring}${mstring}.nc
+
+        ncwa -O -a time $fstem.anom.${nstring}${mstring}.nc $fstem.anom.${nstring}${mstring}.nc # remove degenerate time dimension
+
+    done
+done

@@ -94,7 +94,6 @@ contains
 
 !    --- load lsforcings---
 
-
     open(ifinput,file='ls_flux_in')
     read(ifinput,'(a80)') chmess
     write(6,*) chmess
@@ -108,6 +107,8 @@ contains
 
 
 !      --- load fluxes---
+
+    print*,'********************************',time_end
 
     t    = 0
     ierr = 0

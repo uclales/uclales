@@ -24,7 +24,7 @@ module step
   integer :: istpfl = 1
   real    :: timmax = 18000.
   real    :: timrsm = 86400.
-  real    :: wctime = 1e10
+  real    :: wctime = 1.e10
   logical :: corflg = .false.
   logical :: rylflg = .true.
 
@@ -46,6 +46,9 @@ module step
   character (len=8) :: case_name = 'astex'
 
   integer :: istp
+! linda,b
+  logical ::lanom=.false.
+!linda,e
 
   ! Flags for sampling, statistics output, etc.
   logical :: savgflg=.false.,anlflg=.false.,hisflg=.false.,crossflg=.false.,lpdumpflg=.false.
@@ -61,7 +64,7 @@ contains
   !
   subroutine stepper
 
-    use mpi_interface, only : myid, broadcast, double_scalar_par_max
+    use mpi_interface, only : myid, broadcast_dbl, double_scalar_par_max, mpi_get_time
     use grid, only : dt, dtlong, zt, zm, nzp, dn0, u0, v0, level, &
          write_hist
     use ncio, only : write_anal, close_anal
@@ -75,7 +78,8 @@ contains
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
-    real    :: t1,t2,tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax
+    real    :: tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax
+    double precision    :: t0,t1,t2
     integer :: iret
 
     real    :: dt_prev
@@ -86,8 +90,10 @@ contains
     begtime = time
     istp    = 0
     t2      = 0.
-    do while (time < timmax .and. t2 < wctime)
-       call cpu_time(t1)           !t1=timing()
+    call mpi_get_time(t0)
+    call broadcast_dbl(t0, 0)
+    do while (time < timmax .and. (t2-t0) < wctime)
+       call mpi_get_time(t1)
        istp = istp + 1
 
        call stathandling
@@ -157,20 +163,20 @@ contains
        !end if
 
        if(myid == 0) then
-          call cpu_time(t2)           !t1=timing()
+          call mpi_get_time(t2)
           if (mod(istp,istpfl) == 0 ) then
               if (wctime.gt.1e9) then
-                print "('   Timestep # ',i5," //     &
-                       "'   Model time(sec)=',f10.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2)",     &
-                       istp, time, dt_prev, t2-t1, t2*(timmax/time-1)
+                print "('   Timestep # ',i6," //     &
+                       "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3)",     &
+                       istp, time, dt_prev, t2-t1
               else
-                print "('   Timestep # ',i5," //     &
-                       "'   Model time(sec)=',f10.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3,'   Est. CPU Time left(sec) = ',f10.2,'  WC Time left(sec) = ',f10.2)",     &
-                       istp, time, dt_prev, t2-t1, t2*(timmax/time-1),wctime-t2
+                print "('   Timestep # ',i6," //     &
+                       "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3'  WC Time left(sec) = ',f10.2)",     &
+                       istp, time, dt_prev, t2-t1, wctime-t2+t0
               end if
           end if
        endif
-       call broadcast(t2, 0)
+       call broadcast_dbl(t2, 0)
     enddo
 
     call write_hist(1, time)
@@ -188,7 +194,7 @@ contains
 
     iret = close_stat()
 
-    if (t2 .ge. wctime .and. myid == 0) write(*,*) '  Wall clock limit wctime reached, stopped simulation for restart'
+    if ((t2-t0) .ge. wctime .and. myid == 0) write(*,*) '  Wall clock limit wctime reached, stopped simulation for restart'
     if (time.ge.timmax .and. myid == 0) write(*,*) '  Max simulation time timmax reached. Finished simulation successfully'
 
   end subroutine stepper
@@ -286,15 +292,14 @@ contains
   !
   subroutine t_step
 
-    use mpi_interface, only : myid
+    use mpi_interface, only : myid, appl_abort
     use grid, only : level, dt, nstep, a_tt, a_up, a_vp, a_wp, dxi, dyi, dzi_t, &
          nxp, nyp, nzp, dn0,a_scr1, u0, v0, a_ut, a_vt, a_wt, zt, a_ricep, a_rct, a_rpt, &
          lwaterbudget
     use stat, only : sflg, statistics
     use sgsm, only : diffuse
-    !irina
+    !use sgsm_dyn, only : calc_cs
     use srfc, only : surface
-    !use srfc, only : surface,sst
     use thrm, only : thermo
     use mcrp, only : micro, lpartdrop
     use prss, only : poisson
@@ -303,15 +308,15 @@ contains
     use forc, only : forcings
     use lsvar, only : varlscale
     use util, only : velset,get_avg
+    use centered, only:advection_scalars
     use modtimedep, only : timedep
     use modparticles, only : particles, lpartic, particlestat,lpartstat, &
          deactivate_drops, activate_drops
 
 
     logical, parameter :: debug = .false.
-!     integer :: k
     real :: xtime
-!     character (len=11)    :: fname = 'debugXX.dat'
+  character (len=8) :: adv='monotone'
 
     xtime = time/86400. + strtim
     call timedep(time,timmax, sst)
@@ -333,12 +338,25 @@ contains
        call thermo(level)
 
        if (lsvarflg) then
-          call varlscale(time,case_name,sst,div,u0,v0)
+         call varlscale(time,case_name,sst,div,u0,v0)
        end if
-       call surface(sst)
 
-       call diffuse
-       call fadvect
+       xtime = xtime - strtim
+       call surface(sst,xtime)
+       xtime = xtime + strtim
+
+       ! BvS
+       !call calc_cs(time)      ! calculated dynamic value Cs
+
+       call diffuse(time)
+       if (adv=='monotone') then
+          call fadvect
+       elseif ((adv=='second').or.(adv=='third').or.(adv=='fourth')) then
+          call advection_scalars(adv)
+       else 
+          print *, 'wrong specification for advection scheme'
+          call appl_abort(0)
+       endif
        call ladvect
        if (level >= 1) then
           if (lwaterbudget) then
@@ -346,7 +364,7 @@ contains
           else
              call thermo(level)
           end if
-          call forcings(xtime,cntlat,sst,div,case_name)
+          call forcings(xtime,cntlat,sst,div,case_name,time)
           call micro(level,istp)
        end if
        call corlos
@@ -381,7 +399,7 @@ contains
                      a_ricet,a_nicet,a_rsnowt, a_rgrt,&
                      a_rhailt,a_nhailt,a_nsnowt, a_ngrt,&
                      a_xt1, a_xt2, nscl, nxyzp, level, &
-                     lwaterbudget, a_rct, &
+                     lwaterbudget, a_rct, ncld, &
                      lcouvreux, a_cvrxt, ncvrx
     use util, only : azero
 
@@ -400,7 +418,7 @@ contains
           a_rpt =>a_xt1(:,:,:,6)
           a_npt =>a_xt1(:,:,:,7)
        end if
-       if (lwaterbudget) a_rct =>a_xt1(:,:,:,8)
+       if (lwaterbudget) a_rct =>a_xt1(:,:,:,ncld)
        if (lcouvreux)    a_cvrxt =>a_xt1(:,:,:,ncvrx)
        if (level >= 4) then
           a_ricet  =>a_xt1(:,:,:, 8)
@@ -426,7 +444,7 @@ contains
           a_rpt =>a_xt2(:,:,:,6)
           a_npt =>a_xt2(:,:,:,7)
        end if
-       if (lwaterbudget) a_rct =>a_xt2(:,:,:,8)
+       if (lwaterbudget) a_rct =>a_xt2(:,:,:,ncld)
        if (lcouvreux)    a_cvrxt =>a_xt2(:,:,:,ncvrx)
        if (level >= 4) then
           a_ricet  =>a_xt2(:,:,:, 8)
@@ -471,6 +489,11 @@ contains
        !call sclrset('mixd',nzp,nxp,nyp,a_sp,dzi_t,n)
     end do
 
+    if (level >= 1) then
+       where (a_rp < 0.) 
+          a_rp=0.
+       end where
+    end if
     if (level >= 3) then
        a_rpp(1,:,:) = 0.
        a_npp(1,:,:) = 0.

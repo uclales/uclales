@@ -48,4 +48,6 @@
   lpartdumpth  = .true.
   lpartdumpmr  = .true.
   frqpartdump  = 60.
+  advm = 2
+  advs = 2 
  /

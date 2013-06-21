@@ -19,8 +19,8 @@
 !
 module radiation
 
-  use defs, only       : cp, rcp, cpr, rowt, p00, pi, nv1, nv, SolarConstant
-  use fuliou, only     : rad
+  use defs, only       : cp, rcp, cpr, rowt, roice, p00, pi, nv1, nv, SolarConstant
+  use fuliou, only     : rad, minSolarZenithCosForVis
   implicit none
  character (len=10), parameter :: background = 'backrad_in'
  ! character (len=19), parameter :: background = 'datafiles/s11.lay'
@@ -33,7 +33,9 @@ module radiation
 
   integer :: k,i,j, npts
   real    :: ee, u0, day, time, alat, zz
-
+  logical :: fixed_sun = .false.
+!   real    :: radius = 1.03
+  real    :: rad_eff_radius = 1.
   contains
 
     subroutine d4stream(n1, n2, n3, alat, time, sknt, sfc_albedo, CCN, dn0, &
@@ -45,11 +47,11 @@ module radiation
       real, dimension (n1), intent (in)                 :: dn0, pi0, pi1, dzi_m
       real, dimension (n1,n2,n3), intent (in)           :: pip, th, rv, rc
       real, optional, dimension (n1,n2,n3), intent (in) :: rr,ice,nice,grp
-      real, dimension (n1,n2,n3), intent (inout)        :: tt, rflx, sflx, lflxu, lflxd, sflxu, sflxd 
+      real, dimension (n1,n2,n3), intent (inout)        :: tt, rflx, sflx, lflxu, lflxd, sflxu, sflxd
       real, dimension (n2,n3), intent (out),optional    :: albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa
 
       integer :: kk
-      real    :: xfact, prw, p0(n1), exner(n1), pres(n1)
+      real    :: xfact, prw, pri, p0(n1), exner(n1), pres(n1)
 
       if (first_time) then
          p0(n1) = (p00*(pi0(n1)/cp)**cpr) / 100.
@@ -66,18 +68,21 @@ module radiation
       !
       ! initialize surface albedo, emissivity and skin temperature.
       !
-      ee = 1.0 
+      ee = 1.0
       !
-      ! determine the solar geometery, as measured by u0, the cosine of the 
+      ! determine the solar geometery, as measured by u0, the cosine of the
       ! solar zenith angle
       !
-      u0 = zenith(alat,time)
+      if (.not. fixed_sun) then
+        u0 = zenith(alat,time)
+      end if
     !cgils
-!       u0 = 1.
+
       !
-      ! call the radiation 
+      ! call the radiation
       !
       prw = (4./3.)*pi*rowt
+      pri = (3.*sqrt(3.)/8.)*roice
       do j=3,n3-2
          do i=3,n2-2
             do k=1,n1
@@ -91,9 +96,10 @@ module radiation
                pt(kk) = th(k,i,j)*exner(k)
                !old
              !  pt(kk) = tk(k,i,j)
-               ph(kk) = rv(k,i,j)
+               ph(kk) = max(0.,rv(k,i,j))
                plwc(kk) = 1000.*dn0(k)*max(0.,rc(k,i,j))
-               pre(kk)  = 1.e6*(plwc(kk)/(1000.*prw*CCN*dn0(k)))**(1./3.)
+               pre(kk)  = rad_eff_radius*1.e6*(plwc(kk)/(1000.*prw*CCN*dn0(k)))**(1./3.)
+               pre(kk)=min(max(pre(kk),4.18),31.23)
                if (plwc(kk).le.0.) pre(kk) = 0.
                if (present(rr)) then
                  prwc(kk) = 1000.*dn0(k)*rr(k,i,j)
@@ -102,9 +108,15 @@ module radiation
                end if
                if (present(ice)) then
                  piwc(kk) = 1000.*dn0(k)*ice(k,i,j)
-                 pde(kk)  = 1.e6*(piwc(kk)/(1000.*prw*nice(k,i,j)*dn0(k)))**(1./3.)
+                 if (nice(k,i,j).gt.0.0) then
+                    pde(kk)  = 1.e6*(piwc(kk)/(1000.*pri*nice(k,i,j)*dn0(k)))**(1./3.)
+                    pde(kk)=min(max(pde(kk),20.),180.)
+                 else
+                    pde(kk)  = 0.0
+                 endif
                else
                   piwc(kk) = 0.
+                  pde(kk) = 0.0
                end if
                if (present(grp)) then
                  pgwc(kk) = 1000.*dn0(k)*grp(k,i,j)
@@ -123,12 +135,17 @@ module radiation
             !print *, "pre",pre(:)
             !print *, "u0",u0
 
-            call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
-                 fds, fus, fdir, fuir, plwc=plwc, pre=pre, useMcICA=.True.)
+            if (present(ice).and.present(grp)) then
+               call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
+                    fds, fus, fdir, fuir, plwc=plwc, pre=pre, piwc=piwc, pde=pde, pgwc=pgwc, useMcICA=.true.)
+            else
+               call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
+                    fds, fus, fdir, fuir, plwc=plwc, pre=pre, useMcICA=.true.)
+            end if
 
             do k=1,n1
                kk = nv1 - (k-1)
-               sflx(k,i,j) = fus(kk)  - fds(kk) 
+               sflx(k,i,j) = fus(kk)  - fds(kk)
                !irina
                sflxu(k,i,j)=fus(kk)
                sflxd(k,i,j)=fds(kk)
@@ -141,7 +158,7 @@ module radiation
             end do
 
             if (present(albedo)) then
-              if (u0 > 0.) then
+              if (u0 > minSolarZenithCosForVis) then
                 albedo(i,j) = fus(1)/fds(1)
               else
                 albedo(i,j) = -999.
@@ -149,14 +166,14 @@ module radiation
             end if
 
             if (present(sflxu_toa)) then
-              if (u0 > 0.) then
+              if (u0 > minSolarZenithCosForVis) then
                 sflxu_toa(i,j) = fus(1)
               else
                 sflxu_toa(i,j) = -999.
               end if
             end if
             if (present(sflxd_toa)) then
-              if (u0 > 0.) then
+              if (u0 > minSolarZenithCosForVis) then
                 sflxd_toa(i,j) = fds(1)
               else
                 sflxd_toa(i,j) = -999.
@@ -167,17 +184,45 @@ module radiation
             end if
             if (present(lflxd_toa)) then
               lflxd_toa(i,j) = fdir(1)
-            end if 
+            end if
             do k=2,n1-3
                xfact  = dzi_m(k)/(cp*dn0(k)*exner(k))
                tt(k,i,j) = tt(k,i,j) - (rflx(k,i,j) - rflx(k-1,i,j))*xfact
-             !  print *, 'dt', k, rc(k,i,j),(rflx(k,i,j) - rflx(k-1,i,j))*xfact*3600.
             end do
-
          end do
       end do
 
     end subroutine d4stream
+
+  !
+  ! ---------------------------------------------------------------------------
+  ! BvS: Simple parameterized surface radiation for LSM
+  !
+  subroutine surfacerad(alat,time)
+    use grid, only   : sfc_albedo,a_theta,a_lflxu,a_lflxd,a_sflxu,a_sflxd,a_tskin,nxp,nyp,a_pexnr,pi0,pi1
+    use defs, only   : stefan, cp
+    real, intent(in) :: time, alat
+    integer          :: i,j
+    real             :: tr, exner
+
+    ! Assumes longitude = 0.
+    u0 = max(0.,zenith(alat,time))
+    tr = (0.6 + 0.2 * u0)
+
+    do j=3,nyp-2
+      do i=3,nxp-2
+        exner          = (pi0(2)+pi1(2)+a_pexnr(2,i,j))/cp
+        a_sflxd(2,i,j) = SolarConstant * tr * u0
+        a_sflxu(2,i,j) = sfc_albedo * a_sflxd(2,i,j)
+        a_lflxd(2,i,j) = 0.8 * stefan * (a_theta(2,i,j)*exner)**4.
+        a_lflxu(2,i,j) = stefan * a_tskin(i,j)**4.
+      end do
+    end do
+
+    !print*,'SEB:',a_sflxd(2,10,10),a_sflxu(2,10,10),a_lflxd(2,10,10),a_lflxu(2,10,10)
+    !print*,'NET:',a_sflxd(2,10,10)-a_sflxu(2,10,10)+a_lflxd(2,10,10)-a_lflxu(2,10,10)
+
+  end subroutine surfacerad
 
   ! ---------------------------------------------------------------------------
   ! sets up the input data to extend through an atmopshere of appreiciable
@@ -211,7 +256,7 @@ module radiation
     ! identify what part, if any, of background sounding to use
     !
     ptop = zp(n1)
-    if (sp(2) < ptop) then 
+    if (sp(2) < ptop) then
        pa = sp(1)
        pb = sp(2)
        k = 3
@@ -221,13 +266,13 @@ module radiation
           k  = k+1
        end do
        k=k-1           ! identify first level above top of input
-       blend = .True. 
+       blend = .True.
     else
        blend = .False.
     end if
     !
     ! if blend is true then the free atmosphere above the sounding will be
-    ! specified based on the specified background climatology, here the 
+    ! specified based on the specified background climatology, here the
     ! pressure levels for this part of the sounding are determined
     !
     if (blend) then
@@ -250,9 +295,9 @@ module radiation
     end if
     nv = nv1-1
     !
-    ! allocate the arrays for the sounding data to be used in the radiation 
+    ! allocate the arrays for the sounding data to be used in the radiation
     ! profile and then fill them first with the sounding data, by afill, then
-    ! by interpolating the background profile at pressures less than the 
+    ! by interpolating the background profile at pressures less than the
     ! pressure at the top fo the sounding
     !
     allocate (pp(nv1),fds(nv1),fus(nv1),fdir(nv1),fuir(nv1))
@@ -279,15 +324,14 @@ module radiation
       ! end do
 
       ! interpolate ozone profile
-       do k=npts+1,nv1
+       do k=npts+1,nv
             pp2 = (p00*(pi0(nv-k+2)/cp)**cpr) / 100.
             index  = getindex(sp,ns,pp2)
             po(k) =  intrpl(sp(index),so(index),sp(index+1),so(index+1),pp2)
-            print*,'ozone profile: ', po(k), pp2, sp (index), sp(index+1)
          end do
 
     end if
-
+  
   end subroutine setup
   ! ---------------------------------------------------------------------------
   !  locate the index closest to a value
@@ -320,7 +364,7 @@ module radiation
   end function getindex
 
   ! ---------------------------------------------------------------------------
-  ! linear interpolation between two points, 
+  ! linear interpolation between two points,
   !
   real function intrpl(x1,y1,x2,y2,x)
 
@@ -334,7 +378,7 @@ module radiation
   end function intrpl
 
   ! ---------------------------------------------------------------------------
-  ! Return the cosine of the solar zenith angle give the decimal day and 
+  ! Return the cosine of the solar zenith angle give the decimal day and
   ! the latitude
   !
   real function zenith(alat,time)

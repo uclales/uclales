@@ -40,7 +40,7 @@ module mcrp
        a_rhailp, a_rhailt,  & ! hail mass
        a_nhailp, a_nhailt,  & ! hail number
        prc_c, prc_r, prc_i, prc_s, prc_g, prc_h, & 
-       lwaterbudget, prc_acc, rev_acc, a_rct, cnd_acc, cev_acc, a_cld
+       lwaterbudget, prc_acc, rev_acc, a_rct, cnd_acc, cev_acc, a_cld,prc_lev, lmptend
 
   USE parallele_umgebung, ONLY: isIO,double_global_maxval,global_maxval,global_minval,global_maxval_stdout,global_sumval_stdout
   USE modcross, ONLY: calcintpath
@@ -186,7 +186,7 @@ contains
          &          hlp1,hlp2,hlp3,hlp4,hlp5,hlp6,hlp7,hlp8,hsum
     integer, optional :: istp
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
-
+    integer :: n
 
     if (present(istp)) istep = istp
 
@@ -208,12 +208,15 @@ contains
        if (.not.lwaterbudget) then
           call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
                a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r)
-          prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)) * dt / 3.
+          do n =1,count(prc_lev>0)
+            prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(n,:,:)+prc_r(n,:,:)) * dt / 3.
+          end do
        else
           call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
                a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r,rct=a_rct)
-
-          prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)) * dt / 3.
+            do n =1,count(prc_lev>0)
+              prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(n,:,:)+prc_r(n,:,:)) * dt / 3.
+            end do
 
           if (debug.and.lwaterbudget.and. .false.) then
              ! standard output of liquid water budget
@@ -236,7 +239,7 @@ contains
              hsum = sum(cnd_acc) ; call double_scalar_par_sum(hsum,hlp1)
              hsum = sum(cev_acc) ; call double_scalar_par_sum(hsum,hlp2)
              hsum = sum(rev_acc) ; call double_scalar_par_sum(hsum,hlp3)
-             hsum = sum(prc_acc) ; call double_scalar_par_sum(hsum,hlp4)
+             hsum = sum(prc_acc(:,:,1)) ; call double_scalar_par_sum(hsum,hlp4)
              call calcintpath(liquid,tmp)
              hsum = sum(tmp)     ; call double_scalar_par_sum(hsum,hlp5)
              call calcintpath(a_rpp,tmp)       
@@ -259,7 +262,9 @@ contains
             a_npp,a_rt,a_rpt,a_npt,a_scr7, prc_r,rsi, a_ricet,a_nicet,a_rsnowt,a_rgrt,&
             a_ricep,a_nicep,a_rsnowp,a_rgrp, &
             prc_i, prc_s, prc_g)
-       prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)+prc_i(2,:,:)+prc_s(2,:,:)+prc_g(2,:,:)) * dt / 3.
+      do n =1,count(prc_lev>0)
+        prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(n,:,:)+prc_r(n,:,:)+prc_i(n,:,:)+prc_s(n,:,:)+prc_g(n,:,:)) * dt / 3.
+      end do
     case(5)
        call mcrph_sb(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,a_wp,vapor,liquid, &
             a_rpp,    a_npp    , & ! rain
@@ -274,9 +279,11 @@ contains
             a_rgrt,   a_ngrt,    & ! graupel
             a_rhailt, a_nhailt,  & ! hail
             prc_c, prc_r, prc_i, prc_s, prc_g, prc_h)
-       prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)+prc_i(2,:,:)          &
-                           +prc_s(2,:,:)+prc_g(2,:,:)+prc_h(2,:,:)) * dt / 3.
-    end select
+      do n =1,count(prc_lev>0)
+        prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(n,:,:)+prc_r(n,:,:)+prc_i(n,:,:)          &
+                           +prc_s(n,:,:)+prc_g(n,:,:)+prc_h(n,:,:)) * dt / 3.
+       end do
+   end select
 
   end subroutine micro
   !
@@ -2059,7 +2066,7 @@ contains
     end if
 
     do k=n1-1,2,-1
-      if (rp(k) > rthres) then
+      if ((rp(k) > rthres).and.(np(k).ne.0.)) then
        Xp = rp(k) / np(k)
        xp = MIN(MAX(xp,meteor%x_min),meteor%x_max)
        lam = ( c_lam(metnr) * xp )**(meteor%b_vel)
@@ -2624,9 +2631,9 @@ contains
     real, dimension(:), intent(inout) :: mass
     real, dimension(:), intent(inout), optional :: num
 
-    if (any(mass < 0.)) then
-      print *, trim(meteor%name), 'below zero'!, mass
-    end if
+ !   if (any(mass < 0.)) then
+ !     print *, trim(meteor%name), 'below zero', mass
+ !   end if
     where (mass < rthres)
        mass = 0.
     end where
@@ -2784,7 +2791,10 @@ contains
     ! UCLA-LES modules
 
     use defs, only : cpr,p00,alvl,alvi
-    use grid, only : dt,dzi_t,zm
+    use grid, only : dt,dzi_t,zm, &
+!LINDA
+         nstep, mp_qt, mp_qr, mp_qi, mp_qs, mp_qg, mp_qh, &
+         mp_nqr, mp_nqi, mp_nqs, mp_nqg, mp_nqh, mp_tlt
     use thrm, only : rsif
 
     ! KAMM2 modules
@@ -3303,6 +3313,14 @@ contains
                &      - convice * (q_vap_new - q_vap_old) / dt  &
                &      + convliq * (q_liq_new - q_liq_old) / dt
 
+          ! LINDA, b, write out tendencies
+          if (lmptend) then
+            if (nstep==1) mp_tlt(kk,jj,ii)=0.0
+            mp_tlt(kk,jj,ii) = mp_tlt(kk,jj,ii)                          & 
+                              - convice * (q_vap_new - q_vap_old) / dt  &
+                              + convliq * (q_liq_new - q_liq_old) / dt
+          end if
+          ! LINDA, e
           ! ... mass densities to mixing ratios with actual density:
           qv(kk,jj,ii) = q_v
           qc(kk,jj,ii) = hlp * q_cloud(i,j,k)
@@ -3510,6 +3528,39 @@ contains
              qnstend(k,j,i) = qnstend(k,j,i) + (qns(k,j,i) - qnsin(k,j,i))/dt
              qngtend(k,j,i) = qngtend(k,j,i) + (qng(k,j,i) - qngin(k,j,i))/dt
              qnhtend(k,j,i) = qnhtend(k,j,i) + (qnh(k,j,i) - qnhin(k,j,i))/dt
+! LINDA, b, write out tendenties
+             if (lmptend) then
+                if (nstep==1) then
+                    mp_qt(k,j,i) = 0.0
+                    mp_qr(k,j,i) = 0.0
+                    mp_qi(k,j,i) = 0.0
+                    mp_qs(k,j,i) = 0.0
+                    mp_qg(k,j,i) = 0.0
+                    mp_qh(k,j,i) = 0.0
+
+                    mp_nqr(k,j,i) = 0.0
+                    mp_nqi(k,j,i) = 0.0
+                    mp_nqs(k,j,i) = 0.0
+                    mp_nqg(k,j,i) = 0.0
+                    mp_nqh(k,j,i) = 0.0
+                endif
+
+                mp_qt  (k,j,i) = mp_qt(k,j,i)                 &
+                                + (qv(k,j,i) - qvin(k,j,i))/dt &
+                                + (qc(k,j,i) - qcin(k,j,i))/dt
+                mp_qr  (k,j,i) = mp_qr(k,j,i) + (qr(k,j,i) - qrin(k,j,i))/dt
+                mp_qi  (k,j,i) = mp_qi(k,j,i) + (qi(k,j,i) - qiin(k,j,i))/dt
+                mp_qs  (k,j,i) = mp_qs(k,j,i) + (qs(k,j,i) - qsin(k,j,i))/dt
+                mp_qg  (k,j,i) = mp_qg(k,j,i) + (qg(k,j,i) - qgin(k,j,i))/dt
+                mp_qh  (k,j,i) = mp_qh(k,j,i) + (qh(k,j,i) - qhin(k,j,i))/dt
+
+                mp_nqr (k,j,i) = mp_nqr(k,j,i) + (qnr(k,j,i) - qnrin(k,j,i))/dt
+                mp_nqi (k,j,i) = mp_nqi(k,j,i) + (qni(k,j,i) - qniin(k,j,i))/dt
+                mp_nqs (k,j,i) = mp_nqs(k,j,i) + (qns(k,j,i) - qnsin(k,j,i))/dt
+                mp_nqg (k,j,i) = mp_nqg(k,j,i) + (qng(k,j,i) - qngin(k,j,i))/dt
+                mp_nqh (k,j,i) = mp_nqh(k,j,i) + (qnh(k,j,i) - qnhin(k,j,i))/dt
+              end if
+              ! LINDA, e
           END DO
        END DO
     END DO

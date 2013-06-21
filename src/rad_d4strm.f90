@@ -20,16 +20,16 @@
 module fuliou
 
   use defs, only   : nv, nv1, mb, pi, totalpower, g, R, ep2
-  use cldwtr, only : init_cldwtr, cloud_water
+  use cldwtr, only : init_cldwtr, cloud_water, init_cldice, cloud_ice, init_cldgrp, cloud_grp
   use solver, only : qft
-  use mpi_interface, only : myid
-  use RandomNumbers
+!   use mpi_interface, only : myid
+!   use RandomNumbers
   use ckd
 
   implicit none
 
   logical, save :: Initialized = .False.
-  type(randomNumberSequence), save :: randoms
+!   type(randomNumberSequence), save :: randoms
   real, parameter :: minSolarZenithCosForVis = 1.e-4
 
 contains
@@ -42,8 +42,10 @@ contains
 
     if (.not.Initialized) then
        call init_ckd   
-       randoms = new_RandomNumberSequence(1+myid)
+!        randoms = new_RandomNumberSequence(1+myid)
        call init_cldwtr
+       call init_cldice
+       call init_cldgrp
        Initialized = .True.
     end if
     
@@ -89,10 +91,20 @@ contains
 
     if(present(useMcICA)) McICA = useMcICA
     
-    call rad_ir(pts, ee, pp, pt, ph, po, fdir, fuir, &
-                 plwc, pre, piwc, pde, prwc, pgwc, McICA  )
-    call rad_vis(as, u0, ss, pp, pt, ph, po, fds, fus,  &
-                 plwc, pre, piwc, pde, prwc, pgwc, McICA  )
+    if (present(piwc).and.present(pgwc)) then
+       call rad_ir(pts, ee, pp, pt, ph, po, fdir, fuir, &
+                   plwc, pre, piwc, pde, prwc, pgwc, McICA  )
+    else
+       call rad_ir(pts, ee, pp, pt, ph, po, fdir, fuir, &
+                   plwc, pre, prwc=prwc, useMcICA=McICA  )
+    endif
+    if (present(piwc).and.present(pgwc)) then
+       call rad_vis(as, u0, ss, pp, pt, ph, po, fds, fus,  &
+                    plwc, pre, piwc, pde, prwc, pgwc, McICA  )
+    else
+       call rad_vis(as, u0, ss, pp, pt, ph, po, fds, fus,  &
+                    plwc, pre,prwc=prwc, useMcICA=McICA  )
+    endif
 
   end subroutine rad
 
@@ -133,21 +145,20 @@ contains
     logical, parameter :: irWeighted = .False. 
 
     real, dimension (nv)   :: tw,ww,tg,dz,tauNoGas, wNoGas, Tau, w
+    real, dimension (nv)   :: ti,wi
+    real, dimension (nv)   :: tgr,wgr
     real, dimension (nv1)  :: fu1, fd1, bf
     real, dimension (nv,4) :: www, pfNoGas, pf
-
+    real, dimension (nv,4) :: wwi
+    real, dimension (nv,4) :: wwgr
+  
     integer :: ib, ig, k, ig1, ig2, ibandloop, iblimit
     real :: fuq2, xir_norm
     real, dimension(:), allocatable, save :: bandWeights
     real :: randomNumber
     ! ----------------------------------------
 
-    if (.not.Initialized) then
-       call init_ckd   
-       randoms = new_RandomNumberSequence(1+myid)
-       call init_cldwtr
-       Initialized = .True.
-    end if
+    if (.not.Initialized) call rad_init
 
     if(.not. allocated(bandweights)) then 
       allocate(bandweights(size(ir_bands)))
@@ -163,7 +174,7 @@ contains
        ! Select a single band and g-point (ib, ig1) and use these as the limits
        !   in the loop through the spectrum below. 
        !
-       randomNumber = getRandomReal(randoms)
+       call random_number(randomNumber)
        call select_bandg(ir_bands, bandweights, randomNumber, ib, ig1) 
        ig2 = ig1
        iblimit = 1
@@ -185,6 +196,14 @@ contains
       if (present(plwc)) then
         call cloud_water(ib + size(solar_bands), pre, plwc, dz, tw, ww, www)
         call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tw, ww, www)
+      end if
+      if (present(piwc)) then
+        call cloud_ice(ib + size(solar_bands), pde, piwc, dz, ti, wi, wwi)
+        call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, ti, wi, wwi)
+      end if
+      if (present(pgwc)) then
+        call cloud_grp(ib + size(solar_bands), pgwc, dz, tgr, wgr, wwgr)
+        call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tgr, wgr, wwgr)
       end if 
       
       call planck(pt, pts, llimit(ir_bands(ib)), rlimit(ir_bands(ib)), bf)
@@ -258,8 +277,12 @@ contains
     logical, parameter :: solarWeighted = .true. 
 
     real, dimension (nv)   :: tw,ww,tg,tgm,dz, tauNoGas, wNoGas, tau, w
+    real, dimension (nv)   :: ti,wi
+    real, dimension (nv)   :: tgr,wgr
     real, dimension (nv1)  :: fu1, fd1, bf
     real, dimension (nv,4) :: www, pfNoGas, pf
+    real, dimension (nv,4) :: wwi
+    real, dimension (nv,4) :: wwgr
 
     real, dimension(:), allocatable, save :: bandWeights
 
@@ -284,7 +307,7 @@ contains
       call thicks(pp, pt, ph, dz) 
   
       if (McICA) then
-         randomNumber = getRandomReal(randoms)
+         call random_number(randomNumber)
          !
          ! Select a single band and g-point (ib, ig1) and use these as the 
          ! limits in the loop through the spectrum below. 
@@ -323,6 +346,14 @@ contains
          if (present(plwc)) then
            call cloud_water(ib, pre, plwc, dz, tw, ww, www)
            call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tw,ww,www)
+         end if
+         if (present(piwc)) then
+           call cloud_ice(ib, pde, piwc, dz, ti, wi, wwi)
+           call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, ti,wi,wwi)
+         end if 
+         if (present(pgwc)) then
+           call cloud_grp(ib,pgwc, dz, tgr, wgr, wwgr)
+           call combineOpticalProperties(TauNoGas, wNoGas, pfNoGas, tgr, wgr,wwgr)
          end if 
   
          gPointLoop: do ig =  ig1, ig2
@@ -377,7 +408,8 @@ contains
 
     real :: cumulative
     
-    i=1; j=1 
+    i=1
+    j=1 
     ! The probability contained in the first g point of the first band
     cumulative = gPointWeight(bands(i), j) * bandweights(i)
 
@@ -545,10 +577,20 @@ contains
        fq2 = 1.43884 * vmid
        do k = 2, nv
           tk = (pt(k)+pt(k-1))*0.5
+          if ((tk.gt.0.0)) then
           bf(k) = bf(k) + (fq1/(exp(fq2/tk) - 1.0))*(v1-v2)
+          else
+             print*,'tk wrong',tk,v1,v2,rlimit,llimit
+             stop
+          endif
        end do
+          if ((pt(1).gt.0.0)) then
        bf(1) = bf(1) + (fq1/(exp(fq2/pt(1)) - 1.0))*(v1-v2)
        bf(nv1) = bf(nv1) + (fq1/(exp(fq2/tskin) - 1.0))*(v1-v2)
+          else
+             print*,'pt wrong',pt(1),v1,v2,rlimit,llimit
+             stop
+          endif
        v1 = v2
     end do
 

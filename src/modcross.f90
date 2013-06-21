@@ -28,18 +28,19 @@ implicit none
   character(len=7), allocatable, dimension(:) :: crossname
   character(len=7),  dimension(10) :: hname
   character(len=80), dimension(10) :: hlname
-  integer, parameter :: nvar_all = 47
+  character(len=7) :: hname_prc
+  integer, parameter :: nvar_all = 49
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
-         'l      ','rp     ','tv     ','ricep  ','nicep  ', & !6-10
-         'rsnowp ','rgrpp  ','nsnowp ','ngrpp  ','rhailp ', & !11-15
-         'nhailp ','lwp    ','rwp    ','iwp    ','swp    ', & !16-20
-         'gwp    ','hwp    ','prc_acc','cnd_acc','cev_acc', & !21-25
-         'rev_acc','cldbase','cldtop ','rwpbase','rwptop ', & !26-30
-         'tracer ','trcpath','trcbase','trctop ','wdev_cl', & !31-35
-         'wdev_sc','w_cld  ','tdev_cl','tdev_sc','t_cld  ', & !36-40
-         'qdev_cl','qdev_sc','q_cld  ','tv_cl  ','tv_sc  ', & !41-45
-         'tv_cld ','core   '/)                                !46-47
+         'l      ','rp     ','np     ','tv     ','ricep  ', & !6-10
+         'nicep  ','rsnowp ','rgrpp  ','nsnowp ','ngrpp  ', & !11-15
+         'rhailp ','nhailp ','lwp    ','rwp    ','iwp    ', & !16-20
+         'swp    ','gwp    ','hwp    ','prc_acc','cnd_acc', & !21-25
+         'cev_acc','rev_acc','cldbase','cldtop ','rwpbase', & !26-30
+         'rwptop ','tracer ','trcpath','trcbase','trctop ', & !31-35
+         'wdev_cl','wdev_sc','w_cld  ','tdev_cl','tdev_sc', & !36-40
+         't_cld  ','qdev_cl','qdev_sc','q_cld  ','tv_cl  ', & !41-45
+         'tv_sc  ','tv_cld ','core   ','th_e   '/)            !46-49
   integer :: nccrossxzid,nccrossyzid,nccrossxyid, nccrossrec, nvar
 
   interface writecross
@@ -142,7 +143,7 @@ contains
                             xname, xlongname, xunit, &
                             yname, ylongname, yunit, &
                             tname, tlongname, tunit, &
-                            lwaterbudget, lcouvreux
+                            lwaterbudget, lcouvreux, prc_lev
 
     character (*), intent(in)     :: name
     character (40), dimension(3) :: dimname, dimlongname, dimunit
@@ -150,7 +151,7 @@ contains
     character (len=80) :: longname, unit
     real, allocatable, dimension(:,:) :: dimvalues
     integer, dimension(3)             :: loc, dimsize
-    integer :: n
+    integer :: n, k
     logical :: iscross
 
     if (lcross) then
@@ -263,7 +264,7 @@ contains
         longname = 'Hail water path'
         unit = 'kg/m2'
       case ('prc_acc')
-        if (.not.lwaterbudget) return
+        if (level < 3) return
         longname = 'acc. precip'
         unit = 'kg/m2'
       case ('cnd_acc')
@@ -275,7 +276,7 @@ contains
         longname = 'acc. evaporation of cloud water'
         unit = 'kg/m2'
       case ('rev_acc')
-        if (.not.lwaterbudget) return
+        if (level < 3) return
         longname = 'acc. evaporation of rain water'
         unit = 'kg/m2'
       case ('cldbase')
@@ -354,8 +355,14 @@ contains
         longname = 'Tracer top height'
         unit = 'm'
       case ('core')
+        if (level < 2) return
         longname = 'Max. in cloud buoyancy'
         unit = 'K'
+      case ('th_e')
+        if (level < 2) return
+        longname = 'equivalent potential temperature'
+        unit = 'K'
+        iscross = .true.
       case default
         return
       end select
@@ -437,8 +444,22 @@ contains
         dimvalues(1:nyp-4,2)  = yt(3:nyp-2)
         dimname(2)            = yname
         dimlongname(2)        = ylongname
-        call addvar_nc(nccrossxyid, trim(name), trim(longname), &
-        unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
+        if (trim(name) == 'prc_acc') then
+          do n = 1, count(prc_lev>=0)
+            do k = 2,nzp
+              if (zt(k) >= prc_lev(n)) then
+                prc_lev(n) = k
+                exit
+              end if
+            end do
+            write(hname_prc,'(i4.4)') nint(zt(prc_lev(n)))
+            call addvar_nc(nccrossxyid, trim(name)//'_'//trim(hname_prc), trim(longname), &
+            unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
+          end do
+        else
+          call addvar_nc(nccrossxyid, trim(name), trim(longname), &
+          unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
+        end if
         crossname(ncross) = name
       end if
     end if
@@ -446,17 +467,19 @@ contains
   end subroutine addcross
 
   subroutine triggercross(rtimee)
-    use grid,      only : nxp, nyp, nzp, tname, zt, zm, dzi_m, dzi_t, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
+    use grid,      only : level,nxp, nyp, nzp, tname, zt, zm, dzi_m, dzi_t, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
-       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta
+       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta, pi0, pi1, a_pexnr, prc_lev
     use modnetcdf, only : writevar_nc, fillvalue_double
     use util,      only : get_avg3, get_var3, calclevel
-    use defs,      only : ep2
+    use defs,      only : ep2,cp,cpr, p00
+    use thrm,      only: rslf
     real, intent(in) :: rtimee
+    real             :: tstar, exner, tk
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
-    real, dimension(nzp,nxp,nyp) :: tracer, tv, interp
+    real, dimension(nzp,nxp,nyp) :: tracer, tv, interp, th_e,p
     real, dimension(nzp)         :: c1, thvar, tvbar, tvenv, tvcld
-    integer :: n, i, j, k, ct, cb, zi, lcl
+    integer :: n, nn, i, j, k, ct, cb, zi, lcl
 
     if (.not. lcross) return
 
@@ -469,26 +492,36 @@ contains
       nccrossrec = nccrossrec - 1
       call writevar_nc(nccrossyzid, tname, rtimee, nccrossrec)
     end if
-    do j=3,nyp-2
+    if (level < 2) then
+      do j=3,nyp-2
+        do i=3,nxp-2
+            do k=1,nzp
+              tv(k,i,j) = a_theta(k,i,j)*(1.+ep2*a_rp(k,i,j))
+            end do
+        end do
+      end do
+    else
+      do j=3,nyp-2
+        do i=3,nxp-2
+            do k=1,nzp
+              tv(k,i,j) = a_theta(k,i,j)*(1.+ep2*a_rp(k,i,j) - liquid(k,i,j))
+            end do
+        end do
+      end do
+     do j=3,nyp-2
        do i=3,nxp-2
           do k=1,nzp
-             tv(k,i,j) = a_theta(k,i,j)*(1.+ep2*a_rp(k,i,j) - liquid(k,i,j))
+             exner = (pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp
+             p(k,i,j) = p00 * (exner)**cpr
+             tk=a_theta(k,i,j)*exner
+             tstar = 1./(1./(tk-55.)-log(a_rp(k,i,j)/rslf(p(k,i,j),tk))/2840.)+55.
+             th_e(k,i,j) = tk*(p00/p(k,i,j))**(0.2854*(1.-0.28*a_rp(k,i,j)))*exp(a_rp(k,i,j)*(1.+0.81*a_rp(k,i,j))*(3376./tstar-2.54))
           end do
        end do
-    end do
+      end do
 
-!-------- calc lcl -------------------
-    call calcavg(tv, liquid, tvenv)
-    call calcavgcld(tv, liquid, tvcld)
+    end if
 
-    lcl=0
-    do k=1,nzp
-       if (tvcld(k)>tvenv(k)) then
-           lcl=k
-           exit
-       end if
-    end do
-!-------------------------------------
 
     call get_avg3(nzp,nxp,nyp,tv,tvbar)
     do j=3,nyp-2
@@ -500,16 +533,23 @@ contains
     end do
 
 
-    call calclevel(liquid, cb, 'base')
-    call calclevel(liquid, ct, 'top')
-    call get_avg3(nzp,nxp,nyp, tv,c1)
+    call get_avg3(nzp,nxp,nyp, tv, c1)
     call get_var3(nzp,nxp,nyp, tv, c1, thvar)
     zi = maxloc(thvar,1)
-    if (cb >= nzp-1) then
-      cb = zi
-    end if
-    if (lcl >= nzp-1) then
-      lcl = 0
+    if (level > 1) then
+      call calclevel(liquid, cb, 'base')
+      call calclevel(liquid, ct, 'top')
+
+      if (cb >= nzp-1) then
+        cb = zi
+      end if
+
+  !-------- calc lcl -------------------
+      lcl=cb+nint(200.*dzi_m(cb))
+  !-------------------------------------
+      if (lcl >= nzp-1) then
+        lcl = 0
+      end if
     end if
 
     do n = 1, nkcross
@@ -588,6 +628,8 @@ contains
         call writecross(crossname(n), a_rhailp)
       case('nhailp')
         call writecross(crossname(n), a_nhailp)
+      case ('th_e')
+        call writecross(crossname(n), th_e)
       case('tracer')
         call writecross(crossname(n), tracer)
       case('lwp')
@@ -609,9 +651,12 @@ contains
         call calcintpath(a_rhailp, tmp)
         call writecross(crossname(n), tmp)
       case('prc_acc')
-        tmp = prc_acc(3:nxp-2, 3:nyp-2)
-        call writecross(crossname(n), tmp)
-        prc_acc = 0.
+        do nn = 1,count(prc_lev>0)
+          write(hname_prc,'(i4.4)') nint(zt(prc_lev(nn)))
+          tmp = prc_acc(3:nxp-2, 3:nyp-2,nn)
+          call writecross(trim(crossname(n))//'_'//trim(hname_prc), tmp)
+          prc_acc(:,:,nn) = 0.
+        end do
       case('cnd_acc')
         tmp = cnd_acc(3:nxp-2, 3:nyp-2)
         call writecross(crossname(n), tmp)
@@ -1005,7 +1050,7 @@ contains
           else
             do k=2,nzp-1
               if (mask(k,i,j) > 0) then
-                varout(i,j) = varout(i,j) + varin(k,i,j) - mean(k)
+                varout(i,j) = varout(i,j) + varin(k,i,j) - mean(k) 
               end if
             end do
             varout(i,j) = varout(i,j)/real(nr)
