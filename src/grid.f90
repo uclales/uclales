@@ -89,9 +89,6 @@ module grid
                             a_sflxd_avn, a_sflxu_avn, a_lflxd_avn, a_lflxu_avn
   real, dimension (:,:),    allocatable :: a_tskin, a_qskin, a_Wl, a_Qnet, a_G0
 
-  !Malte: variables to read homogeneous fluxes from nc file
-  real, dimension (:),      allocatable :: shls, lhls, usls, timels
-
   !
   ! 3D Arrays
   !irina
@@ -354,16 +351,6 @@ contains
        allocate (a_lflxu_avn(100,nxp,nyp))
        memsize = memsize + 2*nxp*nyp*4 + 5*nxp*nyp + 4*nxp*nyp*100
     end if
-
-    !Malte: allocate variables for homogeneous fluxes (no lsm used)
-    if (isfctyp == 0) then
-       allocate(shls(1740))
-       allocate(lhls(1740))
-       allocate(usls(1740))
-       allocate(timels(1740))
-       memsize = memsize + 4*1740
-    end if
-    !End Malte
 
     if (level >= 2) then
        allocate(prc_c(nzp,nxp,nyp))

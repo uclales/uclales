@@ -119,12 +119,6 @@ contains
        call lstend_init
      end if
 
-
-!     if (isfctyp==0) then
-!         call homo_surf       !Malte: prescribe homogeneous surface fluxes
-!     end if
-
-
     if (lpartic) then
       if(runtype == 'INITIAL') then
         call init_particles(.false.)
