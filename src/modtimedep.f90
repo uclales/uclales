@@ -37,11 +37,11 @@ implicit none
 save
 ! switches for timedependent surface fluxes and large scale forcings
   logical       :: ltimedep     = .false. !< Overall switch, input in namoptions
-  logical       :: ltimedepz    = .true.  !< Switch for large scale forcings
-  logical       :: ltimedepsurf = .true.  !< Switch for surface fluxes
+  logical       :: ltimedepz    = .false.  !< Switch for large scale forcings
+  logical       :: ltimedepsurf = .false.  !< Switch for surface fluxes
   logical       :: firsttime    = .true.
-  integer, parameter    :: kflux = 200
-  integer, parameter    :: kls   = 200
+  integer, parameter    :: kflux = 2000
+  integer, parameter    :: kls   = 2000
   real, allocatable     :: timeflux (:)
   real, allocatable     :: wqsurft  (:)
   real, allocatable     :: wtsurft  (:)
@@ -126,42 +126,44 @@ contains
     end do
     backspace (ifinput)
 
-    ! ---load large scale forcings----
-    print*,'*** Vertical forcings: ***'
-    t = 0
-    do while (timels(t) < time_end)
-      t = t + 1
-      chmess1 = "#"
-      ierr = 1 ! not zero
-      do while (.not.(chmess1 == "#" .and. ierr ==0)) !search for the next line consisting of "# time", from there onwards the profiles will be read
-        read(ifinput,*,iostat=ierr) chmess1,timels(t)
-        if (ierr < 0) then
-          stop 'STOP: No time dependend data for end of run'
-        end if
+    if(ltimedepz) then
+      ! ---load large scale forcings----
+      print*,'*** Vertical forcings: ***'
+      t = 0
+      do while (timels(t) < time_end)
+        t = t + 1
+        chmess1 = "#"
+        ierr = 1 ! not zero
+        do while (.not.(chmess1 == "#" .and. ierr ==0)) !search for the next line consisting of "# time", from there onwards the profiles will be read
+          read(ifinput,*,iostat=ierr) chmess1,timels(t)
+          if (ierr < 0) then
+            stop 'STOP: No time dependend data for end of run'
+          end if
+        end do
+        write (*,*) 'timels = ',timels(t)
+        read (ifinput,*)  lowheight , lowwflst,lowdthldt,lowdqtdt
+        read (ifinput,*)  highheight , highwflst,highdthldt,highdqtdt
+        do k=2,nzp
+          if (highheight<zt(k)) then
+            lowheight = highheight
+            lowwflst  = highwflst
+            lowdthldt = highdthldt
+            lowdqtdt  = highdqtdt
+            
+            read (ifinput,*) highheight, highwflst, highdthldt, highdqtdt
+          end if
+          fac = (highheight-zt(k))/(highheight - lowheight)
+          wflst(k,t)     = fac*lowwflst  + (1-fac)*highwflst
+          dthldtlst(k,t) = fac*lowdthldt + (1-fac)*highdthldt
+          dqtdtlst(k,t)  = fac*lowdqtdt  + (1-fac)*highdqtdt
+        end do
       end do
-      write (*,*) 'timels = ',timels(t)
-      read (ifinput,*)  lowheight , lowwflst,lowdthldt,lowdqtdt
-      read (ifinput,*)  highheight , highwflst,highdthldt,highdqtdt
-      do k=2,nzp
-        if (highheight<zt(k)) then
-          lowheight = highheight
-          lowwflst  = highwflst
-          lowdthldt = highdthldt
-          lowdqtdt  = highdqtdt
-          
-          read (ifinput,*) highheight, highwflst, highdthldt, highdqtdt
-        end if
-        fac = (highheight-zt(k))/(highheight - lowheight)
-        wflst(k,t)     = fac*lowwflst  + (1-fac)*highwflst
-        dthldtlst(k,t) = fac*lowdthldt + (1-fac)*highdthldt
-        dqtdtlst(k,t)  = fac*lowdqtdt  + (1-fac)*highdqtdt
-      end do
-    end do
 
-    if ((timels(1) > time_end) .or. (timeflux(1) > time_end)) then
-      write(6,*) 'Time dependent large scale forcings sets in after end of simulation'
-      write(6,*) 'only time dependent surface variables'
-      ltimedepz=.false.
+      if ((timels(1) > time_end) .or. (timeflux(1) > time_end)) then
+        write(6,*) 'Time dependent large scale forcings sets in after end of simulation'
+        write(6,*) 'only time dependent surface variables'
+        ltimedepz=.false.
+      end if
     end if
 
     close(ifinput)
