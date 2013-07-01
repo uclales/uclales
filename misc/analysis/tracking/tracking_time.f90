@@ -1502,6 +1502,33 @@ real :: time
             call write_ncvar(fid, ovar, nrelatives)
             deallocate(ovar%dim, ovar%dimids)
           end if
+          
+!         !Write to netcdf file: Cloudsystemid
+          nrelatives = fillvalue_i
+          nn   = 0
+          iret = firstcell(cell)
+          do
+            if (iret == -1) exit
+            tmin = minval(cell%loc(3,1:cell%nelements))
+            tmax = maxval(cell%loc(3,1:cell%nelements))
+            if (tmax - tmin + 1 >= bucket_min(n) .and. tmax - tmin + 1 <= bucket_max(n)) then
+              nn = nn + 1
+              nrelatives(nn)  = cell%cloudsystemnr
+            end if
+            iret = nextcell(cell)
+          end do
+          if (any(nrelatives>0)) then
+            allocate(ovar%dim(1))
+            ovar%dim      = shape(nrelatives)
+            allocate(ovar%dimids(1))
+            ovar%dimids(1) = nrnc%dimids(1)
+            ovar%name     = trim(nrnc%name)//'sysid'
+            ovar%longname = trim(nrnc%longname)//' id of the system'
+            ovar%units    = '#'
+            call define_ncvar(fid, ovar, nf90_int)
+            call write_ncvar(fid, ovar, nrelatives)
+            deallocate(ovar%dim, ovar%dimids)
+          end if
 !           !Write to netcdf file: siblings
 !           if (any(nrelatives>0)) then
 !             allocate(ovar%dim(2))
