@@ -1581,8 +1581,8 @@ program tracking
   use modtrack
   implicit none
   type(cellptr), dimension(:,:,:), allocatable :: parentarr
-  logical :: lcore = .false., lcloud = .false., lthermal = .false., lrain = .false.
-  integer ::  i,j,k,n, ub, lb, vlength, fid, finput, nmincells, nmincells_cloud, nchunk, kk, kkmax
+  logical :: lcore = .false., lcloud = .false., lthermal = .false., lrain = .false., lrwp = .false.
+  integer ::  i,j,k,n, ub, lb, vlength, fid, finput, finput2, nmincells, nmincells_cloud, nchunk, kk, kkmax
   character(100) :: criterion, filename, stem, ctmp
   real    :: lwpthres, corethres, thermthres, rwpthres, heightmin, heightrange, valmin, valrange
   integer(kind=2)    :: i_lwpthres, i_corethres, i_thermthres, i_rwpthres
@@ -1591,16 +1591,16 @@ program tracking
   real, allocatable, dimension(:) :: x, y, t
   integer(kind=2), dimension(:,:,:), allocatable :: base, top
   integer(kind=2), dimension(:), allocatable :: minbasecloud, minbasetherm
-  real, dimension(:,:,:), allocatable :: readfield
+  real, dimension(:,:,:), allocatable :: readfield, readfield2
   real   :: thermmin, thermmax, lwpmin, lwpmax, rwpmin, rwpmax, coremin, coremax, distmin, distmax, maxheight, &
             thermzero, thermrange, lwpzero, lwprange, rwpzero, rwprange, corezero, corerange, distzero, distrange
 
 
-  lwpthres = 0.0050
+  lwpthres = 0.005
   corethres = 0.5
   thermthres = 300.
 
-  rwpthres = 0.005
+  rwpthres = 0.05
   thermmin = -1.
   thermmax = 10000.
   lwpmin   = -1.
@@ -1632,6 +1632,7 @@ program tracking
   i_thermthres = (thermthres - thermzero)/thermrange
   i_rwpthres   = (rwpthres - rwpzero)/rwprange
   cbstep = (300.)/distrange
+!  cbstep = (3000.)/distrange  !AXEL
   nmincells_cloud  = 1
   nmincells        = 4
 
@@ -1671,6 +1672,17 @@ program tracking
       if (ilwp < 0) then
         nvar = nvar + 1
         ilwp = nvar
+      end if
+    case ('liquid')
+      lcloud = .true.
+      lrwp   = .true.
+      if (ilwp < 0) then
+        nvar = nvar + 1
+        ilwp = nvar
+      end if
+      if (irain < 0) then
+        nvar  = nvar + 1
+        irain = nvar
       end if
     case ('thermal')
       lthermal = .true.
@@ -1777,6 +1789,7 @@ program tracking
   allocate(bool(nx, ny, tstart:nt))
   call check(nf90_close(finput))
   allocate(readfield(nx, ny, nchunk))
+  if (lrwp) allocate(readfield2(nx, ny, nchunk))
 
   minparentel = 100!nint(50./(dx*dy*dt))
   if (lthermal) then
@@ -1849,10 +1862,20 @@ program tracking
     write(*,*) 'Reading ', trim(filename)
     call check ( nf90_open (trim(filename), NF90_NOWRITE, finput) )
     call inquire_ncvar(finput, ivar(ilwp))
+    if (lrwp) then
+       filename = trim(stem)//trim(ivar(irain)%name)//'.nc'
+       write(*,*) 'Reading ', trim(filename)
+       call check ( nf90_open (trim(filename), NF90_NOWRITE, finput2) )
+       call inquire_ncvar(finput2, ivar(irain))      
+    end if
     do k = tstart,nt,nchunk
       write (*,*) 'Reading t = ',k
       kkmax = min(nt-k+1,nchunk)
       call read_ncvar(finput, ivar(ilwp), readfield,(/1,1,k/),(/nx,ny,kkmax/))
+      if (lrwp) then
+         call read_ncvar(finput2, ivar(irain), readfield2,(/1,1,k/),(/nx,ny,kkmax/))
+         readfield = readfield + readfield2
+      end if
       do kk = 1,kkmax
         do j = 1, ny
           do i = 1, nx
@@ -1866,6 +1889,7 @@ program tracking
       end do
     end do
     call check(nf90_close(finput))
+    if (lrwp) deallocate(readfield2)
 
 
     do n = 1,2
