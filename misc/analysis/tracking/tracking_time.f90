@@ -946,8 +946,8 @@ module modtrack
     integer :: i, j, t
     write (*,*) '.. entering tracking'
 
-    allocate(cellloc(3,ceiling(min(1.*(huge(1)-2),0.25*real(nx)*real(ny)*real(nt-tstart)))))
-
+    allocate(cellloc(3,ceiling(min(0.3*(huge(1)-2),0.5*real(nx)*real(ny)*real(nt-tstart)))))
+print *, 'cellloc',shape(cellloc),0.3*huge(1), 0.5*real(nx)*real(ny)*real(nt-tstart)
     nullify(cell)
     do t = tstart, nt
       if(mod(t,10)==0) write (*,'(A,I10,A,I10)') "Time =", t,"  Nr of Cells", ncells
@@ -1502,7 +1502,7 @@ real :: time
             call write_ncvar(fid, ovar, nrelatives)
             deallocate(ovar%dim, ovar%dimids)
           end if
-          
+
 !         !Write to netcdf file: Cloudsystemid
           nrelatives = fillvalue_i
           nn   = 0
@@ -1632,11 +1632,11 @@ program tracking
             thermzero, thermrange, lwpzero, lwprange, rwpzero, rwprange, corezero, corerange, distzero, distrange
 
 
-  lwpthres = 0.005
+  lwpthres = 0.01
   corethres = 0.5
   thermthres = 300.
 
-  rwpthres = 0.05
+  rwpthres = 0.01
   thermmin = -1.
   thermmax = 10000.
   lwpmin   = -1.
@@ -1902,7 +1902,7 @@ program tracking
        filename = trim(stem)//trim(ivar(irain)%name)//'.nc'
        write(*,*) 'Reading ', trim(filename)
        call check ( nf90_open (trim(filename), NF90_NOWRITE, finput2) )
-       call inquire_ncvar(finput2, ivar(irain))      
+       call inquire_ncvar(finput2, ivar(irain))
     end if
     do k = tstart,nt,nchunk
       write (*,*) 'Reading t = ',k
