@@ -1440,6 +1440,7 @@ contains
     else                      ! heat + WV + liquid, !NO ICE! 
       exner   = (i1d(pz,pi0)+i1d(pz,pi1)+i3d(px,py,pz,a_pexnr)) / cp
       ploc    = p00 * exner**cpr                     ! Pressure
+      thl     = i3d(px,py,pz,a_tp) + th00            ! Liquid water potential T
       tlloc   = thl * exner                          ! Liquid water T
       rsloc   = rslf(ploc,tlloc)                     ! Saturation vapor mixing ratio
       rt      = i3d(px,py,pz,a_rp)                   ! Total water mixing ratio
@@ -1464,6 +1465,7 @@ contains
       if(present(tk)) tk = tlloc + alvl/cp*rl
       if(present(ev)) ev = (rt-rl)*ploc/(ep+rt-rl)
       thv = i3d(px,py,pz,a_theta) * (1.+ep2*(rt-rl))
+
     end if
 
   end subroutine thermo
@@ -2047,7 +2049,7 @@ contains
         call writevar_nc(ncpartid,'t', sb_sorted(:,nvl+1),ncpartrec)
         nvl = nvl +1
         if(level>0) then
-          call writevar_nc(ncpartid,'tv',sb_sorted(:,nvl+2),ncpartrec)
+          call writevar_nc(ncpartid,'tv',sb_sorted(:,nvl+1),ncpartrec)
           nvl = nvl + 1
         end if
       end if
@@ -2055,7 +2057,7 @@ contains
         call writevar_nc(ncpartid,'rt',sb_sorted(:,nvl+1),ncpartrec)
         nvl = nvl + 1
         if(level>1) then
-          call writevar_nc(ncpartid,'rl',sb_sorted(:,nvl+2),ncpartrec)
+          call writevar_nc(ncpartid,'rl',sb_sorted(:,nvl+1),ncpartrec)
           nvl = nvl + 1
         end if
       end if
