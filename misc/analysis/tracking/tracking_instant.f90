@@ -934,8 +934,9 @@ module modtrack
     type(cellptr), allocatable, dimension(:,:,:), intent(inout), optional :: parentarr
     integer :: i, j, t
     write (*,*) '.. entering tracking'
-    allocate(cellloc(3,ceiling(min(1.*(huge(1)-2)/3.,0.25*real(nx)*real(ny)*real(nt-tstart)))))
 
+    allocate(cellloc(3,ceiling(min(0.3*(huge(1)-2),0.5*real(nx)*real(ny)*real(nt-tstart)))))
+print *, 'cellloc',shape(cellloc),0.3*huge(1), 0.5*real(nx)*real(ny)*real(nt-tstart)
     nullify(cell)
     do t = tstart, nt
       if(mod(t,10)==0) write (*,'(A,I10,A,I10)') "Time =", t,"  Nr of Cells", ncells
@@ -1442,7 +1443,6 @@ real :: time
           ovar%longname = trim(nrnc%longname)//' number of children'
           ovar%units    = '#'
           call define_ncvar(fid, ovar, nf90_int)
-          print *, shape(nrelatives), ovar%dim
           call write_ncvar(fid, ovar, nrelatives)
           deallocate(ovar%dim, ovar%dimids)
         end if
@@ -1582,25 +1582,28 @@ program tracking
   implicit none
   type(cellptr), dimension(:,:,:), allocatable :: parentarr
   logical :: lcore = .false., lcloud = .false., lthermal = .false., lrain = .false., lrwp = .false.
-  integer ::  i,j,k,n, ub, lb, vlength, fid, finput, finput2, nmincells, nmincells_cloud, nchunk, kk, kkmax
+  integer ::  i,j,k,n, ub, lb, vlength, fid, finput, finput2, nmincells, nmincells_cloud, nchunk, ii, jj, kk, kkmax
+  integer ::  nxr, nyr, ncoarsegrain
   character(100) :: criterion, filename, stem, ctmp
   real    :: lwpthres, corethres, thermthres, rwpthres, heightmin, heightrange, valmin, valrange
   integer(kind=2)    :: i_lwpthres, i_corethres, i_thermthres, i_rwpthres
   type(netcdfvar), dimension(10) :: ivar
   type(netcdfvar) :: ovar
-  real, allocatable, dimension(:) :: x, y, t
+  real, allocatable, dimension(:) :: x, y, t, xr, yr
+  logical, allocatable, dimension(:,:) :: cgmask
   integer(kind=2), dimension(:,:,:), allocatable :: base, top
   integer(kind=2), dimension(:), allocatable :: minbasecloud, minbasetherm
   real, dimension(:,:,:), allocatable :: readfield, readfield2
   real   :: thermmin, thermmax, lwpmin, lwpmax, rwpmin, rwpmax, coremin, coremax, distmin, distmax, maxheight, &
-            thermzero, thermrange, lwpzero, lwprange, rwpzero, rwprange, corezero, corerange, distzero, distrange
+            thermzero, thermrange, lwpzero, lwprange, rwpzero, rwprange, corezero, corerange, distzero, distrange, &
+            cgval
 
 
-  lwpthres = 0.005
+  lwpthres = 0.01
   corethres = 0.5
   thermthres = 300.
 
-  rwpthres = 0.05
+  rwpthres = 0.01
   thermmin = -1.
   thermmax = 10000.
   lwpmin   = -1.
@@ -1641,7 +1644,9 @@ program tracking
   read(ctmp,'(i4)') tstart
   call get_command_argument(3,ctmp)
   read(ctmp,'(i4)') nt
-  call get_command_argument(4,criterion)
+  call get_command_argument(4,ctmp)
+  read(ctmp,'(i4)') ncoarsegrain
+  call get_command_argument(5,criterion)
 
 
   nvar = 2
@@ -1764,20 +1769,42 @@ program tracking
   xnc%name = 'xt'
   call inquire_ncvar(finput, xnc)
   nx = xnc%dim(1)
+  nxr = nx
+  nx  = nxr/ncoarsegrain
+  xnc%dim(1) = nx
+  if (nx*ncoarsegrain /= nxr) then
+    write (*,*) "STOP: nx is not a multiple of the coarsegraining factor"
+    stop
+  end if
   allocate(x(nx))
-  call read_ncvar(finput, xnc, x)
+  allocate(xr(nxr))
+  call read_ncvar(finput, xnc, xr)
+  x  = xr(1:nxr:ncoarsegrain)
+  dx = x(2)-x(1)
+  x  = x + 0.5*dx - xr(1)
   call define_ncdim(fid, xnc)
   call write_ncvar(fid, xnc, x)
-  dx = x(2)-x(1)
 
   ync%name = 'yt'
   call inquire_ncvar(finput, ync)
   ny = ync%dim(1)
+  nyr = ny
+  ny  = nyr/ncoarsegrain
+  ync%dim(1) = ny
+  if (ny*ncoarsegrain /= nyr) then
+    write (*,*) "STOP: ny is not a multiple of the coarsegraining factor"
+    stop
+  end if
   allocate(y(ny))
-  call read_ncvar(finput, ync, y)
+  allocate(yr(nyr))
+  call read_ncvar(finput, ync, yr)
+  print *, shape(y), shape(yr), nyr, ncoarsegrain
+  y  = yr(1:nyr:ncoarsegrain)
+  dy = y(2)-y(1)
+  y  = y + 0.5*dy - yr(1)
   call define_ncdim(fid, ync)
   call write_ncvar(fid, ync, y)
-  dy = y(2)-y(1)
+
   if (lcore) then
     nvar = 4
   else
@@ -1788,8 +1815,9 @@ program tracking
   allocate(parentarr(nx, ny, tstart:nt))
   allocate(bool(nx, ny, tstart:nt))
   call check(nf90_close(finput))
-  allocate(readfield(nx, ny, nchunk))
-  if (lrwp) allocate(readfield2(nx, ny, nchunk))
+  allocate(readfield(nxr, nyr, nchunk))
+  if (lrwp) allocate(readfield2(nxr, nyr, nchunk))
+  allocate (cgmask(ncoarsegrain,ncoarsegrain))
 
   minparentel = 100!nint(50./(dx*dy*dt))
   if (lthermal) then
@@ -1803,12 +1831,20 @@ program tracking
     do k = tstart,nt,nchunk
       write (*,*) 'Reading t = ',k
       kkmax = min(nt-k+1,nchunk)
-      call read_ncvar(finput, ivar(ithermal), readfield,(/1,1,k/),(/nx,ny,kkmax/))
+      call read_ncvar(finput, ivar(ithermal), readfield,(/1,1,k/),(/nxr,nyr,kkmax/))
       do kk = 1,kkmax
         do j = 1, ny
+          jj = (j-1) * ncoarsegrain + 1
           do i = 1, nx
-            if (readfield(i,j,kk) >= thermmin) then
-              var(i,j,k+kk-1,ivalue) = (readfield(i,j,kk) - thermzero ) / thermrange
+            ii = (i-1) * ncoarsegrain + 1
+            where (readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk)>=thermmin)
+              cgmask = .true.
+            elsewhere
+              cgmask = .false.
+            end where
+            if (any(cgmask)) then
+              cgval = 1./count(cgmask)*sum(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
+              var(i,j,k+kk-1,ivalue) = (cgval - thermzero ) / thermrange
             else
               var(i,j,k+kk-1,ivalue) = fillvalue_i16
             end if
@@ -1826,14 +1862,27 @@ program tracking
       do k = tstart,nt,nchunk
         write (*,*) 'Reading t = ',k
         kkmax = min(nt-k+1,nchunk)
-        call read_ncvar(finput, ivar(n), readfield,(/1,1,k/),(/nx,ny,kkmax/))
+        call read_ncvar(finput, ivar(n), readfield,(/1,1,k/),(/nxr,nyr,kkmax/))
         do kk = 1,kkmax
           do j = 1, ny
+            jj = (j-1) * ncoarsegrain + 1
             do i = 1, nx
-              if (readfield(i,j,kk) >= distmin) then
-                var(i,j,k+kk-1,n) = (readfield(i,j,kk) - distzero ) / distrange
+              ii = (i-1) * ncoarsegrain + 1
+              where (readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk)>=distmin)
+                cgmask = .true.
+              elsewhere
+                cgmask = .false.
+              end where
+              if (any(cgmask)) then
+                if (n==1) then
+                  cgval = minval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
+                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                else
+                  cgval = maxval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
+                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                end if
               else
-                var(i,j,k+kk-1,n) = fillvalue_i16
+                var(i,j,k+kk-1,ivalue) = fillvalue_i16
               end if
             end do
           end do
@@ -1871,16 +1920,24 @@ program tracking
     do k = tstart,nt,nchunk
       write (*,*) 'Reading t = ',k
       kkmax = min(nt-k+1,nchunk)
-      call read_ncvar(finput, ivar(ilwp), readfield,(/1,1,k/),(/nx,ny,kkmax/))
+      call read_ncvar(finput, ivar(ilwp), readfield,(/1,1,k/),(/nxr,nyr,kkmax/))
       if (lrwp) then
-         call read_ncvar(finput2, ivar(irain), readfield2,(/1,1,k/),(/nx,ny,kkmax/))
+        call read_ncvar(finput, ivar(irain), readfield,(/1,1,k/),(/nxr,nyr,kkmax/))
          readfield = readfield + readfield2
       end if
       do kk = 1,kkmax
         do j = 1, ny
+          jj = (j-1) * ncoarsegrain + 1
           do i = 1, nx
-            if (readfield(i,j,kk) >= lwpmin) then
-              var(i,j,k+kk-1,ivalue) = (readfield(i,j,kk) - lwpzero ) / lwprange
+            ii = (i-1) * ncoarsegrain + 1
+            where (readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk)>=lwpmin)
+              cgmask = .true.
+            elsewhere
+              cgmask = .false.
+            end where
+            if (any(cgmask)) then
+              cgval = 1./count(cgmask)*sum(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
+              var(i,j,k+kk-1,ivalue) = (cgval - lwpzero ) / lwprange
             else
               var(i,j,k+kk-1,ivalue) = fillvalue_i16
             end if
@@ -1900,14 +1957,27 @@ program tracking
       do k = tstart,nt,nchunk
         write (*,*) 'Reading t = ',k
         kkmax = min(nt-k+1,nchunk)
-        call read_ncvar(finput, ivar(n), readfield,(/1,1,k/),(/nx,ny,kkmax/))
+        call read_ncvar(finput, ivar(n), readfield,(/1,1,k/),(/nxr,nyr,kkmax/))
         do kk = 1,kkmax
           do j = 1, ny
+            jj = (j-1) * ncoarsegrain + 1
             do i = 1, nx
-              if (readfield(i,j,kk) >= distmin) then
-                var(i,j,k+kk-1,n) = (readfield(i,j,kk) - distzero ) / distrange
+              ii = (i-1) * ncoarsegrain + 1
+              where (readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk)>=distmin)
+                cgmask = .true.
+              elsewhere
+                cgmask = .false.
+              end where
+              if (any(cgmask)) then
+                if (n==1) then
+                  cgval = minval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
+                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                else
+                  cgval = maxval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
+                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                end if
               else
-                var(i,j,k+kk-1,n) = fillvalue_i16
+                var(i,j,k+kk-1,ivalue) = fillvalue_i16
               end if
             end do
           end do
@@ -1930,12 +2000,20 @@ program tracking
       do k = tstart,nt,nchunk
         write (*,*) 'Reading t = ',k
         kkmax = min(nt-k+1,nchunk)
-        call read_ncvar(finput, ivar(icore), readfield,(/1,1,k/),(/nx,ny,kkmax/))
+        call read_ncvar(finput, ivar(icore), readfield,(/1,1,k/),(/nxr,nyr,kkmax/))
         do kk = 1,kkmax
           do j = 1, ny
+            jj = (j-1) * ncoarsegrain + 1
             do i = 1, nx
-              if (readfield(i,j,kk) >= coremin) then
-                var(i,j,k+kk-1,ivalue) = (readfield(i,j,kk) - corezero ) / corerange
+              ii = (i-1) * ncoarsegrain + 1
+              where (readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk)>=coremin)
+                cgmask = .true.
+              elsewhere
+                cgmask = .false.
+              end where
+              if (any(cgmask)) then
+                cgval = 1./count(cgmask)*sum(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
+                var(i,j,k+kk-1,ivalue) = (cgval - corezero ) / corerange
               else
                 var(i,j,k+kk-1,ivalue) = fillvalue_i16
               end if
@@ -1997,12 +2075,20 @@ program tracking
     do k = tstart,nt,nchunk
       write (*,*) 'Reading t = ',k
       kkmax = min(nt-k+1,nchunk)
-      call read_ncvar(finput, ivar(irain), readfield,(/1,1,k/),(/nx,ny,kkmax/))
+      call read_ncvar(finput, ivar(irain), readfield,(/1,1,k/),(/nxr,nyr,kkmax/))
       do kk = 1,kkmax
         do j = 1, ny
+          jj = (j-1) * ncoarsegrain + 1
           do i = 1, nx
-            if (readfield(i,j,kk) >= rwpmin) then
-              var(i,j,k+kk-1,ivalue) = (readfield(i,j,kk) - rwpzero ) / rwprange
+            ii = (i-1) * ncoarsegrain + 1
+            where (readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk)>=rwpmin)
+              cgmask = .true.
+            elsewhere
+              cgmask = .false.
+            end where
+            if (any(cgmask)) then
+              cgval = 1./count(cgmask)*sum(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
+              var(i,j,k+kk-1,ivalue) = (cgval - rwpzero ) / rwprange
             else
               var(i,j,k+kk-1,ivalue) = fillvalue_i16
             end if
@@ -2022,17 +2108,28 @@ program tracking
       do k = tstart,nt,nchunk
         write (*,*) 'Reading t = ',k
         kkmax = min(nt-k+1,nchunk)
-!         call read_ncvar(finput, ivar(n), readfield,(/1,1,k/),(/nx,ny,kkmax/))
+        call read_ncvar(finput, ivar(n), readfield,(/1,1,k/),(/nxr,nyr,kkmax/))
         do kk = 1,kkmax
           do j = 1, ny
+            jj = (j-1) * ncoarsegrain + 1
             do i = 1, nx
-!               if (readfield(i,j,kk) >= distmin) then
-!                 var(i,j,k+kk-1,ivalue) = (readfield(i,j,kk) - distzero ) / distrange
-!               else
-!                 var(i,j,k+kk-1,ivalue) = fillvalue_i16
-!               end if
-            var(i,j,k+kk-1,1) = (0. - distzero ) / distrange
-            var(i,j,k+kk-1,2) = (4000. - distzero ) / distrange
+              ii = (i-1) * ncoarsegrain + 1
+              where (readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk)>=distmin)
+                cgmask = .true.
+              elsewhere
+                cgmask = .false.
+              end where
+              if (any(cgmask)) then
+                if (n==1) then
+                  cgval = minval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
+                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                else
+                  cgval = maxval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
+                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                end if
+              else
+                var(i,j,k+kk-1,ivalue) = fillvalue_i16
+              end if
              end do
           end do
         end do

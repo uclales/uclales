@@ -263,11 +263,11 @@ program trackmapper
   use modnetcdf
   implicit none
   character(100) :: ifile1, ifile2
-  integer :: ifid1, ifid2, i, j, t, nx, ny, nt, nr, tmax, nrmax
+  integer :: ifid1, ifid2, i, ii, j, jj, t, nx, nxr, ny, nyr, nt, nr, tmax, nrmax, ncoarsegrain
   real, allocatable, dimension(:,:,:) :: var1
   integer, allocatable, dimension(:) :: tt
   real, allocatable, dimension(:) :: time
-
+  character(100) :: ctmp
   real, allocatable, dimension(:,:,:) :: var2
   real, allocatable, dimension(:,:) :: ovar, npts
   type(netcdfvar) :: ncvar1, ncvar2, ncvar3, ncovar, nctime
@@ -279,6 +279,8 @@ program trackmapper
   call get_command_argument(3,ncvar1%name)
   call get_command_argument(4,ncvar2%name)
   call get_command_argument(5,ncvar3%name) !Something shapelike identical to the output variable
+  call get_command_argument(6,ctmp)
+  read(ctmp,'(i4)') ncoarsegrain
 
   !Open files
 
@@ -310,22 +312,24 @@ print *, ncvar2%name
   allocate(npts(tmax, nrmax))
   npts = 0
   allocate(var1(nx,ny,nt))
-  allocate(var2(nx,ny,nt))
+  allocate(var2(nxr,nyr,nt))
   call read_ncvar(ifid1, ncvar1, var1)
-  call read_ncvar(ifid2, ncvar2, var2,(/1,1,nint(time(1)/(time(2)-time(1)))/),(/nx,ny,nt/))
+  call read_ncvar(ifid2, ncvar2, var2,(/1,1,nint(time(1)/(time(2)-time(1)))/),(/nxr,nyr,nt/))
 !   !Time loop
 
   do t = 1,nt
     write (*,*) 'Time = ',t
-    do i=1,nx
-      do j=1,ny
+    do j=1,ny
+      jj = (j-1) * ncoarsegrain + 1
+      do i=1,nx
+        ii = (i-1) * ncoarsegrain + 1
         if (var1(i,j,t) >= 1) then
           nr = var1(i,j,t)
           if (tt(nr)< 0) then ! A new cell
             tt(nr) = 1
             ovar(tt(nr),nr) = 0
           end if
-          ovar(tt(nr),nr) = ovar(tt(nr),nr) + var2(i,j,t)
+          ovar(tt(nr),nr) = ovar(tt(nr),nr) + 1./(ncoarsegrain**2)*sum(var2(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,t))
           npts(tt(nr),nr) = npts(tt(nr),nr) + 1
         end if
       end do
