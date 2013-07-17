@@ -1912,13 +1912,13 @@ program tracking
               if (any(cgmask)) then
                 if (n==1) then
                   cgval = minval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
-                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                  var(i,j,k+kk-1,n) = (cgval - distzero ) / distrange
                 else
                   cgval = maxval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
-                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                  var(i,j,k+kk-1,n) = (cgval - distzero ) / distrange
                 end if
               else
-                var(i,j,k+kk-1,ivalue) = fillvalue_i16
+                var(i,j,k+kk-1,n) = fillvalue_i16
               end if
             end do
           end do
@@ -2007,13 +2007,13 @@ program tracking
               if (any(cgmask)) then
                 if (n==1) then
                   cgval = minval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
-                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                  var(i,j,k+kk-1,n) = (cgval - distzero ) / distrange
                 else
                   cgval = maxval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
-                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                  var(i,j,k+kk-1,n) = (cgval - distzero ) / distrange
                 end if
               else
-                var(i,j,k+kk-1,ivalue) = fillvalue_i16
+                var(i,j,k+kk-1,n) = fillvalue_i16
               end if
             end do
           end do
@@ -2158,13 +2158,13 @@ program tracking
               if (any(cgmask)) then
                 if (n==1) then
                   cgval = minval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
-                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                  var(i,j,k+kk-1,n) = (cgval - distzero ) / distrange
                 else
                   cgval = maxval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
-                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                  var(i,j,k+kk-1,n) = (cgval - distzero ) / distrange
                 end if
               else
-                var(i,j,k+kk-1,ivalue) = fillvalue_i16
+                var(i,j,k+kk-1,n) = fillvalue_i16
               end if
             end do
           end do

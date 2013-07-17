@@ -1843,7 +1843,7 @@ program tracking
               cgmask = .false.
             end where
             if (any(cgmask)) then
-              cgval = 1./count(cgmask)*sum(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
+              cgval = 1./(count(cgmask))*sum(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
               var(i,j,k+kk-1,ivalue) = (cgval - thermzero ) / thermrange
             else
               var(i,j,k+kk-1,ivalue) = fillvalue_i16
@@ -1876,13 +1876,13 @@ program tracking
               if (any(cgmask)) then
                 if (n==1) then
                   cgval = minval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
-                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                  var(i,j,k+kk-1,n) = (cgval - distzero ) / distrange
                 else
                   cgval = maxval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
-                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                  var(i,j,k+kk-1,n) = (cgval - distzero ) / distrange
                 end if
               else
-                var(i,j,k+kk-1,ivalue) = fillvalue_i16
+                var(i,j,k+kk-1,n) = fillvalue_i16
               end if
             end do
           end do
@@ -1915,7 +1915,7 @@ program tracking
        filename = trim(stem)//trim(ivar(irain)%name)//'.nc'
        write(*,*) 'Reading ', trim(filename)
        call check ( nf90_open (trim(filename), NF90_NOWRITE, finput2) )
-       call inquire_ncvar(finput2, ivar(irain))      
+       call inquire_ncvar(finput2, ivar(irain))
     end if
     do k = tstart,nt,nchunk
       write (*,*) 'Reading t = ',k
@@ -1923,7 +1923,7 @@ program tracking
       call read_ncvar(finput, ivar(ilwp), readfield,(/1,1,k/),(/nxr,nyr,kkmax/))
       if (lrwp) then
         call read_ncvar(finput, ivar(irain), readfield,(/1,1,k/),(/nxr,nyr,kkmax/))
-         readfield = readfield + readfield2
+        readfield = readfield + readfield2
       end if
       do kk = 1,kkmax
         do j = 1, ny
@@ -1936,7 +1936,7 @@ program tracking
               cgmask = .false.
             end where
             if (any(cgmask)) then
-              cgval = 1./count(cgmask)*sum(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
+              cgval = 1./(count(cgmask))*sum(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
               var(i,j,k+kk-1,ivalue) = (cgval - lwpzero ) / lwprange
             else
               var(i,j,k+kk-1,ivalue) = fillvalue_i16
@@ -1971,13 +1971,13 @@ program tracking
               if (any(cgmask)) then
                 if (n==1) then
                   cgval = minval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
-                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                  var(i,j,k+kk-1,n) = (cgval - distzero ) / distrange
                 else
                   cgval = maxval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
-                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                  var(i,j,k+kk-1,n) = (cgval - distzero ) / distrange
                 end if
               else
-                var(i,j,k+kk-1,ivalue) = fillvalue_i16
+                var(i,j,k+kk-1,n) = fillvalue_i16
               end if
             end do
           end do
@@ -2012,7 +2012,7 @@ program tracking
                 cgmask = .false.
               end where
               if (any(cgmask)) then
-                cgval = 1./count(cgmask)*sum(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
+                cgval = 1./(count(cgmask))*sum(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
                 var(i,j,k+kk-1,ivalue) = (cgval - corezero ) / corerange
               else
                 var(i,j,k+kk-1,ivalue) = fillvalue_i16
@@ -2087,7 +2087,7 @@ program tracking
               cgmask = .false.
             end where
             if (any(cgmask)) then
-              cgval = 1./count(cgmask)*sum(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
+              cgval = 1./(count(cgmask))*sum(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
               var(i,j,k+kk-1,ivalue) = (cgval - rwpzero ) / rwprange
             else
               var(i,j,k+kk-1,ivalue) = fillvalue_i16
@@ -2122,15 +2122,15 @@ program tracking
               if (any(cgmask)) then
                 if (n==1) then
                   cgval = minval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
-                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                  var(i,j,k+kk-1,n) = (cgval - distzero ) / distrange
                 else
                   cgval = maxval(readfield(ii:ii+ncoarsegrain-1,jj:jj+ncoarsegrain-1,kk), MASK=cgmask)
-                  var(i,j,k+kk-1,ivalue) = (cgval - distzero ) / distrange
+                  var(i,j,k+kk-1,n) = (cgval - distzero ) / distrange
                 end if
               else
-                var(i,j,k+kk-1,ivalue) = fillvalue_i16
+                var(i,j,k+kk-1,n) = fillvalue_i16
               end if
-             end do
+            end do
           end do
         end do
       end do
