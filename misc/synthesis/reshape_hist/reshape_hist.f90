@@ -12,9 +12,10 @@ Program reshape_hist
 ! Compilation: 1. compile the modules separately:                             !
 !                 ifort -c -r8 read_hist_1.f90                                !
 !              2. compile the main program and link the modules:              !
-!                 ifort -r8 -o reshape_hist read_hist_1.o read_hist_srfc.o /  !
-!                 read_hist_2.o read_hist_3.o write_hist_1.o write_hist_2.o/  ! 
-!                 write_hist_3.o write_hist_srfc.o reshape_hist.f90           !
+!                 ifort -r8 -o reshape_hist read_hist_1.o read_hist_srfc.o \  !
+!                 read_hist_srfc_rad.o read_hist_2.o read_hist_3.o \          !
+!                 write_hist_1.o write_hist_2.o write_hist_3.o \              !
+!                 write_hist_srfc.o write_hist_srfc_rad.o reshape_hist.f90    !
 !              Note: it is important to use -r8 since the restart files are   !
 !                    double precision.                                        !
 !                                                                             !
@@ -23,10 +24,12 @@ Program reshape_hist
 
   use readhist_1
   use readhist_srfc
+  use readhist_srfc_rad
   use readhist_2
   use readhist_3
   use writehist_1
   use writehist_srfc
+  use writehist_srfc_rad
   use writehist_2
   use writehist_3
 
@@ -84,14 +87,7 @@ Program reshape_hist
        a_pexnr, &
        a_tsoil, &
        a_phiw,  &
-       a_sflxd, &
-       a_sflxu, &
-       a_lflxd, &
-       a_lflxu, &
-       a_sflxd_avn, &
-       a_sflxu_avn, &
-       a_lflxd_avn, &
-       a_lflxu_avn
+       a_flx
 
   real, dimension (:,:),    allocatable :: &
        a_tskin, &
@@ -118,7 +114,6 @@ Program reshape_hist
   print*,'                             3 - .time s'
   read*,ihtype
 
-  ihtype=2
   select case(ihtype)
   case(1)
      hname = trim(hname)//'.R'
@@ -262,46 +257,38 @@ Program reshape_hist
      allocate (a_tskin (nxt,nyt))
      allocate (a_qskin (nxt,nyt))
      allocate (a_Wl    (nxt,nyt))
-     allocate (a_sflxd_avn(100,nxt,nyt))
-     allocate (a_sflxu_avn(100,nxt,nyt))
-     allocate (a_lflxd_avn(100,nxt,nyt))
-     allocate (a_lflxu_avn(100,nxt,nyt))
 
      a_tsoil(:,:,:)     = 0.
      a_phiw(:,:,:)      = 0.
      a_tskin(:,:)       = 0.
      a_qskin(:,:)       = 0.
      a_wl(:,:)          = 0.
-     a_sflxd_avn(:,:,:) = 0.
-     a_sflxu_avn(:,:,:) = 0.
-     a_lflxd_avn(:,:,:) = 0.
-     a_lflxu_avn(:,:,:) = 0.
-
 
      print*,'********************************************************'
      print*,'Reading in the surface fields from the old restart files'
      print*,'********************************************************'
 
      call read_hist_srfc(nxp1, nyp1, nx1, ny1, nxt, nyt,   &
-          a_tsoil, a_phiw, a_tskin, a_qskin, a_wl, a_sflxd,    &
-          a_sflxu, a_lflxd, a_lflxu, a_sflxd_avn, a_sflxu_avn, &
-          a_lflxd_avn, a_lflxu_avn)
+          a_tsoil, a_phiw, a_tskin, a_qskin, a_wl)
 
      call write_hist_srfc(nxp2, nyp2, nx2, ny2, nxt, nyt,   &
-          a_tsoil, a_phiw, a_tskin, a_qskin, a_wl, a_sflxd,    &
-          a_sflxu, a_lflxd, a_lflxu, a_sflxd_avn, a_sflxu_avn, &
-          a_lflxd_avn, a_lflxu_avn)
-
+          a_tsoil, a_phiw, a_tskin, a_qskin, a_wl)
 
      deallocate (a_tsoil)
      deallocate (a_phiw)
      deallocate (a_tskin)
      deallocate (a_qskin)
      deallocate (a_Wl)
-     deallocate (a_sflxd_avn)
-     deallocate (a_sflxu_avn)
-     deallocate (a_lflxd_avn)
-     deallocate (a_lflxu_avn)
+
+     allocate (a_flx(100,nxt,nyt))
+
+     a_flx(:,:,:) = 0.
+     ! loop through the radiation fields separately, memory issues!
+     do n=1,8
+        call read_hist_srfc_rad(nxp1, nyp1, nx1, ny1, nxt, nyt, a_flx)
+        call write_hist_srfc_rad(nxp2, nyp2, nx2, ny2, nxt, nyt, a_flx)
+     end do
+     deallocate (a_flx)
 
   end if
 
