@@ -8,30 +8,31 @@
 \contentsline {subsubsection}{\numberline {ii}Microphysics}{5}
 \contentsline {subsubsection}{\numberline {iii}Surface Fluxes}{8}
 \contentsline {subsubsection}{\numberline {iv}Radiation}{8}
-\contentsline {section}{\numberline {3}Numerics}{8}
-\contentsline {subsection}{\numberline {a}Time-stepping}{8}
+\contentsline {subsubsection}{\numberline {v}Land Surface Model}{8}
+\contentsline {section}{\numberline {3}Numerics}{9}
+\contentsline {subsection}{\numberline {a}Time-stepping}{9}
 \contentsline {subsection}{\numberline {b}Computational Grid}{9}
-\contentsline {subsection}{\numberline {c}Pressure Solver}{9}
+\contentsline {subsection}{\numberline {c}Pressure Solver}{10}
 \contentsline {subsection}{\numberline {d}Parallelization Strategy}{10}
 \contentsline {paragraph}{Decomposition}{10}
 \contentsline {paragraph}{Communication}{10}
-\contentsline {section}{\numberline {4}The Code}{10}
-\contentsline {subsection}{\numberline {a}Getting the Code}{10}
+\contentsline {section}{\numberline {4}The Code}{11}
+\contentsline {subsection}{\numberline {a}Getting the Code}{11}
 \contentsline {subsection}{\numberline {b}Organization}{11}
-\contentsline {subsection}{\numberline {c}Compilation}{11}
+\contentsline {subsection}{\numberline {c}Compilation}{13}
 \contentsline {subsection}{\numberline {d}Specialized model configurations}{13}
 \contentsline {section}{\numberline {5}Running the Model}{13}
 \contentsline {subsection}{\numberline {a}The NAMELIST}{13}
 \contentsline {subsection}{\numberline {b}Output}{15}
-\contentsline {paragraph}{Standard output:}{15}
-\contentsline {paragraph}{Analysis file:}{15}
+\contentsline {paragraph}{Standard output:}{16}
+\contentsline {paragraph}{Analysis file:}{16}
 \contentsline {paragraph}{Profile statistics:}{16}
 \contentsline {paragraph}{Temporal Statistics:}{16}
 \contentsline {paragraph}{History files:}{16}
-\contentsline {subsection}{\numberline {c}Post-processing:}{16}
-\contentsline {paragraph}{Other Useful Scripts:}{16}
+\contentsline {subsection}{\numberline {c}Post-processing:}{17}
+\contentsline {paragraph}{Other Useful Scripts:}{17}
 \contentsline {subsection}{\numberline {d}Debugging:}{17}
-\contentsline {section}{\numberline {6}Examples}{17}
-\contentsline {subsection}{\numberline {a}RICO}{17}
+\contentsline {section}{\numberline {6}Examples}{18}
+\contentsline {subsection}{\numberline {a}RICO}{18}
 \contentsline {subsection}{\numberline {b}Dry CBL}{18}
 \contentsline {subsection}{\numberline {c}Smoke}{18}
