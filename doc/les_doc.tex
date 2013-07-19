@@ -13,7 +13,7 @@
 \title{\centering \Huge \baselineskip30mm Introduction to UCLA-LES \\ \large Version 3.2.1}
 \baselineskip7mm
 \bigskip
-\author{\LARGE Bjorn Stevens \\ \footnotesize \it updated by Malte Rieck} 
+\author{\LARGE Bjorn Stevens \\ } 
 \maketitle
 
 \baselineskip6mm
@@ -426,20 +426,39 @@ formulation are listed in Table \ref{tbl:surface}.
 
 \subsubsection{Radiation}
 The model allows for a range of different radiation types.
-The radiation type can be set by the variable iradtyp in the
-NAMELIST file. As a default, calculations are done without
-radiation (iradtyp=1). One has the option of using either
-the simple radiation (iradtyp=2) of gcss intercomparison or
-the full radiation (iradtyp=4) of Prescas and Stevens.
-Here, for simple radiation treatment, short- and longwave
+As a default, calculations are done without
+radiation (iradtyp=1). For more explicit radiation treatment one can either use
+the simple radiation (iradtyp=2) following the gcss intercomparison or
+the full radiation (iradtyp=4) from \cite{Pincus:2009}.
+For simple radiation treatment, short- and longwave
 radiation will be computed as described in \emph{src/rad\_gcss.f90}.
-The full radiation approach makes use of \emph{bin/datafiles}
-to apply radiation values above 3km. A particular treatment
+The full radiation package solves the radiative transfer with a delta-4 stream method.
+A particular treatment
 of radiation is available for the smoke cloud and the bellon
 case. The radiation treatment for the smoke cloud case can be
 used by setting iradtyp=2 and level=1. The bellon case has a
 specific radiation code as shown in the bellon\_rad routine
 and can be used by setting iradtyp=3.
+
+\subsubsection{Land Surface Model}
+The model can be used with an interactive land-surface scheme to calculate
+the fluxes between the land and atmosphere system.
+The scheme contains a surface layer and soil model following the approach
+used in the Dutch Atmospheric Large-Eddy Sumulation code (\cite{Heus:2010}).
+Fluxes are calculated interactively solving the energy budget at the surface for
+each grid cell.
+A four layer diffusive soil scheme is used to calculate temperature and soil
+moisture in every grid cell.
+We prescribe a mean deep soil temperature as a lower boundary of the model
+whereas soil and surface temperature and moisture are evolving in time.
+The land surface scheme can used in combination with the full radiation 
+following \cite{Pincus:2009}.
+To assure a stable surface temperature the incoming long and shortwave
+radiation is averaged over a number of time steps (nradtime).
+The interactive calculation of latent and sensible heat fluxes allows for multiple
+feedbacks in the coupled land-atmosphere system.
+This land surface setup has been tested against the Dutch Atmospheric 
+LES (DALES) in a dry convective environment.
 
 \section{Numerics}
 
@@ -1075,6 +1094,13 @@ Cotton, W.~R., 1972: Numerical simulation of precipitation development in
 \bibitem[{Long(1974)}]{Long:1974}
 Long, A.~B., 1974: Solutions to the droplet coalescence equation for polynomial
   kernels. {\it J. Atmos. Sci.\/}, {\bf 31}, 1040.
+  
+\bibitem[{Heus(2010)}]{Heus:2010}
+Heus, T. and van Heerwaarden, C. C. and Jonker, H. J. J. and Pier Siebesma, 
+a. and Axelsen, S. and van den Dries, K. and Geoffroy, O. and Moene, a. F. and
+Pino, D. and de Roode, S. R. and Vil\`{a}-Guerau de Arellano, J., 2010:
+Formulation of the Dutch Atmospheric Large-Eddy Simulation (DALES)
+and overview of its applications. {\it Geoscientific Model Development\/}, {\bf 3}, 415-444.
 
 \bibitem[{L\"upkes et~al.(1989)L\"upkes, Beheng, and Doms}]{Lupke:1989}
 L\"upkes, C., K.~D. Beheng, and G.~Doms, 1989: A parameterization scheme
@@ -1088,6 +1114,10 @@ Milbrandt, J.~A. and M.~Yau, 2005: A multimoment bulk microphysics
 
 \bibitem[{Ogura and Phillip(1962)}]{Ogura:1962}
 Ogura, Y.\ and  N.\ A.\ Phillips, 1962: Scale Analysis of Deep and Shallow Convection in the Atmosphere. {\it J.\ Atmos.\ Sci.\/}, {\bf 19}, 173--179.
+
+\bibitem[{Pincus and Stevens(2009)}]{Pincus:2009}
+Pincus, R.\ and B.\ Stevens, 2009: Monte Carlo Spectral Integration: a Consistent Approximation for Radiative Transfer in Large Eddy Simulations. {\it Journal of Advances in Modeling Earth Systems\/},
+  {\bf 1}.
 
 \bibitem[{Seifert and Beheng(2001)}]{Seife:2001}
 Seifert, A. and K.~D. Beheng, 2001: A double-moment parameterization for
