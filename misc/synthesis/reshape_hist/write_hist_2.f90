@@ -63,7 +63,7 @@ contains
 
           wrxid = xid -1 ! zero-based
           wryid = yid -1
-          unit = 100 + wryid-wryid/nyp2 + nyp2*wrxid
+          unit = 10 + wryid-wryid/nyp2 + nyp2*wrxid
 
           write (unit) a_xp_l
 

@@ -7,6 +7,7 @@ contains
 
     integer :: wrxid, wryid, xid, yid, i, j, ii, jj, k, istart, iend, jstart, jend
     integer :: nxp1, nyp1, nz, nscl, nv2, unit
+    logical :: UNITOK, UNITOP
 
     character(len=40)  :: filename
     character (len=40) :: hname
@@ -52,7 +53,16 @@ contains
           wrxid = xid -1 ! zero-based
           wryid = yid -1
 
-          unit = 1 + wryid-wryid/nyp1 + nyp1*wrxid
+          unit = 300 + wryid-wryid/nyp1 + nyp1*wrxid
+          inquire (unit=unit,exist=UNITOK,opened=UNITOP)
+          if (.not.UNITOK) then
+             print*,'unit does not exist', unit
+             stop
+          end if
+          if (.not.UNITOP) then
+             print*,'unit not opened'
+             stop
+          end if
           !
           ! open input file.
           !

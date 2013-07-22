@@ -2,21 +2,21 @@ module writehist_1
 contains
   subroutine write_hist_1(time, hname, nxp2, nyp2, nx2, ny2, nxt, nyt, nz, nscl,&
        umean, vmean, th00, level, isfctyp, lwaterbudget, iradtyp, xt, xm, yt,   &
-       ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf, seed, nseed, dt,      &
-       a_ustar, a_tstar, a_rstar, a_pexnr)
+       ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf, seed_arr, nseed, dt,      &
+       a_ustar, a_tstar, a_rstar, a_pexnr, nxp1, nyp1)
 
     implicit none
 
     integer :: wrxid, wryid, xid, yid, i, j, ii, jj, k, istart, iend, jstart, jend
-    integer :: nxp2, nyp2, nz, nscl, nv2
+    integer :: nxp2, nyp2, nz, nscl, nv2, nxp1, nyp1
 
     character(len=40)             :: filename
     real, intent(in)              :: time
-    integer                       :: unit
+    integer                       :: unit, seedct
 
     character (len=40), intent(in) :: hname
     integer :: n, nseed, nxpx, nypx, nzpx, iradtyp
-    integer, dimension(:), allocatable :: seed
+    integer, dimension(:,:), allocatable :: seed_arr
     logical :: exans, lwaterbudget
     real    :: umean, vmean, th00, dt, psrf
     integer :: isfctyp, level, nsmp
@@ -113,7 +113,9 @@ contains
           wrxid = xid -1 ! zero-based
           wryid = yid -1
 
-          unit = 100 + wryid-wryid/nyp2 + nyp2*wrxid
+          unit = 10 + wryid-wryid/nyp2 + nyp2*wrxid
+          seedct = int(real(nyp1*wryid)/real(nyp2)) + &
+               int(real(nyp1*nyp2)/real(nyp2))*int(real(nxp1*wrxid)/real(nxp2)) +1
 
           write(filename,'(i4.4,a1,i4.4)') wrxid,'_',wryid
           filename = './out/'//trim(filename)//'.'//trim(hname)
@@ -125,7 +127,7 @@ contains
              open (unit,file=trim(filename),status='new',form='unformatted')
              write (unit) time,th00,umean,vmean,dt,level,iradtyp,nz,nx2,ny2,nscl
              write (unit) nseed
-             write (unit) seed
+             write (unit) seed_arr(:,seedct)
 
              write (unit) xt_l, xm_l, yt_l, ym_l, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf
              write (unit) a_ustar_l, a_tstar_l, a_rstar_l

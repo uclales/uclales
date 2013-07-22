@@ -96,7 +96,7 @@ Program reshape_hist
 
   real, dimension (:,:,:), allocatable:: &
        a_xp
-  integer, dimension(:), allocatable :: seed
+  integer, dimension(:,:), allocatable :: seed_arr
 
   !--------------------------------------------------------------------------
   ! Read the parameters of the restart file
@@ -126,13 +126,17 @@ Program reshape_hist
      write (hname(iblank:iblank+7),'(a1,i6.6,a1)') '.', int(timestamp), 's'
   end select
 
-  print*,'Number of processors nxp, nyp used for original run'
-  read*,nxp1, nyp1
-
   print*,'nx, ny total points of field (without ghost cells)'
   read*,nxt, nyt
   nxt=nxt+4
   nyt=nyt+4
+
+  print*,'nz'
+  read*, nz
+
+  print*,'Number of processors nxp, nyp used for original run'
+  read*,nxp1, nyp1
+
   print*,'Number of processors nxp, nyp for new run'
   read*,nxp2, nyp2
 
@@ -145,18 +149,16 @@ Program reshape_hist
      stop
   end if
 
-  print*,'nz'
-  read*, nz
-  print*,'level (0,1,2,3,4,5)'
+  print*,'microphysics level (0,1,2,3,4,5)'
   read*, level
+
+  print*,'isfctyp (only important, if isfctyp=5)'
+  read*,isfctyp
 
   print*,'lwaterbudget (.true./.false.  default is .false.)'
   read*, lwaterbudget
 
   if(.not.lwaterbudget) lwaterbudget=.false.
-
-  print*,'isfctyp (only important, if isfctyp=5)'
-  read*,isfctyp
 
   print*,'lcouvreux (.true./.false.  default is .false.)'
   read*, lcouvreux
@@ -180,7 +182,7 @@ Program reshape_hist
   nx1 = (nxt-4) / nxp1 +4
   ny1 = (nyt-4) / nxp1 +4
   nx2 = (nxt-4) / nxp2 +4
-  ny2 = (nyt-4) / nxp2 +4
+  ny2 = (nyt-4) / nyp2 +4
 
   ! Allocate the fields of the large gathered domain
 
@@ -217,7 +219,7 @@ Program reshape_hist
 
   call read_hist_1(time, hname, nxp1, nyp1, nx1, ny1, nxt, nyt, nz, nscl,&
        umean, vmean, th00, level, isfctyp, lwaterbudget, iradtyp, xt, xm, yt,   &
-       ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf, seed, nseed, dt, a_ustar,     &
+       ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf, seed_arr, nseed, dt, a_ustar,     &
        a_tstar, a_rstar, a_pexnr)
 
   ! Write out the new restart files
@@ -228,8 +230,8 @@ Program reshape_hist
 
   call write_hist_1(time, hname, nxp2, nyp2, nx2, ny2, nxt, nyt, nz, nscl,&
        umean, vmean, th00, level, isfctyp, lwaterbudget, iradtyp, xt, xm, yt,   &
-       ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf, seed, nseed, dt,      &
-       a_ustar, a_tstar, a_rstar, a_pexnr)
+       ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf, seed_arr, nseed, dt,      &
+       a_ustar, a_tstar, a_rstar, a_pexnr, nxp1, nyp1)
 
   ! Deallocate the first part of the fields of the large gathered domain
 
@@ -243,7 +245,7 @@ Program reshape_hist
 
   deallocate (u0,v0,pi0,pi1,th0,dn0,rt0)
   
-  deallocate(seed)
+  deallocate(seed_arr)
   deallocate (a_ustar,a_tstar,a_rstar)
   deallocate (a_pexnr)
 

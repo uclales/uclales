@@ -2,7 +2,7 @@ module readhist_1
 contains
   subroutine read_hist_1(time, hname, nxp1, nyp1, nx1, ny1, nxt, nyt, nz, nscl,&
        umean, vmean, th00, level, isfctyp, lwaterbudget, iradtyp, xt, xm, yt,  &
-       ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf, seed, nseed, dt,     &
+       ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf, seed_arr, nseed, dt,     &
        a_ustar, a_tstar, a_rstar, a_pexnr)
 
     implicit none
@@ -12,11 +12,11 @@ contains
 
     character(len=40) :: filename
     real              :: time
-    integer           :: unit
+    integer           :: unit, seedct
 
     character (len=40) :: hname
     integer :: n, nseed, nxpx, nypx, nzpx, nsclx, iradtyp, lvlx
-    integer, dimension(:), allocatable :: seed
+    integer, dimension(:,:), allocatable :: seed_arr
     logical :: exans
     real    :: umean, vmean, th00, dt, psrf
     integer :: isfctyp, level, nsmp
@@ -64,7 +64,9 @@ contains
           !
           ! open input file.
           !
-          unit = 1 + wryid-wryid/nyp1 + nyp1*wrxid
+          unit = 300 + wryid-wryid/nyp1 + nyp1*wrxid
+          seedct = wryid + nyp1*wrxid +1
+
           write(filename,'(i4.4,a1,i4.4)') wrxid,'_',wryid
           filename = trim(filename)//'.'//trim(hname)
           inquire(file=trim(filename),exist=exans)
@@ -75,10 +77,12 @@ contains
              open (unit,file=trim(filename),status='old',form='unformatted')
              read (unit) time,th00,umean,vmean,dt,lvlx,iradtyp,nzpx,nxpx,nypx,nsclx
              read (unit) nseed
+             ! the seed is redistributed to the new fields. If nxp2>nxp1 then the seed from 
+             ! adjacent domains is taken, if nxp2<nyp1 some seeds inbetween are dropped. 
              if (xid==1.and.yid==1) then
-                allocate(seed(nseed))
+                allocate(seed_arr(nseed, nxp1*nyp1))
              end if
-             read(unit) seed
+             read(unit) seed_arr(:,seedct)
              if (nxpx /= nx1 .or. nypx /= ny1 .or. nzpx /= nz)  then
                 print *, 'WRONG GRID !', nx1, ny1, nz, nxpx, nypx, nzpx
                 stop
