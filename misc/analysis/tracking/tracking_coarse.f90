@@ -439,7 +439,7 @@ module modtrack
         endlist(:,nendlist+1:nendlist+nlist) = list(:,1:nlist)
         nendlist = nendlist + nlist
       end do
-!       nrel_max = max(nrel_max, 1)
+      nrel_max = max(nrel_max, 1)
 
       !Add cells for the number of parentcells
 !       npassive = 0
