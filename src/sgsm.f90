@@ -76,10 +76,6 @@ contains
     real, intent(in)       :: timein 
     integer :: n
 
-    ! Hack BvS: slowly increase smago constant...
-    !csx = min(timein*0.23/3600.,0.23)    
-
-
     if (.not.Initialized) call diffuse_init(nzp, nxp, nyp)
 
     !

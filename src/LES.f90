@@ -24,17 +24,19 @@
 ! \todo reduce nr of warnings when compiling with gfortran/NAG
 ! \todo Nicer version of accumelated precip
 program ucla_les
-
+  use mpi_interface, only : myid
   implicit none
-
   real :: t1, t2
+  
 
   call cpu_time(t1)
   call driver
   call cpu_time(t2)
 
-  print "(/,' ',49('-')/,' ',A16,F10.1,' s')", '  Execution time: ', t2-t1
-  stop ' ..... Normal termination'
+  if(myid==0) then
+    print "(/,' ',49('-')/,' ',A16,F10.1,' s')", '  Execution time (CPU0): ', t2-t1
+    stop ' ..... Normal termination'
+  end if
 
 contains
 
@@ -75,8 +77,8 @@ contains
     use util, only : fftinix,fftiniy
     use defs, only : SolarConstant
     use sgsm, only : csx, prndtl, clouddiff
-    use advf, only : lmtr !,advs
-    use advl, only : advm
+    use advf, only : lmtr, iadv_scal, gcfl, cfllim
+    use advl, only : iadv_mom
     use srfc, only : zrough, ubmin, dthcon, drtcon, rh_srf, drag, lhomflx
     use step, only : timmax, timrsm, istpfl, corflg, outflg, frqanl, frqhis,          &
          frqcross , strtim, radfrq, cntlat,&
@@ -104,19 +106,20 @@ contains
     implicit none
 
     namelist /model/  &
-         expnme    ,       & ! experiment name
-         nxpart    ,       & ! whether partition in x direction?
-         naddsc    ,       & ! Number of additional scalars
-         savg_intvl,       & ! output statistics frequency
-         ssam_intvl,       & ! integral accumulate/ts print frequency
-         corflg , cntlat , & ! coriolis flag
-         nfpt   , distim , & ! rayleigh friction points, dissipation time
-         level  , CCN    , & ! Microphysical model Number of CCN per kg of air
-         iseed  , zrand  , & ! random seed
+         expnme    ,                & ! experiment name
+         nxpart    ,                & ! whether partition in x direction?
+         naddsc    ,                & ! Number of additional scalars
+         savg_intvl,                & ! output statistics frequency
+         ssam_intvl,                & ! integral accumulate/ts print frequency
+         corflg , cntlat ,          & ! coriolis flag
+         nfpt   , distim ,          & ! rayleigh friction points, dissipation time
+         level  , CCN    ,          & ! Microphysical model Number of CCN per kg of air
+         iseed  , zrand  ,          & ! random seed
          nxp    , nyp    , nzp   ,  & ! number of x, y, z points
          deltax , deltay , deltaz , & ! delta x, y, z (meters)
          dzrat  , dzmax  , igrdtyp, & ! stretched grid parameters
          timmax , dtlong , istpfl , timrsm, wctime, & ! timestep control
+         gcfl, cfllim ,             & ! Goal CFL, CFL lim
          runtype, hfilin , filprf , & ! type of run (INITIAL or HISTORY)
          frqhis , frqanl, frqcross, outflg , & ! freq of history/anal writes, output flg
          lsync, lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars,prc_lev,&
@@ -128,25 +131,24 @@ contains
          hs     , ps     , ts    ,  & ! sounding heights, pressure, temperature
          us     , vs     , rts   ,  & ! sounding E/W winds, water vapor
          umean  , vmean  , th00  ,  & ! gallilean E/W wind, basic state
-         case_name, lmtr,           & !irina:name of the case, i.e. astex, rico, etc
-         advm,                & ! Advection scheme scalars, momentum
+         case_name, lmtr,           & ! irina:name of the case, i.e. astex, rico, etc
+         iadv_scal, iadv_mom,       & ! 
          lsvarflg,                  & ! irina:flag for time bvarying large scale forcing
-         lstendflg,                  & !irina:flag for time large scale advective tendencies
-         div,  &                       !irina: divergence
+         lstendflg,                 & !irina:flag for time large scale advective tendencies
+         div,                       & !irina: divergence
          lnudge, tnudgefac, ltimedep,ltimedepz,ltimedepsurf, qfloor, zfloor,znudgemin, znudgeplus,  &             !thijs: Nudging
-         lnudge_bound, &               ! LINDA, relaxation boundaries
-         rh_srf, drag, &
+         lnudge_bound,              & ! LINDA, relaxation boundaries
+         rh_srf, drag,              & 
          SolarConstant,u0,fixed_sun, rad_eff_radius, & ! SolarConstant (In case of prescribed TOA radiation
          lrandommicro, microseq,timenuc ,nin_set,cloud_type, &  !thijs: sequence of variables for microphysics
-         lwaterbudget, &                 ! axel: flag for liquid water budget diagnostics (only level=3)
-         lcouvreux , tau , &                    ! The Couvreux 'radioactive' scalar
-         lrad_ca, &                        ! Clear air radiation statistics
+         lwaterbudget,              & ! axel: flag for liquid water budget diagnostics (only level=3)
+         lcouvreux , tau ,          & ! The Couvreux 'radioactive' scalar
+         lrad_ca,                   & ! Clear air radiation statistics
          deflate_level , lhomflx,lhomrestart, &                         !Compression of the crosssections
-         clouddiff, &
+         clouddiff,                 &
          lpartic,lpartsgs,lrandsurf,lpartstat,lpartdump, &           ! Particles
          lpartdumpui,lpartdumpth,lpartdumpmr,frqpartdump,&           ! Particles
          lpartdrop, ldropstart                                       ! Particles
-
 
     deflev = deflate_level
     ps       = 0.

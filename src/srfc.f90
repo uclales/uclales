@@ -581,10 +581,14 @@ contains
                if(lmo > 1e6)  lmo = 1e6
                if(lmo < -1e6) lmo = -1e6 
 
-               if(iter>10000) then
-                 print*,'Obukh. length not converged, myid=',myid,'i,j=',i,j
-                 stop
+               if(iter>1000000-10) then
+                 print*,ustar(i,j),lmo,Ldif
                end if
+
+               !if(iter>1000000) then
+               !  print*,'Obukh. length not converged, myid=',myid,'i,j=',i,j
+               !  stop
+               !end if
              end do
           end if
  
