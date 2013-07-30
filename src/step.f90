@@ -311,7 +311,7 @@ contains
     use centered, only:advection_scalars
     use modtimedep, only : timedep
     use modparticles, only : particles, lpartic, particlestat,lpartstat, &
-         deactivate_drops, activate_drops
+         deactivate_drops, activate_drops, lpartmass, grow_drops
 
 
     logical, parameter :: debug = .false.
@@ -377,6 +377,7 @@ contains
 
     end do
 
+    if(lpartic .and. lpartdrop .and. lpartmass) call grow_drops
     if(lpartic .and. lpartdrop) call deactivate_drops(time+dt)
     if(lpartic .and. lpartdrop) call activate_drops(time+dt)
 
