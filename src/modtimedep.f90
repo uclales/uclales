@@ -1,8 +1,5 @@
 !> \file modtimedepsv.f90
 !!  Prescribes surface values, fluxes and LS forcings at certain times for scalars
-
-!>
-!!  Prescribes surface values, fluxes and LS forcings at certain times for scalars
 !>
 !!  \author Roel Neggers, KNMI
 !!  \author Thijs Heus,MPI-M
@@ -11,7 +8,6 @@
 !!  \par Revision list
 !! \todo documentation
 !  This file is part of DALES.
-!
 !
 ! DALES is free software; you can redistribute it and/or modify
 ! it under the terms of the GNU General Public License as published by
@@ -36,53 +32,47 @@ implicit none
 
 save
 ! switches for timedependent surface fluxes and large scale forcings
-  logical       :: ltimedep     = .false. !< Overall switch, input in namoptions
-  logical       :: ltimedepz    = .false.  !< Switch for large scale forcings
-  logical       :: ltimedepsurf = .false.  !< Switch for surface fluxes
-  logical       :: firsttime    = .true.
-  integer, parameter    :: kflux = 2000
-  integer, parameter    :: kls   = 2000
-  real, allocatable     :: timeflux (:)
-  real, allocatable     :: wqsurft  (:)
-  real, allocatable     :: wtsurft  (:)
-  real, allocatable     :: thlst    (:)
-  real, allocatable     :: qtst     (:)
-  real, allocatable     :: pst      (:)
+  logical            :: ltimedep     = .false. !< Overall switch, input in namoptions
+  logical            :: ltimedepz    = .false.  !< Switch for large scale forcings
+  logical            :: ltimedepsurf = .false.  !< Switch for surface fluxes
+  logical            :: firsttime    = .true.
+  integer, parameter :: kflux = 2000
+  integer, parameter :: kls   = 2000
+  real, allocatable  :: timeflux (:)
+  real, allocatable  :: wqsurft  (:)
+  real, allocatable  :: wtsurft  (:)
+  real, allocatable  :: thlst    (:)
+  real, allocatable  :: qtst     (:)
+  real, allocatable  :: pst      (:)
 
-  real, allocatable     :: timels  (:)
-  real, allocatable     :: wflst   (:,:)
-  real, allocatable     :: dqtdtlst(:,:)
-  real, allocatable     :: dthldtlst(:,:)
-
-
+  real, allocatable  :: timels  (:)
+  real, allocatable  :: wflst   (:,:)
+  real, allocatable  :: dqtdtlst(:,:)
+  real, allocatable  :: dthldtlst(:,:)
 
 contains
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine inittimedep(time,time_end)
-!     use modglobal, only :ifnamopt,fname_options,dtmax, btime,cexpnr,nzp,nzp,ifinput,runtime
-!     use modsurfdata,only :ps,qts,wqsurf,wtsurf,thls
-!     use modtimedepsv, only : inittimedepsv
     use grid, only : nzp, zt
+    use mpi_interface, only : myid
     real, intent(in) :: time,time_end
     character (80):: chmess
     character (1) :: chmess1
-    integer :: k,t, ierr, ifinput = 19
-    real :: dummyr, fac
-!     real, allocatable, dimension (:) :: height
-    real :: highheight,highwflst, highdthldt, highdqtdt
-    real :: lowheight,  lowwflst,  lowdthldt,  lowdqtdt
+    integer       :: k,t, ierr, ifinput = 19
+    real          :: dummyr, fac
+    real          :: highheight,highwflst, highdthldt, highdqtdt
+    real          :: lowheight,  lowwflst,  lowdthldt,  lowdqtdt
 
     firsttime = .false.
 
     allocate(timeflux (0:kflux))
     allocate(wqsurft  (kflux))
     allocate(wtsurft  (kflux))
-    allocate(thlst   (0:kls))
-    allocate(qtst    (0:kls))
-    allocate(pst    (0:kls))
+    allocate(thlst    (0:kls))
+    allocate(qtst     (0:kls))
+    allocate(pst      (0:kls))
 
-    allocate(timels  (0:kls))
-    allocate(wflst   (nzp,kls))
+    allocate(timels   (0:kls))
+    allocate(wflst    (nzp,kls))
     allocate(dqtdtlst (nzp,kls))
     allocate(dthldtlst(nzp,kls))
 
@@ -92,33 +82,41 @@ contains
     dthldtlst = 0
 
     ! load ls_flux_in
+    if(myid == 0) then
+      print "(/,49('-'))"
+      print*,'reading ls_flux_in'
+      print "(49('-'))"
+    end if
+
     open(ifinput,file='ls_flux_in')
     read(ifinput,'(a80)') chmess
-    write(6,*) chmess
+    if(myid==0) write(6,*) chmess
     read(ifinput,'(a80)') chmess
-    write(6,*) chmess
+    if(myid==0) write(6,*) chmess
     read(ifinput,'(a80)') chmess
-    write(6,*) chmess
+    if(myid==0) write(6,*) chmess
 
     timeflux = 0
     timels   = 0
 
     ! load surface conditions
-    print*,'*** Surface forcings: ***'
+    if(myid==0) print*,'*** Surface forcings: ***'
     t    = 0
     ierr = 0
     do while (timeflux(t) < (time_end))
       t=t+1
       read(ifinput,*, iostat = ierr) timeflux(t), wtsurft(t), wqsurft(t),thlst(t),qtst(t),pst(t)
-      write(*,'(i8,6e12.4)') t,timeflux(t), wtsurft(t), wqsurft(t),thlst(t),qtst(t),pst(t)
-      if (ierr < 0) then
+      if(myid==0) write(*,'(i8,6e12.4)') t,timeflux(t), wtsurft(t), wqsurft(t),thlst(t),qtst(t),pst(t)
+      if (myid==0 .and. ierr < 0) then
           stop 'STOP: No time dependend data for end of run (surface fluxes)'
       end if
     end do
     if(timeflux(1)>(time_end)) then
-       write(6,*) 'Time dependent surface variables do not change before end of'
-       write(6,*) 'simulation. --> only large scale forcings'
-       ltimedepsurf=.false.
+      if(myid==0) then
+         write(6,*) 'Time dependent surface variables do not change before end of'
+         write(6,*) 'ltimedepsurf set to FALSE'
+      end if
+      ltimedepsurf=.false.
     endif
     ! flush to the end of fluxlist
     do while (ierr ==0)
@@ -126,48 +124,49 @@ contains
     end do
     backspace (ifinput)
 
-    if(ltimedepz) then
-      ! ---load large scale forcings----
-      print*,'*** Vertical forcings: ***'
-      t = 0
-      do while (timels(t) < time_end)
-        t = t + 1
-        chmess1 = "#"
-        ierr = 1 ! not zero
-        do while (.not.(chmess1 == "#" .and. ierr ==0)) !search for the next line consisting of "# time", from there onwards the profiles will be read
-          read(ifinput,*,iostat=ierr) chmess1,timels(t)
-          if (ierr < 0) then
-            stop 'STOP: No time dependend data for end of run'
-          end if
-        end do
-        write (*,*) 'timels = ',timels(t)
-        read (ifinput,*)  lowheight , lowwflst,lowdthldt,lowdqtdt
-        read (ifinput,*)  highheight , highwflst,highdthldt,highdqtdt
-        do k=2,nzp
-          if (highheight<zt(k)) then
-            lowheight = highheight
-            lowwflst  = highwflst
-            lowdthldt = highdthldt
-            lowdqtdt  = highdqtdt
-            
-            read (ifinput,*) highheight, highwflst, highdthldt, highdqtdt
-          end if
-          fac = (highheight-zt(k))/(highheight - lowheight)
-          wflst(k,t)     = fac*lowwflst  + (1-fac)*highwflst
-          dthldtlst(k,t) = fac*lowdthldt + (1-fac)*highdthldt
-          dqtdtlst(k,t)  = fac*lowdqtdt  + (1-fac)*highdqtdt
-        end do
+    ! ---load large scale forcings----
+    if(myid==0) print*,'*** Vertical forcings: ***'
+    t = 0
+    do while (timels(t) < time_end)
+      t = t + 1
+      chmess1 = "#"
+      ierr = 1 ! not zero
+      do while (.not.(chmess1 == "#" .and. ierr ==0)) !search for the next line consisting of "# time", from there onwards the profiles will be read
+        read(ifinput,*,iostat=ierr) chmess1,timels(t)
+        if (myid==0 .and. ierr < 0) then
+          stop 'STOP: No time dependend data for end of run'
+        end if
       end do
+      if(myid==0) write (*,*) 'timels = ',timels(t)
+      if(t==1 .and. timels(t) > time_end) exit
+      read (ifinput,*)  lowheight , lowwflst,lowdthldt,lowdqtdt
+      read (ifinput,*)  highheight , highwflst,highdthldt,highdqtdt
+      do k=2,nzp
+        if (highheight<zt(k)) then
+          lowheight = highheight
+          lowwflst  = highwflst
+          lowdthldt = highdthldt
+          lowdqtdt  = highdqtdt
+          read (ifinput,*) highheight, highwflst, highdthldt, highdqtdt
+        end if
+        fac            = (highheight-zt(k))/(highheight - lowheight)
+        wflst(k,t)     = fac*lowwflst  + (1-fac)*highwflst
+        dthldtlst(k,t) = fac*lowdthldt + (1-fac)*highdthldt
+        dqtdtlst(k,t)  = fac*lowdqtdt  + (1-fac)*highdqtdt
+      end do
+    end do
 
-      if ((timels(1) > time_end) .or. (timeflux(1) > time_end)) then
-        write(6,*) 'Time dependent large scale forcings sets in after end of simulation'
-        write(6,*) 'only time dependent surface variables'
-        ltimedepz=.false.
+    if (timels(1) > time_end) then
+      if(myid==0) then
+        write(6,*) 'Time dependent large scale profile forcings sets in after end of simulation'
+        write(6,*) 'ltimedepz set to FALSE'
       end if
+      ltimedepz=.false.
     end if
 
     close(ifinput)
 
+    if(myid == 0) print "(49('-')/)"
 
   end subroutine inittimedep
 
