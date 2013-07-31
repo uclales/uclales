@@ -1,0 +1,222 @@
+\author{Thijs Heus}
+\lecture{Model Options}{options}
+\begin{frame}{Starting a model run}
+There are four ingredients that feed into the model
+\begin{itemize}
+ \item Hardcoded options
+ \item Restart files (in NetCDF format)
+ \item Data files (in text format)
+ \item An option file: NAMELIST
+\end{itemize}
+\end{frame}
+
+\begin{frame}[allowframebreaks]{Available runs}
+ In \code{misc/initfiles} the following cases are provided by default:
+
+\begin{itemize}
+\item \textbf{namelist\_astex}: The Astex case.
+\item \textbf{namelist\_cumulus}: Namelist to reproduce the idealized
+cumulus cases reported in Stevens, JAS (2007). Requires the
+generation of a sound\_in file with bstate.f95.
+\item \textbf{namelist\_drycbl}: Idealized dry CBL consisting of a
+layer with initially uniform stratification and constant forcing.
+\item \textbf{namelist\_dycm01}: The DYCOMS GCSS RF01 case, requires
+the generation of a sound\_in file with bstate.f95.
+\item \textbf{namelist\_dycm02}: The DYCOMS GCSS RF02 case, requires
+the generation of a sound\_in file with bstate.f95, as well as the
+generation of zm\_grid\_in and zt\_grid\_in files uzing zgrid.gcss9.f.
+\item \textbf{namelist\_rico}: The RICO GCSS composite case.
+\item \textbf{namelist\_smoke}: The GCSS smoke case.
+\end{itemize}
+\end{frame}
+
+\section{Data files}
+\begin{frame}{Data files}
+\framesubtitle{*\_grid\_in}
+\begin{itemize}
+ \item \code{zm\_grid\_in}, \code{zt\_grid\_in} Input files for vertical non-equidistant grids that are not possible with the namelist options. A single column of values, needs to have at least nzp-2 points
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Data files}
+\framesubtitle{sound\_in}
+\begin{itemize}
+ \item A completely flexible input file for the initial profiles of the mean quantities
+ \item Textfile with a bunch of rows:
+\begin{itemize}
+ \item height in meters or in pressure (depending on \code{ipsflg}) The first number is the surface pressure
+ \item Temperature. Depending on \code{itsflg}, the absolute temperature, potential temperature or liquid water potential temperature. 
+ \item Humidity. Depending on \code{irsflg}, the relative humidity or total humidity
+ \item Horizontal velocity fields, $u$ and $v$.
+\end{itemize}
+The file contents should cover the entire domain. Between anchor points, linear interpolation happens.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Data files}
+\framesubtitle{ls\_flux\_in} 
+Time dependent fluxes and large scale forcings. 
+\begin{itemize}
+ \item The first block sets the surface values, with columns:
+\begin{itemize}
+ \item Time in seconds
+ \item 	Surface heat flux in $W m^{-2}$
+ \item 	Surface moisture flux in $W m^{-2}$
+ \item Surface liquid water potential temperature
+ \item Surface pressure
+\end{itemize}
+ \item From the  second block on, every block starts with: \code{\# time}
+ \item Within each block, the following columns show up:
+ \begin{itemize}
+   \item Large scale subsidence $w_s$, gives the tendency $-w_s\derr{\phi}{z}$
+   \item Large scale tendency for $\theta_l$
+   \item Large scale tendency for $q_t$
+  \end{itemize}
+\end{itemize}
+The block contents should cover the entire domain. Between anchor points, linear interpolation happens.
+\end{frame}
+ 
+\begin{frame}{Data files}
+\framesubtitle{nudge\_in}
+Nudges the average fields to a preset value:
+\[
+ \left.\derr{\phi}{t}\right| = \frac{\phi_{nudge} - \bar{\phi}}{\tau}
+\]
+ With $\tau^{-1}$ the nudging strength.
+
+
+The columns depict:
+\begin{itemize}
+ \item height in meters
+ \item Nudging strength
+ \item The nudging value of $u$, $v$, $\theta_l$ and $q_t$
+\end{itemize}
+
+The nudging can be time dependent, so each block shows the nudging at a specific time, set by the number that starts the block just after the \#
+\end{frame}
+
+\begin{frame}{Data files}
+\framesubtitle{datafiles directory}
+\begin{itemize}
+ \item \code{dmin\_wetgrowth\_lookup.dat} Only for level=5 microphysics: Look up table for growth ice hydrometeors
+ \item \code{*.lay}: To be copied to the run dirs and named \code{backrad\_in}. It describes the radiative background state of the atmosphere, including pressure, temperature, humidity and ozone profiles. Only used for \code{iradtyp = 4} and between the top of the domain and the top of the atmosphere. 
+ \item \code{*.dat} Internal lookup tables for iradtyp=4 radiation
+\end{itemize}
+\end{frame}
+
+\section[Namelist]{NAMELIST options}
+\begin{frame}{The Namelist}
+\begin{itemize}
+ \item The only obligatory input file
+ \item Has to be named: \code{NAMELIST} (in capitals)
+ \item All input is being put in a single namelist, read at \code{LES.f90}
+\end{itemize}
+\end{frame}
+\begin{frame}[allowframebreaks]{Grid and Time setup}
+\mylineno=0\begin{longtable}{p{0.1\linewidth}p{0.15\linewidth}p{0.65\linewidth}}
+\alert{Variable} &\alert{Default} & \endhead
+expnme  &  Default & experiment name \tblnewline
+filprf  &  x & file prefix for use in constructing output files\tblnewline
+nxp & 132 & total number of $x$ points ($N_y+4$) \tblnewline
+nyp &   132 & total number of $y$ points ($N_y+4$) \tblnewline
+nzp &   105 & total number of $z$ points \tblnewline
+deltax  & 35.0 m & grid spacing in $x$-direction \tblnewline
+deltay  & 35.0 m & grid spacing in $y$-direction \tblnewline
+deltaz  & 17.5 m & grid spacing in $z$-direction \tblnewline
+dzrat   & 1.02   & grid stretching ration (default 2\% per
+interval) \tblnewline
+dzmax  &  1200 m & height at which grid-stretching begins \tblnewline
+igrdtyp &  1 & control parameter for selecting vertical grid \tblnewline
+dtlong &  10 s  & maximum timestep \tblnewline
+hfilin &  test. & name of input history file for HISTORY starts (xxx.)\tblnewline
+timmax & 18000 s  &  final time of simulation \tblnewline 
+wctime & & Wall clock time to break off the simulation \tblnewline
+nfpt   &  5      & number of levels in upper sponge layer \tblnewline
+distim &  300 s  & minimum relaxation time in sponge layer \tblnewline
+% \tblnewline
+naddsc  &  0 &  number of additional scalars \tblnewline
+runtyp  &  INITIAL & type of run ('INITIAL' or 'HISTORY') \tblnewline 
+\end{longtable}
+\end{frame}
+\begin{frame}[allowframebreaks]{Physics}
+\mylineno=0\begin{longtable}{p{0.15\linewidth}p{0.15\linewidth}p{0.6\linewidth}}
+\alert{Variable} &\alert{Default} & \tblnewline 
+\endhead
+iradtyp &  0 & control parameter for selecting radiation model \tblnewline
+CCN     &  150 $\times 10^{6}$ & cloud droplet mixing ratio \tblnewline
+level   &  0 & 0=thermodynamic level, 1=dry cbl, 2=moist cbl (no rain), 3=moist cbl (with rain), 4, 5= ice microphysics\tblnewline
+corflg    &  false   &  coriolis acceleration (true/false) \tblnewline
+radfrq    &  0   &  radiation update interval \tblnewline
+strtim    &  0   &  GMT of model time \tblnewline
+cntlat    &  31.5$^{\circ}$ N &  model central latitude \tblnewline
+case\_name    &  astex &  specify case name (rico,astex,bomex)\tblnewline
+lsvarflg  &  false & reads large scale forcings from the file lscale\_in\tblnewline
+div       &  3.75e-6 s$^{-1}$ & divergence\tblnewline
+umean     & 0. & Mean $U$ velocity (subtracted during the calculations \tblnewline
+vmean     & 0. & Mean $V$ velocity (subtracted during the calculations \tblnewline
+th00      & 288 & Basic state temperature (subtracted during the calculations \tblnewline
+sst       &  292 K &  sea surface temperature \tblnewline 
+isfctyp   & 0  &  surface parameterization type (0: specified
+fluxes; 1: specified surface layer gradients; 2: fixed lower boundary
+of water, 3-5: Specific variations. See the surface lecture for more information.\tblnewline
+ ubmin     &  0.20  &  minimum $u$ for $u_*$ computation \tblnewline
+ zrough    &  0.1 &  momentum roughness height (if less than
+ zero use Charnock relation)\tblnewline
+ dthcon    & 100 Wm$^{-2}$ &  surface temperature gradient
+ (isfcflg=1) or surface heat flux (itsflg=0) \tblnewline
+ drtcon    & 0   Wm$^{-2}$ &   surface humidity (mixing ratio) gradient
+ (isfcflg=1) or surface latent heat flux (itsflg=0) \tblnewline
+ csx       &   0.23   &  Smagorinsky Coefficient \tblnewline
+ prndtl    &    1/3    &  Prandtl Number (if less than zero no sgs for scalars) \tblnewline
+sfc\_albedo && Albedo of the surface \tblnewline
+lnudge && Switching on/off nudging \tblnewline
+ tnudgefac && Factor to strengthen the nudging \tblnewline
+ ltimedep && Switch for time depend fluxes and large scale forcings \tblnewline
+   SolarConstant && Top of Atmosphere radiation \tblnewline
+
+\end{longtable}
+\end{frame}
+\begin{frame}[allowframebreaks]{Initial profiles}
+\mylineno=0\begin{longtable}{p{0.15\linewidth}p{0.15\linewidth}p{0.6\linewidth}}
+\alert{Variable} &\alert{Default} & \tblnewline 
+\endhead
+ipsflg&  1   & control parameter for input sounding (0: pressure
+in hPa; 1: height in meters with ps(1)= $p_{sfc}$) \tblnewline
+itsflg&   1   & control parameter for input sounding (0: ts =
+$\theta;$ 1: $ts = \theta_l$) \tblnewline
+irsflg&   1   & control parameter for input sounding (0: rs =
+Rel. Hum) 1: ($rs = q_t$) \tblnewline
+us    &   n/a & input zonal wind souding \tblnewline
+vs    &   n/a & input meridional wind souding  \tblnewline
+ts    &   n/a & input temperature souding  \tblnewline
+rts   &   n/a & input humidity souding  \tblnewline
+ps    &   n/a & input pressure sounding \tblnewline
+hs    &   n/a & vertical position  \tblnewline
+iseed &   0   &  random seed \tblnewline
+zrand &   200 m & height below which random perturbations are added \tblnewline
+\end{longtable}
+\end{frame}
+\begin{frame}[allowframebreaks]{Statistics and output}
+\mylineno=0\begin{longtable}{p{0.15\linewidth}p{0.15\linewidth}p{0.6\linewidth}}
+\alert{Variable} &\alert{Default} & \tblnewline 
+\endhead
+outflg    &  true   &  output flag (true/false) \tblnewline
+lsync & false &  Synchronize the crosssection output (true/false)\tblnewline
+frqhis    &  9000 s &  history write interval \tblnewline
+frqanl    &  3600 s &  analysis write interval  \tblnewline
+slcflg    &  false  &  write slice output (true/false) \tblnewline 
+istpfl    &  1 &  print interval for timestep info \tblnewline
+ssam\_intvl&    30 s  &  statistics sampling interval\tblnewline
+savg\_intvl&  1800 s    &  statistics averaging interval \tblnewline
+lcross & false &  Crosssection output (true/false)\tblnewline
+frqcross    &  3600 s &  crosssection write interval  \tblnewline
+lxy & false &  Crosssection output in xy plane (true/false)\tblnewline
+zcross & 0 &  Crosssection location of xy plane (true/false)\tblnewline
+lxz & false &  Crosssection output in xz plane (true/false)\tblnewline
+ycross & 0 &  Crosssection location of xy plane (true/false)\tblnewline
+lyz & false &  Crosssection output in yz plane (true/false)\tblnewline
+xcross & 0 &  Crosssection location of xy plane (true/false)\tblnewline
+lwaterbudget & false &  Crosssection of (costly) waterbudget (true/false)\tblnewline
+\end{longtable}
+\end{frame}

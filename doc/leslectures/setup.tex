@@ -1,0 +1,192 @@
+
+\author{Thijs Heus}
+\lecture[Setting up]{Setting up the code: Obtaining, compiling, running (and version management)}{setup}
+% \begin{frame}[<+->]{Course Setup}
+%  \begin{itemize}
+%   \item login on tornado
+%   \item \code{cd course/yourname}
+%   \item Contents: 
+% \begin{itemize}
+% \item A public SSH key (for \code{gitorious.org})  
+% \item A directory with the lectures (will be updated)
+% \item A directory with supplementary material (e.g. articles to read)
+% \item A directory to run your runs
+%  \end{itemize}
+%  \item Do not overwrite these files - they will be updated
+%  \item Not yet here: The source code
+%  \item \alert{Feel free to do the course on your own account/machine!}
+% \end{itemize}
+% 
+% \end{frame}
+
+\section[Git]{Git version management}
+\begin{frame}{Git version management}
+ \begin{itemize}
+  \item Git is a distributed version management system
+  \item All history of all branches is captured
+  \item Easy to create branches for some project (like the course)
+  \item Easy to merge fixes and features from branch to branch
+  \item The main repository sits on \code{www.gitorious.org/uclales}
+  \item The \code{master} branch should always be the most stable, up-to-date branch
+ \end{itemize}
+
+\end{frame}
+
+\begin{frame}[<+->]{Gitorious.org}
+ \begin{itemize}
+  \item Register on \code{www.gitorious.org} (already done?)
+  \item Tell me your username there, to give you (write) access to UCLALES
+  \item Login at \code{www.gitorious.org}
+  \item Go to ``Manage SSH keys''
+  \item Go to ``Add SSH key''
+  \item Add the contents of \code{key/id\_rsa.pub} (or \code{$\sim$/.ssh/id\_rsa.pub}) and click OK
+  \item Take some time to browse through the website
+ \end{itemize}
+\end{frame}
+\begin{frame}[<+->]{Using Git}
+\framesubtitle{Obtaining the code}
+\begin{itemize}
+ \item In your course directory, download the code with \code{git clone git@gitorious.org:uclales/uclales.git}
+ \item \code{cd uclales; ls}
+ \item The entire history is now local in your folder
+ \item \code{git branch -a} shows all branches
+ \item By default, you are on the master branch
+\end{itemize}
+\end{frame}
+\begin{frame}[<+->]{Using Git}
+\framesubtitle{Switching branches}
+\begin{itemize}
+ \item The start off point for your code is the master branch, so go there if you're not already on it: \code{git checkout master}
+%  \item Some differences appear there
+ \item Now make your personal branch, based on the course branch: \code{git checkout -b yourname}
+ \item Here you can play whatever you like
+\end{itemize}
+\end{frame}
+\begin{frame}[<+->]{Using Git}
+\framesubtitle{Changing something}
+\begin{itemize}
+\item Open the file \code{test1}
+\item Write something in it
+\item See what is different: \code{git status} and \code{git diff}
+\item If you are happy with you change, commit: \code{git commit test1} or \code{git commit -a} for all changes
+\item Write a commit message and save
+\item See what is different now: \code{git diff}
+\item Nothing!
+\end{itemize}
+\end{frame}
+\begin{frame}[<+->]{Using Git}
+\framesubtitle{Creating a new file}
+\begin{itemize}
+\item Open the new file \code{test2}
+\item Write something in it
+\item See what is different: \code{git status} and \code{git diff}
+\item You have to add the file with \code{git add test2}
+\item If you are happy with you change, commit: \code{git commit test1} or \code{git commit -a} for all changes
+\item Write a commit message and save
+\item See what is different now: \code{git diff}
+\item Nothing!
+\end{itemize}
+\end{frame}
+\begin{frame}[<+->]{Using Git}
+\framesubtitle{Updating the remote repository}
+\begin{itemize}
+\item On \code{gitorious.org}, nothing has changed yet
+\item To update: \code{git push origin yourname}
+\item Refresh \code{gitorious.org}; many new branches
+\item To get them all: \code{git pull}
+\item \code{git branch -a} has more branches now
+\end{itemize}
+\end{frame}
+\begin{frame}[<+->]{Using Git}
+\framesubtitle{Other commands}
+\begin{itemize}
+\item \code{git rm filename} and \code{git mv filename} (Re)move files
+\item \code{git merge branchname} merges \code{branchname} into the current branch
+\item  \code{git checkout -f filename} resets a single file to whatever was committed
+\item \code{git reset} is the panic button and reverts everything to the previous state
+\item See \code{uclales/doc/git\_uclales.pdf} for longer explanation
+\end{itemize}
+
+\end{frame}
+
+\section{Compilation}
+\begin{frame}[<+->]{Compilation}
+\framesubtitle{Requirements}
+UCLALES requires almost no outside libraries.
+ \begin{itemize}
+  \item NetCDF (v3 or later) for input and output 
+  \item MPI (Only if you want to do Parallel runs)
+  \item A Fortran 95 compiler (IFort, gfortran, xlf work)
+  \item Git for keeping up to date with the source code
+  \item CMake (optional) for easier/faster compilation
+ \end{itemize}
+On thunder, load cmake, Ifort and mpi with:\\
+\code{module load cmake \\ module load intel\/13.0.0 \\ module load openmpi\_ib\/1.6.2-static-intel13}
+\end{frame}
+\begin{frame}[<+->]{Compilation}
+\framesubtitle{Cmake and Make}
+There are two ways of compiling the code.
+\begin{itemize}
+ \item CMake does its best to create a Makefile automatically. 
+\begin{itemize}
+ \item Allows for parallel compilation
+ \item Easier to maintain
+ \item Not on every system
+%  \item On thunder: \code{module load cmake} to your \code{PATH}
+\end{itemize}
+ \item A bunch of predefined Makefiles are available in the \code{misc/makefiles} directory.
+\end{itemize}
+\end{frame}
+
+% \begin{frame}[<+->]{Compilation}
+% \framesubtitle{Provided Makefiles}
+% The Makefiles provided are platform specific, and has to be maintained whenever internal dependencies change.\begin{itemize}
+%  \item For a parallel build: \\ \code{cd uclales/src; cp mpi/mpi\_interface .}
+%  \item For a sequential build:\\ \code{cd uclales/src; cp seq/seq\_interface .}
+%  \item For both: Copy a main makefile to the bin directory: \\ \code{cd uclales/bin; cp ../misc/makefiles/Makefile\_tornado Makefile}
+%  \item Execute make: \code{make seq} or \code{make mpi}
+%  \item Executables: \code{les.seq} or \code{les.mpi}
+% \end{itemize}
+% 
+% \end{frame}
+
+\begin{frame}[allowframebreaks]{Compilation}
+\framesubtitle{CMake}
+\begin{itemize}
+ \item The \code{CMakeLists.txt} file in the \code{uclales} dir sets all the options, searches for libraries etc.
+ \item Overrides can be set on the commandline or in a configuration file
+ \item Choose/edit a configuration file in \code{uclales/config}. This sets paths to libraries 
+ \item For now, just copy the thunder one to default: \\ \code{cp thunder.cmake default.cmake}
+ \item Create a build directory \\ \code{mkdir build; cd build} from the \code{uclales} dir
+ \item Run CMake to create the makefile: \code{cmake -D MPI=FALSE ..}
+ \item \code{make -j4} to build the binary \code{uclales}
+ \item Executing \code{./uclales} gives an error now: Missing \code{NAMELIST}
+\end{itemize}
+\end{frame}
+
+\begin{frame}[<+->]{Compilation}
+\framesubtitle{CMake options}
+CMake responds to a number of commandline options, case sensitive, always with -D as a flag
+\mylineno=0\begin{longtable}{p{0.3\linewidth}p{0.15\linewidth}p{0.4\linewidth}}
+\alert{Variable} &\alert{Values} & \tblnewline 
+\endhead
+MPI & TRUE, FALSE & Switch between parallel and serial \tblnewline
+CMAKE\_BUILD\_TYPE & DEBUG, RELEASE & Switch between debug settings and optimized \tblnewline
+PROFILER & GPROF, SCALASCA, MARMOT & Switch on profiler (to assess speed bottleneck) \tblnewline
+\end{longtable}
+\end{frame}
+
+
+\section{Executing}
+\begin{frame}[<+->]{Executing}
+\framesubtitle{}
+\begin{itemize}
+ \item Copy the executable \code{uclales} to the \code{run} directory
+ \item We need a runscript (\code{uclales/misc/jobscripts/runscript\_course\_seq})
+ \item We need a \code{NAMELIST} (\code{uclales/misc/initfiles/namelist\_drycbl})
+ \item Submit it: \code{qsub runscript\_course\_seq}
+ \item Wait...
+ \item See what happens with: \code{tail -f output}
+\end{itemize}
+
+\end{frame}

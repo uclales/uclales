@@ -1,0 +1,22 @@
+\author{Thijs Heus}
+% \lecture[Cumulus]{BOMEX Shallow Cumulus}{cumulus}
+\begin{frame}{BOMEX Shallow Cumulus}
+\begin{itemize}
+ \item Check \code{articles/siebesma2003.pdf} for the initial settings of BOMEX
+ \item Build a \code{NAMELIST} based on it. Hint: the \code{RICO} Namelist should be a good starting point
+ \item Run the run, postprocess like the Dry CBL run
+ \item If successful, commit your NAMELIST to git
+ \item Rerun your run with a different name, but with \code{level=3} for microphysics in the NAMELIST
+\end{itemize}
+\end{frame}
+
+\begin{frame}[allowframebreaks]{Questions}
+ \begin{itemize}
+  \item Plot the cloud fraction and the cloud cover. What is the difference between the two?
+  \item What are cloud base and cloud top? There are several cloud bases/tops in the \code{.ts} file. What is the difference between them? What can we (implicitly) learn about these clouds based upon these numbers?
+  \item One classical way of parametrizing (shallow) cumuli in large scale models, is to model the transport through the cloud layer with a mass flux approach. If necessary, read up on it in \code{siebesma1995.pdf}. They found that entrainment and detrainment rates in the large scale models were off by an order of magnitude.
+  \item Try and reproduce figures 6 and on from that study using the output of the \code{.ps} file. \code{\_cs1} is the conditional sampling over the cloud. \code{\_cs2} is the conditional sampling for the buoyant part of the cloud.
+  \item BOMEX was an intercomparison case of non-precipitating cumulus clouds. Is the non-precipitating really true, or just because of a lack of microphysical models a decade ago?
+  \item  If precipitation is present, does it matter?
+ \end{itemize}
+\end{frame}
