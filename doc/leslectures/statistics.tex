@@ -1,0 +1,95 @@
+\author{Thijs Heus}
+\lecture[Statistics]{Statistics and output}{statistics}
+\begin{frame}[allowframebreaks]{Output files}
+ \begin{itemize}
+  \item Restart files \code{*.rst} only for internal model use. Output every \code{frqhis} seconds
+  \item 3D output files \code{name.nc}: 3D output of the main quantities. Output done every \code{frqanl} seconds. Bulky!
+  \item 2D Crosssections \code{name.out.cross*nc}: Crosssections of the data in th xy, xz, yz planes, as well as 2D integrated quantities like Liquid Water Path. Output done every \code{frqcross} seconds, governed by \code{lcross}, \code{lxy}, \code{lxz}, \code{lyz}
+  \item 1D Profiles \code{name.ps*nc}. Profiles as a function of height. Output every \code{savg\_intvl}, sampling every \code{ssam\_intvl}. Need to be post processed for MPI runs.
+  \item Timeseries \code{name.ts.*nc}. Domain averaged surface values, liquid water paths, cloud fraction etc. Output and sampling done every \code{ssam\_intvl}. Needs to be post processed for MPI runs.
+ \end{itemize}
+\end{frame}
+\begin{frame}[allowframebreaks]{Statistics and output}
+\mylineno=0\begin{longtable}{p{0.15\linewidth}p{0.15\linewidth}p{0.6\linewidth}}
+\alert{Variable} &\alert{Default} & \tblnewline 
+\endhead
+outflg    &  true   &  output flag (true/false) \tblnewline
+lsync & false &  Synchronize the crosssection output (true/false)\tblnewline
+frqhis    &  9000 s &  history write interval \tblnewline
+frqanl    &  3600 s &  analysis write interval  \tblnewline
+slcflg    &  false  &  write slice output (true/false) \tblnewline 
+istpfl    &  1 &  print interval for timestep info \tblnewline
+ssam\_intvl&    30 s  &  statistics sampling interval\tblnewline
+savg\_intvl&  1800 s    &  statistics averaging interval \tblnewline
+lcross & false &  Crosssection output (true/false)\tblnewline
+frqcross    &  3600 s &  crosssection write interval  \tblnewline
+lxy & false &  Crosssection output in xy plane (true/false)\tblnewline
+zcross & 0 &  Crosssection location of xy plane (true/false)\tblnewline
+lxz & false &  Crosssection output in xz plane (true/false)\tblnewline
+ycross & 0 &  Crosssection location of xy plane (true/false)\tblnewline
+lyz & false &  Crosssection output in yz plane (true/false)\tblnewline
+xcross & 0 &  Crosssection location of xy plane (true/false)\tblnewline
+lwaterbudget & false &  Crosssection of (costly) waterbudget (true/false)\tblnewline
+\end{longtable}
+\end{frame}
+
+\begin{frame}{Timeseries}
+\begin{itemize}
+ \item  Postprocessing to make 1 file out of all the files per processor
+ \item Build tool in \code{uclales/misc/synthesis}: 
+ \item \code{ifort reducets.f90 -o reducets \textasciigrave /path/to/netcdflib/bin/nc-config --fflags --flibs \textasciigrave }
+ \item \alert{NOTE: The quotation marks are accent graves (Under the tilde at a US International keyboard}
+  \item Use it to gather your timeseries statistics with:
+\code{reducets name nx ny}
+\begin{itemize}
+ \item \code{name} is the \emph{stem} of the filename (so everything before \code{.ts.00....}
+ \item  \code{nx} is the number of processes in the x-direction
+ \item \code{ny} is the number of processes in the y-direction
+\end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Profiles}
+\begin{itemize}
+ \item  Postprocessing to make 1 file out of all the files per processor
+ \item Build tool in \code{uclales/misc/synthesis}: 
+ \item \code{ifort reduceps.f90 -o reduceps \textasciigrave /path/to/netcdflib/bin/nc-config --fflags --flibs \textasciigrave }
+ \item \alert{NOTE: The quotation marks are accent graves (Under the tilde at a US International keyboard}
+  \item Use it to gather your profile statistics with: \code{reduceps name nx ny}
+\begin{itemize}
+ \item \code{name} is the \emph{stem} of the filename (so everything before \code{.ps.00....}
+ \item  \code{nx} is the number of processes in the x-direction
+ \item \code{ny} is the number of processes in the y-direction
+\end{itemize}
+\end{itemize}
+\end{frame}
+\begin{frame}{Adding to Profiles and Timeseries}
+ \begin{itemize}
+  \item Both profiles and timeseries are written from \code{ncio.f90} and \code{stat.f90}
+  \item They are known to change over time. 
+ \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Plot}
+ \begin{itemize}
+  \item You're completely free to do what you want :)
+  \item Depending on who you are and what you want for a plot, you could use NCL, Matlab, Python, Ferret, NCView,...
+  \item We'd like to build up a tools database, so feel even more free to submit scripts over git
+  \item As a starter, copy the 2 \code{plotfld.*} scripts from \code{uclales/misc/analysis/}
+  \item Explore \code{plotfld.csh}, and put in the right variable names and time frame.
+  \item Run it!
+  \item Output sits in two pdf files \code{t1.pdf} and \code{p1.pdf}
+ \end{itemize}
+\end{frame}
+
+\begin{frame}{Crosssections}
+\begin{itemize}
+ \item Postprocessing to make 1 file out of all the files per processor:
+\item \code{cdo gather name.out.cross*nc name.out.cross.nc}
+\item Watch the file quickly with (for instance) \code{ncview}
+\end{itemize}
+
+ 
+
+\end{frame}
