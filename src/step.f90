@@ -21,32 +21,33 @@ module step
 
   implicit none
 
-  integer :: istpfl   = 1
-  real    :: timmax   = 18000.
-  real    :: timrsm   = 86400.
-  real    :: wctime   = 1.e10
-  logical :: corflg   = .false.
-  logical :: rylflg   = .true.
+  integer :: istpfl = 1
+  real    :: timmax = 18000.
+  real    :: timrsm = 86400.
+  real    :: wctime = 1.e10
+  logical :: corflg = .false.
+  logical :: rylflg = .true.
 
-  real    :: frqhis   =  9000.
-  real    :: frqanl   =  3600.
+  real    :: frqhis =  9000.
+  real    :: frqanl =  3600.
   real    :: frqcross =  3600.
-  real    :: radfrq   =  0.
+  real    :: radfrq =  0.
 
-  real    :: time     =  0.
-  real    :: strtim   =  0.0
-  real    :: cntlat   =  31.5 ! 30.0
-  logical :: outflg   = .true.
-  logical :: statflg  = .false.
-  real    :: tau      = 900.
-  real    :: sst      = 292.
-  real    :: div      = 3.75e-6
+  real    :: time   =  0.
+  real    :: strtim =  0.0
+  real    :: cntlat =  31.5 ! 30.0
+  logical :: outflg = .true.
+  logical :: statflg = .false.
+  real    :: tau = 900.
+!irina
+  real    :: sst=292.
+  real    :: div = 3.75e-6
   logical :: lsvarflg = .false.
   character (len=8) :: case_name = 'astex'
 
   integer :: istp
 ! linda,b
-  logical ::lanom     = .false.
+  logical ::lanom=.false.
 !linda,e
 
   ! Flags for sampling, statistics output, etc.
@@ -72,16 +73,16 @@ contains
     use thrm, only : thermo
     use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, &
          lpartstat, exitparticlestat, write_particle_hist, particlestat, &
-         balanced_particledump,frqpartdump, ldropstart
-    use advf, only : gcfl
+	 balanced_particledump,frqpartdump, ldropstart
 
 
-    real, parameter    :: peak_peclet = 0.5  !peak_cfl = 0.5, ! BvS: peak_cfl now in advf 
-    real               :: tplsdt,begtime,cflmax,gcflmax,pecletmax,&
-                          gpecletmax,ustarav,gustarav,oblav,goblav
-    double precision   :: t0,t1,t2
-    integer            :: iret
-    real               :: dt_prev
+    real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
+
+    real    :: tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax,ustarav,gustarav,oblav,goblav
+    double precision    :: t0,t1,t2
+    integer :: iret
+
+    real    :: dt_prev
 
     !
     ! Timestep loop for program
@@ -101,27 +102,27 @@ contains
        call t_step
        time = time + dt
 
-       ! New time step based on CFL lim
        call cfl(cflmax)
        call double_scalar_par_max(cflmax,gcflmax)
-       cflmax    = gcflmax
+       cflmax = gcflmax
        call peclet(pecletmax)
        call double_scalar_par_max(pecletmax,gpecletmax)
        pecletmax = gpecletmax
-       dt_prev   = dt
-       dt        = min(dtlong,dt*gcfl/(cflmax+epsilon(1.)))
+       dt_prev = dt
+       dt = min(dtlong,dt*peak_cfl/(cflmax+epsilon(1.)))
 
        ! Some more output stats
-       ustarav   = sum(a_ustar(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
-       oblav     = sum(obl(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+       ustarav = sum(a_ustar(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+       oblav   = sum(obl(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
        call double_scalar_par_sum(ustarav,gustarav)
        call double_scalar_par_sum(oblav,goblav)
-       gustarav  = gustarav / (nxprocs*nyprocs) 
-       goblav    = goblav   / (nxprocs*nyprocs) 
+       gustarav = gustarav / (nxprocs*nyprocs) 
+       goblav   = goblav   / (nxprocs*nyprocs) 
 
        !
        ! output control
        !
+
        !! Sample particles; automatically samples when savgflg=.true., don't sample double...
        !if(lpartic .and. lpartstat .and. statflg .and. (savgflg .eqv. .false.)) call particlestat(.false.,time+dt)
 
@@ -316,6 +317,7 @@ contains
          lwaterbudget, a_xt2
     use stat, only : sflg, statistics
     use sgsm, only : diffuse
+    !use sgsm_dyn, only : calc_cs
     use srfc, only : surface
     use thrm, only : thermo
     use mcrp, only : micro, lpartdrop
@@ -330,9 +332,10 @@ contains
     use modparticles, only : particles, lpartic, particlestat,lpartstat, &
          deactivate_drops, activate_drops
 
+
     logical, parameter :: debug = .false.
     real :: xtime
-    character (len=8) :: adv='third'
+    character (len=8) :: adv='monotone'
 
     xtime = time/86400. + strtim
     call timedep(time,timmax, sst)
@@ -372,7 +375,6 @@ contains
           call appl_abort(0)
        endif
 
-       !call fadvect
        call ladvect
 
        if (level >= 1) then

@@ -21,14 +21,7 @@ module advl
 
   implicit none
 
-  ! iadv_mom
-    ! 22 = 2nd order centered in xyz
-    ! 44 = 4th order centered in xyz
-    ! 42 = 4th order in xy, 2nd in z
-    ! 2nd to 4th order available
-    ! etc.
-
-  integer :: iadv_mom  = 44 
+  integer :: advm = 4   !< advection scheme; 2=2nd(O) centered, all else defaults to 4th(O) centered
 
 contains
   !
@@ -38,14 +31,13 @@ contains
   ! computed... hence the routine is hardwired to a cyclic domain.  
   ! Vertical advection is density weighted consistent with the anelastic
   ! approximation
-  !
+!
   subroutine ladvect
 
     use grid, only : a_ut, a_vt, a_wt, a_scr1, a_scr2, a_up,a_vp,a_wp,      &
          nxp, nyp, nzp, dzi_t, dzi_m, dxi, dyi, dn0
     use stat, only : sflg, updtst, acc_tend
     use util, only : get_avg3
-    use mpi_interface, only : appl_abort
 
     real, allocatable ::  dzmri(:), dztri(:)
     real, allocatable ::  v1(:), v2(:), v3(:), v4(:)
@@ -70,18 +62,15 @@ contains
     ! advection of u by (u,v,w) all at current timelevel.  also when flag
     ! is set updated statistical array with uw flux derived from ladvzu
     !
-    select case(iadv_mom)
-      case(22)
-        call ladvxu2(nzp,nxp,nyp,a_up,a_ut,a_scr2,dxi)
-        call ladvyu2(nzp,nxp,nyp,a_up,a_ut,a_vp,a_scr2,dyi)
-        call ladvzu2(nzp,nxp,nyp,a_up,a_ut,a_scr1,a_scr2,dztri)
-      case(44)
-        call ladvxu4(nzp,nxp,nyp,a_up,a_ut,a_scr2,dxi)
-        call ladvyu4(nzp,nxp,nyp,a_up,a_ut,a_vp,a_scr2,dyi)
-        call ladvzu4(nzp,nxp,nyp,a_up,a_ut,a_scr1,a_scr2,dztri)
-      case default
-        stop('iadv_mom option not supported')
-    end select
+    if(advm==2) then
+      call ladvxu2nd(nzp,nxp,nyp,a_up,a_ut,a_scr2,dxi)
+      call ladvyu2nd(nzp,nxp,nyp,a_up,a_ut,a_vp,a_scr2,dyi)
+      call ladvzu2nd(nzp,nxp,nyp,a_up,a_ut,a_scr1,a_scr2,dztri)
+    else
+      call ladvxu(nzp,nxp,nyp,a_up,a_ut,a_scr2,dxi)
+      call ladvyu(nzp,nxp,nyp,a_up,a_ut,a_vp,a_scr2,dyi)
+      call ladvzu(nzp,nxp,nyp,a_up,a_ut,a_scr1,a_scr2,dztri)
+    end if 
 
     if (sflg) then
        call get_avg3(nzp,nxp,nyp,a_scr2,v4)
@@ -92,18 +81,15 @@ contains
     ! advection of v by (u,v,w) all at current timelevel.  also when flag
     ! is set updated statistical array with uw flux derived from ladvzu
     !    
-    select case(iadv_mom)
-      case(22)
-        call ladvxv2(nzp,nxp,nyp,a_up,a_vp,a_vt,a_scr2,dxi)
-        call ladvyv2(nzp,nxp,nyp,a_vp,a_vt,a_scr2,dyi)
-        call ladvzv2(nzp,nxp,nyp,a_vp,a_vt,a_scr1,a_scr2,dztri)  
-      case(44)
-        call ladvxv4(nzp,nxp,nyp,a_up,a_vp,a_vt,a_scr2,dxi)
-        call ladvyv4(nzp,nxp,nyp,a_vp,a_vt,a_scr2,dyi)
-        call ladvzv4(nzp,nxp,nyp,a_vp,a_vt,a_scr1,a_scr2,dztri)  
-      case default
-        stop('iadv_mom option not supported')
-    end select
+    if(advm==2) then
+      call ladvxv2nd(nzp,nxp,nyp,a_up,a_vp,a_vt,a_scr2,dxi)
+      call ladvyv2nd(nzp,nxp,nyp,a_vp,a_vt,a_scr2,dyi)
+      call ladvzv2nd(nzp,nxp,nyp,a_vp,a_vt,a_scr1,a_scr2,dztri)  
+    else
+      call ladvxv(nzp,nxp,nyp,a_up,a_vp,a_vt,a_scr2,dxi)
+      call ladvyv(nzp,nxp,nyp,a_vp,a_vt,a_scr2,dyi)
+      call ladvzv(nzp,nxp,nyp,a_vp,a_vt,a_scr1,a_scr2,dztri)  
+    end if   
  
     if (sflg) then
        call get_avg3(nzp,nxp,nyp,a_scr2,v4)
@@ -114,18 +100,15 @@ contains
     ! advection of w by (u,v,w) all at current timelevel.  also when flag
     ! is set updated statistical array with uw flux derived from ladvzu
     !
-    select case(iadv_mom)
-      case(22)
-        call ladvxw2(nzp,nxp,nyp,a_up,a_wp,a_wt,a_scr2,dxi)
-        call ladvyw2(nzp,nxp,nyp,a_vp,a_wp,a_wt,a_scr2,dyi)
-        call ladvzw2(nzp,nxp,nyp,a_wp,a_wt,a_scr1,a_scr2,dzmri)
-      case(44)
-        call ladvxw4(nzp,nxp,nyp,a_up,a_wp,a_wt,a_scr2,dxi)
-        call ladvyw4(nzp,nxp,nyp,a_vp,a_wp,a_wt,a_scr2,dyi)
-        call ladvzw4(nzp,nxp,nyp,a_wp,a_wt,a_scr1,a_scr2,dzmri)
-      case default
-        stop('iadv_mom option not supported')
-    end select
+    if(advm==2) then
+      call ladvxw2nd(nzp,nxp,nyp,a_up,a_wp,a_wt,a_scr2,dxi)
+      call ladvyw2nd(nzp,nxp,nyp,a_vp,a_wp,a_wt,a_scr2,dyi)
+      call ladvzw2nd(nzp,nxp,nyp,a_wp,a_wt,a_scr1,a_scr2,dzmri)
+    else   
+      call ladvxw(nzp,nxp,nyp,a_up,a_wp,a_wt,a_scr2,dxi)
+      call ladvyw(nzp,nxp,nyp,a_vp,a_wp,a_wt,a_scr2,dyi)
+      call ladvzw(nzp,nxp,nyp,a_wp,a_wt,a_scr1,a_scr2,dzmri)
+    end if
  
     if (sflg) then
        call get_avg3(nzp,nxp,nyp,a_scr2,v4)
@@ -139,16 +122,16 @@ contains
 
   end subroutine ladvect
 
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! ###########################
   ! 4th order centered
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+  ! ###########################
+  !
   ! ----------------------------------------------------------------------
   ! Ladvxu: Advection of U, by U, div is a scratch array, 
   ! tendencies are accumulated if ut variable, dxi is the inverse of 
   ! delta-x the grid spacing in the horizontal direction.
   !
-  subroutine ladvxu4(n1,n2,n3,u,ut,flx,dxi)
+  subroutine ladvxu(n1,n2,n3,u,ut,flx,dxi)
 
     integer, intent (in) ::  n1,n2,n3
     real, intent(in)     :: u(n1,n2,n3),dxi
@@ -172,14 +155,14 @@ contains
        end do
     end do
 
-  end subroutine ladvxu4
+  end subroutine ladvxu
   !
   ! ----------------------------------------------------------------------
   ! LADVYU: Advection of U, by V, div is a scratch array, 
   ! tendencies are accumulated if fu variable, dyi is the inverse of 
   ! delta-y.
   !
-  subroutine ladvyu4(n1,n2,n3,u,ut,v,flx,dyi)
+  subroutine ladvyu(n1,n2,n3,u,ut,v,flx,dyi)
 
     integer, intent (in)  ::  n1,n2,n3
     real, intent (in)     :: u(n1,n2,n3),v(n1,n2,n3),dyi
@@ -205,14 +188,14 @@ contains
        end do
     end do
 
-  end subroutine ladvyu4
+  end subroutine ladvyu
   !
   ! ----------------------------------------------------------------------
   ! Subroutine ladvzu: Advection of U, by W*rho, div is a scratch array, 
   ! tendencies are accumulated if ut variable, v1 is the inverse density
   ! array valid at thermo points
   !
-  subroutine ladvzu4(n1,n2,n3,u,ut,wm,flx,v1)
+  subroutine ladvzu(n1,n2,n3,u,ut,wm,flx,v1)
 
     integer, intent (in)  ::  n1,n2,n3
     real, intent (in)     :: u(n1,n2,n3),wm(n1,n2,n3),v1(n1)
@@ -239,14 +222,14 @@ contains
        end do
     end do
 
-  end subroutine ladvzu4
+  end subroutine ladvzu
   !
   ! ----------------------------------------------------------------------
   ! LADVXV: Advection of V, by U, div is a scratch array, 
   ! tendencies are accumulated if vt variable, dxi is the inverse of 
   ! delta-x the grid spacing in the horizontal direction.
   !
-  subroutine ladvxv4(n1,n2,n3,u,v,vt,flx,dxi)
+  subroutine ladvxv(n1,n2,n3,u,v,vt,flx,dxi)
 
     integer, intent (in)  ::  n1,n2,n3
     real, intent (in)     :: u(n1,n2,n3),v(n1,n2,n3),dxi
@@ -270,14 +253,14 @@ contains
        end do
     end do
 
-  end subroutine ladvxv4
+  end subroutine ladvxv
   !
   ! ----------------------------------------------------------------------
   ! LADVYV: Advection of V, by V, div is a scratch array, 
   ! tendencies are accumulated if vt variable, dyi is the inverse of 
   ! delta-y.
   !
-  subroutine ladvyv4(n1,n2,n3,v,vt,flx,dyi)
+  subroutine ladvyv(n1,n2,n3,v,vt,flx,dyi)
 
     integer, intent (in)  ::  n1,n2,n3
     real, intent (in)     :: v(n1,n2,n3),dyi
@@ -303,14 +286,14 @@ contains
        end do
     end do
 
-  end subroutine ladvyv4
+  end subroutine ladvyv
   !
   ! ----------------------------------------------------------------------
   ! LADVZV: Advection of V, by W*rho, div is a scratch array, 
   ! tendencies are accumulated if vt variable, v1 is the inverse density
   ! array valid at thermo points
   !
-  subroutine ladvzv4(n1,n2,n3,v,vt,wm,flx,v1)
+  subroutine ladvzv(n1,n2,n3,v,vt,wm,flx,v1)
 
     integer, intent (in)  ::  n1,n2,n3
     real, intent (in)     :: v(n1,n2,n3),wm(n1,n2,n3),v1(n1)
@@ -337,14 +320,14 @@ contains
        end do
     end do
 
-  end subroutine ladvzv4
+  end subroutine ladvzv
   !
   ! ----------------------------------------------------------------------
   ! LADVXW: Advection of W, by U, div is a scratch array, 
   ! tendencies are accumulated if wt variable, dxi is the inverse of 
   ! delta-x the grid spacing in the horizontal direction.
   !
-  subroutine ladvxw4(n1,n2,n3,u,w,wt,flx,dxi)
+  subroutine ladvxw(n1,n2,n3,u,w,wt,flx,dxi)
 
     integer, intent (in)  :: n1,n2,n3
     real, intent (in)     :: u(n1,n2,n3),w(n1,n2,n3),dxi
@@ -368,14 +351,14 @@ contains
        end do
     end do
 
-  end subroutine ladvxw4
+  end subroutine ladvxw
   !
   ! ----------------------------------------------------------------------
   ! LADVYW: Advection of W, by V, div is a scratch array, 
   ! tendencies are accumulated if wt variable, dyi is the inverse of 
   ! delta-y.
   !
-  subroutine ladvyw4(n1,n2,n3,vm,w,wt,flx,dyi)
+  subroutine ladvyw(n1,n2,n3,vm,w,wt,flx,dyi)
 
     integer, intent (in)  ::  n1,n2,n3
     real, intent (in)     :: vm(n1,n2,n3),w(n1,n2,n3),dyi
@@ -401,14 +384,14 @@ contains
        end do
     end do
 
-  end subroutine ladvyw4
+  end subroutine ladvyw
   !
   ! ----------------------------------------------------------------------
   ! LADVZW: Advection of W, by W*rho, div is a scratch array, 
   ! tendencies are accumulated if wt variable, v2 is the inverse density
   ! array valid at w-points
   !
-  subroutine ladvzw4(n1,n2,n3,w,wt,wm,flx,v2)
+  subroutine ladvzw(n1,n2,n3,w,wt,wm,flx,v2)
 
     integer, intent (in) ::  n1,n2,n3
     real, intent (in)    :: wm(n1,n2,n3),w(n1,n2,n3),v2(n1)
@@ -433,22 +416,18 @@ contains
        end do
     end do
 
-  end subroutine ladvzw4
+  end subroutine ladvzw
 
-
-
-
-
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! ###########################
   ! 2nd order centered
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+  ! ###########################
+  !
   ! ----------------------------------------------------------------------
   ! Ladvxu: Advection of U, by U, div is a scratch array, 
   ! tendencies are accumulated if ut variable, dxi is the inverse of 
   ! delta-x the grid spacing in the horizontal direction.
   !
-  subroutine ladvxu2(n1,n2,n3,u,ut,flx,dxi)
+  subroutine ladvxu2nd(n1,n2,n3,u,ut,flx,dxi)
 
     integer, intent (in) ::  n1,n2,n3
     real, intent(in)     :: u(n1,n2,n3),dxi
@@ -471,14 +450,14 @@ contains
        end do
     end do
 
-  end subroutine ladvxu2
+  end subroutine ladvxu2nd
   !
   ! ----------------------------------------------------------------------
   ! LADVYU: Advection of U, by V, div is a scratch array, 
   ! tendencies are accumulated if fu variable, dyi is the inverse of 
   ! delta-y.
   !
-  subroutine ladvyu2(n1,n2,n3,u,ut,v,flx,dyi)
+  subroutine ladvyu2nd(n1,n2,n3,u,ut,v,flx,dyi)
 
     integer, intent (in)  ::  n1,n2,n3
     real, intent (in)     :: u(n1,n2,n3),v(n1,n2,n3),dyi
@@ -503,14 +482,14 @@ contains
        end do
     end do
 
-  end subroutine ladvyu2
+  end subroutine ladvyu2nd
   !
   ! ----------------------------------------------------------------------
   ! Subroutine ladvzu: Advection of U, by W*rho, div is a scratch array, 
   ! tendencies are accumulated if ut variable, v1 is the inverse density
   ! array valid at thermo points
   !
-  subroutine ladvzu2(n1,n2,n3,u,ut,wm,flx,v1)
+  subroutine ladvzu2nd(n1,n2,n3,u,ut,wm,flx,v1)
 
     integer, intent (in)  ::  n1,n2,n3
     real, intent (in)     :: u(n1,n2,n3),wm(n1,n2,n3),v1(n1)
@@ -536,14 +515,14 @@ contains
        end do
     end do
 
-  end subroutine ladvzu2
+  end subroutine ladvzu2nd
   !
   ! ----------------------------------------------------------------------
   ! LADVXV: Advection of V, by U, div is a scratch array, 
   ! tendencies are accumulated if vt variable, dxi is the inverse of 
   ! delta-x the grid spacing in the horizontal direction.
   !
-  subroutine ladvxv2(n1,n2,n3,u,v,vt,flx,dxi)
+  subroutine ladvxv2nd(n1,n2,n3,u,v,vt,flx,dxi)
 
     integer, intent (in)  ::  n1,n2,n3
     real, intent (in)     :: u(n1,n2,n3),v(n1,n2,n3),dxi
@@ -566,14 +545,14 @@ contains
        end do
     end do
 
-  end subroutine ladvxv2
+  end subroutine ladvxv2nd
   !
   ! ----------------------------------------------------------------------
   ! LADVYV: Advection of V, by V, div is a scratch array, 
   ! tendencies are accumulated if vt variable, dyi is the inverse of 
   ! delta-y.
   !
-  subroutine ladvyv2(n1,n2,n3,v,vt,flx,dyi)
+  subroutine ladvyv2nd(n1,n2,n3,v,vt,flx,dyi)
 
     integer, intent (in)  ::  n1,n2,n3
     real, intent (in)     :: v(n1,n2,n3),dyi
@@ -598,14 +577,14 @@ contains
        end do
     end do
 
-  end subroutine ladvyv2
+  end subroutine ladvyv2nd
   !
   ! ----------------------------------------------------------------------
   ! LADVZV: Advection of V, by W*rho, div is a scratch array, 
   ! tendencies are accumulated if vt variable, v1 is the inverse density
   ! array valid at thermo points
   !
-  subroutine ladvzv2(n1,n2,n3,v,vt,wm,flx,v1)
+  subroutine ladvzv2nd(n1,n2,n3,v,vt,wm,flx,v1)
 
     integer, intent (in)  ::  n1,n2,n3
     real, intent (in)     :: v(n1,n2,n3),wm(n1,n2,n3),v1(n1)
@@ -631,14 +610,14 @@ contains
        end do
     end do
 
-  end subroutine ladvzv2
+  end subroutine ladvzv2nd
   !
   ! ----------------------------------------------------------------------
   ! LADVXW: Advection of W, by U, div is a scratch array, 
   ! tendencies are accumulated if wt variable, dxi is the inverse of 
   ! delta-x the grid spacing in the horizontal direction.
   !
-  subroutine ladvxw2(n1,n2,n3,u,w,wt,flx,dxi)
+  subroutine ladvxw2nd(n1,n2,n3,u,w,wt,flx,dxi)
 
     integer, intent (in)  :: n1,n2,n3
     real, intent (in)     :: u(n1,n2,n3),w(n1,n2,n3),dxi
@@ -661,14 +640,14 @@ contains
        end do
     end do
 
-  end subroutine ladvxw2
+  end subroutine ladvxw2nd
   !
   ! ----------------------------------------------------------------------
   ! LADVYW: Advection of W, by V, div is a scratch array, 
   ! tendencies are accumulated if wt variable, dyi is the inverse of 
   ! delta-y.
   !
-  subroutine ladvyw2(n1,n2,n3,vm,w,wt,flx,dyi)
+  subroutine ladvyw2nd(n1,n2,n3,vm,w,wt,flx,dyi)
 
     integer, intent (in)  ::  n1,n2,n3
     real, intent (in)     :: vm(n1,n2,n3),w(n1,n2,n3),dyi
@@ -693,14 +672,14 @@ contains
        end do
     end do
 
-  end subroutine ladvyw2
+  end subroutine ladvyw2nd
   !
   ! ----------------------------------------------------------------------
   ! LADVZW: Advection of W, by W*rho, div is a scratch array, 
   ! tendencies are accumulated if wt variable, v2 is the inverse density
   ! array valid at w-points
   !
-  subroutine ladvzw2(n1,n2,n3,w,wt,wm,flx,v2)
+  subroutine ladvzw2nd(n1,n2,n3,w,wt,wm,flx,v2)
 
     integer, intent (in) ::  n1,n2,n3
     real, intent (in)    :: wm(n1,n2,n3),w(n1,n2,n3),v2(n1)
@@ -724,7 +703,7 @@ contains
        end do
     end do
 
-  end subroutine ladvzw2
+  end subroutine ladvzw2nd
 
   !
   ! ----------------------------------------------------------------------

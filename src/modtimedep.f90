@@ -63,7 +63,6 @@ contains
 !     use modsurfdata,only :ps,qts,wqsurf,wtsurf,thls
 !     use modtimedepsv, only : inittimedepsv
     use grid, only : nzp, zt
-    use mpi_interface, only : myid
     real, intent(in) :: time,time_end
     character (80):: chmess
     character (1) :: chmess1
@@ -95,30 +94,30 @@ contains
     ! load ls_flux_in
     open(ifinput,file='ls_flux_in')
     read(ifinput,'(a80)') chmess
-    if(myid==0) write(6,*) chmess
+    write(6,*) chmess
     read(ifinput,'(a80)') chmess
-    if(myid==0) write(6,*) chmess
+    write(6,*) chmess
     read(ifinput,'(a80)') chmess
-    if(myid==0) write(6,*) chmess
+    write(6,*) chmess
 
     timeflux = 0
     timels   = 0
 
     ! load surface conditions
-    if(myid==0) print*,'*** Surface forcings: ***'
+    print*,'*** Surface forcings: ***'
     t    = 0
     ierr = 0
     do while (timeflux(t) < (time_end))
       t=t+1
       read(ifinput,*, iostat = ierr) timeflux(t), wtsurft(t), wqsurft(t),thlst(t),qtst(t),pst(t)
-      if(myid==0) write(*,'(i8,6e12.4)') t,timeflux(t), wtsurft(t), wqsurft(t),thlst(t),qtst(t),pst(t)
+      write(*,'(i8,6e12.4)') t,timeflux(t), wtsurft(t), wqsurft(t),thlst(t),qtst(t),pst(t)
       if (ierr < 0) then
           stop 'STOP: No time dependend data for end of run (surface fluxes)'
       end if
     end do
     if(timeflux(1)>(time_end)) then
-       if(myid==0) write(6,*) 'Time dependent surface variables do not change before end of'
-       if(myid==0) write(6,*) 'simulation. --> only large scale forcings'
+       write(6,*) 'Time dependent surface variables do not change before end of'
+       write(6,*) 'simulation. --> only large scale forcings'
        ltimedepsurf=.false.
     endif
     ! flush to the end of fluxlist
@@ -129,7 +128,7 @@ contains
 
     if(ltimedepz) then
       ! ---load large scale forcings----
-      if(myid==0) print*,'*** Vertical forcings: ***'
+      print*,'*** Vertical forcings: ***'
       t = 0
       do while (timels(t) < time_end)
         t = t + 1
@@ -141,7 +140,7 @@ contains
             stop 'STOP: No time dependend data for end of run'
           end if
         end do
-        if(myid==0) write (*,*) 'timels = ',timels(t)
+        write (*,*) 'timels = ',timels(t)
         read (ifinput,*)  lowheight , lowwflst,lowdthldt,lowdqtdt
         read (ifinput,*)  highheight , highwflst,highdthldt,highdqtdt
         do k=2,nzp
@@ -161,8 +160,8 @@ contains
       end do
 
       if ((timels(1) > time_end) .or. (timeflux(1) > time_end)) then
-        if(myid==0) write(6,*) 'Time dependent large scale forcings sets in after end of simulation'
-        if(myid==0) write(6,*) 'only time dependent surface variables'
+        write(6,*) 'Time dependent large scale forcings sets in after end of simulation'
+        write(6,*) 'only time dependent surface variables'
         ltimedepz=.false.
       end if
     end if
