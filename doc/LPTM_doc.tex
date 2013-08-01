@@ -2,56 +2,18 @@
 \usepackage{natbib}           % Bibtex
 \usepackage{amssymb}
 \usepackage{amsmath}
-
 \usepackage{array}            % Eqnarray etc.
 \usepackage{graphicx}         % Figures
 \DeclareGraphicsExtensions{.jpg,.jpeg,.pdf,.png,.mps,.eps,.ps}
-
 \usepackage[colorlinks=true,raiselinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
 \usepackage[center]{caption}
 \usepackage{setspace}
-
-% Document properties
 \setlength{\parindent}{0in}     % Don't indent paragraph
 \linespread{1.0}                % Increase linespread
 \usepackage{anysize}            % To decrease margins
 \marginsize{3.5cm}{3.5cm}{3.5cm}{3cm}
-
-% Rename biblopgraphy
-\renewcommand{\bibname}{References}
-
 \usepackage{supertabular} 	% Tabellen op meerdere pagina's
 \usepackage{tabularx}
-\usepackage{soul}               % Highlighting:w
-
-\usepackage{enumitem}
-\setlist{noitemsep}
-
-% Fancy headers.....
-\usepackage{fancyhdr}
-\fancyhead{}
-\fancyfoot{}
-\fancyhead[LO]{\leftmark}
-\fancyhead[RE]{\leftmark}
-\fancyhead[RO]{\rightmark}
-\fancyhead[LE]{\rightmark}
-\renewcommand{\footrulewidth}{0.1pt}
-\fancyfoot[C]{\thepage}
-\fancypagestyle{plain}{
-          \fancyhead{}
-          \renewcommand{\headrulewidth}{0pt}
-          \renewcommand{\footrulewidth}{0.1pt}
-          \fancyfoot[C]{\thepage}
-}
-\pagestyle{fancy}
-
-% Page captions
-\renewcommand{\chaptermark}[1]{\markboth{#1}{}}
-\renewcommand{\sectionmark}[1]{\markright{#1}{}}
-
-\usepackage{titlesec}
-\titleformat{\chapter}{\bf\huge}{\thechapter}{1em}{}
-\titleformat{\section}{\large\bfseries}{\thesection}{1em}{}[\hrule]
 
 \title{Lagrangian Particle Tracking Module in UCLA-LES
 }
