@@ -3381,20 +3381,37 @@ contains
     TYPE (particle_record), POINTER:: ptr
     TYPE (particle_record), POINTER:: new_p
 
+    !add new particle at the end of the particle list
+    !if( .not. associated(head) ) then
+    !  allocate(head)
+    !  tail => head
+    !  nullify(head%prev)
+    !else
+    !  allocate(tail%next)
+    !  new_p => tail%next
+    !  new_p%prev => tail
+    !  tail => new_p
+    !end if
+    !
+    !nplisted = nplisted + 1
+    !nullify(tail%next)
+    !ptr => tail
+
+    !add new particle at the beginning of the particle list
     if( .not. associated(head) ) then
       allocate(head)
       tail => head
-      nullify(head%prev)
+      nullify(tail%next)
     else
-      allocate(tail%next)
-      new_p => tail%next
-      new_p%prev => tail
-      tail => new_p
+      allocate(head%prev)
+      new_p => head%prev
+      new_p%next => head
+      head => new_p
     end if
 
     nplisted = nplisted + 1
-    nullify(tail%next)
-    ptr => tail
+    nullify(head%prev)
+    ptr => head
 
   end subroutine add_particle
 
