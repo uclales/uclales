@@ -20,19 +20,21 @@
 \contentsline {subsection}{\numberline {a}Getting the Code}{11}
 \contentsline {subsection}{\numberline {b}Organization}{11}
 \contentsline {subsection}{\numberline {c}Compilation}{13}
+\contentsline {subsubsection}{\numberline {i}CMake}{13}
+\contentsline {subsubsection}{\numberline {ii}Make}{13}
 \contentsline {subsection}{\numberline {d}Specialized model configurations}{13}
 \contentsline {section}{\numberline {5}Running the Model}{13}
-\contentsline {subsection}{\numberline {a}The NAMELIST}{13}
-\contentsline {subsection}{\numberline {b}Output}{15}
+\contentsline {subsection}{\numberline {a}The NAMELIST}{14}
+\contentsline {subsection}{\numberline {b}Output}{16}
 \contentsline {paragraph}{Standard output:}{16}
 \contentsline {paragraph}{Analysis file:}{16}
 \contentsline {paragraph}{Profile statistics:}{16}
-\contentsline {paragraph}{Temporal Statistics:}{16}
-\contentsline {paragraph}{History files:}{16}
+\contentsline {paragraph}{Temporal Statistics:}{17}
+\contentsline {paragraph}{History files:}{17}
 \contentsline {subsection}{\numberline {c}Post-processing:}{17}
 \contentsline {paragraph}{Other Useful Scripts:}{17}
 \contentsline {subsection}{\numberline {d}Debugging:}{17}
 \contentsline {section}{\numberline {6}Examples}{18}
 \contentsline {subsection}{\numberline {a}RICO}{18}
 \contentsline {subsection}{\numberline {b}Dry CBL}{18}
-\contentsline {subsection}{\numberline {c}Smoke}{18}
+\contentsline {subsection}{\numberline {c}Smoke}{20}
