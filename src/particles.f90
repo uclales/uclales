@@ -2838,7 +2838,7 @@ contains
       do
         read (666,iostat=io) pu,pts,pstp,pnd,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs,pzp,pwr,pwrp,pus,pvs,pws,pusp,pvsp,pwsp,psg2,pm,pud,pvd,pwd,pudr,pvdr,pwdr,pudrp,pvdrp,pwdrp,pt
         if(io .ne. 0) exit
-        call add_particle(particle)
+        call add_particle_end(particle)
         particle%unique         = pu
         particle%x              = px
         particle%y              = py
@@ -2893,7 +2893,7 @@ contains
     ! ------------------------------------------------------
     ! Cold start -> start with deactivated particles in drop-mode
       nprocs = nxprocs * nyprocs
-      npmyid = floor((nxp-4) * (nyp-4) * nzp * 2.)   ! use 2. particles per grid box
+      npmyid = floor((nxp-4) * (nyp-4) * nzp * 3.)   ! use 3. particles per grid box
       np = nprocs * npmyid               ! only valid if all proc use the same domainsize?!
       if(myid==0) write(*,*) 'Number of Particles ',np
       if(myid==0) write(*,*) 'Number of Particles on each proc ',npmyid
@@ -3373,6 +3373,7 @@ contains
   !
   !--------------------------------------------------------------------------
   ! subroutine add_particle
+  ! adds new particle at the beginning of the particle list
   !--------------------------------------------------------------------------
   !
   subroutine add_particle(ptr)
@@ -3380,22 +3381,6 @@ contains
 
     TYPE (particle_record), POINTER:: ptr
     TYPE (particle_record), POINTER:: new_p
-
-    !add new particle at the end of the particle list
-    !if( .not. associated(head) ) then
-    !  allocate(head)
-    !  tail => head
-    !  nullify(head%prev)
-    !else
-    !  allocate(tail%next)
-    !  new_p => tail%next
-    !  new_p%prev => tail
-    !  tail => new_p
-    !end if
-    !
-    !nplisted = nplisted + 1
-    !nullify(tail%next)
-    !ptr => tail
 
     !add new particle at the beginning of the particle list
     if( .not. associated(head) ) then
@@ -3415,6 +3400,35 @@ contains
 
   end subroutine add_particle
 
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine add_particle_end
+  ! adds new particle at the end of the particle list
+  ! only used for a warm start in init_particles
+  !--------------------------------------------------------------------------
+  !
+  subroutine add_particle_end(ptr)
+    implicit none
+
+    TYPE (particle_record), POINTER:: ptr
+    TYPE (particle_record), POINTER:: new_p
+
+    if( .not. associated(head) ) then
+      allocate(head)
+      tail => head
+      nullify(head%prev)
+    else
+      allocate(tail%next)
+      new_p => tail%next
+      new_p%prev => tail
+      tail => new_p
+    end if
+    
+    nplisted = nplisted + 1
+    nullify(tail%next)
+    ptr => tail
+
+  end subroutine add_particle_end
   !
   !--------------------------------------------------------------------------
   ! subroutine delete_particle
