@@ -649,7 +649,7 @@ contains
        hname = trim(hname)//'.rst'
     case(2)
        iblank=index(hname,' ')
-       write (hname(iblank:iblank+7),'(a1,i6.6,a1)') '.', int(time), 's'
+       write (hname(iblank:iblank+8),'(a1,i7.7,a1)') '.', int(time), 's'
     end select
 
     call random_seed(size=nseed)
