@@ -117,7 +117,8 @@ program mergeparticles
         ! Leave define mode
         call check(nf90_enddef(ncid_out))
       end if
-     
+      print*,'number of particles',npin
+      
       do p=1,npin/npp+1
 	!prepare to read data
         start_in  = (/(p-1)*npp+1,1/)
@@ -139,7 +140,7 @@ program mergeparticles
 	!reduce dims of var_read_in by deleting the empty particles
         mask1d = .not.all(var_read_in.eq.fval,2)
 	npre = count(mask1d)
-	print*,'number of active drops',npre
+	print*,'number of active particles',npre,'of',size(mask1d)
 	mask2d = spread(mask1d,2,ntin)
 	deallocate(mask1d)
 	allocate(var_red(npre,ntin))
@@ -162,10 +163,6 @@ program mergeparticles
 	loc = loc + npre
       end do
   
-      
-      
-
-      print*,i,j
 
       !get and put time values
       if(i .eq. nx .and. j .eq. ny) then
@@ -178,7 +175,7 @@ program mergeparticles
 
       call check(nf90_close(ncid_in))
 
-      print*,'Processed ',trim(path),(i-1)*nx+j,'/',nx*ny 
+      print*,'Processed ',trim(path),(i-1)*ny+j,'/',nx*ny 
     end do
   end do
   

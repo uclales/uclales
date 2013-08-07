@@ -2089,7 +2089,7 @@ contains
       if(lpartdumpth)              nvar = nvar + 2     ! thl,tvh
       if(lpartdumpmr)              nvar = nvar + 2     ! rt,rl
       if(lpartdrop)                nvar = nvar + 1     ! nd
-      if(lpartdrop.and.lpartmass)  nvar = nvar + 1     ! mass
+      if(lpartdrop.and.lpartmass)  nvar = nvar + 4     ! mass,ud,vd,wd
 
       nprocs = nxprocs * nyprocs
       allocate(tosend(0:nprocs-1),toreceive(0:nprocs-1),base(0:nprocs-1),sendbase(0:nprocs-1),receivebase(0:nprocs-1))
@@ -2175,6 +2175,9 @@ contains
             sendbuff(base(p)+nvl+1)   = particle%nd
 	    if(lpartmass) then
 	      sendbuff(base(p)+nvl+2) = particle%mass
+	      sendbuff(base(p)+nvl+3) = particle%udrop * deltax
+	      sendbuff(base(p)+nvl+4) = particle%vdrop * deltay
+	      sendbuff(base(p)+nvl+5) = particle%wdrop / dzi_t(floor(particle%z))
 	    end if
 	  end if
 
@@ -2266,6 +2269,9 @@ contains
 	  sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
 	  if(lpartmass) then
 	    sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
+	    sb_sorted(loc,nvl+3) = recvbuff(ii+nvl+3)
+	    sb_sorted(loc,nvl+4) = recvbuff(ii+nvl+4)
+	    sb_sorted(loc,nvl+5) = recvbuff(ii+nvl+5)
 	  end if
 	end if
 
@@ -2321,6 +2327,9 @@ contains
         call writevar_nc(ncpartid,'nd',sb_sorted(:,nvl+1),ncpartrec)
 	if(lpartmass) then
 	  call writevar_nc(ncpartid,'m',sb_sorted(:,nvl+2),ncpartrec)
+	  call writevar_nc(ncpartid,'ud',sb_sorted(:,nvl+3),ncpartrec)
+	  call writevar_nc(ncpartid,'vd',sb_sorted(:,nvl+4),ncpartrec)
+	  call writevar_nc(ncpartid,'wd',sb_sorted(:,nvl+5),ncpartrec)
 	end if
       end if
       stat  = nf90_sync(ncpartid)
@@ -2528,7 +2537,7 @@ contains
     type (particle_record), pointer:: particle
     real               :: randnr(3), max_auto, sum_auto
     !real               :: zmax = 1.                  ! Max height in grid coordinates
-    real               :: nppd = 1./(1.e7)               ! number of particles per drops
+    real               :: nppd = 1./(1.e10)               ! number of particles per drops
     real               :: xsizelocal, ysizelocal
     real               :: C_d=1.0, vt=1.0
     integer            :: nprocs,i,j,k,newp,np_old,cntp
@@ -3261,9 +3270,9 @@ contains
     call addvar_nc(ncpartid,'y','y-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
     call addvar_nc(ncpartid,'z','z-position of particle','m',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
     if(lpartdumpui) then
-      call addvar_nc(ncpartid,'u','resolved u-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-      call addvar_nc(ncpartid,'v','resolved v-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-      call addvar_nc(ncpartid,'w','resolved w-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      call addvar_nc(ncpartid,'u','resolved u-velocity at particle position','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      call addvar_nc(ncpartid,'v','resolved v-velocity at particle position','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      call addvar_nc(ncpartid,'w','resolved w-velocity at particle position','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
       if(lpartsgs) then
         call addvar_nc(ncpartid,'us','subgrid u-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
         call addvar_nc(ncpartid,'vs','subgrid v-velocity of particle','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
@@ -3280,6 +3289,9 @@ contains
     end if
     if(lpartdrop.and.lpartmass) then
       call addvar_nc(ncpartid,'m','drop mass','kg',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      call addvar_nc(ncpartid,'ud','u-velocity of drop','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      call addvar_nc(ncpartid,'vd','v-velocity of drop','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      call addvar_nc(ncpartid,'wd','w-velocity of drop','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
     end if
 
   end subroutine initparticledump
