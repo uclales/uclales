@@ -33,8 +33,8 @@ implicit none
 save
 ! switches for timedependent surface fluxes and large scale forcings
   logical            :: ltimedep     = .false. !< Overall switch, input in namoptions
-  logical            :: ltimedepz    = .false.  !< Switch for large scale forcings
-  logical            :: ltimedepsurf = .false.  !< Switch for surface fluxes
+  logical            :: ltimedepz    = .true.  !< Switch for large scale forcings
+  logical            :: ltimedepsurf = .true.  !< Switch for surface fluxes
   logical            :: firsttime    = .true.
   integer, parameter :: kflux = 2000
   integer, parameter :: kls   = 2000
@@ -107,13 +107,14 @@ contains
       t=t+1
       read(ifinput,*, iostat = ierr) timeflux(t), wtsurft(t), wqsurft(t),thlst(t),qtst(t),pst(t)
       if(myid==0) write(*,'(i8,6e12.4)') t,timeflux(t), wtsurft(t), wqsurft(t),thlst(t),qtst(t),pst(t)
-      if (myid==0 .and. ierr < 0) then
-          stop 'STOP: No time dependend data for end of run (surface fluxes)'
+      if (ierr < 0) then
+          if(myid==0) print*, 'STOP: No time dependend data for end of run (surface fluxes)'
+          stop 
       end if
     end do
     if(timeflux(1)>(time_end)) then
       if(myid==0) then
-         write(6,*) 'Time dependent surface variables do not change before end of'
+         write(6,*) 'Time dependent surface variables do not change before end of run'
          write(6,*) 'ltimedepsurf set to FALSE'
       end if
       ltimedepsurf=.false.
@@ -133,8 +134,9 @@ contains
       ierr = 1 ! not zero
       do while (.not.(chmess1 == "#" .and. ierr ==0)) !search for the next line consisting of "# time", from there onwards the profiles will be read
         read(ifinput,*,iostat=ierr) chmess1,timels(t)
-        if (myid==0 .and. ierr < 0) then
-          stop 'STOP: No time dependend data for end of run'
+        if (ierr < 0) then
+           if(myid==0) print*, 'STOP: No time dependend data for end of run'
+           stop
         end if
       end do
       if(myid==0) write (*,*) 'timels = ',timels(t)
