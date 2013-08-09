@@ -239,7 +239,7 @@ contains
   !
   subroutine calc_sgstke
     use grid, only             : nzp, zt, dxi, dyi, nxp, nyp, zm, a_rp, a_tp, dzi_t, dzi_m, a_up, a_vp, a_wp, th00, level
-    use defs, only             : pi, vonk, g
+    use defs, only             : pi, vonk, g, ep2
     use mpi_interface, only    : nxg, nyg
     implicit none
 
@@ -274,8 +274,8 @@ contains
 
             ! 1. Brunt-Vaisala^2
             if(level > 0) then
-              thvp = (0.5*(a_tp(k,i,j) + a_tp(kp,i,j))) * (1. + 0.61 * (0.5*(a_rp(k,i,j) + a_rp(kp,i,j))))
-              thvm = (0.5*(a_tp(k,i,j) + a_tp(km,i,j))) * (1. + 0.61 * (0.5*(a_rp(k,i,j) + a_rp(km,i,j))))
+              thvp = (0.5*(a_tp(k,i,j) + a_tp(kp,i,j))) * (1. + ep2 * (0.5*(a_rp(k,i,j) + a_rp(kp,i,j))))
+              thvm = (0.5*(a_tp(k,i,j) + a_tp(km,i,j))) * (1. + ep2 * (0.5*(a_rp(k,i,j) + a_rp(km,i,j))))
             else
               thvp = 0.5*(a_tp(k,i,j) + a_tp(kp,i,j))
               thvm = 0.5*(a_tp(k,i,j) + a_tp(km,i,j))
