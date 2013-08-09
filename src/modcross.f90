@@ -469,7 +469,7 @@ contains
   subroutine triggercross(rtimee)
     use grid,      only : level,nxp, nyp, nzp, tname, zt, zm, dzi_m, dzi_t, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
-       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta, pi0, pi1, a_pexnr, prc_lev, umean, vmean
+       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta, pi0, pi1, a_pexnr, prc_lev, umean, vmean, th00
     use modnetcdf, only : writevar_nc, fillvalue_double
     use util,      only : get_avg3, get_var3, calclevel
     use defs,      only : ep2,cp,cpr, p00
@@ -492,6 +492,7 @@ contains
       nccrossrec = nccrossrec - 1
       call writevar_nc(nccrossyzid, tname, rtimee, nccrossrec)
     end if
+
     if (level == 0) then
       do j=3,nyp-2
         do i=3,nxp-2
@@ -607,9 +608,9 @@ contains
               end do
           end do
         end do
-        call writecross(crossname(n), a_wp)
+        call writecross(crossname(n), interp)
       case('t')
-        call writecross(crossname(n), a_tp)
+        call writecross(crossname(n), a_tp+th00)
       case('r')
         call writecross(crossname(n), a_rp)
       case('l')
