@@ -64,9 +64,9 @@ contains
   !
   subroutine stepper
 
-    use mpi_interface, only : myid, broadcast_dbl, double_scalar_par_max, double_scalar_par_sum,mpi_get_time, nxprocs,nyprocs
+    use mpi_interface, only : myid, broadcast_dbl, double_scalar_par_max,mpi_get_time
     use grid, only : dt, dtlong, zt, zm, nzp, dn0, u0, v0, level, &
-         write_hist, a_ustar, obl, nxp, nyp
+         write_hist
     use ncio, only : write_anal, close_anal
     use modcross, only : triggercross, exitcross, lcross
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
@@ -78,7 +78,7 @@ contains
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
-    real    :: tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax,ustarav,gustarav,oblav,goblav
+    real    :: tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax
     double precision    :: t0,t1,t2
     integer :: iret
 
@@ -111,18 +111,9 @@ contains
        dt_prev = dt
        dt = min(dtlong,dt*peak_cfl/(cflmax+epsilon(1.)))
 
-       ! Some more output stats
-       ustarav = sum(a_ustar(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
-       oblav   = sum(obl(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
-       call double_scalar_par_sum(ustarav,gustarav)
-       call double_scalar_par_sum(oblav,goblav)
-       gustarav = gustarav / (nxprocs*nyprocs) 
-       goblav   = goblav   / (nxprocs*nyprocs) 
-
        !
        ! output control
        !
-
        !! Sample particles; automatically samples when savgflg=.true., don't sample double...
        !if(lpartic .and. lpartstat .and. statflg .and. (savgflg .eqv. .false.)) call particlestat(.false.,time+dt)
 
@@ -171,29 +162,20 @@ contains
        !  if(lpartic) call write_particle_hist(1,time)
        !end if
 
-
        if(myid == 0) then
           call mpi_get_time(t2)
           if (mod(istp,istpfl) == 0 ) then
-                print "(i6,' | t=',f12.2,' | dt=',f7.3,' | CPUdt=',f8.3,' | max(cfl=',f6.3,' pecl=',f6.3,')',' avg(u*=',f6.3,' L=',f9.2,')')",&
-                istp, time, dt_prev,t2-t1,cflmax,pecletmax,gustarav,goblav
+              if (wctime.gt.1e9) then
+                print "('   Timestep # ',i6," //     &
+                       "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3)",     &
+                       istp, time, dt_prev, t2-t1
+              else
+                print "('   Timestep # ',i6," //     &
+                       "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3'  WC Time left(sec) = ',f10.2)",     &
+                       istp, time, dt_prev, t2-t1, wctime-t2+t0
+              end if
           end if
        endif
-
-       !if(myid == 0) then
-       !   call mpi_get_time(t2)
-       !   if (mod(istp,istpfl) == 0 ) then
-       !       if (wctime.gt.1e9) then
-       !         print "('   Timestep # ',i6," //     &
-       !                "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3)",     &
-       !                istp, time, dt_prev, t2-t1
-       !       else
-       !         print "('   Timestep # ',i6," //     &
-       !                "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3'  WC Time left(sec) = ',f10.2)",     &
-       !                istp, time, dt_prev, t2-t1, wctime-t2+t0
-       !       end if
-       !   end if
-       !endif
 
        call broadcast_dbl(t2, 0)
     enddo
@@ -499,11 +481,7 @@ contains
 
     integer :: n
 
-    !print*,'old',a_xp(2,19,8,4),a_xt1(2,19,8,4),a_xt2(2,19,8,4)
-
     a_xp = a_xp + dt *(rkalpha(nstep)*a_xt1 + rkbeta(nstep)*a_xt2)
-
-    !print*,'new',a_xp(2,19,8,4),a_xt1(2,19,8,4),a_xt2(2,19,8,4)
 
     call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
 
