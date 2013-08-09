@@ -687,19 +687,9 @@ contains
        sz7(k)   = 0.
     end do
 
-
-    !a_xt2(2,19,8,4)
-
-
     do j=3,n3-2
        do i=2,n2-2
           do k=2,n1-1
-
-             !if(k==2 .and. j==8 .and. i==19) then
-             !   print*,scp(k,i,j)+310.
-             !end if
-
-
              szx1(k,i)=-(scp(k,i+1,j)-scp(k,i,j))*dxi*.25*(xkh(k,i,j)  +     &
                   xkh(k,i+1,j)+xkh(k-1,i,j)+xkh(k-1,i+1,j)) 
           enddo
