@@ -325,53 +325,137 @@ contains
   integer :: i, k, j, kp1
   real    :: c1, c2, c3, tvk, tvkp1, rtbar, rsbar, aa, bb
 
-  do j=3,n3-2
-     do i=3,n2-2
-        do k=1,n1-1
-           c1=(1.+ep*alvl/R/th(k,i,j))/ep
-           c2=ep*alvl*alvl/(R*cp*th(k,i,j)*th(k,i,j))
-           c3=alvl/(cp*th(k,i,j))
-           select case(level) 
-           case (0)
-              en2(k,i,j)=g*dzi_m(k)*((th(k+1,i,j)-th(k,i,j))/th00)
-           case (1)
-              tvk=th(k,i,j)*(1.+ep2*rt(k,i,j))
-              tvkp1=th(k+1,i,j)*(1.+ep2*rt(k+1,i,j))
-              en2(k,i,j)=g*dzi_m(k)*(tvkp1-tvk)/th00
-           case (2)
-              rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
-              rsbar=0.5*(rs(k,i,j)+rs(k+1,i,j))
-              kp1=min(n1-1,k+1)
-              if (rt(k,i,j) > rs(k,i,j) .and. rt(kp1,i,j) > rs(kp1,i,j)) then
-                 aa=(1. - rtbar + rsbar*c1)/(1. + c2*rsbar)
-                 bb=(c3*aa - 1.)
-              else
-                 aa=(1.00 + ep2*rtbar)
-                 bb=ep2
-              end if
-              en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
-                   + bb*(rt(k+1,i,j)-rt(k,i,j)))
-           case (3,4,5)
-              rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
-              rsbar=0.5*(rs(k,i,j)+rs(k+1,i,j))
-              kp1=min(n1-1,k+2)
-              if (rt(k,i,j) > rs(k,i,j) .and. rt(kp1,i,j) > rs(kp1,i,j)) then
-                 aa=(1. - rtbar + rsbar*c1)/(1. + c2*rsbar)
-                 bb=(c3*aa - 1.)
-              else
-                 aa=(1.00 + ep2*rtbar)
-                 bb=ep2
-              end if
-              en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
-                   + bb*(rt(k+1,i,j)-rt(k,i,j)))
-           case default 
-              WRITE (*,*) 'level=',level,', not supported in bruvais'
-              stop 
-           end select
-        end do
-        en2(n1,i,j)=en2(n1-1,i,j)
-     end do
-  end do
+  select case(level)
+  case(0)
+    do j=3,n3-2
+       do i=3,n2-2
+          ! Inner loop vectorized
+          do k=1,n1-1
+             c1=(1.+ep*alvl/R/th(k,i,j))/ep
+             c2=ep*alvl*alvl/(R*cp*th(k,i,j)*th(k,i,j))
+             c3=alvl/(cp*th(k,i,j))
+             en2(k,i,j)=g*dzi_m(k)*((th(k+1,i,j)-th(k,i,j))/th00)
+          end do
+          en2(n1,i,j)=en2(n1-1,i,j)
+       end do
+    end do
+  case(1)
+    do j=3,n3-2
+       do i=3,n2-2
+          ! Inner loop vectorized
+          do k=1,n1-1
+             c1=(1.+ep*alvl/R/th(k,i,j))/ep
+             c2=ep*alvl*alvl/(R*cp*th(k,i,j)*th(k,i,j))
+             c3=alvl/(cp*th(k,i,j))
+             tvk=th(k,i,j)*(1.+ep2*rt(k,i,j))
+             tvkp1=th(k+1,i,j)*(1.+ep2*rt(k+1,i,j))
+             en2(k,i,j)=g*dzi_m(k)*(tvkp1-tvk)/th00
+          end do
+          en2(n1,i,j)=en2(n1-1,i,j)
+       end do
+    end do
+  case(2)
+    do j=3,n3-2
+       do i=3,n2-2
+          ! Not vectorized -> if statement...
+          do k=1,n1-1
+             c1=(1.+ep*alvl/R/th(k,i,j))/ep
+             c2=ep*alvl*alvl/(R*cp*th(k,i,j)*th(k,i,j))
+             c3=alvl/(cp*th(k,i,j))
+             rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
+             rsbar=0.5*(rs(k,i,j)+rs(k+1,i,j))
+             kp1=min(n1-1,k+1)
+             if (rt(k,i,j) > rs(k,i,j) .and. rt(kp1,i,j) > rs(kp1,i,j)) then
+                aa=(1. - rtbar + rsbar*c1)/(1. + c2*rsbar)
+                bb=(c3*aa - 1.)
+             else
+                aa=(1.00 + ep2*rtbar)
+                bb=ep2
+             end if
+             en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
+                  + bb*(rt(k+1,i,j)-rt(k,i,j)))
+          end do
+          en2(n1,i,j)=en2(n1-1,i,j)
+       end do
+    end do
+  case(3,4,5)
+    do j=3,n3-2
+       do i=3,n2-2
+          ! Not vectorized -> if statement...
+          do k=1,n1-1
+             c1=(1.+ep*alvl/R/th(k,i,j))/ep
+             c2=ep*alvl*alvl/(R*cp*th(k,i,j)*th(k,i,j))
+             c3=alvl/(cp*th(k,i,j))
+             rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
+             rsbar=0.5*(rs(k,i,j)+rs(k+1,i,j))
+             kp1=min(n1-1,k+2)
+             if (rt(k,i,j) > rs(k,i,j) .and. rt(kp1,i,j) > rs(kp1,i,j)) then
+                aa=(1. - rtbar + rsbar*c1)/(1. + c2*rsbar)
+                bb=(c3*aa - 1.)
+             else
+                aa=(1.00 + ep2*rtbar)
+                bb=ep2
+             end if
+             en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
+                  + bb*(rt(k+1,i,j)-rt(k,i,j)))
+          end do
+          en2(n1,i,j)=en2(n1-1,i,j)
+       end do
+    end do
+  case default
+    WRITE (*,*) 'level=',level,', not supported in bruvais'
+    stop 
+  end select
+
+  ! BvS: code doesn't vectorize with select statement in loop
+  ! With vectorization, level 0,1 factor 15 faster 
+  !do j=3,n3-2
+  !   do i=3,n2-2
+  !      do k=1,n1-1
+  !         c1=(1.+ep*alvl/R/th(k,i,j))/ep
+  !         c2=ep*alvl*alvl/(R*cp*th(k,i,j)*th(k,i,j))
+  !         c3=alvl/(cp*th(k,i,j))
+  !         select case(level) 
+  !         case (0)
+  !            en2(k,i,j)=g*dzi_m(k)*((th(k+1,i,j)-th(k,i,j))/th00)
+  !         case (1)
+  !            tvk=th(k,i,j)*(1.+ep2*rt(k,i,j))
+  !            tvkp1=th(k+1,i,j)*(1.+ep2*rt(k+1,i,j))
+  !            en2(k,i,j)=g*dzi_m(k)*(tvkp1-tvk)/th00
+  !         case (2)
+  !            rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
+  !            rsbar=0.5*(rs(k,i,j)+rs(k+1,i,j))
+  !            kp1=min(n1-1,k+1)
+  !            if (rt(k,i,j) > rs(k,i,j) .and. rt(kp1,i,j) > rs(kp1,i,j)) then
+  !               aa=(1. - rtbar + rsbar*c1)/(1. + c2*rsbar)
+  !               bb=(c3*aa - 1.)
+  !            else
+  !               aa=(1.00 + ep2*rtbar)
+  !               bb=ep2
+  !            end if
+  !            en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
+  !                 + bb*(rt(k+1,i,j)-rt(k,i,j)))
+  !         case (3,4,5)
+  !            rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
+  !            rsbar=0.5*(rs(k,i,j)+rs(k+1,i,j))
+  !            kp1=min(n1-1,k+2)
+  !            if (rt(k,i,j) > rs(k,i,j) .and. rt(kp1,i,j) > rs(kp1,i,j)) then
+  !               aa=(1. - rtbar + rsbar*c1)/(1. + c2*rsbar)
+  !               bb=(c3*aa - 1.)
+  !            else
+  !               aa=(1.00 + ep2*rtbar)
+  !               bb=ep2
+  !            end if
+  !            en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
+  !                 + bb*(rt(k+1,i,j)-rt(k,i,j)))
+  !         case default 
+  !            WRITE (*,*) 'level=',level,', not supported in bruvais'
+  !            stop 
+  !         end select
+  !      end do
+  !      en2(n1,i,j)=en2(n1-1,i,j)
+  !   end do
+  !end do
 
   end subroutine bruvais
 
