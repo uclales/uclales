@@ -692,7 +692,18 @@ active MPI calls.\\ \hline \hline
 \end{table}
 
 \subsection{Compilation}
-To compile the model type ``make'' (``make mpi'' or ``make seq'' respectively) in the the 
+There are two ways of compiling the code: The preferred way uses CMake. CMake aims to resolve dependencies and compilation sequence automatically, allows for parallel compilation, and for quick switching between compilers or between debug and release mode.
+If CMake is not available on the system, some older example Makefiles are also provided.
+
+\subsubsection{CMake}
+The first thing to setup is a config file with the paths to the various libraries. CMake will try to find the libraries on its own, but on many clusters the paths are non-standard, so we need to provide some pointers. Example files are available in the \emph{config} directory. If any of these \emph{*.cmake} files matches your system, copy it to \emph{default.cmake} (still in the \emph{config} dir). If not, modify any of the files to create your own \emph{default.cmake}. 
+
+Next thing is to create a build directory from where we will compile the code: \emph{mkdir build \&\& cd build} from the root dir of the code. To configure the code call cmake: \emph{cmake ..} where ``..'' is the path back to the root directory of the code. After this, the code can be build with \emph{make -j 4}, to use 4 processors while building the code. The resulting \emph{uclales} binary can then be found in the \emph{build} directory.
+
+Changing from release mode (the default) to debug mode (with debug info, more restrictive checks, and less optimization) can be done with a cmake command line option: \mbox{\emph{cmake -D CMAKE\_BUILD\_TYPE=DEBUG ..}} and \mbox{\emph{cmake -D CMAKE\_BUILD\_TYPE=RELEASE ..}} respectively. Note that these options are persistent in that they will stay put for all compiling rounds, until being changed again by a cmake command.
+
+\subsubsection{Make}
+To compile the model type ``make'' in the the 
 \emph{bin} directory. This will build the default version of the model using the default
 architecture. To compile the code on different machines \emph{bin/Makefile} 
 must be adjusted. Examples of Makefiles are stored in \emph{misc/makefiles}.

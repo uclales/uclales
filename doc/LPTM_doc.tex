@@ -245,7 +245,7 @@ The contribution of sub-grid processes is determined using a prognostic equation
 \begin{equation}
   du'_i = - \left(\frac{f_s \: C_0 \: \epsilon \: u'_i}{2 \sigma^2_{sgs}}\right)dt 
           + \frac{1}{2} \left( \frac{1}{\sigma^2_{sgs}} \frac{d\sigma^2_{sgs}}{dt} u'_i + \frac{\partial \sigma^2_{sgs}}{\partial x_i}\right) dt
-          + (f_s \: C_0 \: \epsilon)^{1/2} \: d\xi,
+          + (f_s \: C_0 \: \epsilon)^{\frac{1}{2}} \: d\xi,
 \label{eq:duisgs}
 \end{equation}
 
@@ -260,9 +260,9 @@ $C_0$ is a constant, $\epsilon$ the dissipation rate of turbulence, $\sigma^2_{s
 In W04, $f_s$ is calculated using slab-averaged variances. Although this might be a useful and valid simplification for a dry CBL, local differences in $f_s$ are to be expected in cases with (i.a.) shallow convection. Hard-coded in \texttt{particles.f90} is the possibility to switch between the local or global calculation (with respectively \textit{lfsloc=.true.} or \textit{.false.}). For isotropic turbulence, $\sigma^2_{sgs} = \frac{2}{3}e$ and with $\epsilon = \frac{C_\epsilon}{\lambda}e^{3/2}$, equation \ref{eq:duisgs} is implemented in UCLA-LES as:
 
 \begin{equation}
-  du'_i = \underbrace{-\frac{3}{4} f_s \: C_0 \: u'_i \: \frac{C_\epsilon}{\lambda} \: \left(\frac{3}{2}e\right)^\frac{1}{2} \: dt}_{(I) \: dissipation}
+  du'_i = \underbrace{-\frac{3}{4} f_s \: C_0 \: u'_i \: \frac{C_\epsilon}{\lambda} \: \left(\frac{3}{2} \sigma^2_{sgs}\right)^\frac{1}{2} \: dt}_{(I) \: dissipation}
           \underbrace{+\frac{1}{2} \left( \frac{1}{e} \frac{de}{dt} u'_i + \frac{2}{3}\frac{\partial e}{\partial x_i}\right) dt}_{(II) \: relation \: sgs-tke}
-          \underbrace{+\left(f_s \: C_0 \: \frac{C_\epsilon}{\lambda}e\right)^\frac{1}{2} \: d\xi}_{(III) \: random \: fluctuation}
+          \underbrace{+\left(f_s \: C_0 \: \frac{C_\epsilon}{\lambda}\left[\frac{3}{2}\sigma^2_{sgs}\right]^{\frac{3}{2}}\right)^\frac{1}{2} \: d\xi}_{(III) \: random \: fluctuation}
 \label{eq:duisgs_uclales}
 \end{equation}
 
