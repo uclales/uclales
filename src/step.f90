@@ -41,7 +41,7 @@ module step
   real    :: tau = 900.
 !irina
   real    :: sst=292.
-  real    :: div = 3.75e-6
+  real    :: div = 0.0
   logical :: lsvarflg = .false.
   character (len=8) :: case_name = 'astex'
 
@@ -316,7 +316,7 @@ contains
 
     logical, parameter :: debug = .false.
     real :: xtime
-  character (len=8) :: adv='monotone'
+  character (len=8) :: adv='third'
 
     xtime = time/86400. + strtim
     call timedep(time,timmax, sst)

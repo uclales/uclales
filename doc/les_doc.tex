@@ -1,10 +1,11 @@
 \documentclass[11pt,a4paper]{article}
-
 \usepackage{fullpage}
 \usepackage{times}
 \usepackage{amsmath}
 \usepackage{graphicx}
 \usepackage{longtable}
+\usepackage{supertabular}
+\usepackage{tabularx}
 \usepackage[]{ametsoc}
 \bibliographystyle{ametsoc}
 
@@ -427,7 +428,7 @@ formulation are listed in Table \ref{tbl:surface}.
 \subsubsection{Radiation}
 The model allows for a range of different radiation types.
 As a default, calculations are done without
-radiation (iradtyp=1). For more explicit radiation treatment one can either use
+radiation (iradtyp=0). For more explicit radiation treatment one can either use
 the simple radiation (iradtyp=2) following the gcss intercomparison or
 the full radiation (iradtyp=4) from \cite{Pincus:2009}.
 For simple radiation treatment, short- and longwave
@@ -746,87 +747,177 @@ The execution is controlled by a number of model parameters which are
 given default specifications in the code. These specifications can be
 modified in the NAMELIST file so as to allow multiple execution
 without recompilation.  The full NAMELIST is defined in the LES.F90
-subroutine and is described, along with default parameter values, in
-Table \ref{tbl:namelist}. 
-\begin{longtable}[htb]{p{0.1\linewidth}p{0.1\linewidth}p{0.2\linewidth}p{0.5\linewidth}}
+subroutine and is described, along with default parameter values, in Table \ref{tbl:namelist}. 
+
+\clearpage
+
+\begin{longtable}[htb]{p{0.12\linewidth}p{0.1\linewidth}p{0.18\linewidth}p{0.5\linewidth}}
 \caption{NAMELIST variables and default values}\\
 \hline
 \hline
 Variable & Module & Default Value & Comments \\ 
 \hline
 \endhead
-nxp & grid & 132 & total number of $x$ points ($N_y+4$) \\
-nyp &  '' & 132 & total number of $y$ points ($N_y+4$) \\
-nzp &  '' & 105 & total number of $z$ points \\
-deltax & '' & 35.0 m & grid spacing in $x$-direction \\
-deltay & '' & 35.0 m & grid spacing in $y$-direction \\
-deltaz & '' & 17.5 m & grid spacing in $z$-direction \\
-dzrat  & '' & 1.02   & grid stretching ration (default 2\% per
-interval) \\
-dzmax  & '' & 1200 m & height at which grid-stretching begins \\
-dtlong & '' & 10 s  & maximum timestep \\
-nfpt   & '' & 5      & number of levels in upper sponge layer \\
-distim & '' & 300 s  & minimum relaxation time in sponge layer \\
-th00   & '' & 288    & basic state potential temperature, $\Theta_0$, set to mean of values encountered \\
-igrdtyp & '' & 1 & control parameter for selecting vertical grid \\
-isgstyp & '' & 1 & control parameter for selecting sgs model \\
-iradtyp & '' & 0 & control parameter for selecting radiation model \\
-imcrtyp & '' & 1 & control parameter for selecting microphysical model \\
-naddsc  & '' & 0 &  number of additional scalars \\
-CCN     & '' & 150 $\times 10^{6}$ & cloud droplet mixing ratio \\
-expnme  & '' & Default & experiment name \\
-filprf  & '' & x & file prefix for use in constructing output files\\
-runtyp  & '' & INITIAL & type of run ('INITIAL' or 'HISTORY') \\ 
-level   & '' & 0 & 0=thermodynamic level, 1=dry cbl, 2=moist cbl (no rain), 3=moist cbl (with rain), 5=moist convection (with ice, snow, graupel, hail)\\
-cloud\_type&icemcrp&2403&set to 2403\\
+nxp          & grid & 132                 & total number of $x$ points ($N_y+4$)                  \\
+nyp          &  ''  & 132                 & total number of $y$ points ($N_y+4$)                  \\
+nzp          &  ''  & 105                 & total number of $z$ points                            \\
+nxpart       &  ''  & true                & 2D domain decomposition                               \\
+deltax       &  ''  & 35.0 m              & grid spacing in $x$-direction                         \\
+deltay       &  ''  & 35.0 m              & grid spacing in $y$-direction                         \\
+deltaz       &  ''  & 17.5 m              & grid spacing in $z$-direction                         \\
+dzrat        &  ''  & 1.0                 & grid stretching ration                                \\
+dzmax        &  ''  & 1200 m              & height at which grid-stretching begins                \\
+dtlong       &  ''  & 10 s                & maximum timestep                                      \\
+nfpt         &  ''  & 10                  & number of levels in upper sponge layer                \\
+distim       &  ''  & 300 s               & minimum relaxation time in sponge layer               \\
+th00         &  ''  & 288                 & basic state potential temperature                     \\
+igrdtyp      &  ''  & 1                   & control parameter for selecting vertical grid         \\
+             &      &                     & \hspace{2mm} 1 = using nzp, deltaz, dzrat, dzmax      \\
+             &      &                     & \hspace{2mm} 2 = Tschebyschev grid                    \\
+             &      &                     & \hspace{2mm} 3 = grid supplied via zm\_grid\_in       \\
+iradtyp      &  ''  & 0                   & control parameter for selecting radiation model       \\
+             &      &                     & \hspace{2mm} 1,2,3 = case specific (see forc.f90)     \\
+             &      &                     & \hspace{2mm} 4     = delta-4 stream radiative transfer\\
+             &      &                     & \hspace{2mm} 5     = surface radiation                \\
+lrad\_ca     &  ''  & false               & Perform clear air radiation calculations              \\              
+isfctyp      &  ''  & 0                   & control parameter for surface type                    \\
+             &      &                     & \hspace{2mm} 0 = prescribed fluxes in dthcon, drtcon  \\
+             &      &                     & \hspace{2mm} 1 = prescribed gradient in dthcon, drtcon\\
+             &      &                     & \hspace{2mm} 2 = sea surface ($q_{surf} = q_{sat}(SST)$ \\
+             &      &                     & \hspace{2mm} 3 = sea surface ?                        \\
+             &      &                     & \hspace{2mm} 4 = Variable $T_{surface}$ for constant buoyancy flux \\
+             &      &                     & \hspace{2mm} 5 = Interactive land surface scheme      \\
+sfc\_albedo  &  ''  & 0.05                & Surface albedo                                        \\
+naddsc       &  ''  & 0                   & number of additional scalars                          \\
+CCN          &  ''  & 150 $\times 10^{6}$ & cloud droplet mixing ratio                            \\
+expnme       &  ''  & Default             & experiment name                                       \\
+filprf       &  ''  & x                   & file prefix for use in constructing output files      \\
+runtype      &  ''  & INITIAL             & type of run ('INITIAL' or 'HISTORY')                  \\ 
+level        &  ''  & 0                   & \hspace{2mm} 0 = heat ($\theta$) only                 \\ 
+             &      &                     & \hspace{2mm} 1 = + water vapor ($q_v$)                \\
+             &      &                     & \hspace{2mm} 2 = + liquid water ($q_l$)               \\
+             &      &                     & \hspace{2mm} 3 = + rain ($q_r$)                       \\
+             &      &                     & \hspace{2mm} 4 = + ice, snow, graupel ($q_i,q_s,q_g$) \\
+             &      &                     & \hspace{2mm} 5 = + two-moment scheme                  \\
+umean        &  ''  & 0 m/s               & Galilean transformation                               \\ 
+vmean        &  ''  & 0 m/s               & Galilean transformation                               \\ 
+lcouvreux    &  ''  & false               & Couvreux decaying scalar                              \\
+lwaterbudget &  ''  & false               & Liquid water budget diagnostics (level=3)             \\
+prc\_lev     &  ''  & -1                  & ?                                                     \\
 \hline
-ipsflg&  init  & 1   & control parameter for input sounding (0: pressure
-in hPa; 1: height in meters with ps(1)= $p_{sfc}$) \\
-itsflg&  ''  & 1   & control parameter for input sounding (0: ts =
-$\theta;$ 1: $ts = \theta_l$) \\
-us    &  ''  & n/a & input zonal wind sounding (max nns=150 points) \\
-vs    &  ''  & n/a & input meridional wind sounding (max nns=150
-points) \\
-ts    &  ''  & n/a & input temperature sounding (max nns=150 points) \\
-rts   &  ''  & n/a & input humidity sounding (max nns=150 points) \\
-ps    &  ''  & n/a & input pressure sounding (max nns=150 points) \\
-hs    &  ''  & n/a & vertical position (max nns=150 points) \\
-iseed &  ''  & 0   &  random seed \\
-zrand &  ''  & 200 m & height below which random perturbations are added \\
-hfilin & ''  & test. & name of input history file for HISTORY starts (xxx.)\\
+ipsflg       & init & 1                   & control parameter for input sounding \textit{ps}      \\
+             &      &                     & \hspace{2mm} 0 = pressure in hPa                      \\
+             &      &                     & \hspace{2mm} 1 = meters, with ps(1) = $p_{sfc}$       \\
+itsflg       &  ''  & 1                   & control parameter for input sounding \textit{ts}      \\ 
+             &      &                     & \hspace{2mm} 0 = $\theta$, 1 = $\theta_l$             \\
+irsflg       &  ''  & 1                   & control parameter for input sounding \textit{rts}     \\
+             &      &                     & \hspace{2mm} 0 = $q_t$ calculated from RH provided in \textit{rts} \\
+             &      &                     & \hspace{2mm} 1 = input \textit{rts} in $g \ kg^{-1}$  \\
+us           &  ''  & n/a                 & input zonal wind sounding (max 500 points)            \\
+vs           &  ''  & n/a                 & input meridional wind sounding (max 500 points)       \\
+ts           &  ''  & n/a                 & input temperature sounding (max 500 points)           \\
+rts          &  ''  & n/a                 & input humidity sounding (max 500 points)              \\
+ps           &  ''  & n/a                 & input pressure sounding (max 500 points)              \\
+iseed        &  ''  & 0                   & random seed                                           \\
+zrand        &  ''  & 200 m               & height below which random perturbations are added     \\
+mag\_pert\_t &  ''  & 0.2 K               & magnitude of temperature pertubations                 \\
+mag\_pert\_q &  ''  & 5 $\times 10^{-5} kg / kg^{-1}$ & magnitude of moisture pertubations        \\
+hfilin       &  ''  & test.               & name of input history file for HISTORY starts (xxx.)  \\
+lhomrestart  &  ''  & false               & homogenize fields after restart                       \\
 \hline
-timmax & step& 18000 s  &  final time of simulation \\ 
-frqhis    & '' & 9000 s &  history write interval \\
-frqanl    & '' & 3600 s &  analysis write interval  \\
-outflg    & '' & true   &  output flag (true/false) \\
-slcflg    & '' & false  &  write slice output (true/false) \\ 
-istpfl    & '' & 1 &  print interval for timestep info \\
-corflg    & '' & false   &  coriolis acceleration (true/false) \\
-radfrq    & '' & 0   &  radiation update interval \\
-strtim    & '' & 0   &  GMT of model time \\
-cntlat    & '' & 31.5$^{\circ}$ N &  model central latitude \\
-case\_name    & '' & astex &  specify case name (rico,astex,bomex)\\
-lsvarflg  & '' & false & reads large scale forcings from the file lscale\_in\\
-div       & '' & 3.75e-6 s$^{-1}$ & divergence\\
-sst       & '' & 292 K &  sea surface temperature \\ 
+timmax       & step & 18000 s             & final time of simulation                              \\ 
+wctime       &  ''  & 1e10 s              & wall-clock limit                                      \\
+frqhis       &  ''  & 9000 s              & history write interval                                \\
+frqanl       &  ''  & 3600 s              & analysis write interval                               \\
+frqcross     &  ''  & 3600 s              & cross section write interval                          \\
+istpfl       &  ''  & 1                   & print interval for timestep info                      \\
+corflg       &  ''  & false               & coriolis acceleration                                 \\
+radfrq       &  ''  & 0                   & radiation update interval                             \\
+strtim       &  ''  & 0                   & UTC of model time                                     \\
+cntlat       &  ''  & 31.5$^{\circ}$ N    & model central latitude                                \\
+case\_name   &  ''  & astex               & specify case name (rico, astex, bomex, ..)            \\
+lsvarflg     &  ''  & false               & reads large scale forcings from the file lscale\_in   \\
+div          &  ''  & 0 s$^{-1}$          & divergence                                            \\
+sst          &  ''  & 292 K               & (sea) surface temperature                             \\ 
+lanom        &  ''  & false               & ...                                                   \\
+tau          &  ''  & 900 s               & decay time scale Couvreux scalar                      \\
 \hline
-isfctyp   & srfc & 0  &  surface parameterization type (0: specified
-fluxes; 1: specified surface layer gradients; 2: fixed lower boundary
-of water\\
- ubmin     & '' & 0.20  &  minimum $u$ for $u_*$ computation \\
- zrough    & '' & 0.1 &  momentum roughness height (if less than
- zero use Charnock relation)\\
- dthcon    & '' &100 Wm$^{-2}$ &  surface temperature gradient
- (itsflg=1) or surface heat flux (itsflg=0) \\
- drtcon    & '' &0   Wm$^{-2}$ &   surface humidity (mixing ratio) gradient
- (itsflg=1) or surface latent heat flux (itsflg=0) \\
+ltimedep     & modtimedep & false         & time dependant surface and large scale forcings       \\ 
 \hline
- csx       & sgsm &  0.23   &  Smagorinsky Coefficient \\
- prndtl    &  '' &  1/3    &  Prandtl Number (if less than zero no sgs for
- scalars) \\
+lstendflg    & forc & false               & large scale advective tendencies (file lstend\_in)    \\
 \hline
-ssam\_intvl&  '' &  30 s  &  statistics sampling interval\\
-savg\_intvl& stat & 1800 s    &  statistics averaging interval \\
+lmtr         & advf & 3                   & limiter in flux-limited scalar advection              \\ 
+             &      &                     & \hspace{2mm} 0=no limiter, 1=minmod, 2=superbee       \\
+             &      &                     & \hspace{2mm} 3=mc, 4=van leer                         \\
+\hline
+advm         & advl & 4                   & momentum advection scheme                             \\ 
+             &      &                     & \hspace{2mm} 2=2nd order centered                     \\
+             &      &                     & \hspace{2mm} 4=2nd order centered                     \\
+\hline
+csx          & sgsm & 0.23                & Smagorinsky Coefficient                               \\
+prndtl       &  ''  & 1/3                 & Prandtl Number (if less than zero no sgsm for scalars) \\
+clouddiff    &  ''  & -1                  & Additional diffusion outside clouds                   \\
+\hline
+ubmin        & srfc & 0.20                & minimum $u$ for $u_*$ computation                     \\
+zrough       &  ''  & 0.01                & momentum roughness height (if less than zero use Charnock relation) \\
+dthcon       &  ''  & 100 Wm$^{-2}$       & itsflg=0: surface sensible heat flux                  \\
+             &      &                     & itsflg=1: surface temperature gradient                \\
+drtcon       &  ''  & 0   Wm$^{-2}$       & itsflg=0: surface latent heat flux                    \\
+             &      &                     & itsflg=1: surface mixing-ratio gradient               \\
+rh\_srf      &  ''  & 1.                  & surface relative humidity                             \\ 
+drag         &  ''  & -1                  & optional prescribed drag coefficient                  \\
+lhomflx      &  ''  & false               & homogenize surface fluxes                             \\ 
+\hline
+fixed\_sun   &rad\_driver& false          & fix solar zenith angle                                \\
+u0           &  ''  & n/a                 & cos(solar zenith angle) for fixed\_sun=true           \\
+rad\_eff\_radius & '' & 1                 & ...                                                   \\
+\hline
+cloud\_type  & mcrp & 2403                & ...                                                   \\
+lrandommicro &  ''  & false               & ...                                                   \\
+microseq     &  ''  & \{1,2,..,23\}       & ...                                                   \\
+timenuc      &  ''  & 60                  & ...                                                   \\
+nin\_set     &  ''  & 1700                & ...                                                   \\
+lpartdrop    &  ''  & false               & ...                                                   \\
+\hline
+SolarConstant& defs & 1365 $Wm^{-1}$      & Solar constant                                        \\ 
+\hline
+ssam\_intvl  & stat & 30 s                & statistics sampling interval                          \\
+savg\_intvl  &  ''  & 1800 s              & statistics averaging interval                         \\
+\hline
+lcross       & modcross & false              & cross sections                                     \\
+dtcross      &  ''  & 60 s                & frequency cross sections                              \\
+lxy          &  ''  & false               & xy output                                             \\
+lxz          &  ''  & false               & xz output                                             \\
+lyz          &  ''  & false               & yz output                                             \\
+xcross       &  ''  & 0 m                 & location of x slice                                   \\
+ycross       &  ''  & 0 m                 & location of y slice                                   \\
+zcross       &  ''  & 0 m                 & location of z slice (max 10 points, z$>$0), or:       \\
+             &      &                     & \hspace{2mm} -1 = at height maximum buoyancy variance \\
+             &      &                     & \hspace{2mm} -2 = at cloud base                       \\
+             &      &                     & \hspace{2mm} -3 = at lifting condensation level       \\
+crossvars    &  ''  & see modcross.f90    & list of output variables                              \\
+\hline
+lpartic      & particles & false          & Lagrangian particles                                  \\
+lpartsgs     &  ''  & false               & sub-grid scheme particles                             \\
+lrandsurf    &  ''  & false               & randomize particles near surface                      \\
+lpartstat    &  ''  & false               & bin-average particle statistics                       \\
+lpartdump    &  ''  & false               & raw (netcdf) particle analysis files                  \\
+frqpartdump  &  ''  & 3600 s              & frequency of writing analysis files                   \\                
+lpartdumpui  &  ''  & false               & write velocities to analysis                          \\
+lpartdumpth  &  ''  & false               & write potential temperatures to analysis              \\
+lpartdumpmr  &  ''  & false               & write mixing ratios to analysis                       \\
+ldropstart   &  ''  & 0 s                 & ...                                                   \\
+\hline
+lsync        & modnetcdf & false          & ...                                                   \\
+deflate\_level&  ''  & 0                  & NetCDF compression factor                             \\
+\hline
+lnudge       & modnudge & false           & nudging of wind and scalars to predefined profiles    \\ 
+tnudgefac    &  ''  & 1                   & ...                                                   \\
+qfloor       &  ''  & -1                  & ...                                                   \\
+zfloor       &  ''  & 1200 m              & ...                                                   \\
+znudgemin    &  ''  & -1                  & ...                                                   \\
+znudgeplus   &  ''  & -1                  & ...                                                   \\
+lnudgebound  &  ''  & false               & ...                                                   \\
 \hline
 \hline
 \label{tbl:namelist}

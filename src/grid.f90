@@ -34,7 +34,7 @@ module grid
   real              :: deltax = 35.        ! dx for basic grid
   real              :: deltay = 35.        ! dy for basic grid
   real              :: deltaz = 17.5       ! dz for basic grid
-  real              :: dzrat  = 1.02       ! grid stretching ratio
+  real              :: dzrat  = 1.0        ! grid stretching ratio
   real              :: dzmax  = 1200.      ! height to start grid-stretching
   real              :: dtlong = 10.0       ! long timestep
   real              :: th00   = 288.       ! basic state temperature

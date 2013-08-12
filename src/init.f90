@@ -142,7 +142,7 @@ contains
           call triggercross(time)
           call statistics (time)
           call write_ps(nzp,dn0,u0,v0,zm,zt,time)
-	  if(lpartic) call particlestat(.false.,time)
+          if(lpartic) call particlestat(.false.,time)
           if(lpartic) call particlestat(.true.,time)
        else
           call init_anal(time+dt)
