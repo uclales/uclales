@@ -21,14 +21,23 @@ module advf
 
   implicit none
 
-  integer :: lmtr = 3
+  ! iadv_scal: 
+    ! 1  = original upwind flux limited, 
+    ! 22 = 2nd order centered in xyz
+    ! 44 = 4th order centered in xyz
+    ! 42 = 4th order in xy, 2nd in z
+    ! 2nd to 4th order available
+    ! etc.
+
+  integer :: iadv_scal = 1     ! 1=original upwind flux limited
+  integer :: lmtr      = 3     ! 3=mc limiter
+  real    :: gcfl      = 0.5   ! Goal CFL number
+  real    :: cfllim    = 1.    ! CFL violation limit
 
 contains
   !
   !----------------------------------------------------------------------
-  ! subroutine fadvect: This is the driver for scalar advection.  It 
-  ! advects using the average of the velocities at the current and past
-  ! times.
+  ! subroutine fadvect: This is the driver for scalar advection.  
   !
   subroutine fadvect
 
@@ -40,9 +49,13 @@ contains
     use util, only      : atob, get_avg3
 
     real    :: v1da(nzp)
-    integer :: n
+    integer :: n,dummy
+
+    ! BvS Original scheme has CFL check in functions, others don't..
+    if(iadv_scal.ne.1) call checkcfl(nzp,nxp,nyp,a_up,a_vp,a_wp,dxi,dyi,dzi_t,dt)
+
     !
-    ! diagnose liquid water flux
+    ! diagnose liquid water flux -> Alway using monotone scheme
     !
     if (sflg .and. level > 1) then
        call atob(nxyzp,liquid,a_scr1)
@@ -61,10 +74,47 @@ contains
        call newvar(n,istep=nstep)
        call atob(nxyzp,a_sp,a_scr1)
 
-       call mamaos_y(nzp,nxp,nyp,a_vp,a_sp,a_scr1,dyi,dt)
-       call mamaos_x(nzp,nxp,nyp,a_up,a_sp,a_scr1,dxi,dt)
-       call atob(nxyzp,a_wp,a_scr2)
-       call mamaos(nzp,nxp,nyp,a_scr2,a_sp,a_scr1,dzi_t,dzi_m,dn0,dt,.false.)
+       if (n.ge.6) then ! Always monotone scheme for liquid water etc.
+         call mamaos_y(nzp,nxp,nyp,a_vp,a_sp,a_scr1,dyi,dt)
+         call mamaos_x(nzp,nxp,nyp,a_up,a_sp,a_scr1,dxi,dt)
+         call atob(nxyzp,a_wp,a_scr2)
+         call mamaos(nzp,nxp,nyp,a_scr2,a_sp,a_scr1,dzi_t,dzi_m,dn0,dt,.false.)
+       else
+         select case(iadv_scal)
+           case(1)  ! Original flux limited upwind Bjorn
+             call mamaos_y(nzp,nxp,nyp,a_vp,a_sp,a_scr1,dyi,dt)
+             call mamaos_x(nzp,nxp,nyp,a_up,a_sp,a_scr1,dxi,dt)
+             call atob(nxyzp,a_wp,a_scr2)
+             call mamaos(nzp,nxp,nyp,a_scr2,a_sp,a_scr1,dzi_t,dzi_m,dn0,dt,.false.)
+           case(22) ! 2nd order centered
+             call advscaly2(nzp,nxp,nyp,a_vp,a_sp,a_scr1,dyi,dt)
+             call advscalx2(nzp,nxp,nyp,a_up,a_sp,a_scr1,dxi,dt)
+             call atob(nxyzp,a_wp,a_scr2)
+             call advscalz2(nzp,nxp,nyp,a_scr2,a_sp,a_scr1,dzi_t,dzi_m,dn0,dt)
+           case(33) ! 3rd order centered
+             call advscaly3(nzp,nxp,nyp,a_vp,a_sp,a_scr1,dyi,dt)
+             call advscalx3(nzp,nxp,nyp,a_up,a_sp,a_scr1,dxi,dt)
+             call atob(nxyzp,a_wp,a_scr2)
+             call advscalz3(nzp,nxp,nyp,a_scr2,a_sp,a_scr1,dzi_t,dzi_m,dn0,dt)
+           case(32) ! 3rd order centered, 2nd vertical
+             call advscaly3(nzp,nxp,nyp,a_vp,a_sp,a_scr1,dyi,dt)
+             call advscalx3(nzp,nxp,nyp,a_up,a_sp,a_scr1,dxi,dt)
+             call atob(nxyzp,a_wp,a_scr2)
+             call advscalz2(nzp,nxp,nyp,a_scr2,a_sp,a_scr1,dzi_t,dzi_m,dn0,dt)
+           case(44) ! 4th order centered
+             call advscaly4(nzp,nxp,nyp,a_vp,a_sp,a_scr1,dyi,dt)
+             call advscalx4(nzp,nxp,nyp,a_up,a_sp,a_scr1,dxi,dt)
+             call atob(nxyzp,a_wp,a_scr2)
+             call advscalz4(nzp,nxp,nyp,a_scr2,a_sp,a_scr1,dzi_t,dzi_m,dn0,dt)
+           case(42) ! 4th order centered, 2nd vertical
+             call advscaly4(nzp,nxp,nyp,a_vp,a_sp,a_scr1,dyi,dt)
+             call advscalx4(nzp,nxp,nyp,a_up,a_sp,a_scr1,dxi,dt)
+             call atob(nxyzp,a_wp,a_scr2)
+             call advscalz2(nzp,nxp,nyp,a_scr2,a_sp,a_scr1,dzi_t,dzi_m,dn0,dt)
+           case default
+             stop('iadv_scal option not supported')
+         end select
+       end if
 
        if (sflg) then
           call get_avg3(nzp,nxp,nyp,a_scr2,v1da)
@@ -85,7 +135,7 @@ contains
     real, intent(in)   :: varo(n1,n2,n3),varn(n1,n2,n3),dt
     real, intent(inout)  :: tnd(n1,n2,n3)
 
-    real :: dti
+    real    :: dti
     integer :: i,j,k
 
     dti=1./dt
@@ -101,6 +151,337 @@ contains
     enddo
 
   end subroutine advtnd
+  !
+  ! ----------------------------------------------------------------------
+  ! Subroutine checkcfl: generic function to check CFL violations
+  !
+  subroutine checkcfl(n1,n2,n3,u,v,w,dxi,dyi,dzi_t,dt)
+
+    use mpi_interface, only : myid, appl_abort
+
+    integer, intent(in)  :: n1,n2,n3
+    real, intent(in)     :: u(n1,n2,n3),v(n1,n2,n3),w(n1,n2,n3)
+    real, intent(in)     :: dzi_t(n1),dxi,dyi,dt    
+
+    integer :: i,j,k
+    real    :: cflu,cflv,cflw
+
+    do j=3,n3-2
+       do i=3,n2-2
+          do k=2,n1-1
+            cflu  = u(k,i,j) * dt * dxi
+            cflv  = v(k,i,j) * dt * dyi
+            cflw  = w(k,i,j) * dt * dzi_t(k)
+            if((abs(cflu)>cfllim).or.(abs(cflv)>cfllim).or.(abs(cflw)>cfllim)) then
+              print *, '  ABORTING: CFL violation @ myid,kij=',myid,k,i,j
+              call appl_abort (0)
+            end if 
+          end do
+       enddo
+    enddo
+
+  end subroutine checkcfl
+
+  !---------------------------------------------------------------------- 
+  ! 2nd order centered, Following Wicker & Skamarock
+  !---------------------------------------------------------------------- 
+  !
+  !---------------------------------------------------------------------- 
+  ! Subroutine advscalz2: 2nd order z-direction advection scalars
+  !
+  subroutine advscalz2(n1,n2,n3,w,scp0,scp,dzi_t,dzi_m,dn0,dt)
+    integer, intent (in)    :: n1,n2,n3
+    real, intent (in)       :: scp0(n1,n2,n3)
+    real, intent (in)       :: dn0(n1),dzi_t(n1),dzi_m(n1)
+    real, intent (in)       :: dt
+    real, intent (inout)    :: w(n1,n2,n3),scp(n1,n2,n3)
+    integer                 :: i, j, k
+    real                    :: fp,fm,fluxout(n1,n2,n3)
+
+    do j = 3, n3-2
+      do i = 3, n2-2
+        w(1,i,j)     = 0.
+        w(n1-1,i,j)  = 0.
+        do k = 2, n1-1
+          fp = (w(k,i,j)/2.)   * (dn0(k+1) * scp0(k+1,i,j) + dn0(k) * scp0(k,i,j))
+          fm = (w(k-1,i,j)/2.) * (dn0(k) * scp0(k,i,j) + dn0(k-1) * scp0(k-1,i,j))
+          scp(k,i,j) = scp(k,i,j) - (fp-fm) * dt * dzi_t(k) / dn0(k)
+          fluxout(k,i,j) = fp
+        end do
+      enddo
+    enddo
+    w(:,:,:) = fluxout(:,:,:)
+
+  end subroutine advscalz2
+  !
+  !---------------------------------------------------------------------- 
+  ! Subroutine advscalx2: 2nd order x-direction advection scalars
+  !
+  subroutine advscalx2(n1,n2,n3,u,scp0,scp,dxi,dt)
+    integer, intent (in) :: n1,n2,n3
+    real, intent (in)    :: dxi,dt
+    real, intent (in)    :: scp0(n1,n2,n3),u(n1,n2,n3)
+    real, intent (inout) :: scp(n1,n2,n3)
+    integer              :: i, j, k
+    real                 :: fp,fm
+
+    do j=3,n3-2
+      do i=3,n2-2
+        do k=2,n1-1
+          fp = (u(k,i,j)/2.)   * (scp0(k,i+1,j) + scp0(k,i,j))
+          fm = (u(k,i-1,j)/2.) * (scp0(k,i,j)   + scp0(k,i-1,j))
+          scp(k,i,j) = scp(k,i,j) - (fp - fm) * dt * dxi 
+        end do
+      end do
+    end do
+
+  end subroutine advscalx2
+  !
+  !---------------------------------------------------------------------- 
+  ! Subroutine advscaly2: 2nd order y-direction advection scalars
+  !
+  subroutine advscaly2(n1,n2,n3,v,scp0,scp,dyi,dt)
+    integer, intent (in) :: n1,n2,n3
+    real, intent (in)    :: dyi,dt
+    real, intent (in)    :: scp0(n1,n2,n3),v(n1,n2,n3)
+    real, intent (inout) :: scp(n1,n2,n3)
+    integer              :: i, j, k
+    real :: fp,fm
+   
+    do j=3,n3-2
+      do i=3,n2-2
+        do k=2,n1-1
+          fp = (v(k,i,j)/2.)   * (scp0(k,i,j+1) + scp0(k,i,j))
+          fm = (v(k,i,j-1)/2.) * (scp0(k,i,j)   + scp0(k,i,j-1))
+          scp(k,i,j) = scp(k,i,j) - (fp - fm) * dt * dyi 
+        end do
+      end do
+    end do
+
+  end subroutine advscaly2
+
+  !---------------------------------------------------------------------- 
+  ! 3rd order centered, Following Wicker & Skamarock
+  !---------------------------------------------------------------------- 
+  !
+  ! Subroutine advscalz3: 3rd order vertical advection scalars
+  !
+  subroutine advscalz3(n1,n2,n3,w,scp0,scp,dzi_t,dzi_m,dn0,dt)
+    integer, intent (in)    :: n1,n2,n3
+    real, intent (in)       :: scp0(n1,n2,n3)
+    real, intent (in)       :: dn0(n1),dzi_t(n1),dzi_m(n1)
+    real, intent (in)       :: dt
+    real, intent (inout)    :: w(n1,n2,n3),scp(n1,n2,n3)
+    integer                 :: i, j, k
+    real                    :: fp, fm, fluxout(n1,n2,n3) 
+    
+    do j = 3, n3-2
+      do i = 3, n2-2
+        w(1,i,j)     = 0.
+        w(n1-1,i,j)  = 0.
+
+        ! BvS: keep boundaries outside loop to allow vectorization
+        k  = 2
+        fp = (w(k,i,j)/2.)    * (dn0(k+1)*scp0(k+1,i,j) + dn0(k)*  scp0(k,i,j))
+        fm = (w(k-1,i,j)/2.)  * (dn0(k)*  scp0(k,i,j)   + dn0(k-1)*scp0(k-1,i,j))
+        fluxout(k,i,j) = fp
+        scp(k,i,j)     = scp(k,i,j) - (fp-fm) * dt * dzi_t(k) / dn0(k)
+
+        k = n1-1
+        fp = (w(k,i,j)/2.)    * (dn0(k+1)*scp0(k+1,i,j) + dn0(k)*  scp0(k,i,j))
+        fm = (w(k-1,i,j)/2.)  * (dn0(k)*  scp0(k,i,j)   + dn0(k-1)*scp0(k-1,i,j))
+        fluxout(k,i,j) = fp
+        scp(k,i,j)     = scp(k,i,j) - (fp-fm) * dt * dzi_t(k) / dn0(k)
+
+        k = n1-2
+        fp = (w(k,i,j)/2.)    * (dn0(k+1)*scp0(k+1,i,j) + dn0(k)*  scp0(k,i,j))
+        fm = (w(k-1,i,j)/2.)  * (dn0(k)*  scp0(k,i,j)   + dn0(k-1)*scp0(k-1,i,j))
+        fluxout(k,i,j) = fp
+        scp(k,i,j)     = scp(k,i,j) - (fp-fm) * dt * dzi_t(k) / dn0(k)
+
+        k  = 3
+        fp = (w(k,i,j)/12.)   * (7.*(dn0(k+1)*scp0(k+1,i,j)+dn0(k)*scp0(k,i,j)) - (dn0(k+2)*scp0(k+2,i,j)+dn0(k-1)*scp0(k-1,i,j)))
+        fp = fp - abs(w(k,i,j)/12.) * (3.*(dn0(k+1)*scp0(k+1,i,j)-dn0(k)*scp0(k,i,j)) - (dn0(k+2)*scp0(k+2,i,j)-dn0(k-1)*scp0(k-1,i,j)))
+        fm = (w(k-1,i,j)/2.)  * (dn0(k)*  scp0(k,i,j)   + dn0(k-1)*scp0(k-1,i,j))
+        fluxout(k,i,j) = fp
+        scp(k,i,j)     = scp(k,i,j) - (fp-fm) * dt * dzi_t(k) / dn0(k)
+
+        do k = 4, n1-3
+          ! BvS: vectorized
+          fp = (w(k,i,j)/12.)   * (7.*(dn0(k+1)*scp0(k+1,i,j)+dn0(k)*scp0(k,i,j)) - (dn0(k+2)*scp0(k+2,i,j)+dn0(k-1)*scp0(k-1,i,j)))
+          fm = (w(k-1,i,j)/12.) * (7.*(dn0(k)*scp0(k,i,j)+dn0(k-1)*scp0(k-1,i,j)) - (dn0(k+1)*scp0(k+1,i,j)+dn0(k-2)*scp0(k-2,i,j)))
+          fp = fp - abs(w(k,i,j)/12.)   * (3.*(dn0(k+1)*scp0(k+1,i,j)-dn0(k)*scp0(k,i,j)) - (dn0(k+2)*scp0(k+2,i,j)-dn0(k-1)*scp0(k-1,i,j)))
+          fm = fm - abs(w(k-1,i,j)/12.) * (3.*(dn0(k)*scp0(k,i,j)-dn0(k-1)*scp0(k-1,i,j)) - (dn0(k+1)*scp0(k+1,i,j)-dn0(k-2)*scp0(k-2,i,j)))
+          fluxout(k,i,j) = fp
+          scp(k,i,j)     = scp(k,i,j) - (fp-fm) * dt * dzi_t(k) / dn0(k)
+        end do
+      enddo
+    enddo
+    w(:,:,:) = fluxout(:,:,:)
+
+  end subroutine advscalz3
+  !
+  !---------------------------------------------------------------------- 
+  ! Subroutine advscalx3: 3rd order x-direction advection scalars
+  !
+  subroutine advscalx3(n1,n2,n3,u,scp0,scp,dxi,dt)
+    integer, intent (in) :: n1,n2,n3
+    real, intent (in)    :: dxi,dt
+    real, intent (in)    :: scp0(n1,n2,n3),u(n1,n2,n3)
+    real, intent (inout) :: scp(n1,n2,n3)
+    integer              :: i, j, k
+    real                 :: fp,fm
+
+    do j=3,n3-2
+      do i=3,n2-2
+        do k=2,n1-1
+          fp = (u(k,i,j)/12.)   * (7.*(scp0(k,i+1,j)+scp0(k,i,j)) - (scp0(k,i+2,j)+scp0(k,i-1,j)))
+          fm = (u(k,i-1,j)/12.) * (7.*(scp0(k,i,j)+scp0(k,i-1,j)) - (scp0(k,i+1,j)+scp0(k,i-2,j)))
+          fp = fp - abs(u(k,i,j)/12.)   * (3.*(scp0(k,i+1,j)-scp0(k,i,j)) - (scp0(k,i+2,j)-scp0(k,i-1,j)))
+          fm = fm - abs(u(k,i-1,j)/12.) * (3.*(scp0(k,i,j)-scp0(k,i-1,j)) - (scp0(k,i+1,j)-scp0(k,i-2,j)))
+          scp(k,i,j) = scp(k,i,j) - (fp - fm) * dt * dxi 
+        end do
+      end do
+    end do
+
+  end subroutine advscalx3
+  !
+  !---------------------------------------------------------------------- 
+  ! Subroutine advscaly3: 3rd order y-direction advection scalars
+  !
+  subroutine advscaly3(n1,n2,n3,v,scp0,scp,dyi,dt)
+    integer, intent (in) :: n1,n2,n3
+    real, intent (in)    :: dyi,dt
+    real, intent (in)    :: scp0(n1,n2,n3),v(n1,n2,n3)
+    real, intent (inout) :: scp(n1,n2,n3)
+    integer              :: i, j, k
+    real                 :: fp,fm
+
+    do j=3,n3-2
+      do i=3,n2-2
+        do k=2,n1-1
+          fp = (v(k,i,j)/12.)   * (7.*(scp0(k,i,j+1)+scp0(k,i,j)) - (scp0(k,i,j+2)+scp0(k,i,j-1)))
+          fm = (v(k,i,j-1)/12.) * (7.*(scp0(k,i,j)+scp0(k,i,j-1)) - (scp0(k,i,j+1)+scp0(k,i,j-2)))
+          fp = fp - abs(v(k,i,j)/12.)   * (3.*(scp0(k,i,j+1)-scp0(k,i,j)) - (scp0(k,i,j+2)-scp0(k,i,j-1)))
+          fm = fm - abs(v(k,i,j-1)/12.) * (3.*(scp0(k,i,j)-scp0(k,i,j-1)) - (scp0(k,i,j+1)-scp0(k,i,j-2)))
+          scp(k,i,j) = scp(k,i,j) - (fp - fm) * dt * dyi 
+        end do
+      end do
+    end do
+
+  end subroutine advscaly3
+
+
+  !---------------------------------------------------------------------- 
+  ! 4th order centered, Following Wicker & Skamarock
+  !---------------------------------------------------------------------- 
+  !
+  ! Subroutine advscalz4: 4th order vertical advection scalars
+  !
+  subroutine advscalz4(n1,n2,n3,w,scp0,scp,dzi_t,dzi_m,dn0,dt)
+    integer, intent (in)    :: n1,n2,n3
+    real, intent (in)       :: scp0(n1,n2,n3)
+    real, intent (in)       :: dn0(n1),dzi_t(n1),dzi_m(n1)
+    real, intent (in)       :: dt
+    real, intent (inout)    :: w(n1,n2,n3),scp(n1,n2,n3)
+    integer                 :: i, j, k
+    real                    :: fp, fm, fluxout(n1,n2,n3) 
+   
+    do j = 3, n3-2
+      do i = 3, n2-2
+        w(1,i,j)     = 0.
+        w(n1-1,i,j)  = 0.
+
+        ! BvS: keep boundaries outside loop to allow vectorization
+        k = 2 
+        fp = (w(k,i,j)/2.)    * (dn0(k+1)*scp0(k+1,i,j) + dn0(k)*  scp0(k,i,j))
+        fm = (w(k-1,i,j)/2.)  * (dn0(k)*  scp0(k,i,j)   + dn0(k-1)*scp0(k-1,i,j))
+        fluxout(k,i,j) = fp
+        scp(k,i,j)     = scp(k,i,j) - (fp-fm) * dt * dzi_t(k) / dn0(k)
+
+        k = n1-1
+        fp = (w(k,i,j)/2.)    * (dn0(k+1)*scp0(k+1,i,j) + dn0(k)*  scp0(k,i,j))
+        fm = (w(k-1,i,j)/2.)  * (dn0(k)*  scp0(k,i,j)   + dn0(k-1)*scp0(k-1,i,j))
+        fluxout(k,i,j) = fp
+        scp(k,i,j)     = scp(k,i,j) - (fp-fm) * dt * dzi_t(k) / dn0(k)
+
+        k = n1-2
+        fp = (w(k,i,j)/2.)    * (dn0(k+1)*scp0(k+1,i,j) + dn0(k)*  scp0(k,i,j))
+        fm = (w(k-1,i,j)/2.)  * (dn0(k)*  scp0(k,i,j)   + dn0(k-1)*scp0(k-1,i,j))
+        fluxout(k,i,j) = fp
+        scp(k,i,j)     = scp(k,i,j) - (fp-fm) * dt * dzi_t(k) / dn0(k)
+
+        k = 3
+        fp = (w(k,i,j)/12.)   * (7.*(dn0(k+1)*scp0(k+1,i,j)+dn0(k)*scp0(k,i,j)) - (dn0(k+2)*scp0(k+2,i,j)+dn0(k-1)*scp0(k-1,i,j)))
+        fm = (w(k-1,i,j)/2.)  * (dn0(k)*  scp0(k,i,j)   + dn0(k-1)*scp0(k-1,i,j))
+        fluxout(k,i,j) = fp
+        scp(k,i,j)     = scp(k,i,j) - (fp-fm) * dt * dzi_t(k) / dn0(k)
+
+        do k = 4, n1-3
+          fp = (w(k,i,j)/12.)   * (7.*(dn0(k+1)*scp0(k+1,i,j)+dn0(k)*scp0(k,i,j)) - (dn0(k+2)*scp0(k+2,i,j)+dn0(k-1)*scp0(k-1,i,j)))
+          fm = (w(k-1,i,j)/12.) * (7.*(dn0(k)*scp0(k,i,j)+dn0(k-1)*scp0(k-1,i,j)) - (dn0(k+1)*scp0(k+1,i,j)+dn0(k-2)*scp0(k-2,i,j)))
+          fluxout(k,i,j) = fp
+          scp(k,i,j)     = scp(k,i,j) - (fp-fm) * dt * dzi_t(k) / dn0(k)
+        end do
+      enddo
+    enddo
+    w(:,:,:) = fluxout(:,:,:)
+
+  end subroutine advscalz4
+  !
+  !---------------------------------------------------------------------- 
+  ! Subroutine advscalx4: 4th order x-direction advection scalars
+  !
+  subroutine advscalx4(n1,n2,n3,u,scp0,scp,dxi,dt)
+    integer, intent (in) :: n1,n2,n3
+    real, intent (in)    :: dxi,dt
+    real, intent (in)    :: scp0(n1,n2,n3),u(n1,n2,n3)
+    real, intent (inout) :: scp(n1,n2,n3)
+    integer              :: i, j, k
+    real                 :: fp,fm
+
+    do j=3,n3-2
+      do i=3,n2-2
+        do k=2,n1-1
+          fp = (u(k,i,j)/12.)   * (7.*(scp0(k,i+1,j)+scp0(k,i,j)) - (scp0(k,i+2,j)+scp0(k,i-1,j)))
+          fm = (u(k,i-1,j)/12.) * (7.*(scp0(k,i,j)+scp0(k,i-1,j)) - (scp0(k,i+1,j)+scp0(k,i-2,j)))
+          scp(k,i,j) = scp(k,i,j) - (fp - fm) * dt * dxi 
+        end do
+      end do
+    end do
+
+  end subroutine advscalx4
+  !
+  !---------------------------------------------------------------------- 
+  ! Subroutine advscaly4: 4th order y-direction advection scalars
+  !
+  subroutine advscaly4(n1,n2,n3,v,scp0,scp,dyi,dt)
+    integer, intent (in) :: n1,n2,n3
+    real, intent (in)    :: dyi,dt
+    real, intent (in)    :: scp0(n1,n2,n3),v(n1,n2,n3)
+    real, intent (inout) :: scp(n1,n2,n3)
+    integer              :: i, j, k
+    real                 :: fp,fm
+
+    do j=3,n3-2
+      do i=3,n2-2
+        do k=2,n1-1
+          fp = (v(k,i,j)/12.)   * (7.*(scp0(k,i,j+1)+scp0(k,i,j)) - (scp0(k,i,j+2)+scp0(k,i,j-1)))
+          fm = (v(k,i,j-1)/12.) * (7.*(scp0(k,i,j)+scp0(k,i,j-1)) - (scp0(k,i,j+1)+scp0(k,i,j-2)))
+          scp(k,i,j) = scp(k,i,j) - (fp - fm) * dt * dyi 
+        end do
+      end do
+    end do
+
+  end subroutine advscaly4
+
+
+
+  !---------------------------------------------------------------------- 
+  !---------------------------------------------------------------------- 
+  ! Flux limited upwind
+  !---------------------------------------------------------------------- 
+  !---------------------------------------------------------------------- 
   !
   !---------------------------------------------------------------------- 
   ! Subroutine mamaos: An alternative second order flux limited scheme 
@@ -151,8 +532,8 @@ contains
           do k = 1, n1-1
              cfl(k)  = w(k,i,j) * dt * dzi_m_local(k)
              wpdn(k) = w(k,i,j) * density(k)
-             if (abs(cfl(k)) > 1.0) then
-                if (myid == 0) print *, '  ABORTING: mamaos_z'
+             if (abs(cfl(k)) > cfllim) then
+                if (myid == 0) print *, '  ABORTING: mamaos_z @ kij=',k,i,j
                 call appl_abort (0)
              end if
           enddo
@@ -245,8 +626,8 @@ contains
           do i = 1,n2-1
              cfl(i,k)  = u(k,i,j) * dt * dxi
              scr(i,k)  = scp0(k,i+1,j)
-             if (abs(cfl(i,k)) > 1.0) then
-                if (myid == 0) print *, '  ABORTING: mamaos_x'
+             if (abs(cfl(i,k)) > cfllim) then
+                if (myid == 0) print *, '  ABORTING: mamaos_x @ kij=',k,i,j
                 call appl_abort(0)
              end if
           end do
@@ -366,8 +747,9 @@ contains
           do j = 1,n3-1
              cfl(j,k)  = v(k,i,j) * dt * dyi
              scr(j,k)  = scp0(k,i,j+1)
-             if (abs(cfl(j,k)) > 1.0) then
-                if (myid == 0) print *, '  ABORTING: mamaos_y'
+             if (abs(cfl(j,k)) > cfllim) then
+                if (myid == 0) print *, '  ABORTING: mamaos_y @ kij=',k,i,j
+                print*,v(k,i,j),scp(k,i,j)
                 call appl_abort(0)
              end if
           end do

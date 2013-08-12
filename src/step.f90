@@ -41,7 +41,7 @@ module step
   real    :: tau = 900.
 !irina
   real    :: sst=292.
-  real    :: div = 0.0
+  real    :: div = 3.75e-6
   logical :: lsvarflg = .false.
   character (len=8) :: case_name = 'astex'
 
@@ -75,6 +75,7 @@ contains
          lpartstat, exitparticlestat, write_particle_hist, particlestat, &
 	 balanced_particledump,frqpartdump, ldropstart
 
+    use advf, only : gcfl,cfllim
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
 
@@ -109,7 +110,7 @@ contains
        call double_scalar_par_max(pecletmax,gpecletmax)
        pecletmax = gpecletmax
        dt_prev = dt
-       dt = min(dtlong,dt*peak_cfl/(cflmax+epsilon(1.)))
+       dt = min(dtlong,dt*gcfl/(cflmax+epsilon(1.)))
 
        !
        ! output control
@@ -365,7 +366,7 @@ contains
           else
              call thermo(level)
           end if
-          call forcings(xtime,cntlat,sst,div,case_name,time)
+          call forcings(xtime,cntlat,sst,div,case_name)
           call micro(level,istp)
        end if
 
