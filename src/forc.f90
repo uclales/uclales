@@ -19,7 +19,7 @@
 !
 module forc
 
-  use defs, only      : cp
+  use defs, only      : cp, pi
   use radiation, only : d4stream,surfacerad
   !irina
   use rad_gcss, only  : gcss_rad
@@ -46,26 +46,28 @@ contains
   ! -------------------------------------------------------------------
   ! subroutine forcings:  calls the appropriate large-scale forcings
   !irina
-  subroutine forcings(time_in, cntlat, sst, div, case_name)
+  subroutine forcings(time_in, cntlat, sst, div, case_name,time_in_2)
 
 !irina
     use grid, only: nxp, nyp, nzp, zm, zt, dzi_t, dzi_m, dn0, iradtyp, isfctyp, liquid  &
          , a_rflx, a_sflx, albedo, a_tt, a_tp, a_rt, a_rp, a_pexnr, a_scr1 &
          , vapor, a_rpp,a_ricep,a_nicep,a_rgrp, CCN, pi0, pi1, level, a_ut, a_up, a_vt, a_vp,a_theta,&
-          a_lflxu, a_lflxd, a_sflxu, a_sflxd,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa,a_lflxu_ca, a_lflxd_ca, a_sflxu_ca, a_sflxd_ca, lflxd_toa_ca, lflxu_toa_ca, sflxd_toa_ca, sflxu_toa_ca
+          a_lflxu, a_lflxd, a_sflxu, a_sflxd,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa,a_lflxu_ca, a_lflxd_ca, a_sflxu_ca, a_sflxd_ca, lflxd_toa_ca, lflxu_toa_ca, sflxd_toa_ca, sflxu_toa_ca, a_wt, xt
 
     use mpi_interface, only : myid, appl_abort
     use util, only : get_avg
 
 !irina
-    real, optional, intent (in) :: time_in, cntlat, sst, div
+    real, optional, intent (in) :: time_in, cntlat, sst, div, time_in_2
     real, dimension (nzp):: um,vm
 
-    character (len=5), intent (in) :: case_name
+    character (len=8), intent (in) :: case_name
     integer :: i, j, k, kp1
     real, dimension(nzp,nxp,nyp) :: dum0, dum1, dum2, dum3, dum4
 
 !irina
+    real :: alpha, beta, gamma, delta, uinf !linda
+
     select case(iradtyp)
     case (1)
         call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt)
@@ -167,6 +169,33 @@ contains
 
 !cgils: Nudging
     call nudge(time_in)
+
+    if (case_name == 'squall') then
+
+       ! add u forcing to initialize squall line. Proposed change from George Bryan, 12-12-12
+
+      alpha = 0.1
+
+      IF(time_in_2.le.3600.0)THEN
+        gamma = 1.0
+        if(time_in_2.ge.3300.0)THEN
+           gamma = 1.0-(time_in_2-3300.0)/(3600.0-3300.0)
+        endif
+        do k=1,nzp
+           do j=3,nyp
+              do i=3,nxp
+                 beta  = (xt(i)-0.)/10000.0
+                 delta = (zt(k)-0.)/10000.0
+                 if((abs(beta).lt.1.0).and.(abs(delta).lt.1.0)) then
+                    a_ut(k,i,j)=a_ut(k,i,j)+alpha*gamma*cos(0.5*pi*beta)*(cosh(2.5*delta))**(-2.)
+                 endif
+              enddo
+           enddo
+        enddo
+      ENDIF
+
+
+    endif
 
 
   end subroutine forcings

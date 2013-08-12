@@ -41,7 +41,7 @@ module step
   real    :: tau = 900.
 !irina
   real    :: sst=292.
-  real    :: div = 3.75e-6
+  real    :: div = 0.0
   logical :: lsvarflg = .false.
   character (len=8) :: case_name = 'astex'
 
@@ -365,7 +365,7 @@ contains
           else
              call thermo(level)
           end if
-          call forcings(xtime,cntlat,sst,div,case_name)
+          call forcings(xtime,cntlat,sst,div,case_name,time)
           call micro(level,istp)
        end if
 

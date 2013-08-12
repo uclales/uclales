@@ -86,7 +86,7 @@ contains
             do i=3,nxp-2
               do j=3,nyp-2
                 a_tp(k,i,j) = a_tp(k,i,j) + t_ano(k,i-2,j-2)
-                if(level>0) a_rp(k,i,j) = a_rp(k,i,j) + q_ano(k,i-2,j-2)
+                if(level>0) a_rp(k,i,j) = max(0.0,a_rp(k,i,j) + q_ano(k,i-2,j-2))
                 a_up(k,i,j) = a_up(k,i,j) + u_ano(k,i-2,j-2)
                 a_vp(k,i,j) = a_vp(k,i,j) + v_ano(k,i-2,j-2)
                 a_wp(k,i,j) = a_wp(k,i,j) + w_ano(k,i-2,j-2)
@@ -119,12 +119,6 @@ contains
        call lstend_init
      end if
 
-
-    if (isfctyp==0) then
-        call homo_surf       !Malte: prescribe homogeneous surface fluxes
-    end if
-
-
     if (lpartic) then
       if(runtype == 'INITIAL') then
         call init_particles(.false.)
@@ -148,7 +142,7 @@ contains
           call triggercross(time)
           call statistics (time)
           call write_ps(nzp,dn0,u0,v0,zm,zt,time)
-	  if(lpartic) call particlestat(.false.,time)
+          if(lpartic) call particlestat(.false.,time)
           if(lpartic) call particlestat(.true.,time)
        else
           call init_anal(time+dt)
@@ -873,54 +867,11 @@ contains
     call thermo (level)
     call atob(nxyzp,a_pexnr,press)
 
-  end subroutine homogenize
-
- !-----------------------
- ! homo_surf read SHF LHF
- !
- subroutine homo_surf
-
-   use netcdf
-   use grid, only: shls, lhls, usls, timels
-
-   implicit none
-
-   integer            :: ncid, status
-   integer            :: shid, lhid, usid, timeid
-
-!*  Open
-      status=nf90_open('homo_fluxes.ts.nc',nf90_nowrite,ncid)
-      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
-!* Read
-      status=nf90_inq_varid(ncid,"shf_bar",shid)
-      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
-      status=nf90_get_var(ncid,shid,shls)
-      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
-
-      status=nf90_inq_varid(ncid,"lhf_bar",lhid)
-      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
-      status=nf90_get_var(ncid,lhid,lhls)
-      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
-
-      status=nf90_inq_varid(ncid,"ustar",usid)
-      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
-      status=nf90_get_var(ncid,usid,usls)
-      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
-
-      status=nf90_inq_varid(ncid,"time",timeid)
-      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
-      status=nf90_get_var(ncid,timeid,timels)
-      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
-!* Close
-      status=nf90_close(ncid)
-      if (status.ne.nf90_noerr) print*,nf90_strerror(status)
-
-return
- end subroutine homo_surf
-
+  end subroutine homogenize 
 
 !--------------------------------------------------------------------------!
 ! routine to start the model with noise resulting from previous simulation !
+! use cdo script cdo_anomaly in misc/scripts/                              !
 !--------------------------------------------------------------------------!
  subroutine larm_init_anom (n1,n2,n3,t_ano,q_ano,u_ano,v_ano,w_ano)
 

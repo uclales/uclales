@@ -80,7 +80,8 @@ contains
     use srfc, only : zrough, ubmin, dthcon, drtcon, rh_srf, drag, lhomflx
     use step, only : timmax, timrsm, istpfl, corflg, outflg, frqanl, frqhis,          &
          frqcross , strtim, radfrq, cntlat,&
-         case_name,lsvarflg, sst, div, wctime , tau                 !irina
+         case_name,lsvarflg, sst, div, wctime , tau, &                !irina
+         lanom ! linda
     use modnetcdf, only : lsync, deflate_level
     use ncio, only : deflev => deflate_level
     use modcross, only : lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars
@@ -90,7 +91,7 @@ contains
          filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype,             &
          CCN, lwaterbudget, lcouvreux, prc_lev, isfctyp, sfc_albedo, lrad_ca
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,irsflg, iseed, hfilin,   &
-         zrand,lhomrestart
+         zrand,lhomrestart,mag_pert_q,mag_pert_t
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
     use radiation, only : u0, fixed_sun, rad_eff_radius
@@ -104,35 +105,37 @@ contains
     implicit none
 
     namelist /model/  &
-         expnme    ,       & ! experiment name
-         nxpart    ,       & ! whether partition in x direction?
-         naddsc    ,       & ! Number of additional scalars
-         savg_intvl,       & ! output statistics frequency
-         ssam_intvl,       & ! integral accumulate/ts print frequency
-         corflg , cntlat , & ! coriolis flag
-         nfpt   , distim , & ! rayleigh friction points, dissipation time
-         level  , CCN    , & ! Microphysical model Number of CCN per kg of air
-         iseed  , zrand  , & ! random seed
-         nxp    , nyp    , nzp   ,  & ! number of x, y, z points
-         deltax , deltay , deltaz , & ! delta x, y, z (meters)
-         dzrat  , dzmax  , igrdtyp, & ! stretched grid parameters
+         expnme    ,                         & ! experiment name
+         nxpart    ,                         & ! whether partition in x direction?
+         naddsc    ,                         & ! Number of additional scalars
+         savg_intvl,                         & ! output statistics frequency
+         ssam_intvl,                         & ! integral accumulate/ts print frequency
+         corflg , cntlat ,                   & ! coriolis flag
+         nfpt   , distim ,                   & ! rayleigh friction points, dissipation time
+         level  , CCN    ,                   & ! Microphysical model Number of CCN per kg of air
+         iseed  , zrand  ,                   & ! random seed
+         mag_pert_q , mag_pert_t ,            & ! Magnitude of pertubations
+         nxp    , nyp    , nzp   ,           & ! number of x, y, z points
+         deltax , deltay , deltaz ,          & ! delta x, y, z (meters)
+         dzrat  , dzmax  , igrdtyp,          & ! stretched grid parameters
          timmax , dtlong , istpfl , timrsm, wctime, & ! timestep control
-         runtype, hfilin , filprf , & ! type of run (INITIAL or HISTORY)
+         runtype, hfilin , filprf ,          & ! type of run (INITIAL or HISTORY)
          frqhis , frqanl, frqcross, outflg , & ! freq of history/anal writes, output flg
          lsync, lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars,prc_lev,&
                   iradtyp, radfrq , strtim , sfc_albedo, & ! radiation type flag
-         isfctyp, ubmin  , zrough , & ! surface parameterization type
-         sst    , dthcon , drtcon , & ! SSTs, surface flx parameters
-         csx    , prndtl ,          & ! SGS model type, parameters
-         ipsflg , itsflg , irsflg,  & ! sounding flags
-         hs     , ps     , ts    ,  & ! sounding heights, pressure, temperature
-         us     , vs     , rts   ,  & ! sounding E/W winds, water vapor
-         umean  , vmean  , th00  ,  & ! gallilean E/W wind, basic state
-         case_name, lmtr,           & !irina:name of the case, i.e. astex, rico, etc
-         advm,                & ! Advection scheme scalars, momentum
-         lsvarflg,                  & ! irina:flag for time bvarying large scale forcing
-         lstendflg,                  & !irina:flag for time large scale advective tendencies
-         div,  &                       !irina: divergence
+         isfctyp, ubmin  , zrough ,          & ! surface parameterization type
+         sst    , dthcon , drtcon ,          & ! SSTs, surface flx parameters
+         csx    , prndtl ,                   & ! SGS model type, parameters
+         ipsflg , itsflg , irsflg,           & ! sounding flags
+         hs     , ps     , ts    ,           & ! sounding heights, pressure, temperature
+         us     , vs     , rts   ,           & ! sounding E/W winds, water vapor
+         umean  , vmean  , th00  ,           & ! gallilean E/W wind, basic state
+         lanom  ,                            & ! LINDA, start with anomalies
+         case_name, lmtr,                    & ! irina:name of the case, i.e. astex, rico, etc
+         advm,                               & ! Advection scheme scalars, momentum
+         lsvarflg,                           & ! irina:flag for time bvarying large scale forcing
+         lstendflg,                          & ! irina:flag for time large scale advective tendencies
+         div,                                & ! irina: divergence
          lnudge, tnudgefac, ltimedep, qfloor, zfloor,znudgemin, znudgeplus,  &             !thijs: Nudging
          lnudge_bound, &               ! LINDA, relaxation boundaries
          rh_srf, drag, &

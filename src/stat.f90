@@ -148,7 +148,7 @@ contains
 
     fname =  trim(filprf)//'.ps'
     if(myid == 0) print                                                  &
-         "(//' ',49('-')/,' ',/,'  Initiailzing: ',A20)",trim(fname)
+         "(//' ',49('-')/,' ',/,'  Initializing: ',A20)",trim(fname)
     call open_nc( fname, expnme, time,(nxp-4)*(nyp-4), ncid2, nrec2)
     call define_nc( ncid2, nrec2, nv2, s2, n1=nzp)
     if (myid == 0) print *, '   ...starting record: ', nrec2

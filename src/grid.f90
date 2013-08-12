@@ -34,7 +34,7 @@ module grid
   real              :: deltax = 35.        ! dx for basic grid
   real              :: deltay = 35.        ! dy for basic grid
   real              :: deltaz = 17.5       ! dz for basic grid
-  real              :: dzrat  = 1.02       ! grid stretching ratio
+  real              :: dzrat  = 1.0        ! grid stretching ratio
   real              :: dzmax  = 1200.      ! height to start grid-stretching
   real              :: dtlong = 10.0       ! long timestep
   real              :: th00   = 288.       ! basic state temperature
@@ -89,9 +89,6 @@ module grid
   real, dimension (:,:,:),  allocatable :: a_tsoil, a_phiw,                   &
                             a_sflxd_avn, a_sflxu_avn, a_lflxd_avn, a_lflxu_avn
   real, dimension (:,:),    allocatable :: a_tskin, a_qskin, a_Wl, a_Qnet, a_G0
-
-  !Malte: variables to read homogeneous fluxes from nc file
-  real, dimension (:),      allocatable :: shls, lhls, usls, timels
 
   !
   ! 3D Arrays
@@ -358,16 +355,6 @@ contains
        allocate (a_lflxu_avn(100,nxp,nyp))
        memsize = memsize + 2*nxp*nyp*4 + 5*nxp*nyp + 4*nxp*nyp*100
     end if
-
-    !Malte: allocate variables for homogeneous fluxes (no lsm used)
-    if (isfctyp == 0) then
-       allocate(shls(1740))
-       allocate(lhls(1740))
-       allocate(usls(1740))
-       allocate(timels(1740))
-       memsize = memsize + 4*1740
-    end if
-    !End Malte
 
     if (level >= 2) then
        allocate(prc_c(nzp,nxp,nyp))
@@ -669,7 +656,7 @@ contains
        hname = trim(hname)//'.rst'
     case(2)
        iblank=index(hname,' ')
-       write (hname(iblank:iblank+7),'(a1,i6.6,a1)') '.', int(time), 's'
+       write (hname(iblank:iblank+8),'(a1,i7.7,a1)') '.', int(time), 's'
     end select
 
     call random_seed(size=nseed)

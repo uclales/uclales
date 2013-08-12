@@ -48,8 +48,8 @@ contains
     use defs, only: vonk, p00, rcp, g, cp, alvl, ep2
     use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, zt, psrf,   &
          th00, umean, vmean, dn0, level, a_ustar, a_tstar, a_rstar,        &
-         uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, nstep, shls, lhls, usls,  &
-         timels, a_tskin, a_qskin, isfctyp, a_phiw, a_tsoil, a_Wl, deltax, obl
+         uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, nstep, a_tskin, a_qskin,  &
+         isfctyp, a_phiw, a_tsoil, a_Wl, obl
     use thrm, only: rslf
     use stat, only: sfc_stat, sflg
     use util, only : get_avg3

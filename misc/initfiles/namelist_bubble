@@ -1,7 +1,7 @@
  &model
-  nzp =   36
-  nxp =   36 
-  nyp =   36
+  nzp =   30
+  nxp =   64 
+  nyp =   44
   nxpart = .True.
   deltax = 2000
   deltay = 2000
@@ -38,5 +38,5 @@
   itsflg = 0
   div=0.0
   lnudge = .false.
-  wolke_typ = 2403
+  cloud_type = 2403
   /
