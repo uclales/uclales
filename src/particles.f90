@@ -813,6 +813,7 @@ contains
         v_rel = 1.e-20
 	print*,'v_rel ist null!'
       end if
+      
       		      
       if (stokes) then
 	!use Stokes drag
@@ -841,6 +842,7 @@ contains
       v_rel = sqrt((upred - particle%ures/dxi)**2. + &
 	           (vpred - particle%vres/dyi)**2. + &
 	           (wpred - particle%wres/dzi)**2. )
+
       if (stokes) then
 	C_d = 24./ (2.*rmax*v_rel/nu_l)
       else
@@ -858,12 +860,14 @@ contains
                         (1 - exp(-dt/particle%tau)) + (particle%vres/dyi    )*dt) *dyi
     particle%wdrop_rk = 1/dt *(particle%tau*(particle%wdrop/dzi - particle%wres/dzi + vt) * &
                         (1 - exp(-dt/particle%tau)) + (particle%wres/dzi -vt)*dt) *dzi
+
     
     if (nstep==3) then
+
       particle%ures_prev = 0.5 * (particle%ures_prev + particle%ures)
       particle%vres_prev = 0.5 * (particle%vres_prev + particle%vres)
       particle%wres_prev = 0.5 * (particle%wres_prev + particle%wres)
-      
+
       !corrector step for drop position
       particle%udrop = ((particle%udrop/dxi - particle%ures_prev/dxi     ) * exp(-dt/particle%tau) &
                         + particle%ures_prev/dxi)     *dxi
@@ -1384,12 +1388,9 @@ contains
     particle%wdrop_rkprev = particle%wdrop_rk
 
    if ( nstep==3 ) then
-      particle%ures_prev   = 0.
-      particle%vres_prev   = 0.
-      particle%wres_prev   = 0.
-      particle%usgs_prev   = 0.
-      particle%vsgs_prev   = 0.
-      particle%wsgs_prev   = 0.
+      particle%udrop_rkprev   = 0.
+      particle%vdrop_rkprev   = 0.
+      particle%wdrop_rkprev   = 0.
     end if
 
   end subroutine rk3_drop
@@ -2434,7 +2435,7 @@ contains
     particle => head
     do while(associated(particle))
       if(particle%x.ne.-32678..and. &
-      (particle%mass.lt.(rain%x_min-1.e-20).or.particle%z<=(1+zmax))) then
+      (particle%mass.lt.(rain%x_min).or.particle%z<=(1+zmax))) then
         ndel = ndel + 2
       end if
       particle => particle%next
@@ -2445,7 +2446,7 @@ contains
     particle => head
     do while(associated(particle))
       if(particle%x.ne.-32678..and. &
-      (particle%mass.lt.(rain%x_min-1.e-20).or.particle%z<=(1+zmax))) then
+      (particle%mass.lt.(rain%x_min).or.particle%z<=(1+zmax))) then
         ndel_n(ndel+1) = particle%unique
 	ndel_n(ndel+2) = particle%nd
 	ndel = ndel + 2
@@ -2539,7 +2540,6 @@ contains
     !real               :: zmax = 1.                  ! Max height in grid coordinates
     real               :: nppd = 1./(1.e10)               ! number of particles per drops
     real               :: xsizelocal, ysizelocal
-    real               :: C_d=1.0, vt=1.0
     integer            :: nprocs,i,j,k,newp,np_old,cntp
     integer(kind=long) :: npac
 
@@ -2555,15 +2555,16 @@ contains
       do i=3,nxp-2
         do k=2,nzp-2
 	  if (a_npauto(k,i,j)>0) then
-	    
-	    a_npauto(k,i,j) = a_npauto(k,i,j)*deltax*deltay*deltaz*nppd
+	  
+	    a_npauto(k,i,j) = a_npauto(k,i,j)*nppd/dxi/dyi/dzi_t(k)
+
 	    call random_number(randnr)          ! Random seed has been called from init_particles...
+
 	    if(randnr(1)<(a_npauto(k,i,j)-floor(a_npauto(k,i,j)))) then
 	      a_npauto(k,i,j) = a_npauto(k,i,j) + 1.
 	    end if
-	    
+
 	    if (floor(a_npauto(k,i,j))>0) then
-	      
 	      newp = 0
               do while(associated(particle).and.(newp.lt.floor(a_npauto(k,i,j))))
 	        if(particle%x.eq.-32678.) then
@@ -2579,9 +2580,9 @@ contains
                   particle%ures           = ui3d(particle%x,particle%y,particle%z) * dxi
                   particle%vres           = vi3d(particle%x,particle%y,particle%z) * dyi
                   particle%wres           = wi3d(particle%x,particle%y,particle%z) * dzi_t(floor(particle%z))
-                  particle%ures_prev      = 0.
-                  particle%vres_prev      = 0.
-                  particle%wres_prev      = 0.
+                  particle%ures_prev      = particle%ures
+                  particle%vres_prev      = particle%vres
+                  particle%wres_prev      = particle%wres
                   particle%usgs           = 0.
                   particle%vsgs           = 0.
                   particle%wsgs           = 0.
@@ -2592,10 +2593,9 @@ contains
 		  particle%mass           = rain%x_min
                   particle%partstep       = 0
                   particle%nd             = particle%nd + 1
-                  !call drag_coeff(particle,C_d,vt)
                   particle%udrop          = particle%ures
                   particle%vdrop          = particle%vres
-                  particle%wdrop          = particle%wres - 0.1634* dzi_t(floor(particle%z))!- vt * dzi_t(floor(particle%z))
+                  particle%wdrop          = particle%wres - 0.1634* dzi_t(floor(particle%z))
                   particle%udrop_rk       = 0.
                   particle%vdrop_rk       = 0.
                   particle%wdrop_rk       = 0.
@@ -2652,7 +2652,7 @@ contains
     dzi = dzi_t(floor(particle%z))
 
     call thermo(particle%x,particle%y,particle%z,thl,thv,rt,rl,tk=tk,ev=ev)
-    !if (myid==0) write(*,*) 'mass old: ',particle%mass
+    !if (myid==0) write(*,*) myid,'mass old: ',particle%mass
 	    
     ! drop growth by accretion
     
@@ -2673,11 +2673,11 @@ contains
     end if
     
     particle%mass = particle%mass + rl * i1d(particle%z,dn0) * K * dt
-    !if (myid==0) write(*,*) 'mass acc: ',particle%mass
-    
+    !if (myid==0) write(*,*) myid,'mass acc: ',particle%mass
+
     
     ! drop evaporation
-     
+
     es = esl(tk)
     
     Fk = (alvl/(Rm*tk)-1)*alvl*rowt/(Kt*tk)
@@ -2700,8 +2700,8 @@ contains
     !  write(*,*) 'fv : ',f_v
     !end if
     
-    particle%mass = particle%mass + f_v* 4*pi*r0* rowt*(S-1) / ((Fk+Fd)) * dt
-    !if (myid==0) write(*,*) 'mass eva: ',particle%mass
+    particle%mass = particle%mass + f_v* 4.*pi*r0* rowt*(S-1) / (Fk+Fd) * dt
+    !if (myid==0) write(*,*) myid,'mass eva: ',particle%mass
     
     
     !add drop breakup at 3mm to 6mm?! 
