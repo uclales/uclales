@@ -55,7 +55,7 @@ Program reshape_hist
   character(len=40) :: hname
   integer           :: nscl = 4
   integer           :: iblank, nv2, nsmp
-  logical           :: lwaterbudget, lcouvreux
+  logical           :: lwaterbudget, lcouvreux, lbendian
 
   real, dimension(:), allocatable ::  &
        xt,  &
@@ -100,6 +100,10 @@ Program reshape_hist
   real, dimension (:,:,:), allocatable:: &
        a_xp
   integer, dimension(:,:), allocatable :: seed_arr
+
+  ! on some machines (e.g. blizzard) files need to be big endian.
+  ! If so, set to .true.
+  lbendian = .false.
 
   !--------------------------------------------------------------------------
   ! Read the parameters of the restart file
@@ -234,7 +238,7 @@ Program reshape_hist
   call write_hist_1(time, hname, nxp2, nyp2, nx2, ny2, nxt, nyt, nz, nscl,&
        umean, vmean, th00, level, isfctyp, lwaterbudget, iradtyp, xt, xm, yt,   &
        ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf, seed_arr, nseed, dt,      &
-       a_ustar, a_tstar, a_rstar, a_pexnr, nxp1, nyp1)
+       a_ustar, a_tstar, a_rstar, a_pexnr, nxp1, nyp1, lbendian)
 
   ! Deallocate the first part of the fields of the large gathered domain
 
@@ -277,7 +281,7 @@ Program reshape_hist
           a_tsoil, a_phiw, a_tskin, a_qskin, a_wl)
 
      call write_hist_srfc(nxp2, nyp2, nx2, ny2, nxt, nyt, hname,  &
-          a_tsoil, a_phiw, a_tskin, a_qskin, a_wl)
+          a_tsoil, a_phiw, a_tskin, a_qskin, a_wl, lbendian)
 
      deallocate (a_tsoil)
      deallocate (a_phiw)
@@ -292,7 +296,7 @@ Program reshape_hist
      do n=1,4
         print*,'n = ',n,' of 8'
         call read_hist_2(nxp1, nyp1, nx1, ny1, nxt, nyt, nz, a_flx)
-        call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, nz, hname, a_flx)
+        call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, nz, hname, a_flx, lbendian)
      end do
      deallocate (a_flx)
      allocate (a_flx(100,nxt,nyt))
@@ -300,7 +304,7 @@ Program reshape_hist
      do n=1,4
         print*,'n = ',n+4,' of 8'
         call read_hist_2(nxp1, nyp1, nx1, ny1, nxt, nyt, 100, a_flx)
-        call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, 100, hname, a_flx)
+        call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, 100, hname, a_flx, lbendian)
      end do
      deallocate (a_flx)
 
@@ -319,7 +323,7 @@ Program reshape_hist
   do n=1,nscl
      print*,'n = ',n 
      call read_hist_2(nxp1, nyp1, nx1, ny1, nxt, nyt, nz, a_xp)
-     call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, nz, hname, a_xp)
+     call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, nz, hname, a_xp, lbendian)
   end do
 
   deallocate (a_xp)
@@ -355,10 +359,10 @@ Program reshape_hist
   print*,'***************************************************'
 
   if (.not.lwaterbudget) then
-     call write_hist_3(hname, nxp2, nyp2, nx2, ny2, nxt, nyt, nz, level, &
+     call write_hist_3(hname, lbendian, nxp2, nyp2, nx2, ny2, nxt, nyt, nz, level, &
           nv2, nsmp, svctr, prc_acc, rev_acc)
   else
-     call write_hist_3(hname, nxp2, nyp2, nx2, ny2, nxt, nyt, nz, level, &
+     call write_hist_3(hname, lbendian, nxp2, nyp2, nx2, ny2, nxt, nyt, nz, level, &
           nv2, nsmp, svctr, prc_acc, rev_acc, cnd_acc, cev_acc)
   end if
 

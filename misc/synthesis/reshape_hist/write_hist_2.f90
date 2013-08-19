@@ -1,6 +1,6 @@
 module writehist_2
 contains
-  subroutine write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, nz, hname, a_xp)
+  subroutine write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, nz, hname, a_xp, lbendian)
 
     implicit none
 
@@ -8,7 +8,7 @@ contains
     integer :: nxp2, nyp2, nz, unit
     character(len=40)              :: filename
     character (len=40), intent(in) :: hname
-    logical :: exans
+    logical :: exans, lbendian
 
     ! list of variables of the large grid
 
@@ -75,7 +75,11 @@ contains
              print *,'ABORTING: History file', trim(filename),' does not exist'
              stop
           else
-             open (unit,file=trim(filename),status='old',form='unformatted',position='append')!,convert='BIG_ENDIAN')
+             if (.not.lbendian) then
+                open (unit,file=trim(filename),status='old',form='unformatted',position='append')
+             else
+                open (unit,file=trim(filename),status='old',form='unformatted',position='append',convert='BIG_ENDIAN')
+             end if
              write (unit) a_xp_l
              close(unit)
           end if

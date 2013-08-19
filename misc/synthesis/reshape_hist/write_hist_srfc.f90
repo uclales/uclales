@@ -1,7 +1,7 @@
 module writehist_srfc
 contains
   subroutine write_hist_srfc(nxp2, nyp2, nx2, ny2, nxt, nyt, hname,&
-       a_tsoil, a_phiw, a_tskin, a_qskin, a_wl)
+       a_tsoil, a_phiw, a_tskin, a_qskin, a_wl, lbendian)
 
     implicit none
 
@@ -10,7 +10,7 @@ contains
 
     character(len=40)             :: filename
     character(len=40), intent(in) :: hname
-    logical :: exans
+    logical :: exans, lbendian
 
     ! list of variables of the large grid
 
@@ -98,8 +98,11 @@ contains
              print *,'ABORTING: History file', trim(filename),' does not exist'
              stop
           else
-             open (unit,file=trim(filename),status='old',form='unformatted',position='append')!,convert='BIG_ENDIAN')
-
+             if (.not.lbendian) then
+                open (unit,file=trim(filename),status='old',form='unformatted',position='append')
+             else
+                open (unit,file=trim(filename),status='old',form='unformatted',position='append',convert='BIG_ENDIAN')
+             end if
              write(unit) a_tsoil_l
              write(unit) a_phiw_l
              write(unit) a_tskin_l
