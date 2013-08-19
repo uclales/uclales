@@ -24,12 +24,10 @@ Program reshape_hist
 
   use readhist_1
   use readhist_srfc
-  use readhist_srfc_rad
   use readhist_2
   use readhist_3
   use writehist_1
   use writehist_srfc
-  use writehist_srfc_rad
   use writehist_2
   use writehist_3
 
@@ -282,13 +280,22 @@ Program reshape_hist
      deallocate (a_qskin)
      deallocate (a_Wl)
 
-     allocate (a_flx(100,nxt,nyt))
-
-     a_flx(:,:,:) = 0.
      ! loop through the radiation fields separately, memory issues!
-     do n=1,8
-        call read_hist_srfc_rad(nxp1, nyp1, nx1, ny1, nxt, nyt, a_flx)
-        call write_hist_srfc_rad(nxp2, nyp2, nx2, ny2, nxt, nyt, a_flx)
+     allocate (a_flx(nz,nxt,nyt))
+     a_flx(:,:,:) = 0.
+
+     do n=1,4
+        print*,'n = ',n,' of 8'
+        call read_hist_2(nxp1, nyp1, nx1, ny1, nxt, nyt, nz, a_flx)
+        call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, nz, a_flx)
+     end do
+     deallocate (a_flx)
+     allocate (a_flx(100,nxt,nyt))
+     a_flx(:,:,:) = 0.
+     do n=1,4
+        print*,'n = ',n+4,' of 8'
+        call read_hist_2(nxp1, nyp1, nx1, ny1, nxt, nyt, 100, a_flx)
+        call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, 100, a_flx)
      end do
      deallocate (a_flx)
 
