@@ -180,7 +180,7 @@ Program reshape_hist
   ! Determine size of subdomain of each processor
 
   nx1 = (nxt-4) / nxp1 +4
-  ny1 = (nyt-4) / nxp1 +4
+  ny1 = (nyt-4) / nyp1 +4
   nx2 = (nxt-4) / nxp2 +4
   ny2 = (nyt-4) / nyp2 +4
 
