@@ -134,6 +134,7 @@ contains
              write (unit) a_pexnr_l
 
              print "('Wrote history to: ',A60)",filename
+             close(unit)
           end if
        end do
     end do

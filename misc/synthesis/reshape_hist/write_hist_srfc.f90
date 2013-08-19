@@ -1,12 +1,16 @@
 module writehist_srfc
 contains
-  subroutine write_hist_srfc(nxp2, nyp2, nx2, ny2, nxt, nyt,&
+  subroutine write_hist_srfc(nxp2, nyp2, nx2, ny2, nxt, nyt, hname,&
        a_tsoil, a_phiw, a_tskin, a_qskin, a_wl)
 
     implicit none
 
     integer :: wrxid, wryid, xid, yid, i, j, ii, jj, k, istart, iend, jstart, jend
     integer :: nxp2, nyp2, unit
+
+    character(len=40)             :: filename
+    character(len=40), intent(in) :: hname
+    logical :: exans
 
     ! list of variables of the large grid
 
@@ -87,13 +91,23 @@ contains
           wryid = yid -1
 
           unit = 10 + wryid-wryid/nyp2 + nyp2*wrxid
+          write(filename,'(i4.4,a1,i4.4)') wrxid,'_',wryid
+          filename = './out/'//trim(filename)//'.'//trim(hname)
+          inquire(file=trim(filename),exist=exans)
+          if (.not.exans) then
+             print *,'ABORTING: History file', trim(filename),' does not exist'
+             stop
+          else
+             open (unit,file=trim(filename),status='old',form='unformatted',position='append')!,convert='BIG_ENDIAN')
 
-          write(unit) a_tsoil_l
-          write(unit) a_phiw_l
-          write(unit) a_tskin_l
-          write(unit) a_qskin_l
-          write(unit) a_wl_l
+             write(unit) a_tsoil_l
+             write(unit) a_phiw_l
+             write(unit) a_tskin_l
+             write(unit) a_qskin_l
+             write(unit) a_wl_l
 
+             close(unit)
+          end if
        end do
     end do
 

@@ -9,6 +9,11 @@ Program reshape_hist
 ! In order to save memory the programm reads only in a part of the restart    !
 ! files and puts that to the new files immediately.                           !
 !                                                                             !
+! For the write one file after another needs to be opened and close again.    !
+! This is necessesarry since there is an upper limit on the number of files   !
+! that are allowed to be open at the same time. Thus, the write continues     !
+! after reopening where it stopped before closing.                            !
+!                                                                             !
 ! Compilation: 1. compile the modules separately:                             !
 !                 ifort -c -r8 read_hist_1.f90                                !
 !              2. compile the main program and link the modules:              !
@@ -271,7 +276,7 @@ Program reshape_hist
      call read_hist_srfc(nxp1, nyp1, nx1, ny1, nxt, nyt,   &
           a_tsoil, a_phiw, a_tskin, a_qskin, a_wl)
 
-     call write_hist_srfc(nxp2, nyp2, nx2, ny2, nxt, nyt,   &
+     call write_hist_srfc(nxp2, nyp2, nx2, ny2, nxt, nyt, hname,  &
           a_tsoil, a_phiw, a_tskin, a_qskin, a_wl)
 
      deallocate (a_tsoil)
@@ -287,7 +292,7 @@ Program reshape_hist
      do n=1,4
         print*,'n = ',n,' of 8'
         call read_hist_2(nxp1, nyp1, nx1, ny1, nxt, nyt, nz, a_flx)
-        call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, nz, a_flx)
+        call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, nz, hname, a_flx)
      end do
      deallocate (a_flx)
      allocate (a_flx(100,nxt,nyt))
@@ -295,7 +300,7 @@ Program reshape_hist
      do n=1,4
         print*,'n = ',n+4,' of 8'
         call read_hist_2(nxp1, nyp1, nx1, ny1, nxt, nyt, 100, a_flx)
-        call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, 100, a_flx)
+        call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, 100, hname, a_flx)
      end do
      deallocate (a_flx)
 
@@ -314,7 +319,7 @@ Program reshape_hist
   do n=1,nscl
      print*,'n = ',n 
      call read_hist_2(nxp1, nyp1, nx1, ny1, nxt, nyt, nz, a_xp)
-     call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, nz, a_xp)
+     call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, nz, hname, a_xp)
   end do
 
   deallocate (a_xp)
