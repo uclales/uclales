@@ -30,7 +30,7 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 68, nvar2 = 118 ! number of time series and profiles
+  integer, parameter :: nvar1 = 72, nvar2 = 118 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2
   real, save         :: fsttm, lsttm
 
@@ -52,7 +52,7 @@ module stat
        'ra     ','rsurf  ','rsveg  ','rssoil ','tskinav','qskinav', & !49
        'obl    ','cliq   ','a_Wl   ','lflxutc','sflxutc','tsair  ', & !55
        'sflxds ','sflxus ','lflxds ','lflxus ','sflxdsc','sflxusc', & !61
-       'lflxdsc','lflxusc'/),                                       & !67
+       'lflxdsc','lflxusc','Tsoil1 ','Tsoil2 ','Tsoil3 ','Tsoil4 '/), & !67
        s2(nvar2)=(/                                                 &
        'time   ','zt     ','zm     ','dn0    ','u0     ','v0     ', & ! 1
        'fsttm  ','lsttm  ','nsmp   ','u      ','v      ','t      ', & ! 7
@@ -169,7 +169,7 @@ contains
          , vmean, dn0, prc_c,prc_g,prc_i,prc_r,prc_s, prc_h, a_rpp, a_npp, albedo, CCN, iradtyp, a_rflx    &
          , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa &
          , a_ricep, a_rsnowp, a_rgrp, a_rhailp, a_nicep, a_nsnowp, a_ngrp, a_nhailp &
-         , vapor, a_Wl, isfctyp, a_tskin, a_qskin, a_Qnet, a_G0, a_lflxu_ca,a_lflxd_ca,a_sflxu_ca,a_sflxd_ca, a_pexnr, pi0, pi1 &
+         , vapor, a_Wl, isfctyp, a_tsoil,a_tskin, a_qskin, a_Qnet, a_G0, a_lflxu_ca,a_lflxd_ca,a_sflxu_ca,a_sflxd_ca, a_pexnr, pi0, pi1 &
           , lflxu_toa_ca, lflxd_toa_ca, sflxu_toa_ca, sflxd_toa_ca, lrad_ca, obl
     use lsmdata, only: tndskin,ra,rsurf,rsveg,rssoil,cliq,Cskinav,init_lsm
 
@@ -194,7 +194,7 @@ contains
     if (iradtyp == 2 .and. level >1) then
        call accum_rad(nzp, nxp, nyp, a_rflx, sflx=a_sflx, alb=albedo)
     end if
-    if (iradtyp >2) then
+    if (iradtyp >2 .and. iradtyp < 5) then
       if (lrad_ca) then
         call accum_rad(nzp, nxp, nyp, a_rflx, sflx=a_sflx, alb=albedo,lflxu=a_lflxu,&
         lflxd=a_lflxd,sflxu=a_sflxu, sflxd=a_sflxd,lflxu_ca=a_lflxu_ca,&
@@ -242,6 +242,11 @@ contains
     if ((isfctyp == 5) .and. (init_lsm .eqv. .false.)) then
       call accum_lsm(nxp,nyp,a_Qnet,a_G0,tndskin,ra,rsurf,rsveg,rssoil,a_tskin,a_qskin,obl,cliq,a_Wl,Cskinav)
     end if
+
+    if(isfctyp == 55 .and. init_lsm .eqv. .false.) then
+      call accum_lsm2(nxp,nyp,nzp,a_Qnet,a_G0,ra,a_tskin,obl,a_sflxd,a_sflxu,a_lflxd,a_lflxu,a_tsoil)
+    end if
+ 
 
     if (debug) WRITE (0,*) 'statistics: set_ts ok,  myid=',myid
 
@@ -1256,10 +1261,11 @@ contains
   ! subroutine: sfc_stat:  Updates statistical arrays with surface flux
   ! variables
   !
-  subroutine sfc_stat(n2,n3,tflx,qflx,ustar,sst)
+  subroutine sfc_stat(n2,n3,tflx,ustar,sst,qflx)
 
     integer, intent(in) :: n2,n3
-    real, intent(in), dimension(n2,n3) :: tflx, qflx, ustar
+    real, intent(in), dimension(n2,n3) :: tflx, ustar
+    real, intent(in), optional, dimension(n2,n3) :: qflx
     real, intent(in)    :: sst
 
     ssclr(10) = sst
@@ -1646,6 +1652,44 @@ contains
     ssclr(57) = sum(a_Wl(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
 
   end subroutine accum_lsm
+
+  !
+  !---------------------------------------------------------------------
+  ! SUBROUTINE ACCUM_LSM2: Accumulates timeseries statistics
+  ! for land surface variables (if isfctyp=55)
+  !
+  subroutine accum_lsm2(nxp, nyp, nzp, a_Qnet, a_G0, ra, a_tskin,obl,a_sflxd,a_sflxu,a_lflxd,a_lflxu,a_tsoil)
+
+    integer, intent (in)  :: nxp,nyp,nzp
+    real, intent (in)     :: a_Qnet(nxp,nyp)
+    real, intent (in)     :: a_G0(nxp,nyp)
+    real, intent (in)     :: ra(nxp,nyp)
+    real, intent (in)     :: a_tskin(nxp,nyp)
+    real, intent (in)     :: obl(nxp,nyp)
+    real, intent (in)     :: a_sflxd(nzp,nxp,nyp),a_sflxu(nzp,nxp,nyp),&
+                             a_lflxd(nzp,nxp,nyp),a_lflxu(nzp,nxp,nyp)
+    real, intent (in)     :: a_tsoil(4,nxp,nyp)
+
+
+    ssclr(46) = sum(a_Qnet(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(47) = sum(a_G0(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(49) = sum(ra(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(53) = sum(a_tskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(55) = sum(obl(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+
+    ssclr(69) = sum(a_tsoil(1,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(70) = sum(a_tsoil(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(71) = sum(a_tsoil(3,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(72) = sum(a_tsoil(4,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+
+    !!!!!!!!! ONLY FOR IRADTYP=5 !!!!!!!!!!!!!!!!!!!!!!!
+    ssclr(61) = sum(a_sflxd(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(62) = sum(a_sflxu(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(63) = sum(a_lflxd(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    ssclr(64) = sum(a_lflxu(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+
+  end subroutine accum_lsm2
+
 
 end module stat
 

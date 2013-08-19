@@ -1,8 +1,9 @@
-# Thunder
+#Thunder
 set(CMAKE_Fortran_COMPILER "ifort")
 set(Fortran_COMPILER_WRAPPER mpif90)
 
-set(USER_Fortran_FLAGS "-traceback -r8 -ftz -extend_source -profile-functions -profile-loops=all -profile-loops-report=2")
+set(USER_Fortran_FLAGS "-traceback -r8 -ftz -extend_source")
+#set(USER_Fortran_FLAGS "-traceback -r8 -ftz -extend_source -profile-functions -profile-loops=all -profile-loops-report=2 -vec-report5")
 set(USER_Fortran_FLAGS_RELEASE "-O3 -no-prec-div -xAVX -fp-model source")
 set(USER_Fortran_FLAGS_DEBUG "-fpe0 -O0 -g -check all -check nopointers -check noarg_temp_created")
 

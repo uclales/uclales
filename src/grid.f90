@@ -28,6 +28,7 @@ module grid
   integer           :: nxp = 132           ! number of x points
   integer           :: nyp = 132           ! number of y points
   integer           :: nzp = 105           ! number of z points
+  integer           :: nzs = 4             ! number of soil levels
 
   logical           :: nxpart = .true.     ! number of processors in x
 
@@ -355,6 +356,14 @@ contains
        allocate (a_lflxu_avn(100,nxp,nyp))
        memsize = memsize + 2*nxp*nyp*4 + 5*nxp*nyp + 4*nxp*nyp*100
     end if
+
+    ! Bart: Simplified LSM (only heat)
+    if(isfctyp == 55) then
+       allocate (a_tsoil(nzs,nxp,nyp))
+       allocate (a_tskin(nxp,nyp))
+       allocate (a_Qnet (nxp,nyp))
+       allocate (a_G0    (nxp,nyp))
+    end if 
 
     if (level >= 2) then
        allocate(prc_c(nzp,nxp,nyp))
@@ -695,6 +704,16 @@ contains
     end if
     !End Malte
 
+    if (isfctyp == 55) then
+       write(10) a_tsoil
+       write(10) a_tskin
+       write(10) obl
+       write(10) a_sflxd
+       write(10) a_sflxu
+       write(10) a_lflxd
+       write(10) a_lflxu
+    end if
+
     do n=1,nscl
        call newvar(n)
        write(10) a_sp
@@ -776,6 +795,17 @@ contains
           read(10) a_lflxu_avn
        end if
        !End Malte
+
+       if (isfctyp == 55) then
+          read(10) a_tsoil
+          read(10) a_tskin
+          read(10) obl
+          read(10) a_sflxd
+          read(10) a_sflxu
+          read(10) a_lflxd
+          read(10) a_lflxu
+       end if
+
 
        do n=1,nscl
           call newvar(n)

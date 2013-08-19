@@ -27,8 +27,8 @@ use lsmdata
   real    :: drtcon  = 0.0
 
   logical :: lhomflx = .false.
-  real    :: rh_srf = 1.
-  real    :: drag   = -1.
+  real    :: rh_srf  = 1.
+  real    :: drag    = -1.
 
 contains
   !
@@ -49,7 +49,8 @@ contains
     use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, zt, psrf,   &
          th00, umean, vmean, dn0, level, a_ustar, a_tstar, a_rstar,        &
          uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, nstep, a_tskin, a_qskin,  &
-         isfctyp, a_phiw, a_tsoil, a_Wl, obl
+         isfctyp, a_phiw, a_tsoil, a_Wl, obl, &
+         a_lflxu, a_lflxd, a_sflxu, a_sflxd, rkalpha, rkbeta, a_Qnet, dt, a_G0
     use thrm, only: rslf
     use stat, only: sfc_stat, sflg
     use util, only : get_avg3
@@ -59,17 +60,21 @@ contains
     implicit none
 
     real, optional, intent (inout) :: sst, time_in
-    integer :: i, j, iterate 
+    integer :: i, j, k, iterate 
     real :: zs, bflx, ffact, sst1, bflx1, Vbulk, Vzt, usum
     real (kind=8) :: bfl(2), bfg(2)
 
     real :: dtdz(nxp,nyp), drdz(nxp,nyp), usfc(nxp,nyp), vsfc(nxp,nyp) &
             ,wspd(nxp,nyp), bfct(nxp,nyp), mnflx(5), flxarr(5,nxp,nyp)
 
+    ! BvS: for isfctyp=55 
+    !---------------------------------------
+    real     :: tsbar                                    ! Average surface T
+    real     :: rhcpa,gkm,gkp,soiltend,temp(20),zeff
+
     drdz(:,:)   = 0.
 
     select case(isfctyp)
-
     !
     ! use prescribed surface gradients dthcon, drton from NAMELIST
     ! use then similarity theory to compute the fluxes 
@@ -314,6 +319,72 @@ contains
 
     !
     ! ----------------------------------------------------------------------
+    ! Bart: simplified LSM for case without moisture
+    !
+    case(55)
+       if(init_lsm) call initlsm_simple   ! shouldn't be necessary
+
+       call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,a_up,a_vp,umean,vmean)
+       call getobl(wspd)
+
+       ! Get drag coefficients and aerodynamic resistance
+       do j=3,nyp-2
+         do i=3,nxp-2
+           cm(i,j) =  vonk**2. / (log(zt(2)/z0m(i,j)) - psim(zt(2) / &
+                      obl(i,j)) + psim(z0m(i,j) / obl(i,j))) ** 2.
+           cs(i,j) =  vonk**2. / (log(zt(2)/z0m(i,j)) - psim(zt(2) / &
+                      obl(i,j)) + psim(z0m(i,j) / obl(i,j))) / (log(zt(2) / &
+                      z0h(i,j)) - psih(zt(2) / obl(i,j)) + psih(z0h(i,j) / obl(i,j)))
+           ra(i,j) =  1. / (cs(i,j)* wspd(i,j))
+         end do
+       end do
+
+       ! Solve surface temperature from SEB
+       do j=3,nyp-2
+         do i=3,nxp-2
+           a_Qnet(i,j)  = a_lflxd(2,i,j) - a_lflxu(2,i,j) + a_sflxd(2,i,j) - a_sflxu(2,i,j)
+           rhcpa        = dn0(2)*cp/ra(i,j)
+           a_tskin(i,j) = (a_Qnet(i,j) + rhcpa * a_theta(2,i,j)*(psrf/p00) + labsk * a_tsoil(1,i,j)) / (rhcpa + labsk)
+         end do
+       end do
+
+       ! Integrate soil heat diffusion
+       tsoilm(:,:,:) = a_tsoil(:,:,:)  
+       do j=3, nyp-2
+         do i=3, nxp-2
+           do k=1,3 
+             if(k==1) then
+               gkm = labsk * (a_tskin(i,j) - tsoilm(k,i,j))
+             else
+               gkm = -lambdab * ((tsoilm(k,i,j)   - tsoilm(k-1,i,j)) / (zsf(k) - zsf(k-1)))
+             end if
+             gkp   = -lambdab * ((tsoilm(k+1,i,j) - tsoilm(k,i,j))   / (zsf(k+1) - zsf(k)))
+             soiltend = -(gkp - gkm) / (zsh(k+1) - zsh(k)) 
+             a_tsoil(k,i,j) = a_tsoil(k,i,j) + rkalpha(nstep) * (dt/rhoCs) * soiltend &
+                                             + rkbeta(nstep)  * (dt/rhoCs) * soiltendm(k,i,j)
+             if(nstep==3) then
+               soiltendm(k,i,j) = 0.
+             else                              
+               soiltendm(k,i,j) = soiltend
+             end if
+           end do
+         end do
+       end do
+
+       ! Calculate surface fluxes
+       do j=3, nyp-2
+         do i=3, nxp-2
+           a_ustar(i,j) = vonk * wspd(i,j)  / (log(zt(2) / z0m(i,j)) - psim(zt(2) / obl(i,j)) + psim(z0m(i,j) / obl(i,j)))
+           wt_sfc(i,j)  = - (a_theta(2,i,j)*(psrf/p00)**rcp - a_tskin(i,j)) / ra(i,j) 
+           uw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j) * (a_up(2,i,j)+umean)/wspd(i,j)
+           vw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j) * (a_vp(2,i,j)+vmean)/wspd(i,j)
+           a_tstar(i,j) = - wt_sfc(i,j)/a_ustar(i,j)
+           a_G0(i,j)    = labsk * (a_tskin(i,j) - a_tsoil(1,i,j))
+         end do
+       end do
+
+    !
+    ! ----------------------------------------------------------------------
     ! fix thermodynamic fluxes at surface given values in energetic 
     ! units and calculate  momentum fluxes from similarity theory
     !
@@ -363,7 +434,13 @@ contains
 
     end select
 
-    if (sflg) call sfc_stat(nxp,nyp,wt_sfc,wq_sfc,a_ustar,sst)
+    if (sflg) then
+      if(level==0) then
+        call sfc_stat(nxp,nyp,wt_sfc,a_ustar,sst)
+      else
+        call sfc_stat(nxp,nyp,wt_sfc,a_ustar,sst,wq_sfc)
+      end if
+    end if
 
     return
 
@@ -471,7 +548,9 @@ contains
   !
   ! Code writen March, 1999 by Bjorn Stevens
   !
-  subroutine srfcscls(n2,n3,z,z0,th00,u,dth,ustar,tstar,obl,drt,rstar)
+
+ !call srfcscls(      nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,a_ustar,a_tstar,obl,drt=drdz,rstar=a_rstar)
+  subroutine srfcscls(n2, n3, z,    z0,    th00,    u,   dth, ustar,  tstar,  obl,drt,rstar)
 
     use defs, only : vonk, g, ep2
     use grid ,only: nstep, runtype, level, a_theta, vapor
@@ -643,105 +722,73 @@ contains
   ! ----------------------------------------------------------------------
   ! subroutine: getobl - Calculates the Obuhkov length iteratively. (van Heerwarden)
   !
-  subroutine getobl
+  subroutine getobl(wspd)
     use defs, only: g,ep2
-    use grid, only: nzp,nxp,nyp,a_up,a_vp,a_theta,umean,vmean,vapor,zt,u0,v0,obl
+    use grid, only: nzp,nxp,nyp,a_up,a_vp,a_theta,umean,vmean,vapor,zt,&
+                    u0,v0,obl,level,a_theta,a_tskin,a_up,a_vp
     implicit none
-
-    integer        :: i,j,iter
-    real           :: upcu, vpcv
-    !real           :: thv,thvs, thvsl
-    real           :: L, Lstart, Lend, Lold
-    real           :: Rib, fx, fxdif, wspd2
-    real           :: thetavbar, tvskinbar
-    !real          :: tskinav,thvskinbar,qskinav,thl0av,qt0av,u0av2,v0av2
+    real, intent(in) :: wspd(nxp,nyp)
+    integer          :: i,j,iter
+    !real             :: upcu, vpcv
+    real             :: L, Lstart, Lend, Lold
+    real             :: Rib, fx, fxdif !, wspd2
+    real             :: thetavbar, tvskinbar
      
-    if (local) then
-
-      do j=3,nyp-2
-        do i=3,nxp-2
+    do j=3,nyp-2
+      do i=3,nxp-2
+        if(level==0) then
+          thetavbar   = a_theta(2,i,j)
+          tvskinbar   = a_tskin(i,j)
+        else
           thetavbar   = thetaav(i,j) * (1. + ep2 * vaporav(i,j))
           tvskinbar   = tskinav(i,j) * (1. + ep2 * qskinav(i,j))
+        end if
 
-          upcu    = 0.5 * (u0bar(2,i,j) + u0bar(2,i+1,j)) + umean
-          vpcv    = 0.5 * (v0bar(2,i,j) + v0bar(2,i,j+1)) + vmean
-          wspd2   = max(abs(ubmin), upcu**2. + vpcv**2.)
+        !upcu    = 0.5 * (a_up(2,i,j) + a_up(2,i+1,j)) + umean
+        !vpcv    = 0.5 * (a_vp(2,i,j) + a_vp(2,i,j+1)) + vmean
+        !wspd2   = max(abs(ubmin), upcu**2. + vpcv**2.)
+        Rib     = g / thetavbar * zt(2) * (thetavbar - tvskinbar) / wspd(i,j)
 
-          Rib     = g / thetavbar * zt(2) * (thetavbar - tvskinbar) / wspd2
-
-          iter = 0
+        iter = 0
+        if(obl(i,j) == 0.0) then
+          L = 1e5
+        else
           L = obl(i,j)
+        end if
 
-          if (Rib * L < 0. .or. abs(L) == 1e5) then
+        if (Rib * L < 0. .or. abs(L) == 1e5) then
+           if(Rib > 0) L = 0.01
+           if(Rib < 0) L = -0.01
+        end if
+
+        do while (.true.)
+           iter    = iter + 1
+           Lold    = L
+           fx      = Rib - zt(2) / L * (log(zt(2) / z0h(i,j)) - psih(zt(2)  &
+                     / L) + psih(z0h(i,j) / L)) / (log(zt(2) / z0m(i,j)) -  &
+                     psim(zt(2) / L) + psim(z0m(i,j) / L)) ** 2.
+
+           Lstart  = L - 0.001*L
+           Lend    = L + 0.001*L
+
+           fxdif   = ( (- zt(2) / Lstart * (log(zt(2) / z0h(i,j)) - psih(zt(2) / Lstart) + psih(z0h(i,j) / Lstart)) / (log(zt(2) / z0m(i,j)) - psim(zt(2) / Lstart) + psim(z0m(i,j) / Lstart)) ** 2.) - (-zt(2) / Lend * (log(zt(2) / z0h(i,j)) - psih(zt(2) / Lend) + psih(z0h(i,j) / Lend)) / (log(zt(2) / z0m(i,j)) - psim(zt(2) / Lend) + psim(z0m(i,j) / Lend)) ** 2.) ) / (Lstart - Lend)
+
+           L       = L - fx / fxdif
+
+           if(Rib * L < 0. .or. abs(L) == 1e5) then
              if(Rib > 0) L = 0.01
              if(Rib < 0) L = -0.01
-          end if
+           end if
 
-          do while (.true.)
-             iter    = iter + 1
-             Lold    = L
-             fx      = Rib - zt(2) / L * (log(zt(2) / z0h(i,j)) - psih(zt(2)  &
-                       / L) + psih(z0h(i,j) / L)) / (log(zt(2) / z0m(i,j)) -  &
-                       psim(zt(2) / L) + psim(z0m(i,j) / L)) ** 2.
 
-             Lstart  = L - 0.001*L
-             Lend    = L + 0.001*L
+           if(abs(L - Lold) < 0.0001) exit
+           if(iter > 1000) stop 'Obukhov length calculation does not converge!'
+         end do
 
-             fxdif   = ( (- zt(2) / Lstart * (log(zt(2) / z0h(i,j)) - psih(zt(2) / Lstart) + psih(z0h(i,j) / Lstart)) / (log(zt(2) / z0m(i,j)) - psim(zt(2) / Lstart) + psim(z0m(i,j) / Lstart)) ** 2.) - (-zt(2) / Lend * (log(zt(2) / z0h(i,j)) - psih(zt(2) / Lend) + psih(z0h(i,j) / Lend)) / (log(zt(2) / z0m(i,j)) - psim(zt(2) / Lend) + psim(z0m(i,j) / Lend)) ** 2.) ) / (Lstart - Lend)
+         obl(i,j) = L
 
-             L       = L - fx / fxdif
-
-             if(Rib * L < 0. .or. abs(L) == 1e5) then
-               if(Rib > 0) L = 0.01
-               if(Rib < 0) L = -0.01
-             end if
-
-             if(abs(L - Lold) < 0.0001) exit
-             if(iter > 1000) stop 'Obukhov length calculation does not converge!'
-           end do
-
-           obl(i,j) = L
-
-        end do
       end do
-    end if
-
-    ! CvH also do a global evaluation if local = .true.
-    ! to get an appropriate local mean ??????????????????????????
-    if (.not. local) then
-       thetavbar   = thetaav(3,3) * (1. + ep2 * vaporav(3,3))
-       tvskinbar   = tskinav(3,3) * (1. + ep2 * qskinav(3,3))
-
-       wspd2   = max(abs(ubmin), u0av**2. + v0av**2.)
-
-       Rib     = g / thetavbar * zt(2) * (thetavbar - tvskinbar) / wspd2
-
-       iter = 0
-       L = oblav
-
-       if(Rib * L < 0. .or. abs(L) == 1e5) then
-         if(Rib > 0) L = 0.01
-         if(Rib < 0) L = -0.01
-       end if
-
-       do while (.true.)
-         iter    = iter + 1
-         Lold    = L
-         fx      = Rib - zt(2) / L * (log(zt(2) / z0hav) - psih(zt(2) / L) + psih(z0hav / L)) / (log(zt(2) / z0mav) - psim(zt(2) / L) + psim(z0mav / L)) ** 2.
-         Lstart  = L - 0.001*L
-         Lend    = L + 0.001*L
-         fxdif   = ( (- zt(2) / Lstart * (log(zt(2) / z0hav) - psih(zt(2) / Lstart) + psih(z0hav / Lstart)) / (log(zt(2) / z0mav) - psim(zt(2) / Lstart) + psim(z0mav / Lstart)) ** 2.) - (-zt(2) / Lend * (log(zt(2) / z0hav) - psih(zt(2) / Lend) + psih(z0hav / Lend)) / (log(zt(2) / z0mav) - psim(zt(2) / Lend) + psim(z0mav / Lend)) ** 2.) ) / (Lstart - Lend)
-         L       = L - fx / fxdif
-         if(Rib * L < 0. .or. abs(L) == 1e5) then
-            if(Rib > 0) L = 0.01
-            if(Rib < 0) L = -0.01
-         end if
-         if(abs(L - Lold) < 0.0001) exit
-         if(iter > 1000) stop 'Obukhov length calculation does not converge!'
-       end do
-
-       obl(:,:) = L
-    end if
+    end do
 
     oblav = L
 

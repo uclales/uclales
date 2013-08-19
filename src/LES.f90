@@ -87,7 +87,7 @@ contains
          case_name,lsvarflg, sst, div, wctime , tau                 !irina
     use modnetcdf, only : lsync, deflate_level
     use ncio, only : deflev => deflate_level
-    use modcross, only : lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars
+    use modcross, only : lcross, lxy,lxz,lyz,lxysurf,xcross,ycross,zcross, crossvars
     use forc, only : lstendflg, sfc_albedo
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
@@ -123,7 +123,7 @@ contains
          timmax , dtlong , istpfl , timrsm, wctime, & ! timestep control
          runtype, hfilin , filprf , & ! type of run (INITIAL or HISTORY)
          frqhis , frqanl, frqcross, outflg , & ! freq of history/anal writes, output flg
-         lsync, lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars,prc_lev,&
+         lsync, lcross, lxy,lxz,lyz,lxysurf,xcross,ycross,zcross, crossvars,prc_lev,&
                   iradtyp, radfrq , strtim , sfc_albedo, & ! radiation type flag
          isfctyp, ubmin  , zrough , & ! surface parameterization type
          sst    , dthcon , drtcon , & ! SSTs, surface flx parameters
@@ -209,6 +209,12 @@ contains
           if (myid == 0) print *, ' Land surface scheme (isfctyp=5) without moisture (level=0) not supported'
           call appl_abort(0)
        endif
+
+       if(isfctyp == 55 .and. level > 0) then 
+          if (myid == 0) print *, ' Land surface scheme (isfctyp=55) with moisture (level>0) not supported'
+          call appl_abort(0)
+       endif
+
 
 
     end if

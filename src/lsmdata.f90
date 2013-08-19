@@ -140,7 +140,7 @@ module lsmdata
   real              :: rssoilminav = 50.
 
   real, allocatable :: gD       (:,:)   !<  Response factor vegetation to vapor pressure deficit [-]
-  real              :: gDav	= 0.
+  real              :: gDav = 0.
 
   real, allocatable :: LE       (:,:)   !<  Latent heat flux [W/m2]
   real, allocatable :: H        (:,:)   !<  Sensible heat flux [W/m2]
@@ -167,6 +167,15 @@ module lsmdata
   real, allocatable :: vaporav  (:,:)   !<  Filtered specific humidity at first full level
   real, allocatable :: tskinav  (:,:)   !<  Filtered surface temperature
   real, allocatable :: qskinav  (:,:)   !<  Filtered surface specific humidity
+
+  ! Bart: for simple LSM
+  real, dimension(:,:,:), allocatable :: soiltendm !< previous soil temperature tendency 
+  real     :: zsh(5)    = (/0.,  0.1,  0.25, 0.5,1./)  ! depth flux levels in soil [m]
+  real     :: zsf(4)    = (/0.05,0.175,0.375,0.75/)    ! depth T levels in soil [m]
+  real     :: Tsoil0(4) = (/290.,290.,290.,290./)      ! temperature soil [K]
+  real     :: lambdab   = 1.25455213342                ! From IFS, eq. 8.57, for phiw=0.247
+  real     :: labsk     = 5.9                          ! skin conductivity (IFS, bare=15,low veg=10)
+  real     :: rhoCs     = 2.19e6                       ! Volumetric soil heat cap. (IFS, p.123) [J m-3 K-1]
 
   contains
 
@@ -220,12 +229,12 @@ module lsmdata
     !allocate(obl(nxp,nyp))
     allocate(ra(nxp,nyp))
     allocate(rsurf(nxp,nyp))
-    allocate(z0m(nxp,nyp))
-    allocate(z0h(nxp,nyp))
+    !allocate(z0m(nxp,nyp))
+    !allocate(z0h(nxp,nyp))
     allocate(cm(nxp,nyp))
     allocate(cs(nxp,nyp))
 
-    ! Allocate LSM arrays
+    ! Allocate LSM arraysSoil temperature previous time step [K]
     allocate(zsoil(ksoilmax))
     allocate(zsoilc(ksoilmax))
     allocate(dzsoil(ksoilmax))
@@ -359,5 +368,39 @@ module lsmdata
     deallocate(LAIG)
 
   end subroutine initlsm
+
+  !
+  ! ----------------------------------------------------------
+  ! Bart: initialize simple LSM (heat only)
+  !
+  subroutine initlsm_simple
+    use grid, only : nzp, nxp, nyp, runtype, a_tsoil
+    implicit none
+    integer             :: i,j,k
+
+    allocate(ra(nxp,nyp))
+    allocate(cm(nxp,nyp))
+    allocate(cs(nxp,nyp))
+    allocate(soiltendm(4,nxp,nyp),tsoilm(4,nxp,nyp))
+    allocate(z0m(nxp,nyp),z0h(nxp,nyp))
+
+    soiltendm(:,:,:) = 0.0
+
+    ! setup
+    do j=3,nyp-2    
+      do i=3,nxp-2
+        z0m(i,j) = z0mav
+        z0h(i,j) = z0hav
+        if(runtype=='INITIAL') then
+          do k=1,4
+            a_tsoil(k,i,j) = Tsoil0(k) 
+          end do
+        end if
+      end do
+    end do
+
+    init_lsm = .false.
+
+  end subroutine initlsm_simple
 
 end module lsmdata

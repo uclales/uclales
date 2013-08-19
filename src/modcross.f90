@@ -19,7 +19,8 @@ module modcross
 
 implicit none
 
-  logical            :: lcross = .false., ldocross, lxy = .false., lxz = .false., lyz = .false.
+  logical            :: lcross = .false., ldocross, &
+                        lxy = .false., lxz = .false., lyz = .false., lxysurf = .false.
   real               :: dtcross = 60, xcross = 0., ycross = 0., zcross(10) = 0.
   integer            :: icross,jcross,kcross(10) = 0, nkcross
   real               :: threstracer = 2
@@ -29,7 +30,7 @@ implicit none
   character(len=7),  dimension(10) :: hname
   character(len=80), dimension(10) :: hlname
   character(len=7) :: hname_prc
-  integer, parameter :: nvar_all = 49
+  integer, parameter :: nvar_all = 54
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
          'l      ','rp     ','np     ','tv     ','ricep  ', & !6-10
@@ -40,14 +41,15 @@ implicit none
          'rwptop ','tracer ','trcpath','trcbase','trctop ', & !31-35
          'wdev_cl','wdev_sc','w_cld  ','tdev_cl','tdev_sc', & !36-40
          't_cld  ','qdev_cl','qdev_sc','q_cld  ','tv_cl  ', & !41-45
-         'tv_sc  ','tv_cld ','core   ','th_e   '/)            !46-49
-  integer :: nccrossxzid,nccrossyzid,nccrossxyid, nccrossrec, nvar
+         'tv_sc  ','tv_cld ','core   ','th_e   ','H0     ', & !46-50
+         'G0     ','tsoil  ','tsurf  ','ra     '/)            !51-54
+
+  integer :: nccrossxzid,nccrossyzid,nccrossxyid,nccrossrec,nvar
 
   interface writecross
     module procedure writecross_2D
     module procedure writecross_3D
   end interface writecross
-
 
 contains
 
@@ -131,11 +133,12 @@ contains
       end if
     end do
     do n=1,nvar_all
-      call addcross(crossvars(n))
+      call addcross(0,crossvars(n))
     end do
+
   end subroutine initcross
 
-  subroutine addcross(name)
+  subroutine addcross(mode,name)
     use modnetcdf,     only : addvar_nc
     use mpi_interface, only : appl_abort
     use grid,          only : level, ictr, ihlf, nzp, nxp, nyp, zt, xt, yt, zm, xm, ym, &
@@ -143,9 +146,11 @@ contains
                             xname, xlongname, xunit, &
                             yname, ylongname, yunit, &
                             tname, tlongname, tunit, &
-                            lwaterbudget, lcouvreux, prc_lev
+                            lwaterbudget, lcouvreux, prc_lev, &
+                            isfctyp
 
-    character (*), intent(in)     :: name
+    integer, intent(in)          :: mode
+    character (*), intent(in)    :: name
     character (40), dimension(3) :: dimname, dimlongname, dimunit
     character (len=80), dimension(size(crossname)) :: ctmp
     character (len=80) :: longname, unit
@@ -288,6 +293,7 @@ contains
         longname = 'Av. In cloud vertical velocity'
         unit = 'm/s'
       case ('wdev_cl')
+        if (level < 2) return
         longname = 'Av. Cloud layer vertical velocity'
         unit = 'm/s'
       case ('wdev_sc')
@@ -363,6 +369,31 @@ contains
         longname = 'equivalent potential temperature'
         unit = 'K'
         iscross = .true.
+      case ('H0')
+        if (isfctyp < 5) return
+        loc = (/ihlf, ictr, ictr/)
+        longname =  'surface sensible heat flux'
+        unit = 'W/m2'
+      case ('G0')
+        if (isfctyp < 5) return
+        loc = (/ihlf, ictr, ictr/)
+        longname =  'soil heat flux'
+        unit = 'W/m2'
+      case ('tsoil')
+        if (isfctyp < 5) return
+        loc = (/ihlf, ictr, ictr/)
+        longname =  'top soil layer temperature'
+        unit = 'K'
+      case ('tsurf')
+        if (isfctyp < 5) return
+        loc = (/ihlf, ictr, ictr/)
+        longname =  'suface (skin) temperature'
+        unit = 'K'
+      case ('ra')
+        if (isfctyp < 5) return
+        loc = (/ihlf, ictr, ictr/)
+        longname =  'aerodynamic resistance'
+        unit = 's/m'
       case default
         return
       end select
@@ -371,7 +402,6 @@ contains
         deallocate(crossname)
       end if
       ncross   = ncross + 1
-
 
       allocate(crossname(ncross))
       if (ncross > 1) crossname(1:ncross-1) = ctmp
@@ -400,6 +430,7 @@ contains
           unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
           crossname(ncross) = name
         end if
+
         if (lyz) then
           dimunit(1) = zunit
           dimunit(2) = yunit
@@ -433,6 +464,7 @@ contains
           end do
           crossname(ncross) = name
         end if
+
       else
         dimunit(1) = xunit
         dimunit(2) = yunit
@@ -469,13 +501,15 @@ contains
   subroutine triggercross(rtimee)
     use grid,      only : level,nxp, nyp, nzp, tname, zt, zm, dzi_m, dzi_t, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
-       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta, pi0, pi1, a_pexnr, prc_lev, umean, vmean, th00
+       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta, pi0, pi1, a_pexnr, prc_lev, umean, vmean, th00, &
+       wt_sfc, a_G0, dn0, a_tsoil, a_tskin
+    use lsmdata,   only : ra
     use modnetcdf, only : writevar_nc, fillvalue_double
     use util,      only : get_avg3, get_var3, calclevel
     use defs,      only : ep2,cp,cpr, p00
     use thrm,      only: rslf
     real, intent(in) :: rtimee
-    real             :: tstar, exner, tk
+    real             :: tstar, exner, tk, dnsurf
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
     real, dimension(nzp,nxp,nyp) :: tracer, tv, interp, th_e,p
     real, dimension(nzp)         :: c1, thvar, tvbar, tvenv, tvcld
@@ -528,9 +562,7 @@ contains
           end do
        end do
       end do
-
     end if
-
 
     call get_avg3(nzp,nxp,nyp,tv,tvbar)
     do j=3,nyp-2
@@ -540,7 +572,6 @@ contains
           end do
        end do
     end do
-
 
     call get_avg3(nzp,nxp,nyp, tv, c1)
     call get_var3(nzp,nxp,nyp, tv, c1, thvar)
@@ -566,7 +597,6 @@ contains
       case(-1)
         kcross(n) = zi
         call writevar_nc(nccrossxyid, trim(hname(n)), zt(zi), nccrossrec)
-
       case(-2)
         call writevar_nc(nccrossxyid, trim(hname(n)), zt(cb), nccrossrec)
         kcross(n) = cb
@@ -747,8 +777,20 @@ contains
       case ('core')
         call calcmax(tv, liquid, tmp)
         call writecross(crossname(n), tmp)
+      case ('H0')
+        dnsurf = 0.5*(dn0(1)+dn0(2))
+        call writecross(crossname(n), wt_sfc(3:nxp-2, 3:nyp-2)*dnsurf*cp)
+      case ('G0')
+        call writecross(crossname(n), a_G0(3:nxp-2, 3:nyp-2))
+      case ('tsoil')
+        call writecross(crossname(n), a_tsoil(1,3:nxp-2, 3:nyp-2))
+      case ('tsurf')
+        call writecross(crossname(n), a_tskin(3:nxp-2, 3:nyp-2))
+      case ('ra')
+        call writecross(crossname(n), ra(3:nxp-2, 3:nyp-2))
       end select
     end do
+
   end subroutine triggercross
 
   subroutine writecross_3D(crossname, am)
@@ -780,6 +822,7 @@ contains
     if (lxy) then
       allocate(cross(3:nxp-2, 3:nyp-2))
       do n=1,nkcross
+        !print*,'xy cross at:',kcross(n)
         cross = am(kcross(n), 3:nxp-2, 3:nyp-2)
         call writevar_nc(nccrossxyid, trim(crossname)//trim(hname(n)), cross, nccrossrec)
       end do

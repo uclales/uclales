@@ -282,7 +282,7 @@ contains
     if (level  >= 3) nvar0 = nvar0+2
     if (level  >= 4) nvar0 = nvar0+4
     if (level  >= 5) nvar0 = nvar0+4
-    if (iradtyp > 1) nvar0 = nvar0+3
+    if (iradtyp > 1 .and. iradtyp < 5) nvar0 = nvar0+3
     if (isfctyp == 5) nvar0 = nvar0+9
     if (lmptend)      nvar0 = nvar0+7
 
@@ -332,7 +332,7 @@ contains
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(27)
     end if
-    if (iradtyp > 1) then
+    if (iradtyp > 1 .and. iradtyp < 5) then
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(28)
        nvar0 = nvar0+1
@@ -512,7 +512,7 @@ contains
       end do
     endif  
 
-    if (iradtyp > 1)  then
+    if (iradtyp > 1 .and. iradtyp < 5)  then
        nn = nn+1
        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
        iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
@@ -1534,6 +1534,23 @@ contains
        if (itype==0) ncinfo = 'Surface Ground Heat Flux'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'mmt'
+    case('Tsoil1')    
+       if (itype==0) ncinfo = 'Bulk soil temperature (11)'
+       if (itype==1) ncinfo = 'K'
+       if (itype==2) ncinfo = 'time'
+    case('Tsoil2')    
+       if (itype==0) ncinfo = 'Bulk soil temperature (2)'
+       if (itype==1) ncinfo = 'K'
+       if (itype==2) ncinfo = 'time'
+    case('Tsoil3')    
+       if (itype==0) ncinfo = 'Bulk soil temperature (3)'
+       if (itype==1) ncinfo = 'K'
+       if (itype==2) ncinfo = 'time'
+    case('Tsoil4')    
+       if (itype==0) ncinfo = 'Bulk soil temperature (4)'
+       if (itype==1) ncinfo = 'K'
+       if (itype==2) ncinfo = 'time'
+
     case default
        if (myid==0) print *, 'ABORTING: variable not found in ncinfo, ',trim(short_name)
        call appl_abort(0)

@@ -98,7 +98,7 @@ contains
        istp = istp + 1
 
        call stathandling
-       if(myid .eq. 0 .and. statflg) print*,'     sampling stat at t=',time+dt
+       !if(myid .eq. 0 .and. statflg) print*,'     sampling stat at t=',time+dt
 
        call t_step
        time = time + dt
@@ -119,31 +119,31 @@ contains
        !if(lpartic .and. lpartstat .and. statflg .and. (savgflg .eqv. .false.)) call particlestat(.false.,time+dt)
 
        if(savgflg) then
-         if(myid==0) print*,'     profiles at time=',time
+         !if(myid==0) print*,'     profiles at time=',time
          call write_ps(nzp,dn0,u0,v0,zm,zt,time)
          if (lpartic .and. lpartstat) call particlestat(.true.,time)
        end if
 
        if (hisflg) then
-         if(myid==0) print*,'     history at time=',time
+         !if(myid==0) print*,'     history at time=',time
          call write_hist(2, time)
          if(lpartic) call write_particle_hist(2,time)
        end if
 
        if (anlflg) then
-         if(myid==0) print*,'     analysis at time=',time
+         !if(myid==0) print*,'     analysis at time=',time
          call thermo(level)
          call write_anal(time)
        end if
 
        if (crossflg) then
-         if(myid==0) print*,'     cross at time=',time
+         !if(myid==0) print*,'     cross at time=',time
          call thermo(level)
          call triggercross(time)
        end if
 
        if (lpdumpflg.and.(time.ge.ldropstart)) then
-         if(myid==0) print*,'     particle dump at time=',time
+         !if(myid==0) print*,'     particle dump at time=',time
          call balanced_particledump(time)
        end if
 
@@ -366,7 +366,11 @@ contains
           else
              call thermo(level)
           end if
-          call forcings(xtime,cntlat,sst,div,case_name)
+       end if
+
+       call forcings(xtime,cntlat,sst,div,case_name)
+
+       if (level >= 1) then
           call micro(level,istp)
        end if
 

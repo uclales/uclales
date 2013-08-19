@@ -61,6 +61,7 @@ contains
     use modcross, only : initcross, triggercross
     use grid, only : nzp, dn0, u0, v0, zm, zt, isfctyp
     use modparticles, only: init_particles, lpartic, lpartdump, lpartstat, initparticledump, initparticlestat, write_particle_hist, particlestat
+    use lsmdata, only : initlsm_simple
 
     implicit none
 
@@ -108,16 +109,17 @@ contains
 
     call initmcrp(level)
 
+    if(isfctyp==55) call initlsm_simple
+
     call init_stat(time+dt,filprf,expnme,nzp)
-    !
-    !irina
-       if (lsvarflg) then
+     
+    if (lsvarflg) then
        call lsvar_init
-       end if
-    !cgils
-     if (lstendflg) then
+    end if
+
+    if (lstendflg) then
        call lstend_init
-     end if
+    end if
 
     if (lpartic) then
       if(runtype == 'INITIAL') then

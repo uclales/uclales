@@ -158,10 +158,12 @@ contains
           call get_avg3(nzp,nxp,nyp,a_scr1,sz1)
 
           call updtst(nzp,'sgs',n-3,sz1,1)
-          if (associated(a_sp,a_tp))                                          &
-             call sgsflxs(nzp,nxp,nyp,level,liquid,vapor,a_theta,a_scr1,'tl')
-          if (associated(a_sp,a_rp))                                          &
-             call sgsflxs(nzp,nxp,nyp,level,liquid,vapor,a_theta,a_scr1,'rt')
+          if(level>0) then
+            if (associated(a_sp,a_tp))                                          &
+               call sgsflxs(nzp,nxp,nyp,level,liquid,vapor,a_theta,a_scr1,'tl')
+            if (associated(a_sp,a_rp))                                          &
+               call sgsflxs(nzp,nxp,nyp,level,liquid,vapor,a_theta,a_scr1,'rt')
+          end if
 
        endif
        call cyclics(nzp,nxp,nyp,a_st,req)
