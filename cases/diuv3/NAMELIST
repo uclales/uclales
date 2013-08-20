@@ -2,7 +2,7 @@
 ! GRID --------------------
   nxp          = 36
   nyp          = 36
-  nzp          = 100
+  nzp          = 60
   deltax       = 50
   deltay       = 50
   deltaz       = 25
@@ -10,7 +10,7 @@
 
 ! TIME --------------------
   runtype      = "INITIAL"
-  strtim       = 135.625
+  strtim       = 135.75
   timmax       = 10800.
   wctime       = 27000.
   dtlong       = 5.
@@ -32,7 +32,7 @@
   sst          = 291.
 
   iadv_mom     = 44
-  iadv_scal    = 44    
+  iadv_scal    = 22    
   gcfl         = 1.0 
   cfllim       = 1.2  
 
@@ -50,9 +50,9 @@
   vmean        = 0.
 
 ! STAT --------------------
-  hfilin       = 'diu.rst'
+  hfilin       = 'diu.0002100s'
   filprf       = 'diu'
-  frqhis       = 3600. 
+  frqhis       = 1800. 
   frqanl       = 3600.
   savg_intvl   = 900.
   ssam_intvl   = 120.
