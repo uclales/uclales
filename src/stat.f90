@@ -243,10 +243,9 @@ contains
       call accum_lsm(nxp,nyp,a_Qnet,a_G0,tndskin,ra,rsurf,rsveg,rssoil,a_tskin,a_qskin,obl,cliq,a_Wl,Cskinav)
     end if
 
-    if(isfctyp == 55 .and. init_lsm .eqv. .false.) then
+    if((isfctyp == 55) .and. (init_lsm .eqv. .false.)) then
       call accum_lsm2(nxp,nyp,nzp,a_Qnet,a_G0,ra,a_tskin,obl,a_sflxd,a_sflxu,a_lflxd,a_lflxu,a_tsoil)
     end if
- 
 
     if (debug) WRITE (0,*) 'statistics: set_ts ok,  myid=',myid
 
