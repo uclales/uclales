@@ -30,6 +30,10 @@ use lsmdata
   real    :: rh_srf  = 1.
   real    :: drag    = -1.
 
+  ! --------------------------
+  ! some real-time statistics
+  real    :: Hg,Gg,oblg,ustarg
+
 contains
   !
   ! --------------------------------------------------------------------------
@@ -442,9 +446,36 @@ contains
       end if
     end if
 
+    if(isfctyp >= 5) call srfcstat
+
     return
 
   end subroutine surface
+
+  subroutine srfcstat
+    use mpi_interface, only : myid,double_scalar_par_sum,nxpg,nypg
+    use grid, only          : wt_sfc, wq_sfc, obl, a_ustar, a_G0, nxp, nyp, dn0
+    use defs, only          : cp
+    implicit none
+
+    real    :: Hl,Gl,obll,ustarl
+    integer :: i,j
+
+    Hl     = sum(wt_sfc (3:nxp-2,3:nyp-2))
+    Gl     = sum(a_G0   (3:nxp-2,3:nyp-2))
+    obll   = sum(obl    (3:nxp-2,3:nyp-2))
+    ustarl = sum(a_ustar(3:nxp-2,3:nyp-2))
+    
+    call double_scalar_par_sum(Hl,Hg)
+    call double_scalar_par_sum(Gl,Gg)
+    call double_scalar_par_sum(obll,oblg)
+    call double_scalar_par_sum(ustarl,ustarg)
+    Hg     = (Hg     / ((nxpg-4)*(nypg-4))) * cp * (dn0(1)+dn0(2))/2.
+    Gg     = (Gg     / ((nxpg-4)*(nypg-4))) 
+    oblg   = (oblg   / ((nxpg-4)*(nypg-4))) 
+    ustarg = (ustarg / ((nxpg-4)*(nypg-4))) 
+
+  end subroutine srfcstat
 
   !
   ! -------------------------------------------------------------------
