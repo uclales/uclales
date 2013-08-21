@@ -95,7 +95,6 @@ contains
               if ((zm(k-1)<zcross(n)) .and. (zm(k) >= zcross(n))) exit
             end do
           kcross(n) = k
-          print*,'init cross at z=',zt(k),'level=',k
           write(hname(n),'(i4.4)') floor(zt(kcross(n)))
           hlname(n) = ' at '//trim(hname(n))//' m'
           end if
