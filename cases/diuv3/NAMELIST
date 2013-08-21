@@ -2,7 +2,7 @@
 ! GRID --------------------
   nxp          = 36
   nyp          = 36
-  nzp          = 30
+  nzp          = 100
   deltax       = 50
   deltay       = 50
   deltaz       = 25
@@ -11,7 +11,7 @@
 ! TIME --------------------
   runtype      = "INITIAL"
   strtim       = 135.625
-  timmax       = 200.
+  timmax       = 10800.
   wctime       = 27000.
   dtlong       = 5.
   istpfl       = 10
@@ -41,7 +41,7 @@
   itsflg       = 0
   ipsflg       = 1
   irsflg       = 1
-  ps           = 1000.0,  50.,   5000.,
+  ps           = 1000.0,  500.,  5000.,
   ts           =  290.0,  290.0, 317,
   rts          =    0.,   0.,    0.,
   us           =   10,   10,    10,
@@ -57,14 +57,12 @@
   savg_intvl   = 900.
   ssam_intvl   = 120.
   lcross       = .true.
-  frqcross     = 30.
+  frqcross     = 120.
   lxy          = .true.
   lxz          = .true.
   lyz          = .true.
+  lxysurf      = .true.
   xcross       = 0.
   ycross       = 0.
   zcross(1)    = 1
-  zcross(2)    = 25
-  zcross(3)    = 37.5
-  zcross(4)    = 112.5
 /

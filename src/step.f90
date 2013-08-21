@@ -73,16 +73,17 @@ contains
     use thrm, only : thermo
     use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, &
          lpartstat, exitparticlestat, write_particle_hist, particlestat, &
-         balanced_particledump,frqpartdump, ldropstart
-    use srfc, only : Hg,Gg,oblg,ustarg
+	 balanced_particledump,frqpartdump, ldropstart
 
     use advf, only : gcfl,cfllim
 
-    real, parameter     :: peak_cfl = 0.5, peak_peclet = 0.5
-    real                :: tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax
+    real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
+
+    real    :: tplsdt,begtime,cflmax,gcflmax,pecletmax,gpecletmax
     double precision    :: t0,t1,t2
-    integer             :: iret
-    real                :: dt_prev
+    integer :: iret
+
+    real    :: dt_prev
 
     !
     ! Timestep loop for program
@@ -165,20 +166,15 @@ contains
        if(myid == 0) then
           call mpi_get_time(t2)
           if (mod(istp,istpfl) == 0 ) then
-              !if (wctime.gt.1e9) then
-              !  print "('   Timestep # ',i6," //     &
-              !         "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3)",     &
-              !         istp, time, dt_prev, t2-t1
-              !else
-              !  print "('   Timestep # ',i6," //     &
-              !         "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3'  WC Time left(sec) = ',f10.2)",     &
-              !         istp, time, dt_prev, t2-t1, wctime-t2+t0
-              !end if
-
-              print "(' # =',i6,' time =',f12.2,' dt =',f8.4,' CPUt =',f8.3,' WCt =',f10.2,' | H =',f7.2,' G =',f7.2,' L =',e10.2,' u* =',f7.3)", istp,time,dt_prev,t2-t1, wctime-t2+t0, Hg, Gg, oblg, ustarg
-
-!Hg,Gg,oblg,ustarg
-
+              if (wctime.gt.1e9) then
+                print "('   Timestep # ',i6," //     &
+                       "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3)",     &
+                       istp, time, dt_prev, t2-t1
+              else
+                print "('   Timestep # ',i6," //     &
+                       "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3'  WC Time left(sec) = ',f10.2)",     &
+                       istp, time, dt_prev, t2-t1, wctime-t2+t0
+              end if
           end if
        endif
 
