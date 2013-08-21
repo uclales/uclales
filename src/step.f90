@@ -177,8 +177,6 @@ contains
 
               print "(' # =',i6,' time =',f12.2,' dt =',f8.4,' CPUt =',f8.3,' WCt =',f10.2,' | H =',f7.2,' G =',f7.2,' L =',e10.2,' u* =',f7.3)", istp,time,dt_prev,t2-t1, wctime-t2+t0, Hg, Gg, oblg, ustarg
 
-!Hg,Gg,oblg,ustarg
-
           end if
        endif
 
