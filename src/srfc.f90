@@ -747,7 +747,7 @@ contains
         !upcu    = 0.5 * (a_up(2,i,j) + a_up(2,i+1,j)) + umean
         !vpcv    = 0.5 * (a_vp(2,i,j) + a_vp(2,i,j+1)) + vmean
         !wspd2   = max(abs(ubmin), upcu**2. + vpcv**2.)
-        Rib     = g / thetavbar * zt(2) * (thetavbar - tvskinbar) / wspd(i,j)
+        Rib     = g / thetavbar * zt(2) * (thetavbar - tvskinbar) / wspd(i,j)**2.
 
         iter = 0
         if(obl(i,j) == 0.0) then
