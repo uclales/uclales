@@ -59,7 +59,7 @@ contains
   subroutine initcross(rtimee, expname)
     use mpi_interface,   only : wrxid, wryid
     use modnetcdf,       only : open_nc, addvar_nc
-    use grid,            only : nzp, nxp, nyp, zt, xt, yt, xm, ym, &
+    use grid,            only : nzp, nxp, nyp, zt, zm, xt, yt, xm, ym, &
                                 tname, tlongname, tunit
 
     real, intent(in) :: rtimee
@@ -88,15 +88,16 @@ contains
           hname(n)  = 'lcl'
           hlname(n) = 'at lifting condensation level'
         case default
-          write(hname(n),'(i4.4)') nint(zcross(n))
-          hlname(n) = ' at '//trim(hname(n))//' m'
           if (nint(zcross(n)) == 0) then
           elseif (zcross(n) < 0) then
           else
             do k=2,nzp-1
-              if (zt(k)>zcross(n)) exit
+              if ((zm(k-1)<zcross(n)) .and. (zm(k) >= zcross(n))) exit
             end do
-            kcross(n) = k
+          kcross(n) = k
+          print*,'init cross at z=',zt(k),'level=',k
+          write(hname(n),'(i4.4)') floor(zt(kcross(n)))
+          hlname(n) = ' at '//trim(hname(n))//' m'
           end if
         end select
       end do docross
@@ -133,12 +134,12 @@ contains
       end if
     end do
     do n=1,nvar_all
-      call addcross(0,crossvars(n))
+      call addcross(crossvars(n))
     end do
 
   end subroutine initcross
 
-  subroutine addcross(mode,name)
+  subroutine addcross(name)
     use modnetcdf,     only : addvar_nc
     use mpi_interface, only : appl_abort
     use grid,          only : level, ictr, ihlf, nzp, nxp, nyp, zt, xt, yt, zm, xm, ym, &
@@ -149,7 +150,6 @@ contains
                             lwaterbudget, lcouvreux, prc_lev, &
                             isfctyp
 
-    integer, intent(in)          :: mode
     character (*), intent(in)    :: name
     character (40), dimension(3) :: dimname, dimlongname, dimunit
     character (len=80), dimension(size(crossname)) :: ctmp
