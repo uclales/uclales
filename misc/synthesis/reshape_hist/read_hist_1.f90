@@ -64,7 +64,7 @@ contains
           !
           ! open input file.
           !
-          unit = 300 + wryid-wryid/nyp1 + nyp1*wrxid
+          unit = 3000 + wryid-wryid/nyp1 + nyp1*wrxid
           seedct = wryid + nyp1*wrxid +1
 
           write(filename,'(i4.4,a1,i4.4)') wrxid,'_',wryid

@@ -3,7 +3,7 @@ contains
   subroutine write_hist_1(time, hname, nxp2, nyp2, nx2, ny2, nxt, nyt, nz, nscl,&
        umean, vmean, th00, level, isfctyp, lwaterbudget, iradtyp, xt, xm, yt,   &
        ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf, seed_arr, nseed, dt,      &
-       a_ustar, a_tstar, a_rstar, a_pexnr, nxp1, nyp1)
+       a_ustar, a_tstar, a_rstar, a_pexnr, nxp1, nyp1, lbendian)
 
     implicit none
 
@@ -17,7 +17,7 @@ contains
     character (len=40), intent(in) :: hname
     integer :: n, nseed, nxpx, nypx, nzpx, iradtyp
     integer, dimension(:,:), allocatable :: seed_arr
-    logical :: exans, lwaterbudget
+    logical :: exans, lwaterbudget, lbendian
     real    :: umean, vmean, th00, dt, psrf
     integer :: isfctyp, level, nsmp
 
@@ -124,7 +124,11 @@ contains
              print *,'ABORTING: History file', trim(filename),' exists already'
              stop
           else
-             open (unit,file=trim(filename),status='new',form='unformatted')
+             if (.not.lbendian) then
+                open (unit,file=trim(filename),status='new',form='unformatted')
+             else
+                open (unit,file=trim(filename),status='new',form='unformatted',convert='BIG_ENDIAN')
+             end if
              write (unit) time,th00,umean,vmean,dt,level,iradtyp,nz,nx2,ny2,nscl
              write (unit) nseed
              write (unit) seed_arr(:,seedct)
@@ -134,6 +138,7 @@ contains
              write (unit) a_pexnr_l
 
              print "('Wrote history to: ',A60)",filename
+             close(unit)
           end if
        end do
     end do
