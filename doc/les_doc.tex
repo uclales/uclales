@@ -817,7 +817,6 @@ umean        &  ''  & 0 m/s               & Galilean transformation             
 vmean        &  ''  & 0 m/s               & Galilean transformation                               \\ 
 lcouvreux    &  ''  & false               & Couvreux decaying scalar                              \\
 lwaterbudget &  ''  & false               & Liquid water budget diagnostics (level=3)             \\
-prc\_lev     &  ''  & -1                  & ?                                                     \\
 \hline
 ipsflg       & init & 1                   & control parameter for input sounding \textit{ps}      \\
              &      &                     & \hspace{2mm} 0 = pressure in hPa                      \\
@@ -884,13 +883,13 @@ lhomflx      &  ''  & false               & homogenize surface fluxes           
 \hline
 fixed\_sun   &rad\_driver& false          & fix solar zenith angle                                \\
 u0           &  ''  & n/a                 & cos(solar zenith angle) for fixed\_sun=true           \\
-rad\_eff\_radius & '' & 1                 & ...                                                   \\
+rad\_eff\_radius & '' & 1                 & fix for the cloud drop effective radius \\
 \hline
-cloud\_type  & mcrp & 2403                & ...                                                   \\
-lrandommicro &  ''  & false               & ...                                                   \\
-microseq     &  ''  & \{1,2,..,23\}       & ...                                                   \\
-timenuc      &  ''  & 60                  & ...                                                   \\
-nin\_set     &  ''  & 1700                & ...                                                   \\
+cloud\_type  & mcrp & 2403                & Icemicro settings      \\
+lrandommicro &  ''  & false               & Do the microphysical terms in random order or not                                 \\
+microseq     &  ''  & \{1,2,..,23\}       & Specify the order of the microphysical terms      \\
+timenuc      &  ''  & 60                  & Ice nucleation time scale                                   \\
+nin\_set     &  ''  & 1700                & Ice nuclei number  \\
 lpartdrop    &  ''  & false               & ...                                                   \\
 \hline
 SolarConstant& defs & 1365 $Wm^{-1}$      & Solar constant                                        \\ 
@@ -910,6 +909,8 @@ zcross       &  ''  & 0 m                 & location of z slice (max 10 points, 
              &      &                     & \hspace{2mm} -2 = at cloud base                       \\
              &      &                     & \hspace{2mm} -3 = at lifting condensation level       \\
 crossvars    &  ''  & see modcross.f90    & list of output variables                              \\
+prc\_lev     &  ''  & -1                  & Output levels for the precip crosssections     \\
+
 \hline
 lpartic      & particles & false          & Lagrangian particles                                  \\
 lpartsgs     &  ''  & false               & sub-grid scheme particles                             \\
@@ -922,15 +923,15 @@ lpartdumpth  &  ''  & false               & write potential temperatures to anal
 lpartdumpmr  &  ''  & false               & write mixing ratios to analysis                       \\
 ldropstart   &  ''  & 0 s                 & ...                                                   \\
 \hline
-lsync        & modnetcdf & false          & ...                                                   \\
+lsync        & modnetcdf & false          & switch for buffering or immediate (much slower) IO in the netcdf files \\
 deflate\_level&  ''  & 0                  & NetCDF compression factor                             \\
 \hline
 lnudge       & modnudge & false           & nudging of wind and scalars to predefined profiles    \\ 
-tnudgefac    &  ''  & 1                   & ...                                                   \\
-qfloor       &  ''  & -1                  & ...                                                   \\
-zfloor       &  ''  & 1200 m              & ...                                                   \\
-znudgemin    &  ''  & -1                  & ...                                                   \\
-znudgeplus   &  ''  & -1                  & ...                                                   \\
+tnudgefac    &  ''  & 1                   & nudging time scale                                    \\
+qfloor       &  ''  & -1                  & (CGILS parameter) below zfloor, qt will be kept above this value \\
+zfloor       &  ''  & 1200 m              & (CGILS parameter) below this value, qt will be kept above qfloor                                    \\
+znudgemin    &  ''  & -1                  & lower bound of the transition layer between free development and nudged atmoshpere \\
+znudgeplus   &  ''  & -1                  & upper bound of the transition layer between free development and nudged atmoshpere \\
 lnudgebound  &  ''  & false               & ...                                                   \\
 \hline
 \hline
