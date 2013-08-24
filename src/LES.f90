@@ -89,7 +89,7 @@ contains
     use ncio, only : deflev => deflate_level
     use modcross, only : lcross, lxy,lxz,lyz,lxysurf,xcross,ycross,zcross, crossvars
     use forc, only : lstendflg, sfc_albedo
-    use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
+    use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nzs, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
          filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype,             &
          CCN, lwaterbudget, lcouvreux, prc_lev, isfctyp, sfc_albedo, lrad_ca
@@ -117,7 +117,7 @@ contains
          nfpt   , distim , & ! rayleigh friction points, dissipation time
          level  , CCN    , & ! Microphysical model Number of CCN per kg of air
          iseed  , zrand  , & ! random seed
-         nxp    , nyp    , nzp   ,  & ! number of x, y, z points
+         nxp    , nyp    , nzp   , nzs,   & ! number of x, y, z points
          deltax , deltay , deltaz , & ! delta x, y, z (meters)
          dzrat  , dzmax  , igrdtyp, & ! stretched grid parameters
          timmax , dtlong , istpfl , timrsm, wctime, & ! timestep control

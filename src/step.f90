@@ -83,6 +83,7 @@ contains
     double precision    :: t0,t1,t2
     integer             :: iret
     real                :: dt_prev
+    logical             :: get_first_cfl = .true.
 
     !
     ! Timestep loop for program
@@ -98,6 +99,15 @@ contains
 
        call stathandling
        !if(myid .eq. 0 .and. statflg) print*,'     sampling stat at t=',time+dt
+
+       ! TEST BVS------------------------
+       if(get_first_cfl) then
+         call cfl(cflmax)
+         call double_scalar_par_max(cflmax,gcflmax)
+         dt = min(dtlong,dt*gcfl/(gcflmax+epsilon(1.)))
+         get_first_cfl = .false.
+       end if
+       ! TEST BVS------------------------
 
        call t_step
        time = time + dt

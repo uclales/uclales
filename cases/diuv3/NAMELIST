@@ -3,15 +3,16 @@
   nxp          = 36
   nyp          = 36
   nzp          = 30
-  deltax       = 50
-  deltay       = 50
+  nzs          = 4
+  deltax       = 5
+  deltay       = 5
   deltaz       = 25
   igrdtyp      = 1
 
 ! TIME --------------------
   runtype      = "INITIAL"
   strtim       = 135.625
-  timmax       = 200.
+  timmax       = 36000.
   wctime       = 27000.
   dtlong       = 5.
   istpfl       = 10
@@ -67,4 +68,12 @@
   zcross(2)    = 25
   zcross(3)    = 37.5
   zcross(4)    = 112.5
+/
+
+&simple_lsm
+  zsoilin      = 0.0,   0.07,    0.33,    1.0,    2.,
+  tsoilin      =     291.,  290.6,   289.6,  287.9,
+  lambdab      = 1.25455213342
+  labsk        = 5.9          
+  rhoCs        = 2.19e6       
 /

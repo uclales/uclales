@@ -360,10 +360,10 @@ contains
              if(k==1) then
                gkm = labsk * (a_tskin(i,j) - tsoilm(k,i,j))
              else
-               gkm = -lambdab * ((tsoilm(k,i,j)   - tsoilm(k-1,i,j)) / (zsf(k) - zsf(k-1)))
+               gkm = -lambdab * ((tsoilm(k,i,j)   - tsoilm(k-1,i,j)) / (zsoilc(k) - zsoilc(k-1)))
              end if
-             gkp   = -lambdab * ((tsoilm(k+1,i,j) - tsoilm(k,i,j))   / (zsf(k+1) - zsf(k)))
-             soiltend = -(gkp - gkm) / (zsh(k+1) - zsh(k)) 
+             gkp   = -lambdab * ((tsoilm(k+1,i,j) - tsoilm(k,i,j))   / (zsoilc(k+1) - zsoilc(k)))
+             soiltend = -(gkp - gkm) / (zsoil(k+1) - zsoil(k)) 
              a_tsoil(k,i,j) = a_tsoil(k,i,j) + rkalpha(nstep) * (dt/rhoCs) * soiltend &
                                              + rkbeta(nstep)  * (dt/rhoCs) * soiltendm(k,i,j)
              if(nstep==3) then
@@ -816,6 +816,7 @@ contains
            if(iter > 1000) stop 'Obukhov length calculation does not converge!'
          end do
 
+         L = max(min(L,1e4),1e-4)
          obl(i,j) = L
 
       end do

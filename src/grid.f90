@@ -362,7 +362,7 @@ contains
        allocate (a_tsoil(nzs,nxp,nyp))
        allocate (a_tskin(nxp,nyp))
        allocate (a_Qnet (nxp,nyp))
-       allocate (a_G0    (nxp,nyp))
+       allocate (a_G0   (nxp,nyp))
     end if 
 
     if (level >= 2) then

@@ -170,12 +170,7 @@ module lsmdata
 
   ! Bart: for simple LSM
   real, dimension(:,:,:), allocatable :: soiltendm !< previous soil temperature tendency 
-  real     :: zsh(5)    = (/0.,  0.1,  0.25, 0.5,1./)  ! depth flux levels in soil [m]
-  real     :: zsf(4)    = (/0.05,0.175,0.375,0.75/)    ! depth T levels in soil [m]
-  real     :: Tsoil0(4) = (/290.,290.,290.,290./)      ! temperature soil [K]
-  real     :: lambdab   = 1.25455213342                ! From IFS, eq. 8.57, for phiw=0.247
-  real     :: labsk     = 5.9                          ! skin conductivity (IFS, bare=15,low veg=10)
-  real     :: rhoCs     = 2.19e6                       ! Volumetric soil heat cap. (IFS, p.123) [J m-3 K-1]
+  real              :: lambdab, labsk, rhoCs
 
   contains
 
@@ -374,26 +369,43 @@ module lsmdata
   ! Bart: initialize simple LSM (heat only)
   !
   subroutine initlsm_simple
-    use grid, only : nzp, nxp, nyp, runtype, a_tsoil
+    use grid, only : nzp, nxp, nyp, nzs, runtype, a_tsoil
     implicit none
-    integer             :: i,j,k
+    integer             :: i,j,k, ierr
+    real, dimension(20) :: zsoilin=0,tsoilin=0 
 
+    allocate(zsoil(nzs+1),zsoilc(nzs))
     allocate(ra(nxp,nyp))
     allocate(cm(nxp,nyp))
     allocate(cs(nxp,nyp))
-    allocate(soiltendm(4,nxp,nyp),tsoilm(4,nxp,nyp))
+    allocate(soiltendm(nzs,nxp,nyp),tsoilm(nzs,nxp,nyp))
     allocate(z0m(nxp,nyp),z0h(nxp,nyp))
+
+    ! Read namelist section
+    namelist/simple_lsm/ zsoilin, tsoilin, lambdab, labsk, rhoCs
+    open(666,file='NAMELIST',status='old',iostat=ierr)
+    read (666,simple_lsm,iostat=ierr)
+    close(666)
+  
+    ! Calculate full soil levels
+    do k=1,nzs+1
+      zsoil(k)  = zsoilin(k)
+      if((k>1) .and. (zsoilin(k) == 0)) stop 'STOP: not enough soil layers in namelist'
+    end do
+    do k=1,nzs
+      zsoilc(k) = (zsoil(k+1) + zsoil(k)) / 2.
+    end do
 
     soiltendm(:,:,:) = 0.0
 
-    ! setup
+    ! setup surface & soil
     do j=3,nyp-2    
       do i=3,nxp-2
         z0m(i,j) = z0mav
         z0h(i,j) = z0hav
         if(runtype=='INITIAL') then
-          do k=1,4
-            a_tsoil(k,i,j) = Tsoil0(k) 
+          do k=1,nzs
+            a_tsoil(k,i,j) = tsoilin(k)  
           end do
         end if
       end do
