@@ -374,18 +374,18 @@ module lsmdata
     integer             :: i,j,k, ierr
     real, dimension(20) :: zsoilin=0,tsoilin=0 
 
+    ! Read namelist section
+    namelist /simple_lsm/ zsoilin, tsoilin, lambdab, labsk, rhoCs
+    open(666,file='NAMELIST',status='old',iostat=ierr)
+    read (666,simple_lsm,iostat=ierr)
+    close(666)
+
     allocate(zsoil(nzs+1),zsoilc(nzs))
     allocate(ra(nxp,nyp))
     allocate(cm(nxp,nyp))
     allocate(cs(nxp,nyp))
     allocate(soiltendm(nzs,nxp,nyp),tsoilm(nzs,nxp,nyp))
     allocate(z0m(nxp,nyp),z0h(nxp,nyp))
-
-    ! Read namelist section
-    namelist/simple_lsm/ zsoilin, tsoilin, lambdab, labsk, rhoCs
-    open(666,file='NAMELIST',status='old',iostat=ierr)
-    read (666,simple_lsm,iostat=ierr)
-    close(666)
   
     ! Calculate full soil levels
     do k=1,nzs+1
