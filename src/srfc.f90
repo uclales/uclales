@@ -811,12 +811,12 @@ contains
              if(Rib < 0) L = -0.01
            end if
 
-
+           if(abs(L) > 1e9) exit  ! BvS prevent runaway L in neutral limit
+           if(iter > 990) print*,wspd(i,j),thetavbar,tvskinbar,zt(2),Rib,L  ! BvS debug
            if(abs(L - Lold) < 0.0001) exit
            if(iter > 1000) stop 'Obukhov length calculation does not converge!'
          end do
 
-         L = max(min(L,1e4),1e-4)
          obl(i,j) = L
 
       end do
@@ -839,11 +839,12 @@ contains
     real             :: x
 
     if(zeta <= 0) then
-      x     = (1. - 15. * zeta) ** (0.25)
-      !psim = 3.14159265/2. - 2. *atan(x) + log((1.+x)** 2. * (1. + x**2.)/ 8.)
-      psim  = 3.14159265/2. - atan(x) + 2.*log((1+x)/2.) + log((1+x*x)/2.)
+      x     = (1. - 16. * zeta) ** (0.25)
+      !psim = 3.14159265/2. - atan(x) + 2.*log((1+x)/2.) + log((1+x*x)/2.)
+      psim  = 3.14159265/2. - 2. *atan(x) + log((1.+x)** 2. * (1. + x**2.)/ 8.)
     else
-      psim  = - 4.7 * zeta
+      !psim = - 4.7 * zeta
+      psim  = -2./3. * (zeta - 5./0.35) * exp(-0.35 * zeta) - zeta - (10./3.) / 0.35 
     end if
 
     return
@@ -865,7 +866,8 @@ contains
       x     = (1. - 15. * zeta) ** (0.25)
       psih  = 2. * log( (1. + x ** 2.) / 2. )
     else
-      psih  = - 4.7 * zeta
+      !psih  = - 4.7 * zeta
+      psih  = -2./3. * (zeta - 5./0.35) * exp(-0.35 * zeta) - (1. + (2./3.) * zeta) ** (1.5) - (10./3.) / 0.35 + 1.
     end if
 
     return
