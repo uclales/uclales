@@ -54,7 +54,7 @@ contains
          th00, umean, vmean, dn0, level, a_ustar, a_tstar, a_rstar,        &
          uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, nstep, a_tskin, a_qskin,  &
          isfctyp, a_phiw, a_tsoil, a_Wl, obl, &
-         a_lflxu, a_lflxd, a_sflxu, a_sflxd, rkalpha, rkbeta, a_Qnet, dt, a_G0
+         a_lflxu, a_lflxd, a_sflxu, a_sflxd, rkalpha, rkbeta, a_Qnet, dt, a_G0, wspd
     use thrm, only: rslf
     use stat, only: sfc_stat, sflg
     use util, only : get_avg3
@@ -69,7 +69,8 @@ contains
     real (kind=8) :: bfl(2), bfg(2)
 
     real :: dtdz(nxp,nyp), drdz(nxp,nyp), usfc(nxp,nyp), vsfc(nxp,nyp) &
-            ,wspd(nxp,nyp), bfct(nxp,nyp), mnflx(5), flxarr(5,nxp,nyp)
+            ,bfct(nxp,nyp), mnflx(5), flxarr(5,nxp,nyp)
+            !,wspd(nxp,nyp), bfct(nxp,nyp), mnflx(5), flxarr(5,nxp,nyp)
 
     ! BvS: for isfctyp=55 
     !---------------------------------------
@@ -329,6 +330,17 @@ contains
        if(init_lsm) call initlsm_simple   ! shouldn't be necessary
 
        call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,a_up,a_vp,umean,vmean)
+
+       ! Option to filter wind speed
+       select case(imostloc)
+         case(1)   ! Use local filtered wind
+           call filterwind(nxp,nyp,wspd,1)
+         case(2)   ! Use global average of wind
+           call filterwind(nxp,nyp,wspd,2)
+         case default
+           ! do nothing
+       end select
+
        call getobl(wspd)
 
        ! Get drag coefficients and aerodynamic resistance
@@ -452,6 +464,10 @@ contains
 
   end subroutine surface
 
+  !
+  ! -------------------------------------------------------------------
+  ! BvS: srfcstat: some global statistics of surface
+  !
   subroutine srfcstat
     use mpi_interface, only : myid,double_scalar_par_sum,nxpg,nypg
     use grid, only          : wt_sfc, wq_sfc, obl, a_ustar, a_G0, nxp, nyp, dn0
@@ -479,6 +495,50 @@ contains
 
   !
   ! -------------------------------------------------------------------
+  ! BvS: filterwind: calculate local or global average of wind
+  !
+  subroutine filterwind(n2,n3,wind,ftype)
+    use mpi_interface, only : myid,double_scalar_par_sum,nxpg,nypg
+    implicit none
+
+    integer, intent(in) :: n2,n3
+    real, intent(inout) :: wind(n2,n3)
+    integer, intent(in) :: ftype
+    real                :: wind0(n2,n3)
+
+    real                :: uloc,uglob
+    integer             :: i,j
+    integer, parameter  :: nfc = 1   ! BvS: can only be one because of nghost!!
+    real, parameter     :: fac = 1. / (1+nfc+nfc)**2.
+
+    select case(ftype)
+      case(1)   ! Filter wind locally (top hat)
+        wind0 = wind
+        do j=3,n3-2
+           do i=3,n2-2
+             wind(i,j) = sum(wind0(i-nfc:i+nfc,j-nfc:j+nfc)) * fac
+           end do
+        end do 
+
+      case(2)   ! Average wind globally
+        uloc     = sum(wind(3:n2-2,3:n3-2))
+        call double_scalar_par_sum(uloc,uglob)
+        uglob    = (uglob / ((nxpg-4)*(nypg-4))) 
+        
+        do j=3,n3-2
+           do i=3,n2-2
+             wind(i,j) = uglob
+           end do
+        end do 
+
+      case default
+        stop 'filter type not supported'
+    end select
+
+  end subroutine filterwind
+
+  !
+  ! -------------------------------------------------------------------
   ! GET_SWNDS: returns surface winds valid at cell centers
   !
   subroutine get_swnds(n1,n2,n3,usfc,vsfc,wspd,up,vp,umean,vmean)
@@ -491,9 +551,10 @@ contains
 
     integer :: i, j, ii, jj
 
-    do j=3,n3-2
+    ! BvS: include one ghost cell
+    do j=2,n3-1
        jj = j-1
-       do i=3,n2-2
+       do i=2,n2-1
           ii = i-1
           usfc(i,j) = (up(2,i,j)+up(2,ii,j))*0.5+umean
           vsfc(i,j) = (vp(2,i,j)+vp(2,i,jj))*0.5+vmean

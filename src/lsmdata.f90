@@ -170,7 +170,8 @@ module lsmdata
 
   ! Bart: for simple LSM
   real, dimension(:,:,:), allocatable :: soiltendm !< previous soil temperature tendency 
-  real              :: lambdab, labsk, rhoCs
+  real              :: lambdab, labsk, rhoCs 
+  integer           :: imostloc = 0   ! 0=local, 1=local average, 2=global average 
 
   contains
 
@@ -375,7 +376,7 @@ module lsmdata
     real, dimension(20) :: zsoilin=0,tsoilin=0 
 
     ! Read namelist section
-    namelist /simple_lsm/ zsoilin, tsoilin, lambdab, labsk, rhoCs
+    namelist /simple_lsm/ zsoilin, tsoilin, lambdab, labsk, rhoCs, imostloc
     open(666,file='NAMELIST',status='old',iostat=ierr)
     read (666,simple_lsm,iostat=ierr)
     close(666)

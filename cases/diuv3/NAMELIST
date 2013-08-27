@@ -12,7 +12,7 @@
 ! TIME --------------------
   runtype      = "INITIAL"
   strtim       = 135.625
-  timmax       = 36000.
+  timmax       = 1800.
   wctime       = 27000.
   dtlong       = 5.
   istpfl       = 10
@@ -75,5 +75,6 @@
   tsoilin      =     291.,  290.6,   289.6,  287.9,
   lambdab      = 1.25455213342
   labsk        = 5.9          
-  rhoCs        = 2.19e6       
+  rhoCs        = 2.19e6     
+  imostloc     = 1  
 /
