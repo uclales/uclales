@@ -1599,7 +1599,7 @@ program tracking
             cgval
 
 
-  lwpthres = 0.01
+  lwpthres = 0.001
   corethres = 0.5
   thermthres = 300.
 
