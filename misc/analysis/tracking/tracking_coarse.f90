@@ -343,6 +343,12 @@ module modtrack
       tmp  => cell%previous
       tmp%next=> cell%next
     elseif (associated(cell%next)) then
+      tmp => cell
+      do
+        ierr = nextcell(tmp)
+        if (ierr== -1) exit
+        tmp%head => cell%next
+      end do
       tmp  => cell%next
       tmp%previous=> cell%previous
     end if
@@ -399,7 +405,6 @@ module modtrack
 
     oldcell => cell
     if(cell%nelements> 10000000) write (*,*) 'Begin Splitcell'
-
     allocate(list(4,oldcell%nelements))
     allocate(newlist(4,oldcell%nelements))
     allocate(endlist(4,oldcell%nelements))
@@ -946,7 +951,7 @@ module modtrack
     integer :: i, j, t
     write (*,*) '.. entering tracking'
 
-    allocate(cellloc(3,ceiling(min(0.3*(huge(1)-2),0.5*real(nx)*real(ny)*real(nt-tstart)))))
+    allocate(cellloc(3,ceiling(min(0.3*(huge(1)-2),0.5*real(nx)*real(ny)*real(nt-tstart+1)))))
 print *, 'cellloc',shape(cellloc),0.3*huge(1), 0.5*real(nx)*real(ny)*real(nt-tstart)
     nullify(cell)
     do t = tstart, nt
