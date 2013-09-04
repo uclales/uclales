@@ -36,6 +36,11 @@ module radiation
   logical :: fixed_sun = .false.
 !   real    :: radius = 1.03
   real    :: rad_eff_radius = 1.
+
+  ! BvS: for simple surface radiation
+  logical :: fixed_lwin = .false.
+  real    :: flwin      = 300.
+
   contains
 
     subroutine d4stream(n1, n2, n3, alat, time, sknt, sfc_albedo, CCN, dn0, &
@@ -204,6 +209,8 @@ module radiation
     real, intent(in) :: time, alat
     integer          :: i,j
     real             :: tr, exner
+    real, parameter  :: epss = 1.  
+    real, parameter  :: epsa = 0.8   
 
     ! Assumes longitude = 0.
     u0 = max(0.,zenith(alat,time))
@@ -214,8 +221,12 @@ module radiation
         exner          = (pi0(2)+pi1(2)+a_pexnr(2,i,j))/cp
         a_sflxd(2,i,j) = SolarConstant * tr * u0
         a_sflxu(2,i,j) = sfc_albedo * a_sflxd(2,i,j)
-        a_lflxd(2,i,j) = 0.8 * stefan * (a_theta(2,i,j)*exner)**4.
-        a_lflxu(2,i,j) = stefan * a_tskin(i,j)**4.
+        if(fixed_lwin) then
+          a_lflxd(2,i,j) = flwin
+        else
+          a_lflxd(2,i,j) = epsa * stefan * (a_theta(2,i,j)*exner)**4.
+        end if
+        a_lflxu(2,i,j) = epss * stefan * a_tskin(i,j)**4.
       end do
     end do
 

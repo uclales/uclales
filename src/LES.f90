@@ -97,7 +97,7 @@ contains
          zrand,lhomrestart
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
-    use radiation, only : u0, fixed_sun, rad_eff_radius
+    use radiation, only : u0, fixed_sun, rad_eff_radius, fixed_lwin, flwin
     use modnudge, only : lnudge,tnudgefac, qfloor, zfloor, znudgemin, znudgeplus, &
          lnudge_bound
     use modtimedep, only : ltimedep
@@ -144,6 +144,7 @@ contains
          lnudge_bound, &               ! LINDA, relaxation boundaries
          rh_srf, drag, &
          SolarConstant,u0,fixed_sun, rad_eff_radius, & ! SolarConstant (In case of prescribed TOA radiation
+         fixed_lwin, flwin, &          ! BvS: for simple surface radiation  
          lrandommicro, microseq,timenuc ,nin_set,cloud_type, &  !thijs: sequence of variables for microphysics
          lwaterbudget, &                 ! axel: flag for liquid water budget diagnostics (only level=3)
          lcouvreux , tau , &                    ! The Couvreux 'radioactive' scalar
