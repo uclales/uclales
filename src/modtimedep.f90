@@ -45,9 +45,11 @@ save
   real, allocatable  :: qtst     (:)
   real, allocatable  :: pst      (:)
 
-  real, allocatable  :: timels  (:)
-  real, allocatable  :: wflst   (:,:)
-  real, allocatable  :: dqtdtlst(:,:)
+  real, allocatable  :: timels   (:)
+  real, allocatable  :: ugt      (:,:)
+  real, allocatable  :: vgt      (:,:)
+  real, allocatable  :: wflst    (:,:)
+  real, allocatable  :: dqtdtlst (:,:)
   real, allocatable  :: dthldtlst(:,:)
 
 contains
@@ -59,8 +61,8 @@ contains
     character (1) :: chmess1
     integer       :: k,t, ierr, ifinput = 19
     real          :: dummyr, fac
-    real          :: highheight,highwflst, highdthldt, highdqtdt
-    real          :: lowheight,  lowwflst,  lowdthldt,  lowdqtdt
+    real          :: highheight, highugt, highvgt, highwflst, highdthldt, highdqtdt
+    real          :: lowheight,  lowugt,  lowvgt,  lowwflst,  lowdthldt,  lowdqtdt
 
     firsttime = .false.
 
@@ -72,6 +74,8 @@ contains
     allocate(pst      (0:kls))
 
     allocate(timels   (0:kls))
+    allocate(ugt      (nzp,kls))
+    allocate(vgt      (nzp,kls))
     allocate(wflst    (nzp,kls))
     allocate(dqtdtlst (nzp,kls))
     allocate(dthldtlst(nzp,kls))
@@ -141,22 +145,29 @@ contains
       end do
       if(myid==0) write (*,*) 'timels = ',timels(t)
       if(t==1 .and. timels(t) > time_end) exit
-      read (ifinput,*)  lowheight , lowwflst,lowdthldt,lowdqtdt
-      read (ifinput,*)  highheight , highwflst,highdthldt,highdqtdt
+      read (ifinput,*)  lowheight , lowugt,  lowvgt,  lowwflst,  lowdthldt,  lowdqtdt
+      read (ifinput,*)  highheight, highugt, highvgt, highwflst, highdthldt, highdqtdt
+
       do k=2,nzp
         if (highheight<zt(k)) then
-          lowheight = highheight
-          lowwflst  = highwflst
-          lowdthldt = highdthldt
-          lowdqtdt  = highdqtdt
-          read (ifinput,*) highheight, highwflst, highdthldt, highdqtdt
+          lowheight    = highheight
+          lowugt       = highugt
+          lowvgt       = highvgt
+          lowwflst     = highwflst
+          lowdthldt    = highdthldt
+          lowdqtdt     = highdqtdt
+          read (ifinput,*) highheight, highugt, highvgt, highwflst, highdthldt, highdqtdt
         end if
         fac            = (highheight-zt(k))/(highheight - lowheight)
+        ugt(k,t)       = fac*lowugt    + (1-fac)*highugt
+        vgt(k,t)       = fac*lowvgt    + (1-fac)*highvgt
         wflst(k,t)     = fac*lowwflst  + (1-fac)*highwflst
         dthldtlst(k,t) = fac*lowdthldt + (1-fac)*highdthldt
         dqtdtlst(k,t)  = fac*lowdqtdt  + (1-fac)*highdqtdt
       end do
     end do
+
+
 
     if (timels(1) > time_end) then
       if(myid==0) then
@@ -208,7 +219,7 @@ contains
   ! Interpolates the vertical ls forcings from ls_flux_in 
   !
   subroutine timedepz(time)
-    use grid, only : wfls,dthldtls,dqtdtls
+    use grid, only : u0,v0,wfls,dthldtls,dqtdtls
     real, intent(in) :: time
     integer          :: t,k
     real             :: fac
@@ -225,6 +236,8 @@ contains
     end if
 
     fac      = (time-timels(t)) / (timels(t+1)-timels(t))
+    u0       = ugt      (:,t) + fac * ( ugt      (:,t+1) - ugt      (:,t) )
+    v0       = vgt      (:,t) + fac * ( vgt      (:,t+1) - vgt      (:,t) )
     wfls     = wflst    (:,t) + fac * ( wflst    (:,t+1) - wflst    (:,t) )
     dqtdtls  = dqtdtlst (:,t) + fac * ( dqtdtlst (:,t+1) - dqtdtlst (:,t) )
     dthldtls = dthldtlst(:,t) + fac * ( dthldtlst(:,t+1) - dthldtlst(:,t) )
