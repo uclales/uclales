@@ -91,7 +91,7 @@ contains
     use forc, only : lstendflg, sfc_albedo
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nzs, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
-         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype,             &
+         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, lspongeinit, runtype,             &
          CCN, lwaterbudget, lcouvreux, prc_lev, isfctyp, sfc_albedo, lrad_ca
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,irsflg, iseed, hfilin,   &
          zrand,lhomrestart
@@ -115,6 +115,7 @@ contains
          ssam_intvl,       & ! integral accumulate/ts print frequency
          corflg , cntlat , & ! coriolis flag
          nfpt   , distim , & ! rayleigh friction points, dissipation time
+         lspongeinit     , & ! Sponge back to initial profile or bulk values
          level  , CCN    , & ! Microphysical model Number of CCN per kg of air
          iseed  , zrand  , & ! random seed
          nxp    , nyp    , nzp   , nzs,   & ! number of x, y, z points

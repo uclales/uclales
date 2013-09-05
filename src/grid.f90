@@ -60,6 +60,7 @@ module grid
 
   integer           :: nfpt = 10           ! number of rayleigh friction points
   real              :: distim = 300.0      ! dissipation timescale
+  logical           :: lspongeinit = .true. ! Sponge layer acts on initial profiles
 
   character (len=7), allocatable, save :: sanal(:)
   character (len=80):: expnme = 'Default' ! Experiment name
