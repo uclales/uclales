@@ -792,7 +792,7 @@ contains
 
     real :: C_d, vt, r0, rmax, dzi, v_rel, tau, upred, vpred, wpred
     TYPE (particle_record), POINTER:: particle
-    logical :: stokes=.false.
+    logical :: stokes=.false., kc05=.false.
     integer :: j
     real, parameter ::      &
          wr     = 33.,      &   ! S13
@@ -802,7 +802,7 @@ contains
 	 
     dzi = dzi_t(floor(particle%z))
 
-    if (nstep==1) then
+    if (nstep==1.and.(.not.kc05)) then
       r0 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! equivalent drop radius
       rmax = r0*exp(wr*2.*r0)                         ! maximum radius from Seifert et al (2013)
 
@@ -853,16 +853,24 @@ contains
       
     end if 
     
-    vt = particle%tau *(1-i1d(particle%z,dn0)/rowt)*g
-    particle%udrop_rk = 1/dt *(particle%tau*(particle%udrop/dxi - particle%ures/dxi     ) * &
-                        (1 - exp(-dt/particle%tau)) + (particle%ures/dxi    )*dt) *dxi
-    particle%vdrop_rk = 1/dt *(particle%tau*(particle%vdrop/dyi - particle%vres/dyi     ) * &
-                        (1 - exp(-dt/particle%tau)) + (particle%vres/dyi    )*dt) *dyi
-    particle%wdrop_rk = 1/dt *(particle%tau*(particle%wdrop/dzi - particle%wres/dzi + vt) * &
-                        (1 - exp(-dt/particle%tau)) + (particle%wres/dzi -vt)*dt) *dzi
+    ! for all nstep
+    if(.not.kc05) then
+      vt = particle%tau *(1-i1d(particle%z,dn0)/rowt)*g
+      particle%udrop_rk = 1/dt *(particle%tau*(particle%udrop/dxi - particle%ures/dxi     ) * &
+                          (1 - exp(-dt/particle%tau)) + (particle%ures/dxi    )*dt) *dxi
+      particle%vdrop_rk = 1/dt *(particle%tau*(particle%vdrop/dyi - particle%vres/dyi     ) * &
+                          (1 - exp(-dt/particle%tau)) + (particle%vres/dyi    )*dt) *dyi
+      particle%wdrop_rk = 1/dt *(particle%tau*(particle%wdrop/dzi - particle%wres/dzi + vt) * &
+                          (1 - exp(-dt/particle%tau)) + (particle%wres/dzi -vt)*dt) *dzi
+    else
+      call drag_coeff(particle, C_d, vt, tau)
+      particle%udrop_rk =  particle%ures
+      particle%vdrop_rk =  particle%vres
+      particle%wdrop_rk = (particle%wres/dzi - vt)*dzi
+    end if			  
 
     
-    if (nstep==3) then
+    if (nstep==3.and.(.not.kc05)) then
 
       particle%ures_prev = 0.5 * (particle%ures_prev + particle%ures)
       particle%vres_prev = 0.5 * (particle%vres_prev + particle%vres)
@@ -876,6 +884,14 @@ contains
       particle%wdrop = ((particle%wdrop/dzi - particle%wres_prev/dzi + vt) * exp(-dt/particle%tau) &
                         + particle%wres_prev/dzi- vt) *dzi
       
+      particle%ures_prev = particle%ures
+      particle%vres_prev = particle%vres
+      particle%wres_prev = particle%wres
+    else
+      particle%udrop =  particle%ures
+      particle%vdrop =  particle%vres
+      particle%wdrop = (particle%wres/dzi - vt)*dzi
+
       particle%ures_prev = particle%ures
       particle%vres_prev = particle%vres
       particle%wres_prev = particle%wres
@@ -2435,6 +2451,7 @@ contains
     particle => head
     do while(associated(particle))
       if(particle%x.ne.-32678..and. &
+      !(particle%mass.lt.(5.2e-10).or.particle%z<=(1+zmax))) then  !r0=50mum
       (particle%mass.lt.(rain%x_min).or.particle%z<=(1+zmax))) then
         ndel = ndel + 2
       end if
@@ -2446,6 +2463,7 @@ contains
     particle => head
     do while(associated(particle))
       if(particle%x.ne.-32678..and. &
+      !(particle%mass.lt.(5.2e-10).or.particle%z<=(1+zmax))) then !r0=50mum
       (particle%mass.lt.(rain%x_min).or.particle%z<=(1+zmax))) then
         ndel_n(ndel+1) = particle%unique
 	ndel_n(ndel+2) = particle%nd
@@ -2538,7 +2556,7 @@ contains
     type (particle_record), pointer:: particle
     real               :: randnr(3), max_auto, sum_auto
     !real               :: zmax = 1.                  ! Max height in grid coordinates
-    real               :: nppd = 1./(1.e10)               ! number of particles per drops
+    real               :: nppd = 1./(1.e9)               ! number of particles per drops
     real               :: xsizelocal, ysizelocal
     integer            :: nprocs,i,j,k,newp,np_old,cntp
     integer(kind=long) :: npac
@@ -2591,7 +2609,8 @@ contains
                   particle%wsgs_prev      = 0.
                   particle%sigma2_sgs     = 0.
 		  particle%mass           = rain%x_min
-                  particle%partstep       = 0
+                  !particle%mass           = 5.2e-10   !r0=50mum
+		  particle%partstep       = 0
                   particle%nd             = particle%nd + 1
                   particle%udrop          = particle%ures
                   particle%vdrop          = particle%vres
