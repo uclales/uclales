@@ -94,7 +94,7 @@ contains
          filprf, expnme, iradtyp, igrdtyp, nfpt, distim, lspongeinit, runtype,             &
          CCN, lwaterbudget, lcouvreux, prc_lev, isfctyp, sfc_albedo, lrad_ca
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,irsflg, iseed, hfilin,   &
-         zrand,lhomrestart
+         zrand,mag_pert_t,mag_pert_q,lhomrestart
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
     use radiation, only : u0, fixed_sun, rad_eff_radius, fixed_lwin, flwin
@@ -117,7 +117,7 @@ contains
          nfpt   , distim , & ! rayleigh friction points, dissipation time
          lspongeinit     , & ! Sponge back to initial profile or bulk values
          level  , CCN    , & ! Microphysical model Number of CCN per kg of air
-         iseed  , zrand  , & ! random seed
+         iseed  , zrand  , mag_pert_t, mag_pert_q,  & ! random seed
          nxp    , nyp    , nzp   , nzs,   & ! number of x, y, z points
          deltax , deltay , deltaz , & ! delta x, y, z (meters)
          dzrat  , dzmax  , igrdtyp, & ! stretched grid parameters
