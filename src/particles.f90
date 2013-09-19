@@ -50,6 +50,7 @@ module modparticles
   integer            :: int_part       =  1             !< Interpolation scheme, 1=linear, 3=3rd order Lagrange
   real               :: ldropstart     = 0.             !< Earliest time to start drops
 
+  real               :: nppd = 1./(1.e10)               ! number of Lagrangian particles per real drops
   character(30)      :: startfile
   integer            :: ifinput        = 1
   integer(kind=long) :: np
@@ -236,15 +237,17 @@ contains
   !
   !--------------------------------------------------------------------------
   ! Subroutine grow_drops
-  !> calls drop_growth
+  !> calls drop_growth (and optional self_coll)
   !> called from: step.f90
   !--------------------------------------------------------------------------
   !
   subroutine grow_drops
-    type (particle_record), pointer:: particle
+    type (particle_record), pointer :: particle
+    logical, parameter              :: selfcollection = .true.
 
     ! Let drops grow
     if (lpartdrop.and.lpartmass) then
+      ! Accretion, condensation and evaporation
       particle => head
       do while( associated(particle))
         if (particle%x.ne.-32678.) then
@@ -252,6 +255,8 @@ contains
 	end if
 	particle => particle%next
       end do
+      ! Self-collection of Lagrangian drops
+      if (selfcollection) call self_coll
     end if
   
   end subroutine grow_drops
@@ -2556,7 +2561,7 @@ contains
     type (particle_record), pointer:: particle
     real               :: randnr(3), max_auto, sum_auto
     !real               :: zmax = 1.                  ! Max height in grid coordinates
-    real               :: nppd = 1./(1.e9)               ! number of particles per drops
+    !real               :: nppd = 1./(1.e10)               ! number of particles per drops
     real               :: xsizelocal, ysizelocal
     integer            :: nprocs,i,j,k,newp,np_old,cntp
     integer(kind=long) :: npac
@@ -2726,6 +2731,75 @@ contains
     !add drop breakup at 3mm to 6mm?! 
         
   end subroutine drop_growth
+
+  !
+  !--------------------------------------------------------------------------
+  ! subroutine self_coll 
+  ! calculates the self-collection of Lagrangian drops
+  ! -not working for non-equidistant grids
+  !--------------------------------------------------------------------------
+  !
+  subroutine self_coll
+    use mpi_interface, only : myid
+    use defs,          only : pi,rowt
+    use grid,          only : nxp, nyp, nzp, dxi,dyi,dzi_t, dt
+    implicit none
+    
+    type (particle_record), pointer:: pred_p,prey_p
+    real                   :: r_pred, r_prey, deltav, dzi, randnr(2), pij
+
+    pred_p => head
+    do while(associated(pred_p))
+      ! find prey in predator's surrounding
+      if (pred_p%mass.ne.0.and.pred_p%mass.ne.-32678.) then
+	prey_p => pred_p%next   !Start seraching for the prey only from pred_next to avoid double counting.
+	dzi = dzi_t(floor(pred_p%z))
+	preyloop: do while(associated(prey_p))
+	  !if prey is in a grid-box-sized surrounding of predator
+	  if (prey_p%mass.ne.0.and.prey_p%mass.ne.-32678.) then
+	    if ((prey_p%x.ge.pred_p%x-0.5).and.(prey_p%x.lt.pred_p%x+0.5).and. &
+	        (prey_p%y.ge.pred_p%y-0.5).and.(prey_p%y.lt.pred_p%y+0.5).and. &
+	        (prey_p%z.ge.pred_p%z-0.5).and.(prey_p%z.lt.pred_p%z+0.5)) then
+	      	
+	      call random_number(randnr)          ! Random seed has been called from init_particles...
+	      !To save computational cost, calculate the probability of collision only for 10 percent of the 
+	      !predator-prey pairs. To make up for this, multiply their collision probability by 10.
+	      !This is not working if pij gets larger than 1.
+	      if(randnr(1)<0.1) then
+  
+                !calculate probability pij of self-collection from geometrical considerations
+		!similarly used in Shima et al. 2009 QJRMS
+	        r_pred = (3./(4*pi) * pred_p%mass/rowt)**(1./3.)  ! equivalent drop radius
+                r_prey = (3./(4*pi) * prey_p%mass/rowt)**(1./3.)  ! equivalent drop radius
+	        deltav =  sqrt( (pred_p%udrop/dxi - prey_p%udrop/dxi)**2. + &
+                                (pred_p%vdrop/dyi - prey_p%vdrop/dyi)**2. + &
+                                (pred_p%wdrop/dzi - prey_p%wdrop/dzi)**2. )  
+	        pij = 10.*(dxi * dyi * dzi) * 1./nppd * pi * (r_pred+r_prey)**2. * deltav * dt
+                write(*,*) myid,'prob: ',pij
+                !do a self-collection
+                if(randnr(2)<pij) then
+	          write(*,*) myid,'SC! old mass: ',pred_p%mass,' ',prey_p%mass
+	          if (r_pred.ge.r_prey) then  !predator may be larger or smaller than prey
+		    pred_p%mass = pred_p%mass + prey_p%mass
+		    prey_p%mass = 0.  !prey will be deactivated later this time step
+	          else
+		    prey_p%mass = pred_p%mass + prey_p%mass
+		    pred_p%mass = 0.  !pred will be deactivated later this time step
+		    exit preyloop
+	          end if
+	        end if
+		
+              end if  
+	    end if
+	  end if
+	  prey_p => prey_p%next
+        end do preyloop
+      
+      end if
+      pred_p => pred_p%next
+    end do !predloop
+    
+  end subroutine self_coll
 
   !
   !--------------------------------------------------------------------------
