@@ -2559,7 +2559,7 @@ contains
 
     real, intent(in)  :: time
     type (particle_record), pointer:: particle
-    real               :: randnr(3), max_auto, sum_auto
+    real               :: randnr(5), max_auto, sum_auto
     !real               :: zmax = 1.                  ! Max height in grid coordinates
     !real               :: nppd = 1./(1.e10)               ! number of particles per drops
     real               :: xsizelocal, ysizelocal
@@ -2592,9 +2592,9 @@ contains
               do while(associated(particle).and.(newp.lt.floor(a_npauto(k,i,j))))
 	        if(particle%x.eq.-32678.) then
 		  call random_number(randnr)          ! Random seed has been called from init_particles...
-		  particle%x              = real(i) + randnr(1)
-                  particle%y              = real(j) + randnr(2)
-                  particle%z              = real(k) + randnr(3)
+		  particle%x              = real(i) + randnr(2)
+                  particle%y              = real(j) + randnr(3)
+                  particle%z              = real(k) + randnr(4)
                   particle%zprev          = particle%z
                   particle%xstart         = particle%x
                   particle%ystart         = particle%y
@@ -2613,7 +2613,7 @@ contains
                   particle%vsgs_prev      = 0.
                   particle%wsgs_prev      = 0.
                   particle%sigma2_sgs     = 0.
-		  particle%mass           = rain%x_min
+		  particle%mass           = rain%x_min*(1.+randnr(5))
                   !particle%mass           = 5.2e-10   !r0=50mum
 		  particle%partstep       = 0
                   particle%nd             = particle%nd + 1
