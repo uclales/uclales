@@ -243,7 +243,7 @@ contains
   !
   subroutine grow_drops
     type (particle_record), pointer :: particle
-    logical, parameter              :: selfcollection = .true.
+    logical, parameter              :: selfcollection = .false.
 
     ! Let drops grow
     if (lpartdrop.and.lpartmass) then
@@ -2561,7 +2561,6 @@ contains
     type (particle_record), pointer:: particle
     real               :: randnr(5), max_auto, sum_auto
     !real               :: zmax = 1.                  ! Max height in grid coordinates
-    !real               :: nppd = 1./(1.e10)               ! number of particles per drops
     real               :: xsizelocal, ysizelocal
     integer            :: nprocs,i,j,k,newp,np_old,cntp
     integer(kind=long) :: npac
@@ -2579,7 +2578,7 @@ contains
         do k=2,nzp-2
 	  if (a_npauto(k,i,j)>0) then
 	  
-	    a_npauto(k,i,j) = a_npauto(k,i,j)*nppd/dxi/dyi/dzi_t(k)
+	    a_npauto(k,i,j) = a_npauto(k,i,j)/(rain%x_min*1.5)*nppd/dxi/dyi/dzi_t(k)
 
 	    call random_number(randnr)          ! Random seed has been called from init_particles...
 

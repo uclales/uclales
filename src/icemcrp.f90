@@ -697,7 +697,7 @@ contains
           np(k) = np(k) + au/cldw%x_max
 	  
 	  ! For particles: a_npauto in #/(kg*dt)
-	  if(lpartdrop .and. nstep==3) a_npauto(k,i,j) = au/cldw%x_max*dn0(k)
+	  if(lpartdrop .and. nstep==3) a_npauto(k,i,j) = au*dn0(k)
        end if
     end do
 
