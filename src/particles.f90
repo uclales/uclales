@@ -50,7 +50,7 @@ module modparticles
   integer            :: int_part       =  1             !< Interpolation scheme, 1=linear, 3=3rd order Lagrange
   real               :: ldropstart     = 0.             !< Earliest time to start drops
 
-  real               :: nppd = 1./(1.e10)               ! number of Lagrangian particles per real drops
+  real               :: nppd = 1./(1.e9)               ! number of Lagrangian particles per real drops
   character(30)      :: startfile
   integer            :: ifinput        = 1
   integer(kind=long) :: np
@@ -59,6 +59,7 @@ module modparticles
   real               :: tnextrand = 6e6 
   logical            :: lpartmass = .true.              ! hard code switch to turn on/off drop mass 
                                                         ! used only in combination with lpartdrop = .true. (namelist)
+  logical            :: selfcollection = .true.         ! switch for enabling self-collection of LD
 
   ! Particle structure
   type :: particle_record
@@ -73,6 +74,13 @@ module modparticles
 
   integer(kind=long) :: nplisted, npmyid = 0
   type (particle_record), pointer :: head, tail
+  
+  type :: sc_el
+    type (particle_record), pointer :: ptr
+    type (sc_el), pointer :: next
+  end type
+
+  type (sc_el), dimension(:,:,:), pointer:: sc_3d
 
   integer            :: ipunique, ipx, ipy, ipz, ipzprev, ipxstart, ipystart, ipzstart, iptsart
   integer            :: ipures, ipvres, ipwres, ipures_prev, ipvres_prev, ipwres_prev, ipartstep, ipnd, nrpartvar
@@ -243,7 +251,6 @@ contains
   !
   subroutine grow_drops
     type (particle_record), pointer :: particle
-    logical, parameter              :: selfcollection = .false.
 
     ! Let drops grow
     if (lpartdrop.and.lpartmass) then
@@ -1390,6 +1397,8 @@ contains
     use mpi_interface, only : myid
     implicit none
     TYPE (particle_record), POINTER:: particle
+    TYPE (sc_el), POINTER :: tmp, tmp2
+    integer :: i,j,k
 
     particle%zprev = particle%z
         
@@ -1407,12 +1416,39 @@ contains
     particle%udrop_rkprev = particle%udrop_rk
     particle%vdrop_rkprev = particle%vdrop_rk
     particle%wdrop_rkprev = particle%wdrop_rk
+    
 
-   if ( nstep==3 ) then
+    if ( nstep==3 ) then
       particle%udrop_rkprev   = 0.
       particle%vdrop_rkprev   = 0.
       particle%wdrop_rkprev   = 0.
+      
+      if (selfcollection) then
+        i=floor(particle%x)
+        j=floor(particle%y)
+        k=floor(particle%z)
+      
+        allocate(tmp2)
+        tmp2%ptr  => particle
+        tmp2%next => null()
+     
+        if( .not. associated(sc_3d(k,i,j)%ptr) ) then
+          sc_3d(k,i,j)%ptr => particle
+          nullify(sc_3d(k,i,j)%next)
+        else ! add at beginning
+          if ( .not. associated(sc_3d(k,i,j)%next) ) then
+            sc_3d(k,i,j)%next => tmp2
+          else
+	    tmp => sc_3d(k,i,j)%next
+	    sc_3d(k,i,j)%next => tmp2
+	    tmp2%next => tmp
+	  end if 
+        end if
+        
+      end if
+      
     end if
+
 
   end subroutine rk3_drop
 
@@ -2612,7 +2648,7 @@ contains
                   particle%vsgs_prev      = 0.
                   particle%wsgs_prev      = 0.
                   particle%sigma2_sgs     = 0.
-		  particle%mass           = rain%x_min*(1.+randnr(5))
+		  particle%mass           = rain%x_min*(1.+randnr(5))  ! uniform distribution between 40 mum und 50 mum
                   !particle%mass           = 5.2e-10   !r0=50mum
 		  particle%partstep       = 0
                   particle%nd             = particle%nd + 1
@@ -2745,59 +2781,69 @@ contains
     implicit none
     
     type (particle_record), pointer:: pred_p,prey_p
-    real                   :: r_pred, r_prey, deltav, dzi, randnr(2), pij
+    type (sc_el), pointer  :: pred_sc, prey_sc, pred_free
+    integer                :: i,j,k
+    real                   :: r_pred, r_prey, deltav, dzi, randnr, pij
+   
 
-    pred_p => head
-    do while(associated(pred_p))
-      ! find prey in predator's surrounding
-      if (pred_p%mass.ne.0.and.pred_p%mass.ne.-32678.) then
-	prey_p => pred_p%next   !Start seraching for the prey only from pred_next to avoid double counting.
-	dzi = dzi_t(floor(pred_p%z))
-	preyloop: do while(associated(prey_p))
-	  !if prey is in a grid-box-sized surrounding of predator
-	  if (prey_p%mass.ne.0.and.prey_p%mass.ne.-32678.) then
-	    if ((prey_p%x.ge.pred_p%x-0.5).and.(prey_p%x.lt.pred_p%x+0.5).and. &
-	        (prey_p%y.ge.pred_p%y-0.5).and.(prey_p%y.lt.pred_p%y+0.5).and. &
-	        (prey_p%z.ge.pred_p%z-0.5).and.(prey_p%z.lt.pred_p%z+0.5)) then
-	      	
-	      call random_number(randnr)          ! Random seed has been called from init_particles...
-	      !To save computational cost, calculate the probability of collision only for 10 percent of the 
-	      !predator-prey pairs. To make up for this, multiply their collision probability by 10.
-	      !This is not working if pij gets larger than 1.
-	      if(randnr(1)<0.1) then
-  
-                !calculate probability pij of self-collection from geometrical considerations
-		!similarly used in Shima et al. 2009 QJRMS
-	        r_pred = (3./(4*pi) * pred_p%mass/rowt)**(1./3.)  ! equivalent drop radius
-                r_prey = (3./(4*pi) * prey_p%mass/rowt)**(1./3.)  ! equivalent drop radius
-	        deltav =  sqrt( (pred_p%udrop/dxi - prey_p%udrop/dxi)**2. + &
-                                (pred_p%vdrop/dyi - prey_p%vdrop/dyi)**2. + &
-                                (pred_p%wdrop/dzi - prey_p%wdrop/dzi)**2. )  
-	        pij = 10.*(dxi * dyi * dzi) * 1./nppd * pi * (r_pred+r_prey)**2. * deltav * dt
-                write(*,*) myid,'prob: ',pij
-                !do a self-collection
-                if(randnr(2)<pij) then
-	          write(*,*) myid,'SC! old mass: ',pred_p%mass,' ',prey_p%mass
-	          if (r_pred.ge.r_prey) then  !predator may be larger or smaller than prey
-		    pred_p%mass = pred_p%mass + prey_p%mass
-		    prey_p%mass = 0.  !prey will be deactivated later this time step
-	          else
-		    prey_p%mass = pred_p%mass + prey_p%mass
-		    pred_p%mass = 0.  !pred will be deactivated later this time step
-		    exit preyloop
+    do j=3,nyp-2
+      do i=3,nxp-2
+        do k=2,nzp-1 
+	 
+          pred_sc => sc_3d(k,i,j)
+	  do while(associated(pred_sc%next))!predloop
+            pred_p => pred_sc%ptr
+	    if (pred_p%mass.ne.0.and.pred_p%mass.ne.-32678.) then
+	      dzi = dzi_t(floor(pred_p%z))
+	      prey_sc => pred_sc%next
+	    
+	      preyloop: do while(associated(prey_sc))
+	        prey_p => prey_sc%ptr
+	        if (prey_p%mass.ne.0.and.prey_p%mass.ne.-32678.) then
+
+                  !calculate probability pij of self-collection from geometrical considerations
+                  !similarly used in Shima et al. 2009 QJRMS
+	          r_pred = (3./(4*pi) * pred_p%mass/rowt)**(1./3.)  ! equivalent drop radius
+                  r_prey = (3./(4*pi) * prey_p%mass/rowt)**(1./3.)  ! equivalent drop radius
+	          deltav =  sqrt( (pred_p%udrop/dxi - prey_p%udrop/dxi)**2. + &
+                                  (pred_p%vdrop/dyi - prey_p%vdrop/dyi)**2. + &
+                                  (pred_p%wdrop/dzi - prey_p%wdrop/dzi)**2. )  
+	          pij = (dxi * dyi * dzi) * 1./nppd * pi * (r_pred+r_prey)**2. * deltav * dt
+                  write(*,*) myid,'prob: ',pij
+                  !do a self-collection
+	          call random_number(randnr)          ! Random seed has been called from init_particles...
+                  if(randnr<pij) then
+	            write(*,*) myid,'SC! old mass: ',pred_p%mass,' ',prey_p%mass
+	            if (r_pred.ge.r_prey) then  !predator may be larger or smaller than prey
+	              pred_p%mass = pred_p%mass + prey_p%mass
+		      prey_p%mass = 0.  !prey will be deactivated later this time step
+	            else
+	              prey_p%mass = pred_p%mass + prey_p%mass
+	              pred_p%mass = 0.  !pred will be deactivated later this time step
+		      exit preyloop
+	            end if
 	          end if
 	        end if
-		
-              end if  
+	        prey_sc => prey_sc%next
+	      end do preyloop
 	    end if
-	  end if
-	  prey_p => prey_p%next
-        end do preyloop
-      
-      end if
-      pred_p => pred_p%next
-    end do !predloop
-    
+	    pred_sc => pred_sc%next
+	  end do !predloop
+	  
+	  !deallocate
+	  pred_sc => sc_3d(k,i,j)%next
+	  do while(associated(pred_sc))
+	    pred_free => pred_sc
+	    pred_sc => pred_sc%next
+	    deallocate(pred_free)
+	  end do
+	  nullify(sc_3d(k,i,j)%next)
+	  nullify(sc_3d(k,i,j)%ptr)
+	  	    
+        end do
+      end do
+    end do
+
   end subroutine self_coll
 
   !
@@ -2895,7 +2941,7 @@ contains
     logical, intent(in) :: hot
     character (len=80), intent(in), optional :: hfilin
     integer(kind=long) :: n
-    integer  :: k, kmax, io, nprocs
+    integer  :: k, kmax, io, nprocs, i,j
     logical  :: exans
     real     :: tstart, xstart, ystart, zstart, ysizelocal, xsizelocal, firststartl, firststart
     real     :: pu,pts,px,py,pz,pzp,pxs,pys,pzs,pur,pvr,pwr,purp,pvrp,pwrp
@@ -2915,7 +2961,20 @@ contains
     nullify(head)
     nullify(tail)
     nplisted = 0
-
+    
+    if (selfcollection) then
+      allocate(sc_3d(nzp,nxp,nyp))
+      do j=3,nyp-2
+        do i=3,nxp-2
+          do k=2,nzp-1
+            nullify(sc_3d(k,i,j)%ptr)
+	    nullify(sc_3d(k,i,j)%next)
+          end do
+        end do
+      end do
+    end if
+	
+    
     if(hot) then
     ! ------------------------------------------------------
     ! Warm start -> load restart file
