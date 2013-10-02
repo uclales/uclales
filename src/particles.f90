@@ -60,11 +60,13 @@ module modparticles
   logical            :: lpartmass = .true.              ! hard code switch to turn on/off drop mass 
                                                         ! used only in combination with lpartdrop = .true. (namelist)
   logical            :: selfcollection = .true.         ! switch for enabling self-collection of LD
+  logical            :: var_mtpl = .true.               ! switch to use a variable multiplicity in self-collection
+                                                        ! used only in combination with lpartmass = .true.
 
   ! Particle structure
   type :: particle_record
     real             :: unique, tstart
-    integer          :: partstep, nd
+    integer          :: partstep, nd, mtpl
     real             :: x, xstart, ures, ures_prev, usgs, usgs_prev, udrop, udrop_rk, udrop_rkprev
     real             :: y, ystart, vres, vres_prev, vsgs, vsgs_prev, vdrop, vdrop_rk, vdrop_rkprev
     real             :: z, zstart, wres, wres_prev, wsgs, wsgs_prev, wdrop, wdrop_rk, wdrop_rkprev, zprev
@@ -86,7 +88,7 @@ module modparticles
   integer            :: ipures, ipvres, ipwres, ipures_prev, ipvres_prev, ipwres_prev, ipartstep, ipnd, nrpartvar
   integer            :: ipusgs, ipvsgs, ipwsgs, ipusgs_prev, ipvsgs_prev, ipwsgs_prev, ipsigma2_sgs, ipm, ipt
   integer            :: ipudrop, ipudrop_rkprev, ipvdrop, ipvdrop_rkprev, ipwdrop, ipwdrop_rkprev
-  integer            :: ipudrop_rk, ipvdrop_rk, ipwdrop_rk
+  integer            :: ipudrop_rk, ipvdrop_rk, ipwdrop_rk, ipmtpl
 
   ! Statistics and particle dump
   integer            :: ncpartid, ncpartrec             ! Particle dump
@@ -1729,6 +1731,7 @@ contains
       buffer(n+ipvdrop_rkprev)  = particle%vdrop_rkprev
       buffer(n+ipwdrop_rkprev)  = particle%wdrop_rkprev
       buffer(n+ipt)             = particle%tau
+      buffer(n+ipmtpl)          = particle%mtpl
     else
       particle%unique           = buffer(n+ipunique)
       particle%x                = buffer(n+ipx)
@@ -1765,6 +1768,7 @@ contains
       particle%vdrop_rkprev     = buffer(n+ipvdrop_rkprev)
       particle%wdrop_rkprev     = buffer(n+ipwdrop_rkprev)
       particle%tau              = buffer(n+ipt)
+      particle%mtpl             = int(buffer(n+ipmtpl))
     end if
 
   end subroutine partbuffer
@@ -2148,6 +2152,8 @@ contains
       if(lpartdumpmr)              nvar = nvar + 2     ! rt,rl
       if(lpartdrop)                nvar = nvar + 1     ! nd
       if(lpartdrop.and.lpartmass)  nvar = nvar + 4     ! mass,ud,vd,wd
+      if(lpartdrop.and.lpartmass.and.var_mtpl) &
+                                   nvar = nvar + 1     ! mtpl
 
       nprocs = nxprocs * nyprocs
       allocate(tosend(0:nprocs-1),toreceive(0:nprocs-1),base(0:nprocs-1),sendbase(0:nprocs-1),receivebase(0:nprocs-1))
@@ -2231,11 +2237,16 @@ contains
           end if
 	  if(lpartdrop)  then
             sendbuff(base(p)+nvl+1)   = particle%nd
+	    nvl = nvl + 1
 	    if(lpartmass) then
-	      sendbuff(base(p)+nvl+2) = particle%mass
-	      sendbuff(base(p)+nvl+3) = particle%udrop * deltax
-	      sendbuff(base(p)+nvl+4) = particle%vdrop * deltay
-	      sendbuff(base(p)+nvl+5) = particle%wdrop / dzi_t(floor(particle%z))
+	      sendbuff(base(p)+nvl+1) = particle%mass
+	      sendbuff(base(p)+nvl+2) = particle%udrop * deltax
+	      sendbuff(base(p)+nvl+3) = particle%vdrop * deltay
+	      sendbuff(base(p)+nvl+4) = particle%wdrop / dzi_t(floor(particle%z))
+	      nvl = nvl + 4
+              if(var_mtpl) then
+	        sendbuff(base(p)+nvl+1) = particle%mtpl
+	      end if
 	    end if
 	  end if
 
@@ -2325,11 +2336,16 @@ contains
         end if
 	if(lpartdrop) then
 	  sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
+	  nvl = nvl + 1
 	  if(lpartmass) then
+	    sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
 	    sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
 	    sb_sorted(loc,nvl+3) = recvbuff(ii+nvl+3)
 	    sb_sorted(loc,nvl+4) = recvbuff(ii+nvl+4)
-	    sb_sorted(loc,nvl+5) = recvbuff(ii+nvl+5)
+	    nvl = nvl + 4
+            if(var_mtpl) then
+	      sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
+	    end if
 	  end if
 	end if
 
@@ -2383,11 +2399,16 @@ contains
       end if
       if(lpartdrop) then
         call writevar_nc(ncpartid,'nd',sb_sorted(:,nvl+1),ncpartrec)
+	nvl = nvl + 1
 	if(lpartmass) then
-	  call writevar_nc(ncpartid,'m',sb_sorted(:,nvl+2),ncpartrec)
-	  call writevar_nc(ncpartid,'ud',sb_sorted(:,nvl+3),ncpartrec)
-	  call writevar_nc(ncpartid,'vd',sb_sorted(:,nvl+4),ncpartrec)
-	  call writevar_nc(ncpartid,'wd',sb_sorted(:,nvl+5),ncpartrec)
+	  call writevar_nc(ncpartid,'m',sb_sorted(:,nvl+1),ncpartrec)
+	  call writevar_nc(ncpartid,'ud',sb_sorted(:,nvl+2),ncpartrec)
+	  call writevar_nc(ncpartid,'vd',sb_sorted(:,nvl+3),ncpartrec)
+	  call writevar_nc(ncpartid,'wd',sb_sorted(:,nvl+4),ncpartrec)
+	  nvl = nvl + 4
+          if(var_mtpl) then
+	    call writevar_nc(ncpartid,'mtpl',sb_sorted(:,nvl+1),ncpartrec)	
+	  end if
 	end if
       end if
       stat  = nf90_sync(ncpartid)
@@ -2571,7 +2592,8 @@ contains
         particle%udrop_rkprev   = -32678.
         particle%vdrop_rkprev   = -32678.
         particle%wdrop_rkprev   = -32678.
-	particle%tau           = -32678.
+	particle%tau            = -32678.
+	particle%mtpl           = -32678.
       end if
       i = i + 2
     end do
@@ -2662,6 +2684,7 @@ contains
                   particle%vdrop_rkprev   = 0.
                   particle%wdrop_rkprev   = 0.
 		  particle%tau            = 0.
+		  particle%mtpl           = int(1./nppd)
 		  newp = newp + 1
 	          !write(*,*) 're-activate: unique',particle%unique,'nd',particle%nd
 		end if
@@ -2784,7 +2807,7 @@ contains
     type (sc_el), pointer  :: pred_sc, prey_sc, pred_free
     integer                :: i,j,k
     real                   :: r_pred, r_prey, deltav, dzi, randnr, pij
-   
+    
 
     do j=3,nyp-2
       do i=3,nxp-2
@@ -2808,20 +2831,36 @@ contains
 	          deltav =  sqrt( (pred_p%udrop/dxi - prey_p%udrop/dxi)**2. + &
                                   (pred_p%vdrop/dyi - prey_p%vdrop/dyi)**2. + &
                                   (pred_p%wdrop/dzi - prey_p%wdrop/dzi)**2. )  
-	          pij = (dxi * dyi * dzi) * 1./nppd * pi * (r_pred+r_prey)**2. * deltav * dt
-                  write(*,*) myid,'prob: ',pij
+	          pij = (dxi * dyi * dzi) * max(pred_p%mtpl,prey_p%mtpl) &
+		                          * pi * (r_pred+r_prey)**2. * deltav * dt
+                  !write(*,*) myid,'prob: ',pij
                   !do a self-collection
 	          call random_number(randnr)          ! Random seed has been called from init_particles...
                   if(randnr<pij) then
-	            write(*,*) myid,'SC! old mass: ',pred_p%mass,' ',prey_p%mass
-	            if (r_pred.ge.r_prey) then  !predator may be larger or smaller than prey
-	              pred_p%mass = pred_p%mass + prey_p%mass
-		      prey_p%mass = 0.  !prey will be deactivated later this time step
-	            else
-	              prey_p%mass = pred_p%mass + prey_p%mass
-	              pred_p%mass = 0.  !pred will be deactivated later this time step
-		      exit preyloop
-	            end if
+	            !write(*,*) myid,'SC! old mass: ',pred_p%mass,' ',prey_p%mass
+	            if (.not.var_mtpl) then
+		      if (r_pred.ge.r_prey) then  !predator may be larger or smaller than prey
+	                pred_p%mass = pred_p%mass + prey_p%mass
+		        prey_p%mass = 0.  !prey will be deactivated later this time step
+	              else
+	                prey_p%mass = pred_p%mass + prey_p%mass
+	                pred_p%mass = 0.  !pred will be deactivated later this time step
+		        exit preyloop
+	              end if
+		    else !variable multiplicity
+		      if (pred_p%mtpl.eq.prey_p%mtpl) then
+		        pred_p%mtpl = floor(pred_p%mtpl/2.)
+			prey_p%mtpl = prey_p%mtpl - pred_p%mtpl
+			pred_p%mass = pred_p%mass + prey_p%mass
+			prey_p%mass = pred_p%mass
+		      else if (pred_p%mtpl.lt.prey_p%mtpl) then
+			prey_p%mtpl = prey_p%mtpl - pred_p%mtpl
+			pred_p%mass = pred_p%mass + prey_p%mass
+		      else
+			pred_p%mtpl = pred_p%mtpl - prey_p%mtpl
+			prey_p%mass = prey_p%mass + pred_p%mass
+		      end if
+		    end if
 	          end if
 	        end if
 	        prey_sc => prey_sc%next
@@ -2945,8 +2984,9 @@ contains
     logical  :: exans
     real     :: tstart, xstart, ystart, zstart, ysizelocal, xsizelocal, firststartl, firststart
     real     :: pu,pts,px,py,pz,pzp,pxs,pys,pzs,pur,pvr,pwr,purp,pvrp,pwrp
-    real     :: pus,pvs,pws,pusp,pvsp,pwsp,psg2,pm,pud,pvd,pwd,pudr,pvdr,pwdr,pudrp,pvdrp,pwdrp,pt
-    integer  :: pstp,pnd,idot
+    real     :: pus,pvs,pws,pusp,pvsp,pwsp,psg2,pm,pud,pvd,pwd,pudr,pvdr,pwdr
+    real     :: pudrp,pvdrp,pwdrp,pt
+    integer  :: pstp,pnd,idot,pmtpl
     type (particle_record), pointer:: particle
     character (len=80) :: hname,prefix,suffix
 
@@ -2996,7 +3036,9 @@ contains
         read (666,iostat=io) np,tnextdump
       end if
       do
-        read (666,iostat=io) pu,pts,pstp,pnd,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs,pzp,pwr,pwrp,pus,pvs,pws,pusp,pvsp,pwsp,psg2,pm,pud,pvd,pwd,pudr,pvdr,pwdr,pudrp,pvdrp,pwdrp,pt
+        read (666,iostat=io) pu,pts,pstp,pnd,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs, &
+	                     pzp,pwr,pwrp,pus,pvs,pws,pusp,pvsp,pwsp,psg2,pm,pud,pvd,pwd, &
+			     pudr,pvdr,pwdr,pudrp,pvdrp,pwdrp,pt,pmtpl
         if(io .ne. 0) exit
         call add_particle_end(particle)
         particle%unique         = pu
@@ -3034,6 +3076,7 @@ contains
         particle%vdrop_rkprev   = pvdrp
         particle%wdrop_rkprev   = pwdrp
 	particle%tau            = pt
+	particle%mtpl           = pmtpl
 	if(pts < firststartl) firststartl = pts
       end do
       close(666)
@@ -3094,6 +3137,7 @@ contains
         particle%vdrop_rkprev   = -32678.
         particle%wdrop_rkprev   = -32678.
 	particle%tau            = -32678.
+	particle%mtpl           = -32678.
       end do
       ! Set first dump times
       tnextdump = frqpartdump
@@ -3166,6 +3210,7 @@ contains
               particle%vdrop_rkprev   = 0.
               particle%wdrop_rkprev   = 0.
 	      particle%tau            = 0.
+	      particle%mtpl           = 1
               if(tstart < firststartl) firststartl = tstart
             end if
           end if
@@ -3218,7 +3263,8 @@ contains
     ipvdrop_rkprev  = 33
     ipwdrop_rkprev  = 34
     ipt             = 35
-    nrpartvar       = ipt
+    ipmtpl          = 36
+    nrpartvar       = ipmtpl
     
     ! 1D arrays for online statistics
     if(lpartstat) then
@@ -3357,7 +3403,8 @@ contains
         particle%sigma2_sgs, particle%mass, &
 	particle%udrop, particle%vdrop, particle%wdrop, &
 	particle%udrop_rk, particle%vdrop_rk, particle%wdrop_rk, &
-	particle%udrop_rkprev, particle%vdrop_rkprev, particle%wdrop_rkprev, particle%tau
+	particle%udrop_rkprev, particle%vdrop_rkprev, particle%wdrop_rkprev, &
+	particle%tau, particle%mtpl
       particle => particle%next
     end do
     close(666)
@@ -3443,6 +3490,9 @@ contains
       call addvar_nc(ncpartid,'ud','u-velocity of drop','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
       call addvar_nc(ncpartid,'vd','v-velocity of drop','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
       call addvar_nc(ncpartid,'wd','w-velocity of drop','m/s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      if(var_mtpl) then
+        call addvar_nc(ncpartid,'mtpl','multiplicity','#',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)        
+      end if
     end if
 
   end subroutine initparticledump
