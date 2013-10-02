@@ -1659,6 +1659,8 @@ contains
   !
   subroutine accum_lsm2(nxp, nyp, nzp, a_Qnet, a_G0, ra, a_tskin,obl,a_sflxd,a_sflxu,a_lflxd,a_lflxu,a_tsoil)
 
+    use grid, only : iradtyp
+
     integer, intent (in)  :: nxp,nyp,nzp
     real, intent (in)     :: a_Qnet(nxp,nyp)
     real, intent (in)     :: a_G0(nxp,nyp)
@@ -1682,11 +1684,13 @@ contains
     ssclr(72) = sum(a_tsoil(4,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
 
     !!!!!!!!! ONLY FOR IRADTYP=5 !!!!!!!!!!!!!!!!!!!!!!!
-    ssclr(61) = sum(a_sflxd(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
-    ssclr(62) = sum(a_sflxu(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
-    ssclr(63) = sum(a_lflxd(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
-    ssclr(64) = sum(a_lflxu(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
-
+    if(iradtyp==5) then
+      ssclr(61) = sum(a_sflxd(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+      ssclr(62) = sum(a_sflxu(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+      ssclr(63) = sum(a_lflxd(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+      ssclr(64) = sum(a_lflxu(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    end if
+ 
   end subroutine accum_lsm2
 
 

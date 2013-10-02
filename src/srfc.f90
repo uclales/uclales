@@ -355,47 +355,52 @@ contains
          end do
        end do
 
-       ! Solve surface temperature from SEB
-       do j=3,nyp-2
-         do i=3,nxp-2
-           a_Qnet(i,j)  = a_lflxd(2,i,j) - a_lflxu(2,i,j) + a_sflxd(2,i,j) - a_sflxu(2,i,j)
-           rhcpa        = dn0(2)*cp/ra(i,j)
-           a_tskin(i,j) = (a_Qnet(i,j) + rhcpa * a_theta(2,i,j)*(psrf/p00) + labsk * a_tsoil(1,i,j)) / (rhcpa + labsk)
-         end do
-       end do
-
-       ! Integrate soil heat diffusion
-       tsoilm(:,:,:) = a_tsoil(:,:,:)  
-       do j=3, nyp-2
-         do i=3, nxp-2
-           do k=1,3 
-             if(k==1) then
-               gkm = labsk * (a_tskin(i,j) - tsoilm(k,i,j))
-             else
-               gkm = -lambdab * ((tsoilm(k,i,j)   - tsoilm(k-1,i,j)) / (zsoilc(k) - zsoilc(k-1)))
-             end if
-             gkp   = -lambdab * ((tsoilm(k+1,i,j) - tsoilm(k,i,j))   / (zsoilc(k+1) - zsoilc(k)))
-             soiltend = -(gkp - gkm) / (zsoil(k+1) - zsoil(k)) 
-             a_tsoil(k,i,j) = a_tsoil(k,i,j) + rkalpha(nstep) * (dt/rhoCs) * soiltend &
-                                             + rkbeta(nstep)  * (dt/rhoCs) * soiltendm(k,i,j)
-             if(nstep==3) then
-               soiltendm(k,i,j) = 0.
-             else                              
-               soiltendm(k,i,j) = soiltend
-             end if
+       
+       if (dolsm) then ! --------------------------------------------------
+         ! Solve surface temperature from SEB
+         do j=3,nyp-2
+           do i=3,nxp-2
+             a_Qnet(i,j)  = a_lflxd(2,i,j) - a_lflxu(2,i,j) + a_sflxd(2,i,j) - a_sflxu(2,i,j)
+             rhcpa        = dn0(2)*cp/ra(i,j)
+             a_tskin(i,j) = (a_Qnet(i,j) + rhcpa * a_theta(2,i,j)*(psrf/p00) + labsk * a_tsoil(1,i,j)) / (rhcpa + labsk)
            end do
          end do
-       end do
+
+         ! Integrate soil heat diffusion
+         tsoilm(:,:,:) = a_tsoil(:,:,:)  
+         do j=3, nyp-2
+           do i=3, nxp-2
+             do k=1,3 
+               if(k==1) then
+                 gkm = labsk * (a_tskin(i,j) - tsoilm(k,i,j))
+               else
+                 gkm = -lambdab * ((tsoilm(k,i,j)   - tsoilm(k-1,i,j)) / (zsoilc(k) - zsoilc(k-1)))
+               end if
+               gkp   = -lambdab * ((tsoilm(k+1,i,j) - tsoilm(k,i,j))   / (zsoilc(k+1) - zsoilc(k)))
+               soiltend = -(gkp - gkm) / (zsoil(k+1) - zsoil(k)) 
+               a_tsoil(k,i,j) = a_tsoil(k,i,j) + rkalpha(nstep) * (dt/rhoCs) * soiltend &
+                                               + rkbeta(nstep)  * (dt/rhoCs) * soiltendm(k,i,j)
+               if(nstep==3) then
+                 soiltendm(k,i,j) = 0.
+               else                              
+                 soiltendm(k,i,j) = soiltend
+               end if
+             end do
+           end do
+         end do
+       else ! --------------------------------------------------
+         a_tskin(:,:) = sst *(p00/psrf)**rcp
+       end if
 
        ! Calculate surface fluxes
        do j=3, nyp-2
          do i=3, nxp-2
            a_ustar(i,j) = vonk * wspd(i,j)  / (log(zt(2) / z0m(i,j)) - psim(zt(2) / obl(i,j)) + psim(z0m(i,j) / obl(i,j)))
-           wt_sfc(i,j)  = - (a_theta(2,i,j)*(psrf/p00)**rcp - a_tskin(i,j)) / ra(i,j) 
+           wt_sfc(i,j)  = - (a_theta(2,i,j)*(psrf/p00)**rcp - a_tskin(i,j)) / ra(i,j)
            uw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j) * (a_up(2,i,j)+umean)/wspd(i,j)
            vw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j) * (a_vp(2,i,j)+vmean)/wspd(i,j)
            a_tstar(i,j) = - wt_sfc(i,j)/a_ustar(i,j)
-           a_G0(i,j)    = labsk * (a_tskin(i,j) - a_tsoil(1,i,j))
+           if(dolsm) a_G0(i,j)    = labsk * (a_tskin(i,j) - a_tsoil(1,i,j))
          end do
        end do
 
