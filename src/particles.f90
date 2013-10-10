@@ -224,19 +224,6 @@ contains
 
     ! Communicate particles to other procs
     call partcomm
-    
-    ! Let drops grow
-    if (lpartdrop.and.lpartmass) then
-      if (nstep==3) then
-        particle => head
-        do while( associated(particle))
-          if ( time - particle%tstart >= 0 .and. particle%x.ne.fillvalue_double) then
-            call drop_growth(particle)
-          end if
-          particle => particle%next
-        end do
-      end if
-    end if
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! Temporary hack, sync particle dump with statistics
@@ -266,6 +253,8 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine grow_drops
+    use modnetcdf, only : fillvalue_double
+    implicit none
     type (particle_record), pointer :: particle
 
     ! Let drops grow
@@ -273,7 +262,7 @@ contains
       ! Accretion, condensation and evaporation
       particle => head
       do while( associated(particle))
-        if (particle%x.ne.-32678.) then
+        if (particle%x.ne.fillvalue_double) then
           call drop_growth(particle)
 	end if
 	particle => particle%next
@@ -2184,9 +2173,9 @@ contains
       if(lpartdumpmr .and. level>0)  nvar = nvar + 1     ! rt
       if(lpartdumpmr .and. level>1)  nvar = nvar + 1     ! rl
       if(lpartdrop)                  nvar = nvar + 1     ! nd
-      if(lpartdrop.and.lpartmass)  nvar = nvar + 4     ! mass,ud,vd,wd
+      if(lpartdrop.and.lpartmass)    nvar = nvar + 4     ! mass,ud,vd,wd
       if(lpartdrop.and.lpartmass.and.var_mtpl) &
-                                   nvar = nvar + 1     ! mtpl
+                                     nvar = nvar + 1     ! mtpl
 
       nprocs = nxprocs * nyprocs
       allocate(tosend(0:nprocs-1),toreceive(0:nprocs-1),base(0:nprocs-1),sendbase(0:nprocs-1),receivebase(0:nprocs-1))
@@ -2374,7 +2363,7 @@ contains
           sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
           nvl = nvl + 1
           if(level>0) then
-            sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+2)
+            sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
             nvl = nvl + 1
           end if
         end if
@@ -2382,7 +2371,7 @@ contains
           sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
           nvl = nvl + 1
           if(level>1) then
-            sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+2)
+            sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
             nvl = nvl + 1
           end if
         end if
@@ -2642,16 +2631,16 @@ contains
         particle%partstep       = fillvalue_double
         particle%nd             = buffrecv(i+1)
         myac = myac - 1
-        particle%vdrop          = -32678.
-        particle%wdrop          = -32678.
-        particle%udrop_rk       = -32678.
-        particle%vdrop_rk       = -32678.
-        particle%wdrop_rk       = -32678.
-        particle%udrop_rkprev   = -32678.
-        particle%vdrop_rkprev   = -32678.
-        particle%wdrop_rkprev   = -32678.
-	particle%tau            = -32678.
-	particle%mtpl           = -32678.
+        particle%vdrop          = fillvalue_double
+        particle%wdrop          = fillvalue_double
+        particle%udrop_rk       = fillvalue_double
+        particle%vdrop_rk       = fillvalue_double
+        particle%wdrop_rk       = fillvalue_double
+        particle%udrop_rkprev   = fillvalue_double
+        particle%vdrop_rkprev   = fillvalue_double
+        particle%wdrop_rkprev   = fillvalue_double
+	particle%tau            = fillvalue_double
+	particle%mtpl           = fillvalue_double
       end if
       i = i + 2
     end do
@@ -2859,6 +2848,7 @@ contains
     use mpi_interface, only : myid
     use defs,          only : pi,rowt
     use grid,          only : nxp, nyp, nzp, dxi,dyi,dzi_t, dt
+    use modnetcdf,     only : fillvalue_double
     implicit none
     
     type (particle_record), pointer:: pred_p,prey_p
@@ -2874,13 +2864,13 @@ contains
           pred_sc => sc_3d(k,i,j)
 	  do while(associated(pred_sc%next))!predloop
             pred_p => pred_sc%ptr
-	    if (pred_p%mass.ne.0.and.pred_p%mass.ne.-32678.) then
+	    if (pred_p%mass.ne.0.and.pred_p%mass.ne.fillvalue_double) then
 	      dzi = dzi_t(floor(pred_p%z))
 	      prey_sc => pred_sc%next
 	    
 	      preyloop: do while(associated(prey_sc))
 	        prey_p => prey_sc%ptr
-	        if (prey_p%mass.ne.0.and.prey_p%mass.ne.-32678.) then
+	        if (prey_p%mass.ne.0.and.prey_p%mass.ne.fillvalue_double) then
 
                   !calculate probability pij of self-collection from geometrical considerations
                   !similarly used in Shima et al. 2009 QJRMS
@@ -3097,7 +3087,7 @@ contains
       do
         read (666,iostat=io) pu,pts,pstp,pnd,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs, &
 	                     pzp,pwr,pwrp,pus,pvs,pws,pusp,pvsp,pwsp,psg2,pm,pud,pvd,pwd, &
-			     pudr,pvdr,pwdr,pudrp,pvdrp,pwdrp,pt,pmtpl
+			     pudr,pvdr,pwdr,pudrp,pvdrp,pwdrp,pt !,pmtpl
         if(io .ne. 0) exit
         call add_particle_end(particle)
         particle%unique         = pu
@@ -3135,7 +3125,7 @@ contains
         particle%vdrop_rkprev   = pvdrp
         particle%wdrop_rkprev   = pwdrp
 	particle%tau            = pt
-	particle%mtpl           = pmtpl  !int(1.e9)
+	particle%mtpl           = int(1.e9)  !pmtpl  !int(1.e9)
 	if(pts < firststartl) firststartl = pts
       end do
       close(666)
@@ -3186,17 +3176,17 @@ contains
         particle%mass           = fillvalue_double
         particle%partstep       = fillvalue_double
         particle%nd             = 0
-        particle%udrop          = -32678.
-        particle%vdrop          = -32678.
-        particle%wdrop          = -32678.
-        particle%udrop_rk       = -32678.
-        particle%vdrop_rk       = -32678.
-        particle%wdrop_rk       = -32678.
-        particle%udrop_rkprev   = -32678.
-        particle%vdrop_rkprev   = -32678.
-        particle%wdrop_rkprev   = -32678.
-	particle%tau            = -32678.
-	particle%mtpl           = -32678.
+        particle%udrop          = fillvalue_double
+        particle%vdrop          = fillvalue_double
+        particle%wdrop          = fillvalue_double
+        particle%udrop_rk       = fillvalue_double
+        particle%vdrop_rk       = fillvalue_double
+        particle%wdrop_rk       = fillvalue_double
+        particle%udrop_rkprev   = fillvalue_double
+        particle%vdrop_rkprev   = fillvalue_double
+        particle%wdrop_rkprev   = fillvalue_double
+	particle%tau            = fillvalue_double
+	particle%mtpl           = fillvalue_double
       end do
       ! Set first dump times
       tnextdump = frqpartdump
