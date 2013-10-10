@@ -2684,7 +2684,7 @@ contains
                   particle%vdrop_rkprev   = 0.
                   particle%wdrop_rkprev   = 0.
 		  particle%tau            = 0.
-		  particle%mtpl           = int(1./nppd)
+		  particle%mtpl           = nint(1./nppd)
 		  newp = newp + 1
 	          !write(*,*) 're-activate: unique',particle%unique,'nd',particle%nd
 		end if
@@ -3076,7 +3076,7 @@ contains
         particle%vdrop_rkprev   = pvdrp
         particle%wdrop_rkprev   = pwdrp
 	particle%tau            = pt
-	particle%mtpl           = pmtpl
+	particle%mtpl           = pmtpl  !int(1.e9)
 	if(pts < firststartl) firststartl = pts
       end do
       close(666)
