@@ -1,0 +1,88 @@
+\documentclass[handout]{beamer}
+% \documentclass{beamer}
+\usepackage{color}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage[utf8x]{inputenc}
+\usepackage{longtable}
+\usepackage{pdfpages}
+\usetheme{MPIM}
+\logo{}
+% \mode<handout|presentation>{
+\newcount\mylineno
+\mylineno=0
+\def\tblnewline{%
+  \global\advance\mylineno by 1
+  \ifnum\mylineno=7
+    \global\mylineno=0
+    \\
+    \pagebreak
+  \else
+    \\
+  \fi
+}
+% }
+% \mode<article>{
+% \newcount\mylineno
+% \mylineno=0
+% \def\tblnewline{%
+%   \global\advance\mylineno by 1
+%   \ifnum\mylineno=7
+%     \global\mylineno=0
+%     \\
+%     \pagebreak
+%   \else
+%     \\
+%   \fi
+% }
+% }
+\newcommand{\derr}[2]{\frac{\partial #1}{\partial #2}}
+\newcommand{\fav}[1]{\widetilde{#1}}
+\newcommand{\xav}[1]{\left\langle{#1}\right\rangle}
+\newcommand{\tav}[1]{\overline{#1}}
+\newcommand{\source}[2]{\ensuremath{\mathcal{S}_{#1}^{\mathrm{#2}}}}
+\newcommand{\force}[2]{\ensuremath{\mathcal{F}_{#1}^{\mathrm{#2}}}}
+\newcommand{\mr}[1]{\ensuremath{\mathrm{\ #1}}}
+\newcommand{\sgse}{e}
+\newcommand{\rese}{E}
+\newcommand{\code}[1]{{\tt #1}}
+\newenvironment{codenv}{\tt}{}
+
+\usepackage{pgfpages}
+\usepackage{textcomp}
+% \mode<handout>\pgfpagesuselayout{4 on 1}[a4paper,border shrink=5mm,landscape]
+\title[UCLALES Tutorial]{Using the UCLA Large Eddy Simulation code }
+\author[HERZ-CC]{Thijs Heus, Bjorn Stevens, Axel Seifert, Cathy Hohenegger}
+\institute{Max Planck Institute for Meteorology}
+\date{November 7 - 11, 2011}
+
+\begin{document}
+\begin{frame}[plain]
+\titlepage
+\end{frame}
+
+
+\subtitle{UCLALES Tutorial}
+ 
+\include{overview}
+\include{setup}	
+\include{options}
+
+\include{structure}
+
+\include{statistics}
+
+
+\include{dynamics}
+\include{surface}
+\include{microphysics}
+\include{radiation}
+% \include{other}
+\lecture[Exercises]{Excercises}{excercises}
+
+\include{drycbl}
+\include{cumulus} 
+\include{stratocumulus}
+
+\end{document}

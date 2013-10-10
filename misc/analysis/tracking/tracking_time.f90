@@ -946,8 +946,8 @@ module modtrack
     integer :: i, j, t
     write (*,*) '.. entering tracking'
 
-    allocate(cellloc(3,ceiling(min(1.*(huge(1)-2),0.25*real(nx)*real(ny)*real(nt-tstart)))))
-
+    allocate(cellloc(3,ceiling(min(0.3*(huge(1)-2),0.5*real(nx)*real(ny)*real(nt-tstart)))))
+print *, 'cellloc',shape(cellloc),0.3*huge(1), 0.5*real(nx)*real(ny)*real(nt-tstart)
     nullify(cell)
     do t = tstart, nt
       if(mod(t,10)==0) write (*,'(A,I10,A,I10)') "Time =", t,"  Nr of Cells", ncells
@@ -1502,6 +1502,33 @@ real :: time
             call write_ncvar(fid, ovar, nrelatives)
             deallocate(ovar%dim, ovar%dimids)
           end if
+
+!         !Write to netcdf file: Cloudsystemid
+          nrelatives = fillvalue_i
+          nn   = 0
+          iret = firstcell(cell)
+          do
+            if (iret == -1) exit
+            tmin = minval(cell%loc(3,1:cell%nelements))
+            tmax = maxval(cell%loc(3,1:cell%nelements))
+            if (tmax - tmin + 1 >= bucket_min(n) .and. tmax - tmin + 1 <= bucket_max(n)) then
+              nn = nn + 1
+              nrelatives(nn)  = cell%cloudsystemnr
+            end if
+            iret = nextcell(cell)
+          end do
+          if (any(nrelatives>0)) then
+            allocate(ovar%dim(1))
+            ovar%dim      = shape(nrelatives)
+            allocate(ovar%dimids(1))
+            ovar%dimids(1) = nrnc%dimids(1)
+            ovar%name     = trim(nrnc%name)//'sysid'
+            ovar%longname = trim(nrnc%longname)//' id of the system'
+            ovar%units    = '#'
+            call define_ncvar(fid, ovar, nf90_int)
+            call write_ncvar(fid, ovar, nrelatives)
+            deallocate(ovar%dim, ovar%dimids)
+          end if
 !           !Write to netcdf file: siblings
 !           if (any(nrelatives>0)) then
 !             allocate(ovar%dim(2))
@@ -1590,8 +1617,8 @@ program tracking
   use modtrack
   implicit none
   type(cellptr), dimension(:,:,:), allocatable :: parentarr
-  logical :: lcore = .false., lcloud = .false., lthermal = .false., lrain = .false.
-  integer ::  i,j,k,n, ub, lb, vlength, fid, finput, nmincells, nmincells_cloud, nchunk, kk, kkmax
+  logical :: lcore = .false., lcloud = .false., lthermal = .false., lrain = .false., lrwp = .false.
+  integer ::  i,j,k,n, ub, lb, vlength, fid, finput, finput2, nmincells, nmincells_cloud, nchunk, kk, kkmax
   character(100) :: criterion, filename, stem, ctmp
   real    :: lwpthres, corethres, thermthres, rwpthres, heightmin, heightrange, valmin, valrange
   integer(kind=2)    :: i_lwpthres, i_corethres, i_thermthres, i_rwpthres
@@ -1600,16 +1627,16 @@ program tracking
   real, allocatable, dimension(:) :: x, y, t
   integer(kind=2), dimension(:,:,:), allocatable :: base, top
   integer(kind=2), dimension(:), allocatable :: minbasecloud, minbasetherm
-  real, dimension(:,:,:), allocatable :: readfield
+  real, dimension(:,:,:), allocatable :: readfield, readfield2
   real   :: thermmin, thermmax, lwpmin, lwpmax, rwpmin, rwpmax, coremin, coremax, distmin, distmax, maxheight, &
             thermzero, thermrange, lwpzero, lwprange, rwpzero, rwprange, corezero, corerange, distzero, distrange
 
 
-  lwpthres = 0.05
+  lwpthres = 0.01
   corethres = 0.5
   thermthres = 300.
 
-  rwpthres = 0.05
+  rwpthres = 0.01
   thermmin = -1.
   thermmax = 10000.
   lwpmin   = -1.
@@ -1641,6 +1668,7 @@ program tracking
   i_thermthres = (thermthres - thermzero)/thermrange
   i_rwpthres   = (rwpthres - rwpzero)/rwprange
   cbstep = (300.)/distrange
+!  cbstep = (3000.)/distrange  !AXEL
   nmincells_cloud  = 1
   nmincells        = 4
 
@@ -1680,6 +1708,17 @@ program tracking
       if (ilwp < 0) then
         nvar = nvar + 1
         ilwp = nvar
+      end if
+    case ('liquid')
+      lcloud = .true.
+      lrwp   = .true.
+      if (ilwp < 0) then
+        nvar = nvar + 1
+        ilwp = nvar
+      end if
+      if (irain < 0) then
+        nvar  = nvar + 1
+        irain = nvar
       end if
     case ('thermal')
       lthermal = .true.
@@ -1786,6 +1825,7 @@ program tracking
   allocate(bool(nx, ny, tstart:nt))
   call check(nf90_close(finput))
   allocate(readfield(nx, ny, nchunk))
+  if (lrwp) allocate(readfield2(nx, ny, nchunk))
 
   minparentel = 100!nint(50./(dx*dy*dt))
   if (lthermal) then
@@ -1858,10 +1898,20 @@ program tracking
     write(*,*) 'Reading ', trim(filename)
     call check ( nf90_open (trim(filename), NF90_NOWRITE, finput) )
     call inquire_ncvar(finput, ivar(ilwp))
+    if (lrwp) then
+       filename = trim(stem)//trim(ivar(irain)%name)//'.nc'
+       write(*,*) 'Reading ', trim(filename)
+       call check ( nf90_open (trim(filename), NF90_NOWRITE, finput2) )
+       call inquire_ncvar(finput2, ivar(irain))
+    end if
     do k = tstart,nt,nchunk
       write (*,*) 'Reading t = ',k
       kkmax = min(nt-k+1,nchunk)
       call read_ncvar(finput, ivar(ilwp), readfield,(/1,1,k/),(/nx,ny,kkmax/))
+      if (lrwp) then
+         call read_ncvar(finput2, ivar(irain), readfield2,(/1,1,k/),(/nx,ny,kkmax/))
+         readfield = readfield + readfield2
+      end if
       do kk = 1,kkmax
         do j = 1, ny
           do i = 1, nx
@@ -1875,6 +1925,7 @@ program tracking
       end do
     end do
     call check(nf90_close(finput))
+    if (lrwp) deallocate(readfield2)
 
 
     do n = 1,2

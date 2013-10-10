@@ -461,9 +461,9 @@ contains
                 call resetvar(ice,rice,nice)
                 call resetvar(snow,rsnow)
                 call resetvar(graupel,rgrp)
-                call sedimentation (n1,ice, rice,nice,rrate = prc_i(1:n1,i,j))
-                call sedimentation (n1,snow, rsnow, rrate = prc_s(1:n1,i,j))
-                call sedimentation (n1,graupel, rgrp, rrate = prc_g(1:n1,i,j))
+                call sedimentation (n1,dn0,ice, rice,nice,rrate = prc_i(1:n1,i,j))
+                call sedimentation (n1,dn0,snow, rsnow, rrate = prc_s(1:n1,i,j))
+                call sedimentation (n1,dn0,graupel, rgrp, rrate = prc_g(1:n1,i,j))
                 prc_i(1:n1,i,j) = prc_i(1:n1,i,j)
                 prc_s(1:n1,i,j) = prc_s(1:n1,i,j)
                 prc_g(1:n1,i,j) = prc_g(1:n1,i,j)
@@ -2003,11 +2003,12 @@ contains
     enddo
   end subroutine ice_collection
 
-  subroutine sedimentation(n1,meteor,rp,nr,rrate,dtopt)
+  subroutine sedimentation(n1,dn0,meteor,rp,nr,rrate,dtopt)
     integer, intent(in) :: n1
     real, dimension(n1), intent(inout) :: rp
     type(particle),  intent(in) :: meteor
     real, dimension(n1), intent(inout),optional :: nr
+    real, dimension(n1), intent(in),optional :: dn0
     real, intent(in), optional :: dtopt
     real, intent (out)  , dimension(n1) :: rrate
 
@@ -2037,12 +2038,12 @@ contains
        vlimit = 2.0
     case('graupel')
        metnr = 3
-       vmin   = 1.0
-       vlimit = 10.0
+       vmin   = 0.1
+       vlimit = 30.0
     case('hail')
        metnr = 4
-       vmin   = 1.0
-       vlimit = 10.0
+       vmin   = 0.1
+       vlimit = 30.0
     case default
        WRITE (0,*) 'icrmcrp: stopped in sedimentation ',meteor%name
        stop
@@ -2075,7 +2076,7 @@ contains
        vr(k) = min(vr(k),vlimit)
        !      vr(k) = -vr(k)
 
-       vn(k) = alfn(metnr) * lam
+       vn(k) = alfn(metnr) * lam * (dn0(1)/dn0(k))**0.5
        vn(k) = max(vn(k),vmin)
        vn(k) = min(vn(k),vlimit)
        !      vn(k) = -vn(k)
@@ -3416,16 +3417,16 @@ contains
     prec_g = 0.0
     DO j=3,je-2
       DO i=3,ie-2
-         IF (ANY(qi(1:ke,j,i).gt.0.0)) call sedimentation (ke,pice, qi(1:ke,j,i),qni(1:ke,j,i),rrate = prec_i(1:ke,j,i))
-         IF (ANY(qs(1:ke,j,i).gt.0.0)) call sedimentation (ke,psnow,qs(1:ke,j,i),qns(1:ke,j,i),rrate = prec_s(1:ke,j,i))
+         IF (ANY(qi(1:ke,j,i).gt.0.0)) call sedimentation (ke,dn0,pice, qi(1:ke,j,i),qni(1:ke,j,i),rrate = prec_i(1:ke,j,i))
+         IF (ANY(qs(1:ke,j,i).gt.0.0)) call sedimentation (ke,dn0,psnow,qs(1:ke,j,i),qns(1:ke,j,i),rrate = prec_s(1:ke,j,i))
       end do
     end do
-    ntsedi = 2
+    ntsedi = 3
     DO j=3,je-2
       DO i=3,ie-2
         IF (ANY(qg(1:ke,j,i).gt.0.0)) THEN
           DO ii=1,ntsedi
-            call sedimentation (ke,pgraupel,qg(1:ke,j,i),qng(1:ke,j,i),rrate = prec_g(1:ke,j,i),dtopt=dt/ntsedi)
+            call sedimentation (ke,dn0,pgraupel,qg(1:ke,j,i),qng(1:ke,j,i),rrate = prec_g(1:ke,j,i),dtopt=dt/ntsedi)
           end do
         ENDIF
       end do
@@ -3433,12 +3434,12 @@ contains
     end if
     if (cloud_type.ge.2000) then
     prec_h = 0.0
-    ntsedi = 2
+    ntsedi = 3
     DO j=3,je-2
       DO i=3,ie-2
         IF (ANY(qh(1:ke,j,i).gt.0.0)) THEN
           DO ii=1,ntsedi
-            call sedimentation (ke,phail,qh(1:ke,j,i),qnh(1:ke,j,i),rrate = prec_h(1:ke,j,i),dtopt=dt/ntsedi)
+            call sedimentation (ke,dn0,phail,qh(1:ke,j,i),qnh(1:ke,j,i),rrate = prec_h(1:ke,j,i),dtopt=dt/ntsedi)
           end do
         ENDIF
       end do

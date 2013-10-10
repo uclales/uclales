@@ -170,8 +170,8 @@ contains
          , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa &
          , a_ricep, a_rsnowp, a_rgrp, a_rhailp, a_nicep, a_nsnowp, a_ngrp, a_nhailp &
          , vapor, a_Wl, isfctyp, a_tskin, a_qskin, a_Qnet, a_G0, a_lflxu_ca,a_lflxd_ca,a_sflxu_ca,a_sflxd_ca, a_pexnr, pi0, pi1 &
-          , lflxu_toa_ca, lflxd_toa_ca, sflxu_toa_ca, sflxd_toa_ca, lrad_ca
-    use lsmdata, only: tndskin,ra,rsurf,rsveg,rssoil,obl,cliq,Cskinav,init_lsm
+          , lflxu_toa_ca, lflxd_toa_ca, sflxu_toa_ca, sflxd_toa_ca, lrad_ca, obl
+    use lsmdata, only: tndskin,ra,rsurf,rsveg,rssoil,cliq,Cskinav,init_lsm
 
     real, intent (in) :: time
     real, intent (in),optional :: cntlat,sst

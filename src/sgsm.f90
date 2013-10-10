@@ -87,10 +87,14 @@ contains
     ! Calculate Deformation and stability for SGS calculations
     !
 
-    call fll_tkrs(nzp,nxp,nyp,a_theta,a_pexnr,pi0,pi1,a_scr1,rs=a_scr2)
+    if(level>0) then
+      call fll_tkrs(nzp,nxp,nyp,a_theta,a_pexnr,pi0,pi1,a_scr1,rs=a_scr2)
+      call bruvais(nzp,nxp,nyp,level,a_theta,a_tp,a_scr3,dzi_m,th00,a_rp,a_scr2)
+    else
+      call fll_tkrs(nzp,nxp,nyp,a_theta,a_pexnr,pi0,pi1,a_scr1)
+      call bruvais(nzp,nxp,nyp,level,a_theta,a_tp,a_scr3,dzi_m,th00)
+    end if
 
-
-    call bruvais(nzp,nxp,nyp,level,a_theta,a_tp,a_rp,a_scr2,a_scr3,dzi_m,th00)
     !
     !
     call deform(nzp,nxp,nyp,dzi_m,dzi_t,dxi,dyi,a_up,a_vp,a_wp,a_scr5,a_scr6     &
@@ -135,6 +139,7 @@ contains
     !
     ! Diffuse scalars
     !
+
     do n=4,nscl
        call newvar(n,istep=nstep)
        call azero(nxyp,sxy1)
@@ -284,8 +289,8 @@ contains
              !     *0.5*(dn0(k)+dn0(k+1))/(1./(delta*csx)**2+1./(zm(k)*vonk)**2)
 
              ! BvS: split out wall damping and stability correction 
-             labn      = 1./(delta*csx)**2+1./(zm(k)*vonk)**2
-             km(k,i,j) =  (dn0(k)+dn0(k+1))/2. * sqrt(max(0.,kh(k,i,j))) * sqrt(max(0.,(1.-ri(k,i,j)/pr))) / labn
+             labn      = (1./(delta*csx)**2+1./(zm(k)*vonk)**2)
+             km(k,i,j) =  (dn0(k)+dn0(k+1))/2. * sqrt(max(0.,kh(k,i,j))) * sqrt(max(0.,(1.-ri(k,i,j)/pr))) / labn 
              !
              ! after kh is multiplied with the factor (1-ri/pr), the product of kh 
              ! and km represents the dissipation rate epsilon 
@@ -299,9 +304,6 @@ contains
           km(n1-1,i,j) = km(n1-2,i,j)    
        enddo
     enddo
-
-
-    !print*,sum(km(1,:,:))/1024.,sum(km(2,:,:))/1024.,sum(km(3,:,:))/1024.,sum(km(4,:,:))/1024.,sum(km(5,:,:))/1024.,sum(km(6,:,:))/1024.,sum(km(7,:,:))/1024.,sum(km(8,:,:))/1024.,sum(km(9,:,:))/1024.,sum(km(10,:,:))/1024.
 
     call cyclics(n1,n2,n3,km,req)
     call cyclicc(n1,n2,n3,km,req)
@@ -676,6 +678,7 @@ contains
     ! Coefficients need only be calculated once and can be used repeatedly
     ! for other scalars
     !
+
     dti       = 1.0/dt
     do k=1,n1
        sz7(k)   = 0.

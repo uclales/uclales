@@ -154,14 +154,16 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine nudge(time)
+  subroutine nudge(timein)
     use grid, only : dt, nxp, nyp, nzp, a_ut, a_vt, a_wt, a_tt, a_rt, a_up,a_vp,a_tp,a_rp,zt,a_wp
     use util, only : get_avg3
     implicit none
-    real, intent (in) :: time
+    real, intent (in) :: timein
     integer k,t,i,j
-    real :: dtm,dtp,currtnudge, nudgefac
+    real :: dtm,dtp,currtnudge, nudgefac, time
     real, dimension(nzp) :: uav, vav, tav, qav
+
+    time = timein * 86400.
 
     if (firsttime) then
       firsttime = .false.
@@ -180,6 +182,7 @@ contains
 
     dtm = ( time-timenudge(t) ) / ( timenudge(t+1)-timenudge(t) )
     dtp = ( timenudge(t+1)-time)/ ( timenudge(t+1)-timenudge(t) )
+
     call get_avg3(nzp, nxp, nyp,a_up,uav)
     call get_avg3(nzp, nxp, nyp,a_vp,vav)
     call get_avg3(nzp, nxp, nyp,a_tp,tav)
@@ -188,7 +191,7 @@ contains
     do j=3,nyp-2
     do i=3,nxp-2
     do k=2,nzp-1
-     currtnudge = max(dt,tnudge(k,t)*dtp+tnudge(k,t+1)*dtm)
+      currtnudge = max(dt,tnudge(k,t)*dtp+tnudge(k,t+1)*dtm)
       if(lunudge  ) a_ut(k,i,j)=a_ut(k,i,j)-&
           (uav(k)-(unudge  (k,t)*dtp+unudge  (k,t+1)*dtm))/currtnudge
       if(lvnudge  ) a_vt(k,i,j)=a_vt(k,i,j)-&

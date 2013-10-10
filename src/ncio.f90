@@ -467,10 +467,11 @@ contains
     iret = nf90_inq_varid(ncid0, sanal(15), VarID)
     iret = nf90_put_var(ncid0, VarID, press(:,i1:i2,j1:j2), start=ibeg, &
          count=icnt)
-    iret = nf90_inq_varid(ncid0, sanal(16), VarID)
-    iret = nf90_put_var(ncid0, VarID, a_rp(:,i1:i2,j1:j2), start=ibeg, &
-         count=icnt)
-
+    if (level > 0) then
+       iret = nf90_inq_varid(ncid0, sanal(16), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_rp(:,i1:i2,j1:j2), start=ibeg, &
+           count=icnt)
+    end if 
     if (level >= 2)  then
        iret = nf90_inq_varid(ncid0, sanal(17), VarID)
        iret = nf90_put_var(ncid0, VarID, liquid(:,i1:i2,j1:j2), start=ibeg, &

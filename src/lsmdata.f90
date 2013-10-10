@@ -25,6 +25,15 @@ module lsmdata
   logical          :: filter     = .false.  !<  Filter variables at 3 dx to  prevent peak in
                                             !<  dimensionless wind profile if MOST-local enabled
 
+  !Important Land surface variables -> now defined in grid.f90 
+  !real, allocatable :: tsoil   (:,:,:)     !<  Soil temperature [K]
+  !real, allocatable :: phiw    (:,:,:)     !<  Water content soil matrix [-]
+  !real, allocatable :: tskin   (:,:)       !<  Skin temperature [K]
+  !real, allocatable :: qskin   (:,:)       !<  Skin specific humidity [kg/kg]
+  !real, allocatable :: Wl      (:,:)       !<  Liquid water reservoir [m]
+  !real, allocatable :: Qnet    (:,:)       !<  Net radiation [W/m2]
+  !real, allocatable :: G0      (:,:)       !<  Ground heat flux [W/m2]
+
   ! Soil properties
   ! ----------------------------------------------------------
 
@@ -58,24 +67,15 @@ module lsmdata
   real, allocatable :: rootf   (:,:,:)    !<  Root fraction per soil layer [-]
   real              :: rootfav (ksoilmax) !<  Average root fraction per soil layer [-]
 
- !real, allocatable :: phiw    (:,:,:)    !<  Water content soil matrix [-]
   real              :: phiwav  (ksoilmax) !<  Average water content soil matrix [-]
-
   real, allocatable :: phiwm   (:,:,:)    !<  Water content soil matrix previous time step [-]
   real, allocatable :: phifrac (:,:,:)    !<  Relative water content per layer [-]
   real, allocatable :: phitot  (:,:)      !<  Total soil water content [-]
   real, allocatable :: pCs     (:,:,:)    !<  Volumetric heat capacity [J/m3/K]
   real, allocatable :: Dh      (:,:,:)    !<  Heat diffusivity
 
- !real, allocatable :: sflxd_avn (:,:,:)  !<  Radiation of nradtime timesteps
- !real, allocatable :: sflxu_avn (:,:,:)  !<  Radiation of nradtime timesteps
- !real, allocatable :: lflxd_avn (:,:,:)  !<  Radiation of nradtime timesteps
- !real, allocatable :: lflxu_avn (:,:,:)  !<  Radiation of nradtime timesteps
-
- !real, allocatable :: tsoil   (:,:,:)    !<  Soil temperature [K]
   real, allocatable :: tsoilm  (:,:,:)    !<  Soil temperature previous time step [K]
   real              :: tsoilav (ksoilmax) !<  Average Soil temperature [K]
-
   real, allocatable :: tsoildeep (:,:)    !<  Deep soil temperature [K]
   real              :: tsoildeepav = 283. !< Average deep soil temperature [K]
 
@@ -105,8 +105,6 @@ module lsmdata
   real, allocatable :: z0h        (:,:) !<  Roughness length for heat [m]
   real              :: z0hav    = 0.025
 
-  !real, allocatable :: albedo    (:,:) !<  Surface albedo [-]
-
   real, allocatable :: LAI        (:,:) !<  Leaf area index vegetation [-]
   real, allocatable :: LAIG       (:,:) !<  Global leaf area index vegetation [-]
   real              :: LAIav    = 4.    !<  Average leaf area index [-]
@@ -122,20 +120,15 @@ module lsmdata
   real, allocatable :: lambdaskin (:,:) !<  Heat conductivity skin layer [W/m/K]
   real              :: lambdaskinav = 5.
 
- !real, allocatable :: Wl         (:,:) !<  Liquid water reservoir [m]
-  real              :: Wlav     = 0.     
-                             
+  real              :: Wlav     = 0.                          
   real, parameter   :: Wmax     = 0.0002 !<  Maximum layer of liquid water on surface [m]
   real, allocatable :: Wlm        (:,:) !<  Liquid water reservoir previous timestep [m]
-
   real, allocatable :: cliq       (:,:) !<  Fraction of vegetated surface covered with liquid water 
- !real, allocatable :: tskin      (:,:) !<  Skin temperature [K]
+
   real, allocatable :: tskinm     (:,:) !<  Skin temperature previous timestep [K]
- !real, allocatable :: qskin      (:,:) !<  Skin specific humidity [kg/kg]
   real              :: tskinavg = 0.    !<  Slab average of tskin used by srfcsclrs 
 
   ! Surface energy balance
-  !real, allocatable :: Qnet     (:,:)   !<  Net radiation [W/m2]
   real              :: Qnetav   = 300.
   real, allocatable :: Qnetm    (:,:)   !<  Net radiation previous timestep [W/m2]
   real, allocatable :: Qnetn    (:,:)   !<  Net radiation dummy [W/m2]
@@ -151,7 +144,7 @@ module lsmdata
 
   real, allocatable :: LE       (:,:)   !<  Latent heat flux [W/m2]
   real, allocatable :: H        (:,:)   !<  Sensible heat flux [W/m2]
-  !real, allocatable :: G0       (:,:)   !<  Ground heat flux [W/m2]
+
   real, allocatable :: ra       (:,:)   !<  Aerodynamic resistance [s/m]
   real, allocatable :: rsurf    (:,:)   !<  Composite resistance [s/m]
   real, allocatable :: rsveg    (:,:)   !<  Vegetation resistance [s/m]
@@ -161,7 +154,7 @@ module lsmdata
   real, allocatable :: tndskin  (:,:)   !<  Tendency of skin [W/m2]
 
   ! Turbulent exchange variables
-  real, allocatable :: obl     (:,:)    !<  local obuhkov length [m]
+  !real, allocatable :: obl     (:,:)    !<  local obuhkov length [m] BvS: moved to grid, used beyond lsm
   real              :: oblav            !<  Spatially averaged obukhov length [m]
   real, allocatable :: cm      (:,:)    !<  Drag coefficient for momentum [-]
   real, allocatable :: cs      (:,:)    !<  Drag coefficient for scalars [-]
@@ -224,14 +217,13 @@ module lsmdata
     ! 
 
     !Allocate surface scheme arrays
-    allocate(obl(nxp,nyp))
+    !allocate(obl(nxp,nyp))
     allocate(ra(nxp,nyp))
     allocate(rsurf(nxp,nyp))
     allocate(z0m(nxp,nyp))
     allocate(z0h(nxp,nyp))
     allocate(cm(nxp,nyp))
     allocate(cs(nxp,nyp))
-    !allocate(albedo(nxp,nyp))
 
     ! Allocate LSM arrays
     allocate(zsoil(ksoilmax))
@@ -253,12 +245,10 @@ module lsmdata
     allocate(tsoilm(ksoilmax,nxp,nyp))
     allocate(tsoildeep(nxp,nyp))
 
-    !allocate(Qnet(nxp,nyp))
     allocate(Qnetm(nxp,nyp))
     allocate(Qnetn(nxp,nyp))
     allocate(LE(nxp,nyp))
     allocate(H(nxp,nyp))
-    !allocate(G0(nxp,nyp))
 
     allocate(rsveg(nxp,nyp))
     allocate(rsvegm(nxp,nyp))
@@ -287,13 +277,6 @@ module lsmdata
     allocate(tskinav(nxp,nyp))
     allocate(qskinav(nxp,nyp))
 
-    !Variables are now defined in grid
-    !allocate(Wl(nxp,nyp))
-    !allocate(tskin(nxp,nyp))
-    !allocate(qskin(nxp,nyp))
-    !allocate(phiw(ksoilmax,nxp,nyp))
-    !allocate(tsoil(ksoilmax,nxp,nyp))
-
     ! --------------------------------------------------------
     ! Initialize arrays
     ! 
@@ -319,12 +302,14 @@ module lsmdata
     z0m       = z0mav
     z0h       = z0hav
     
-    dzsoil(1) = 0.07    !z = 0.07 m COSMO config from Linda
+    !COSMO config from Linda
+    dzsoil(1) = 0.07    !z = 0.07 m 
     dzsoil(2) = 0.27    !z = 0.34 m
     dzsoil(3) = 1.13    !z = 1.47 m
     dzsoil(4) = 1.39    !z = 2.86 m 
 
-    !dzsoil(1) = 0.07   ! ECMWF config from Chiel
+    !ECMWF config from Chiel
+    !dzsoil(1) = 0.07  
     !dzsoil(2) = 0.21
     !dzsoil(3) = 0.72
     !dzsoil(4) = 1.89
@@ -370,45 +355,6 @@ module lsmdata
     LAI        = LAIav
     gD         = gDav
     cveg       = cvegav
-
-    ! --------------------------------------------------------http://journals.ametsoc.org/doi/abs/10.1175/2011MWR3599.1
-    ! Static Heterogeneity of Vegetation
-    ! 
-    ! std:    LAI=4. albedo=0.20 z0mav=0.035 z0hav=0.035
-    ! grass:  LAI=2. albedo=0.25 z0mav=0.035 z0hav=0.035
-    ! forest: LAI=6. albedo=0.15 z0mav=0.500 z0hav=0.500
-    ! hetper sets the number of heterogeneity periods in the domain
-    ! hetper*2 is the number of patches in x or y direction
-    
-    if (hetero) then
-      hetlen = nxpg/(2*hetper)
-
-      do yhet=0,(hetper*2)
-         do xhet=0,(hetper*2) 
-
-            if (mod(yhet,2) .eq. 0) then 
-               if (mod(xhet,2) .eq. 0) then
-                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = LAImin
-               else if (mod(xhet,2) .ne. 0) then
-                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = LAImax
-               end if
-            end if              
-
-            if (mod(yhet,2) .ne. 0) then
-               if (mod(xhet,2) .eq. 0) then
-                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = LAImax
-               else if (mod(xhet,2) .ne. 0) then
-                   LAIG(xhet*hetlen+3:xhet*hetlen+hetlen+3,yhet*hetlen+3:yhet*hetlen+hetlen+3) = LAImin
-               end if 
-            end if   
-
-         end do
-      end do
-
-      LAI(3:(nxp-2),3:(nyp-2)) = LAIG(3+xoffset(wrxid):nxp+xoffset(wrxid)-2, &
-                                  3+yoffset(wryid):nyp+yoffset(wryid)-2 )
-
-    end if
 
     deallocate(LAIG)
 

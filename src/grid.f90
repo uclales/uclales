@@ -34,7 +34,7 @@ module grid
   real              :: deltax = 35.        ! dx for basic grid
   real              :: deltay = 35.        ! dy for basic grid
   real              :: deltaz = 17.5       ! dz for basic grid
-  real              :: dzrat  = 1.02       ! grid stretching ratio
+  real              :: dzrat  = 1.0        ! grid stretching ratio
   real              :: dzmax  = 1200.      ! height to start grid-stretching
   real              :: dtlong = 10.0       ! long timestep
   real              :: th00   = 288.       ! basic state temperature
@@ -80,7 +80,8 @@ module grid
        uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, trac_sfc, sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa, sflxu_toa_ca,sflxd_toa_ca,lflxu_toa_ca,lflxd_toa_ca, &
        cnd_acc, &  ! accumulated condensation  [kg/m2] (diagnostic for 2D output)
        cev_acc, &  ! accumulated evaporation of cloud water [kg/m2] (diagnostic for 2D output)
-       rev_acc     ! accumulated evaporation of rainwater   [kg/m2] (diagnostic for 2D output)
+       rev_acc, &  ! accumulated evaporation of rainwater   [kg/m2] (diagnostic for 2D output)
+       obl         ! BvS : save obl for faster itertion
   integer, dimension(10) :: prc_lev = -1
   integer :: nv1, nv2, nsmp = 0
 
@@ -88,9 +89,6 @@ module grid
   real, dimension (:,:,:),  allocatable :: a_tsoil, a_phiw,                   &
                             a_sflxd_avn, a_sflxu_avn, a_lflxd_avn, a_lflxu_avn
   real, dimension (:,:),    allocatable :: a_tskin, a_qskin, a_Wl, a_Qnet, a_G0
-
-  !Malte: variables to read homogeneous fluxes from nc file
-  real, dimension (:),      allocatable :: shls, lhls, usls, timels
 
   !
   ! 3D Arrays
@@ -177,7 +175,7 @@ contains
     a_km(:,:,:) = 0.
     memsize = memsize + nxyzp*14 !
 
-    if (level >= 0) then
+    if (level > 0) then
        allocate (vapor(nzp,nxp,nyp))
        vapor(:,:,:) = 0.
        memsize = memsize + nxyzp
@@ -269,16 +267,17 @@ contains
     allocate (a_xp(nzp,nxp,nyp,nscl), a_xt1(nzp,nxp,nyp,nscl),        &
          a_xt2(nzp,nxp,nyp,nscl))
 
-    a_xp(:,:,:,:) = 0.
+    a_xp(:,:,:,:)  = 0.
     a_xt1(:,:,:,:) = 0.
     a_xt2(:,:,:,:) = 0.
 
     a_up =>a_xp (:,:,:,1)
     a_vp =>a_xp (:,:,:,2)
     a_wp =>a_xp (:,:,:,3)
-    a_tp =>a_xp(:,:,:,4)
+    a_tp =>a_xp (:,:,:,4)
 
-    if (level >= 0) a_rp =>a_xp (:,:,:,5)
+    if (level > 0) a_rp =>a_xp (:,:,:,5)
+
     ! warm rain with number and mass of rain
     if (level >= 3) then
       a_rpp =>a_xp(:,:,:,6)
@@ -334,10 +333,12 @@ contains
       a_cvrxp => NULL()
     end if
 
-    allocate (a_ustar(nxp,nyp),a_tstar(nxp,nyp),a_rstar(nxp,nyp))
+    allocate (a_ustar(nxp,nyp),a_tstar(nxp,nyp))
     allocate (uw_sfc(nxp,nyp),vw_sfc(nxp,nyp),ww_sfc(nxp,nyp))
-    allocate (wt_sfc(nxp,nyp),wq_sfc(nxp,nyp))
+    allocate (wt_sfc(nxp,nyp))
+    allocate (obl(nxp,nyp))
 
+    if (level > 0) allocate(wq_sfc(nxp,nyp),a_rstar(nxp,nyp))
 
     !Malte: allocate Land surface variables for restart
     if (isfctyp == 5) then
@@ -354,16 +355,6 @@ contains
        allocate (a_lflxu_avn(100,nxp,nyp))
        memsize = memsize + 2*nxp*nyp*4 + 5*nxp*nyp + 4*nxp*nyp*100
     end if
-
-    !Malte: allocate variables for homogeneous fluxes (no lsm used)
-    if (isfctyp == 0) then
-       allocate(shls(1740))
-       allocate(lhls(1740))
-       allocate(usls(1740))
-       allocate(timels(1740))
-       memsize = memsize + 4*1740
-    end if
-    !End Malte
 
     if (level >= 2) then
        allocate(prc_c(nzp,nxp,nyp))
@@ -394,12 +385,15 @@ contains
 
     a_ustar(:,:) = 0.
     a_tstar(:,:) = 0.
-    a_rstar(:,:) = 0.
     uw_sfc(:,:)  = 0.
     vw_sfc(:,:)  = 0.
     ww_sfc(:,:)  = 0.
     wt_sfc(:,:) = 0.
-    wq_sfc(:,:) = 0.
+    
+    if (level > 0) then
+      wq_sfc(:,:) = 0.
+      a_rstar(:,:) = 0.
+    end if
 
     memsize = memsize +  nxyzp*nscl*2 + 3*nxyp + nxyp*10
 
@@ -662,7 +656,7 @@ contains
        hname = trim(hname)//'.rst'
     case(2)
        iblank=index(hname,' ')
-       write (hname(iblank:iblank+7),'(a1,i6.6,a1)') '.', int(time), 's'
+       write (hname(iblank:iblank+8),'(a1,i7.7,a1)') '.', int(time), 's'
     end select
 
     call random_seed(size=nseed)
