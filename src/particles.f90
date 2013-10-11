@@ -3097,7 +3097,7 @@ contains
       do
         read (666,iostat=io) pu,pts,pstp,pnd,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs, &
 	                     pzp,pwr,pwrp,pus,pvs,pws,pusp,pvsp,pwsp,psg2,pm,pud,pvd,pwd, &
-			     pudr,pvdr,pwdr,pudrp,pvdrp,pwdrp,pt,pmtpl
+			     pudr,pvdr,pwdr,pudrp,pvdrp,pwdrp,pt !,pmtpl
         if(io .ne. 0) exit
         call add_particle_end(particle)
         particle%unique         = pu
@@ -3135,7 +3135,7 @@ contains
         particle%vdrop_rkprev   = pvdrp
         particle%wdrop_rkprev   = pwdrp
 	particle%tau            = pt
-	particle%mtpl           = pmtpl  !int(1.e9)
+	particle%mtpl           = int(1.e9) !pmtpl  !int(1.e9)
 	if(pts < firststartl) firststartl = pts
       end do
       close(666)

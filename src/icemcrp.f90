@@ -132,6 +132,13 @@ module mcrp
     ni_het_max = 100.0d3,   & ! max number of in between 1-10 per liter, i.e. 1d3-10d3
     ni_hom_max = 5000.0d3     ! number of liquid aerosols between 100-5000 per liter
 
+    !..Axel's mu-Dm-relation for raindrops based on 1d-bin model
+  real, parameter :: rain_cmu0 = 6.0             
+  real, parameter :: rain_cmu1 = 30.0             
+  real, parameter :: rain_cmu2 = 1.00d+3         
+  real, parameter :: rain_cmu3 = 1.10d-3   ! D_eq,breakup
+  real, parameter :: rain_cmu4 = 1.0        
+
   ! look-up table for phillips et al. nucleation
   integer, parameter :: &
     ttmax  = 30,      &  ! sets limit for temperature in look-up table
@@ -555,27 +562,92 @@ contains
     real, parameter     :: c_Nevap = 1.
     integer             :: k
     real                :: Xp, Dp, G, S, cerpt, cenpt
-    do k=2,n1
-       if (rp(k) > 0) then
-          Xp = rp(k)/ (np(k)+eps0)
-          Dp = ( Xp / prw )**(1./3.)
-          G = 1. / (1. / (dn0(k)*rs(k)*Dv) + &
-               alvl*(alvl/(Rm*tk(k))-1.) / (Kt*tk(k)))
+
+    real, parameter :: a2 = 9.65       ! in SI [m/s]
+    real, parameter :: c2 = 6e2        ! in SI [1/m]
+    real, parameter :: Dv = 25.0e-6    ! in SI [m/s]
+
+    logical, parameter :: oldevaporation = .false.
+
+    real :: mue,lam,gfak,f_q,gamma_eva,b2
+
+    b2 = a2*exp(c2*Dv)
+
+
+    if (oldevaporation) then
+      do k=2,n1
+         if (rp(k) > 0) then
+            Xp = rp(k)/ (np(k)+eps0)
+            Dp = ( Xp / prw )**(1./3.)
+            G = 1. / (1. / (dn0(k)*rs(k)*Dv) + &
+                 alvl*(alvl/(Rm*tk(k))-1.) / (Kt*tk(k)))
+            S = rv(k)/rs(k) - 1.
+
+            if (S < 0) then
+               cerpt = 2. * pi * Dp * G * S * np(k) * dt
+               cerpt = max (cerpt, -rp(k))
+               cenpt = c_Nevap*cerpt * np(k) / rp(k)
+               np(k)=np(k) + cenpt
+               rp(k)=rp(k) + cerpt
+               rv(k)=rv(k) - cerpt
+               tl(k)=tl(k) + convliq(k)*cerpt
+             
+               if (present(ev)) ev=ev - cerpt * (zm(k)-zm(k-1))*dn0(k) / 3.
+            end if
+         end if
+      end do
+    else
+       do k=2,n1
+
           S = rv(k)/rs(k) - 1.
 
-          if (S < 0) then
-             cerpt = 2. * pi * Dp * G * S * np(k) * dt
+          if (rp(k) > 0 .and. S < 0) then
+             Xp  = rp(k)/ (np(k)+eps0)
+             Dp  = ( Xp / prw )**(1./3.)
+             G = 1.0 / ( alvl**2 / (Kt * Rm * tk(k)**2) + Rm * tk(k) / (Dv * esl(tk(k))) )
+
+             IF (Dp.LE.rain_cmu3) THEN ! see Seifert (2008)            
+                mue = rain_cmu0*TANH((4.*rain_cmu2*(Dp-rain_cmu3))**2) &
+                     & + rain_cmu4
+             ELSE
+                mue = rain_cmu1*TANH((1.*rain_cmu2*(Dp-rain_cmu3))**2) &
+                     & + rain_cmu4
+             ENDIF
+
+             lam = (pi/6.* rowt &
+                  &      * (mue+3.0)*(mue+2.0)*(mue+1.0) / Xp)**(1./3.)
+
+             gfak =  0.1357940435E+01 &
+                  &  + mue * ( +0.3033273220E+00  &
+                  &  + mue * ( -0.1299313363E-01  &
+                  &  + mue * ( +0.4002257774E-03  &
+                  &  - mue * 0.4856703981E-05 ) ) )
+
+             f_q  = rain%a_ven + rain%b_ven * 0.71**0.333 * sqrt(a2/nu_l)            &
+                  &    * gfak / SQRT(lam)                                    &
+                  &    * (1.0                                                &
+                  &      - 1./2.  * (b2/a2)**1 * (lam/(1.*c2+lam))**(mue+5.0/2.0) &
+                  &      - 1./8.  * (b2/a2)**2 * (lam/(2.*c2+lam))**(mue+5.0/2.0) &
+                  &      - 1./16. * (b2/a2)**3 * (lam/(3.*c2+lam))**(mue+5.0/2.0) &
+                  &      - 5./127.* (b2/a2)**4 * (lam/(4.*c2+lam))**(mue+5.0/2.0) &
+                  &      )
+
+             gamma_eva = (1.1e-3/Dp) * EXP(-0.2*mue)
+
+             cerpt = 2. * pi * G * np(k) * (mue+1.0) / lam * f_q * S * dt
              cerpt = max (cerpt, -rp(k))
-             cenpt = c_Nevap*cerpt * np(k) / rp(k)
-             np(k)=np(k) + cenpt
-             rp(k)=rp(k) + cerpt
-             rv(k)=rv(k) - cerpt
-             tl(k)=tl(k) + convliq(k)*cerpt
+             cenpt = gamma_eva * cerpt * np(k) / rp(k)
+
+             np(k) = np(k) + cenpt
+             rp(k) = rp(k) + cerpt
+             rv(k) = rv(k) - cerpt
+             tl(k) = tl(k) + convliq(k)*cerpt
              
-             if (present(ev)) ev=ev - cerpt * (zm(k)-zm(k-1))*dn0(k) / 3.
+             if (present(ev)) ev = ev - cerpt * (zm(k)-zm(k-1))*dn0(k) / 3.
           end if
-       end if
-    end do
+       end do
+    end if
+
 
   end subroutine wtr_dff_SB
   subroutine auto_SB(n1,dn0,rc,rp,np,tl,diss,i,j)
@@ -803,6 +875,8 @@ contains
     real    :: b2, Xp, Dp, Dm, mu, flxdiv, tot,sk, mini, maxi, cc, zz, cmax
     real, dimension(n1) :: nslope,rslope,dn,dr, rfl, nfl, vn, vr, cn, cr
 
+    logical, parameter :: oldsedimentation = .false.
+
     b2 = a2*exp(c2*Dv)
 
     nfl(n1) = 0.
@@ -818,7 +892,17 @@ contains
         ! Adjust Dm and mu-Dm and Dp=1/lambda following Milbrandt & Yau
         !
         Dm = ( 6. / (rowt*pi) * Xp )**(1./3.)
-        mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))
+	if (oldsedimentation) then
+          mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))
+	else
+	  IF (Dm.LE.rain_cmu3) THEN ! see Seifert (2008)            
+             mu = rain_cmu0*TANH((4.*rain_cmu2*(Dm-rain_cmu3))**2) &
+                 & + rain_cmu4
+          ELSE
+             mu = rain_cmu1*TANH((1.*rain_cmu2*(Dm-rain_cmu3))**2) &
+                 & + rain_cmu4
+          ENDIF
+	end if
         Dp = (Dm**3/((mu+3.)*(mu+2.)*(mu+1.)))**(1./3.)
 
         vn(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
