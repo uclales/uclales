@@ -815,9 +815,9 @@ contains
       r0 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! equivalent drop radius
       rmax = r0*exp(wr*2.*r0)                         ! maximum radius from Seifert et al (2013)
 
-      v_rel = sqrt((particle%udrop/dxi - particle%ures/dxi)**2. + &
-	           (particle%vdrop/dyi - particle%vres/dyi)**2. + &
-	           (particle%wdrop/dzi - particle%wres/dzi)**2. )
+      v_rel = sqrt((particle%udrop/dxi - particle%ures/dxi - particle%usgs/dxi)**2. + &
+	           (particle%vdrop/dyi - particle%vres/dyi - particle%vsgs/dyi)**2. + &
+	           (particle%wdrop/dzi - particle%wres/dzi - particle%wsgs/dzi)**2. )
       if (v_rel==0) then
         v_rel = 1.e-20
 	print*,'v_rel ist null!'
@@ -840,17 +840,17 @@ contains
       vt = particle%tau *(1-i1d(particle%z,dn0)/rowt)*g
 	
       !predictor step
-      upred = (particle%udrop/dxi - particle%ures/dxi     ) * exp(-dt/particle%tau) &
-                        + particle%ures/dxi
-      vpred = (particle%vdrop/dyi - particle%vres/dyi     ) * exp(-dt/particle%tau) &
-                        + particle%vres/dyi
-      wpred = (particle%wdrop/dzi - particle%wres/dzi + vt) * exp(-dt/particle%tau) &
-                        + particle%wres/dzi - vt
+      upred = (particle%udrop/dxi - particle%ures/dxi - particle%usgs/dxi     ) * exp(-dt/particle%tau) &
+                        + particle%ures/dxi + particle%usgs/dxi
+      vpred = (particle%vdrop/dyi - particle%vres/dyi - particle%vsgs/dyi     ) * exp(-dt/particle%tau) &
+                        + particle%vres/dyi + particle%vsgs/dyi
+      wpred = (particle%wdrop/dzi - particle%wres/dzi - particle%wsgs/dzi + vt) * exp(-dt/particle%tau) &
+                        + particle%wres/dzi + particle%wsgs/dzi - vt
         
       !corrector step for tau
-      v_rel = sqrt((upred - particle%ures/dxi)**2. + &
-	           (vpred - particle%vres/dyi)**2. + &
-	           (wpred - particle%wres/dzi)**2. )
+      v_rel = sqrt((upred - particle%ures/dxi - particle%usgs/dxi)**2. + &
+	           (vpred - particle%vres/dyi - particle%vsgs/dyi)**2. + &
+	           (wpred - particle%wres/dzi - particle%wsgs/dzi)**2. )
 
       if (stokes) then
 	C_d = 24./ (2.*rmax*v_rel/nu_l)
@@ -860,30 +860,36 @@ contains
       particle%tau = 0.5 * (particle%tau + &
 	             8.* r0**3. *rowt / (3. * C_d *i1d(particle%z,dn0) * rmax**2.) / v_rel)
       
+      !write(*,*) myid,'res u ',particle%ures/dxi,' v ',particle%vres/dyi,' w ',particle%wres/dzi
+      !write(*,*) myid,'sgs u ',particle%usgs/dxi,' v ',particle%vsgs/dyi,' w ',particle%wsgs/dzi
+      !write(*,*) myid,'drp u ',particle%udrop/dxi,' v ',particle%vdrop/dyi,' w ',particle%wdrop/dzi
+      
+      !write(*,*) myid,'vrel ',v_rel
+      
     end if 
     
     ! for all nstep
     if(.not.kc05) then
       vt = particle%tau *(1-i1d(particle%z,dn0)/rowt)*g
-      particle%udrop_rk = 1/dt *(particle%tau*(particle%udrop/dxi - particle%ures/dxi     ) * &
-                          (1 - exp(-dt/particle%tau)) + (particle%ures/dxi    )*dt) *dxi
-      particle%vdrop_rk = 1/dt *(particle%tau*(particle%vdrop/dyi - particle%vres/dyi     ) * &
-                          (1 - exp(-dt/particle%tau)) + (particle%vres/dyi    )*dt) *dyi
-      particle%wdrop_rk = 1/dt *(particle%tau*(particle%wdrop/dzi - particle%wres/dzi + vt) * &
-                          (1 - exp(-dt/particle%tau)) + (particle%wres/dzi -vt)*dt) *dzi
+      particle%udrop_rk = 1/dt *(particle%tau*(particle%udrop/dxi - particle%ures/dxi - particle%usgs/dxi     ) * &
+                          (1 - exp(-dt/particle%tau)) + (particle%ures/dxi + particle%usgs/dxi     )*dt) *dxi
+      particle%vdrop_rk = 1/dt *(particle%tau*(particle%vdrop/dyi - particle%vres/dyi - particle%vsgs/dyi     ) * &
+                          (1 - exp(-dt/particle%tau)) + (particle%vres/dyi + particle%vsgs/dyi     )*dt) *dyi
+      particle%wdrop_rk = 1/dt *(particle%tau*(particle%wdrop/dzi - particle%wres/dzi - particle%wsgs/dzi + vt) * &
+                          (1 - exp(-dt/particle%tau)) + (particle%wres/dzi + particle%wsgs/dzi - vt)*dt) *dzi
     else
       call drag_coeff(particle, C_d, vt, tau)
-      particle%udrop_rk =  particle%ures
-      particle%vdrop_rk =  particle%vres
-      particle%wdrop_rk = (particle%wres/dzi - vt)*dzi
+      particle%udrop_rk =  particle%ures + particle%usgs
+      particle%vdrop_rk =  particle%vres + particle%vsgs
+      particle%wdrop_rk = (particle%wres/dzi + particle%wsgs/dzi - vt)*dzi
     end if			  
 
     
     if (nstep==3.and.(.not.kc05)) then
 
-      particle%ures_prev = 0.5 * (particle%ures_prev + particle%ures)
-      particle%vres_prev = 0.5 * (particle%vres_prev + particle%vres)
-      particle%wres_prev = 0.5 * (particle%wres_prev + particle%wres)
+      particle%ures_prev = 0.5 * (particle%ures_prev + particle%ures + particle%usgs_prev + particle%usgs)
+      particle%vres_prev = 0.5 * (particle%vres_prev + particle%vres + particle%vsgs_prev + particle%vsgs)
+      particle%wres_prev = 0.5 * (particle%wres_prev + particle%wres + particle%wsgs_prev + particle%wsgs)
 
       !corrector step for drop position
       particle%udrop = ((particle%udrop/dxi - particle%ures_prev/dxi     ) * exp(-dt/particle%tau) &
@@ -896,14 +902,22 @@ contains
       particle%ures_prev = particle%ures
       particle%vres_prev = particle%vres
       particle%wres_prev = particle%wres
+      
+      particle%usgs_prev = particle%usgs
+      particle%vsgs_prev = particle%vsgs
+      particle%wsgs_prev = particle%wsgs
     else
-      particle%udrop =  particle%ures
-      particle%vdrop =  particle%vres
-      particle%wdrop = (particle%wres/dzi - vt)*dzi
+      particle%udrop =  particle%ures + particle%usgs
+      particle%vdrop =  particle%vres + particle%vsgs
+      particle%wdrop = (particle%wres/dzi + particle%wsgs/dzi - vt)*dzi
 
       particle%ures_prev = particle%ures
       particle%vres_prev = particle%vres
       particle%wres_prev = particle%wres
+      
+      particle%usgs_prev = particle%usgs
+      particle%vsgs_prev = particle%vsgs
+      particle%wsgs_prev = particle%wsgs
     end if
      
   end subroutine drop_vel
@@ -1406,10 +1420,6 @@ contains
                      + rkbeta(nstep) * (particle%vdrop_rkprev) * dt
     particle%z     = particle%z + rkalpha(nstep) * (particle%wdrop_rk) * dt &
                      + rkbeta(nstep) * (particle%wdrop_rkprev) * dt
-
-    particle%usgs_prev = particle%usgs
-    particle%vsgs_prev = particle%vsgs
-    particle%wsgs_prev = particle%wsgs
 
     particle%udrop_rkprev = particle%udrop_rk
     particle%vdrop_rkprev = particle%vdrop_rk
@@ -2787,9 +2797,9 @@ contains
     
     r0 = (3./(4*pi) * particle%mass/rowt)**(1./3.)  ! equivalent drop radius
     rmax = r0*exp(wr*2.*r0)                         ! max diameter S13 
-    v_rel = sqrt( (particle%ures/dxi - particle%udrop/dxi)**2. + &
-                  (particle%vres/dyi - particle%vdrop/dyi)**2. + &
-                  (particle%wres/dzi - particle%wdrop/dzi)**2. )
+    v_rel = sqrt( (particle%ures/dxi + particle%usgs/dxi - particle%udrop/dxi)**2. + &
+                  (particle%vres/dyi + particle%vsgs/dyi - particle%vdrop/dyi)**2. + &
+                  (particle%wres/dzi + particle%wsgs/dzi - particle%wdrop/dzi)**2. )
     
     if (longkernel) then
       if (r0.le.50.e-6) then                          ! collection kernel (Long, 1974)
@@ -3087,7 +3097,7 @@ contains
       do
         read (666,iostat=io) pu,pts,pstp,pnd,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs, &
 	                     pzp,pwr,pwrp,pus,pvs,pws,pusp,pvsp,pwsp,psg2,pm,pud,pvd,pwd, &
-			     pudr,pvdr,pwdr,pudrp,pvdrp,pwdrp,pt !,pmtpl
+			     pudr,pvdr,pwdr,pudrp,pvdrp,pwdrp,pt,pmtpl
         if(io .ne. 0) exit
         call add_particle_end(particle)
         particle%unique         = pu
@@ -3125,7 +3135,7 @@ contains
         particle%vdrop_rkprev   = pvdrp
         particle%wdrop_rkprev   = pwdrp
 	particle%tau            = pt
-	particle%mtpl           = int(1.e9)  !pmtpl  !int(1.e9)
+	particle%mtpl           = pmtpl  !int(1.e9)
 	if(pts < firststartl) firststartl = pts
       end do
       close(666)
@@ -3432,7 +3442,7 @@ contains
        hname = trim(hname)//'.rst'
     case(2)
        iblank=index(hname,' ')
-       write (hname(iblank:iblank+7),'(a1,i6.6,a1)') '.', int(time), 's'
+       write (hname(iblank:iblank+8),'(a1,i7.7,a1)') '.', int(time), 's'
     end select
 
     open(666,file=trim(hname), form='unformatted')
