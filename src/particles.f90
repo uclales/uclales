@@ -62,7 +62,8 @@ module modparticles
   logical            :: selfcollection = .true.         ! switch for enabling self-collection of LD
   logical            :: var_mtpl = .true.               ! switch to use a variable multiplicity in self-collection
                                                         ! used only in combination with lpartmass = .true.
-
+  logical            :: cal_ecoal = .true.              ! switch for coalescence efficiency as in Seifert et al. 2005
+   
   ! Particle structure
   type :: particle_record
     real             :: unique, tstart
@@ -2864,8 +2865,10 @@ contains
     type (particle_record), pointer:: pred_p,prey_p
     type (sc_el), pointer  :: pred_sc, prey_sc, pred_free
     integer                :: i,j,k
-    real                   :: r_pred, r_prey, deltav, dzi, randnr, pij
-    
+    real                   :: r_pred, r_prey, deltav, dzi, randnr, pij, Dgr, Dkl, x, ecoal, dv
+    real                   :: thl,thv,rt,rl,tk
+    real, parameter        :: eps = 1.0e-30, Dmin = 300e-6, Dmax = 600e-6
+
 
     do j=3,nyp-2
       do i=3,nxp-2
@@ -2889,8 +2892,38 @@ contains
 	          deltav =  sqrt( (pred_p%udrop/dxi - prey_p%udrop/dxi)**2. + &
                                   (pred_p%vdrop/dyi - prey_p%vdrop/dyi)**2. + &
                                   (pred_p%wdrop/dzi - prey_p%wdrop/dzi)**2. )  
-	          pij = (dxi * dyi * dzi) * max(pred_p%mtpl,prey_p%mtpl) &
-		                          * pi * (r_pred+r_prey)**2. * deltav * dt
+	          
+		  !choose coalescence efficiency
+		  if (cal_ecoal) then
+		    ! to calculate ecoal* CGS units are used
+		    Dkl = 2.*min(r_pred,r_prey)*1e2 ! in cm
+		    Dgr = 2.*max(r_pred,r_prey)*1e2 ! in cm
+		    dv = deltav*1e2                 ! in cm/s
+		    call thermo(pred_p%x,pred_p%y,pred_p%z,thl,thv=thv,rt=rt,rl=rl,tk=tk)
+		    !if (Dkl.lt.Dmin) then
+                      ecoal = max(ecoalOchs(Dgr,Dkl,dv,tk),ecoalBeard(Dgr,Dkl))
+		    !  write(*,*) myid,'in:',Dgr,Dkl,dv,tk
+		    !  write(*,*) myid,'ecoal O: ',ecoalOchs(Dgr,Dkl,dv,tk)
+		    !  write(*,*) myid,'ecoal B: ',ecoalBeard(Dgr,Dkl)
+		    !  write(*,*) myid,'ecoal BO: ',ecoal
+                    !elseif (Dkl.ge.Dmin.and.Dkl.lt.Dmax) then
+                    !  x = (Dkl - Dmin) / (Dmax - Dmin)
+                    !  ecoal = sin(pi/2.0*x)**2 * ecoalLowList(Dgr,Dkl,dv,tk) + &
+                    !          sin(pi/2.0*(1 - x))**2 * ecoalOchs(Dgr,Dkl,dv,tk)
+		    !  write(*,*) myid,'ecoal mix: ',ecoal
+                    !elseif (Dkl.ge.Dmax) then
+                    !  ecoal = ecoalLowList(Dgr,Dkl,deltav,tk)
+		    !  write(*,*) myid,'ecoal LL: ',ecoal
+                    !else
+                    !  ecoal = 1.0
+                    !endif
+                    ecoal = max(min(1.0,ecoal),eps)
+		  else
+                    ecoal = 1.0
+		  end if
+		  
+		  pij = (dxi * dyi * dzi) * max(pred_p%mtpl,prey_p%mtpl) &
+		                   * ecoal * pi * (r_pred+r_prey)**2. * deltav * dt
                   !write(*,*) myid,'prob: ',pij
                   !do a self-collection
 	          call random_number(randnr)          ! Random seed has been called from init_particles...
@@ -2942,6 +2975,235 @@ contains
     end do
 
   end subroutine self_coll
+
+!-------------------------------------------------- 
+!     Function f. Coalescence-Efficiency (Ochs) 
+!--------------------------------------------------       
+
+  FUNCTION ecoalOchs(D_l,D_s,dv,T) 
+    use defs, only : pi
+    IMPLICIT NONE 
+       
+    real            :: ecoalOchs
+    REAL            :: D_l,D_s,dv,T
+    REAL            :: sigma,N_w,R_s,R_l,p,g,x
+    REAL, PARAMETER :: FPMIN = 1.e-30 
+
+    sigma = sigma_water(T)
+                                ! Alles in CGS (1 J = 10^7 g cm^2/s^2)  
+    R_s = 0.5 * D_s
+    R_l = 0.5 * D_l      
+    p   = R_s / R_l
+
+    if (dv.lt.FPMIN) dv = FPMIN
+    N_w = R_s * dv**2 / sigma
+    g   = 2**(3./2.)/(6.*pi) * p**4 * (1.+ p) / ((1.+p**2)*(1.+p**3))
+    x   = N_w**(0.5) * g      
+
+    EcoalOchs = 0.767 - 10.14 * x
+    RETURN 
+  END FUNCTION  ecoalOchs
+
+!!-------------------------------------------------- 
+!!     Function f. Coalescence-Efficiency (Low&List) 
+!!--------------------------------------------------       
+!
+!  FUNCTION ecoalLowList(Dgr,Dkl,dv,T) 
+!    use defs, only : pi
+!    IMPLICIT NONE 
+!       
+!    REAL :: PI,sigma,ka,kb,epsi
+!    REAL :: Dgr,Dkl,Rgr,Rkl,x,T
+!    REAL :: ST,Sc,ET,dSTSc,CKE,W1,W2,Dc,Ecl 
+!    REAL :: qq0,qq1,qq2
+!
+!    PARAMETER (epsi=1.e-20)   
+!
+!      
+!    ! 1 J = 10^7 g cm^2/s^2
+!
+!    sigma = sigma_water(T) ! Surface Tension,[sigma]=g/s^2 (7.28E-2 N/m)
+!
+!    ka = 0.778                   ! Empirical Constant 
+!    kb = 2.61e-4                 ! Empirical Constant,[b]=2.61E6 m^2/J^2
+! 
+!    Rgr = 0.5*Dgr
+!    Rkl = 0.5*Dkl
+!
+!    CALL energy(Dgr,Dkl,dv,T,CKE,ST,Sc,W1,W2,Dc)
+!
+!    dSTSc = ST-Sc             ! Diff. of Surf. Energies   [dSTSc] = g*cm^2/s^2   
+!    ET = CKE+dSTSc            ! Coal. Energy,             [ET]    =     "   
+!         
+!    IF (ET .LT. 50.0) THEN    ! ET < 5 uJ (= 50 g*cm^2/s^2) 
+!       qq0=1.0+(Dkl/Dgr)                       
+!       qq1=ka/qq0**2  
+!       qq2=kb*sigma*(ET**2)/(Sc+epsi)                        
+!       Ecl=qq1*exp(-qq2)     
+!    ELSE
+!       Ecl=0.0 
+!    ENDIF 
+!
+!    EcoalLowList = Ecl
+!
+!    RETURN 
+!  END FUNCTION  ecoalLowList
+!
+!
+!!----------------------------------------- 
+!!     Calculating the Collision Energy 
+!!-----------------------------------------  
+!
+!  SUBROUTINE ENERGY(Dgr,Dkl,dv,T,CKE,ST,Sc,W1,W2,Dc) 
+!    IMPLICIT NONE 
+!
+!    REAL :: Dgr,Dkl,Dc
+!    REAL :: k10,PI,sigma,rho
+!    REAL :: CKE,W1,W2,ST,Sc
+!    REAL :: Dgka3,Dgkb3,Dgka2 
+!    REAL :: v1,v2,dv
+!
+!    REAL , PARAMETER :: epsf=1.e-30 
+!    REAL , PARAMETER :: FPMIN = 1.e-30 
+! 
+!    Real , EXTERNAL :: vTerminal,vTBest
+!     
+!    rho   = 1.0               ! Water Density,[rho]=g/cm^3 
+!    sigma = sigma_water(T)
+!
+!    k10=rho*PI/12.0d0 
+!
+!    Dgr = max(Dgr,epsf)
+!    Dkl = max(Dkl,epsf)
+!
+!    Dgka2=(Dgr**2)+(Dkl**2)
+!
+!    Dgka3=(Dgr**3)+(Dkl**3)
+!     
+!    if (Dgr.ne.Dkl) then
+!       if (dv.lt.FPMIN) dv = FPMIN 
+!       dv = dv**2
+!       if (dv.lt.FPMIN) dv = FPMIN 
+!       Dgkb3=(Dgr**3)*(Dkl**3) 
+!       CKE = k10 * dv * Dgkb3/Dgka3 ! Collision Energy           [CKE]=g*cm^2/s^2
+!    else
+!       CKE = 0.0d0
+!    endif
+!    ST = PI*sigma*Dgka2            ! Surf. Energy (Parent Drop)  [ST]=   ''      
+!    Sc = PI*sigma*Dgka3**(2./3.)   ! Surf. Energy (coal. System) [Sc]=   ''    
+!
+!    W1=CKE/(Sc+epsf)                ! Weber Number 1   
+!    W2=CKE/(ST+epsf)                ! Weber Number 2   
+!
+!    Dc=Dgka3**(1./3.)            ! Diam. of coal. System
+!
+!    RETURN 
+!  END SUBROUTINE ENERGY 
+!
+
+!-------------------------------------------------- 
+!     Function f. Coalescence-Efficiency 
+!     Eq. (7) of Beard and Ochs (1995)
+!--------------------------------------------------      
+ 
+  FUNCTION ecoalBeard(D_l,D_s) 
+       
+    IMPLICIT NONE 
+    
+    real            :: ecoalBeard   
+    REAL            :: D_l,D_s
+    REAL            :: R_s,R_l
+    REAL            :: rcoeff
+    REAL, PARAMETER :: epsf  = 1.e-30 
+
+    INTEGER         :: its
+    COMPLEX         :: acoeff(4),x
+
+    R_s = 0.5 * min(D_s,D_l)
+    R_l = 0.5 * max(D_s,D_l)
+
+    rcoeff = 5.07 - log(R_s*1e4) - log(R_l*1e4/200.0)
+
+    acoeff(1) = CMPLX(rcoeff)
+    acoeff(2) = CMPLX(-5.94)
+    acoeff(3) = CMPLX(+7.27)
+    acoeff(4) = CMPLX(-5.29)
+
+    x = (0.50,0)
+
+    CALL LAGUER(acoeff,3,x,its)
+
+    EcoalBeard = REAL(x)
+
+    RETURN 
+  END FUNCTION  ecoalBeard
+
+!--------------------------------------------------       
+
+  SUBROUTINE laguer(a,m,x,its)
+    INTEGER   :: m,its,MAXIT,MR,MT
+    REAL      :: EPSS
+    COMPLEX   :: a(m+1),x
+    PARAMETER (EPSS=2.e-7,MR=8,MT=10,MAXIT=MT*MR)
+    INTEGER   :: iter,j
+    REAL      :: abx,abp,abm,err,frac(MR)
+    COMPLEX   :: dx,x1,b,d,f,g,h,sq,gp,gm,g2
+    SAVE frac
+    DATA frac /.5,.25,.75,.13,.38,.62,.88,1./
+    
+    do 12 iter=1,MAXIT
+      its=iter
+      b=a(m+1)
+      err=abs(b)
+      d=cmplx(0.,0.)
+      f=cmplx(0.,0.)
+      abx=abs(x)
+      do 11 j=m,1,-1
+        f=x*f+d
+        d=x*d+b
+        b=x*b+a(j)
+        err=abs(b)+abx*err
+11    continue
+      err=EPSS*err
+      if(abs(b).le.err) then
+        return
+      else
+        g=d/b
+        g2=g*g
+        h=g2-2.*f/b
+        sq=sqrt((m-1)*(m*h-g2))
+        gp=g+sq
+        gm=g-sq
+        abp=abs(gp)
+        abm=abs(gm)
+        if(abp.lt.abm) gp=gm
+        if (max(abp,abm).gt.0.) then
+          dx=m/gp
+        else
+          dx=exp(cmplx(log(1.+abx),float(iter)))
+        endif
+      endif
+      x1=x-dx
+      if(x.eq.x1)return
+      if (mod(iter,MT).ne.0) then
+        x=x1
+      else
+        x=x-dx*frac(iter/MT)
+      endif
+12  continue
+    pause 'too many iterations in laguer'
+    return
+  END subroutine laguer
+
+
+  FUNCTION sigma_water(T) 
+    IMPLICIT NONE 
+      
+    REAL :: T, sigma_water
+ 
+    sigma_water = 76.1 - 0.155 * (T-273.15)
+    return
+  END FUNCTION sigma_water
 
   !
   !--------------------------------------------------------------------------
@@ -3135,7 +3397,7 @@ contains
         particle%vdrop_rkprev   = pvdrp
         particle%wdrop_rkprev   = pwdrp
 	particle%tau            = pt
-	particle%mtpl           = int(1.e9) !pmtpl  !int(1.e9)
+	particle%mtpl           = int(1.e9)  !pmtpl  !int(1.e9)
 	if(pts < firststartl) firststartl = pts
       end do
       close(666)

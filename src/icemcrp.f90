@@ -894,6 +894,7 @@ contains
         Dm = ( 6. / (rowt*pi) * Xp )**(1./3.)
 	if (oldsedimentation) then
           mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))
+	  !mu = 5.
 	else
 	  IF (Dm.LE.rain_cmu3) THEN ! see Seifert (2008)            
              mu = rain_cmu0*TANH((4.*rain_cmu2*(Dm-rain_cmu3))**2) &
