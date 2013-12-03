@@ -30,7 +30,7 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 72, nvar2 = 118 ! number of time series and profiles
+  integer, parameter :: nvar1 = 72, nvar2 = 120 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2
   real, save         :: fsttm, lsttm
 
@@ -73,7 +73,7 @@ module stat
        'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel', & !97
        'rsup   ','prc_c  ','prc_i  ','prc_s  ','prc_g  ','prc_h  ', & !103
        'hail   ','qt_th  ','s_1    ','s_2    ','s_3    ','RH     ', & !109
-       'lwuca  ','lwdca  ','swuca  ','swdca  '/)                      !115
+       'lwuca  ','lwdca  ','swuca  ','swdca  ','tot_tvw','sgs_tvw'/)            !115
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:)
@@ -120,7 +120,6 @@ contains
        nv1 = nvar1
        nv2 = nvar2
 !     end select
-
 
     allocate (wtv_sgs(nzp),wtv_res(nzp),wrl_sgs(nzp))
     allocate (tke_res(nzp),tke_sgs(nzp),tke0(nzp),thvar(nzp))
@@ -427,6 +426,8 @@ contains
     end do
     ssclr(35) = get_avg(1,n2,n3,1,scr)
     ssclr(60) = c1(2) + th00
+
+
   end subroutine accum_stat
   !
   !---------------------------------------------------------------------
@@ -550,6 +551,8 @@ contains
   ! averaging period for moisture variable (smoke or total water)
   !
   subroutine accum_lvl1(n1,n2,n3,rt,th)
+    use defs, only : g, cp
+    use grid, only : a_wp, a_scr1, th00, dn0
 
     integer, intent (in)  :: n1,n2,n3
     real, intent (in)     :: rt(n1,n2,n3)
@@ -567,6 +570,7 @@ contains
     do j=3,n3-2
        do i=3,n2-2
           do k=1,n1
+             
              a3(k) = a3(k) + (rt(k,i,j)-a1(k))**3
              ab(k) = ab(k) + (rt(k,i,j)-a1(k))*(th(k,i,j)-b1(k))
           end do
@@ -578,6 +582,8 @@ contains
        svctr(k,51) =svctr(k,51)  + a2(k)
        svctr(k,52) =svctr(k,52)  + a3(k)/REAL((n2-4)*(n3-4))
        svctr(k,110)=svctr(k,110) + ab(k)/REAL((n2-4)*(n3-4))
+       svctr(k,120)=svctr(k,120) + wtv_sgs(k) 
+       svctr(k,119)=svctr(k,119) + wtv_res(k) + wtv_sgs(k) 
     end do
 
   end subroutine accum_lvl1

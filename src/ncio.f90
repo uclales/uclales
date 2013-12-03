@@ -919,6 +919,14 @@ contains
        if (itype==0) ncinfo = 'Sub-filter scale vertical flux of theta'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
+    case('tot_tvw')
+       if (itype==0) ncinfo = 'Total buoyancy flux'
+       if (itype==1) ncinfo = 'Km/s'
+       if (itype==2) ncinfo = 'ttmt'
+    case('sgs_tvw')
+       if (itype==0) ncinfo = 'Sub-filter scale buoyancy flux'
+       if (itype==1) ncinfo = 'Km/s'
+       if (itype==2) ncinfo = 'ttmt'
     case('tot_uw')
        if (itype==0) ncinfo = 'Total vertical flux of u-wind'
        if (itype==1) ncinfo = 'm^2/s^2'

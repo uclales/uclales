@@ -1,6 +1,6 @@
 # OS X
-set(CMAKE_Fortran_COMPILER "gfortran-mp-4.7")
-set(Fortran_COMPILER_WRAPPER openmpif90)
+set(CMAKE_Fortran_COMPILER "gfortran")
+set(Fortran_COMPILER_WRAPPER mpif90)
 
 set(USER_Fortran_FLAGS "-fbacktrace -finit-real=nan -fdefault-real-8  -fno-f2c -ffree-line-length-none")
 set(USER_Fortran_FLAGS_RELEASE "-funroll-all-loops -O3")
