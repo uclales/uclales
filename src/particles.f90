@@ -2391,8 +2391,8 @@ contains
 	  nvl = nvl + 1
           if(lpartmass) then
 	    sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
-            sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
-	    sb_sorted(loc,nvl+3) = recvbuff(ii+nvl+3)
+            sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2) + umean
+	    sb_sorted(loc,nvl+3) = recvbuff(ii+nvl+3) + vmean
 	    sb_sorted(loc,nvl+4) = recvbuff(ii+nvl+4)
 	    nvl = nvl + 4
             if(var_mtpl) then
