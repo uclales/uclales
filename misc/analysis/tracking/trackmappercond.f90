@@ -291,18 +291,15 @@ program trackmapper
   call check ( nf90_open(trim(adjustl(ifilecond)), NF90_NOWRITE, ifidcond))
 
   !Find dimensions/sizes
-print *, ncvar1%name
   call inquire_ncvar(ifid1, ncvar1)
-print *, ncvar3%name
   call inquire_ncvar(ifid1, ncvar3)
-print *, ncvar2%name
   call inquire_ncvar(ifid2, ncvar2)
-print *, ncvarcond%name
   call inquire_ncvar(ifidcond, ncvarcond)
   nx = ncvar1%dim(1)
   ny = ncvar1%dim(2)
   nt = ncvar1%dim(3)
 
+  nctime%name="time"
   call inquire_ncvar(ifid1, nctime)
   allocate(time(nctime%dim(1)))
   call read_ncvar(ifid1, nctime, time)
