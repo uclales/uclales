@@ -1991,7 +1991,7 @@ contains
           sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
           nvl = nvl + 1
           if(level>0) then
-            sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+2)
+            sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
             nvl = nvl + 1
           end if
         end if
@@ -1999,7 +1999,7 @@ contains
           sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
           nvl = nvl + 1
           if(level>1) then
-            sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+2)
+            sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
             nvl = nvl + 1
           end if
         end if
