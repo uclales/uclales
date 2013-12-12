@@ -60,9 +60,10 @@ module modparticles
   logical            :: lpartmass = .true.              ! hard code switch to turn on/off drop mass 
                                                         ! used only in combination with lpartdrop = .true. (namelist)
   logical            :: selfcollection = .true.         ! switch for enabling self-collection of LD
-  logical            :: var_mtpl = .true.               ! switch to use a variable multiplicity in self-collection
+  logical            :: var_mtpl       = .true.               ! switch to use a variable multiplicity in self-collection
                                                         ! used only in combination with lpartmass = .true.
-  logical            :: cal_ecoal = .true.              ! switch for coalescence efficiency as in Seifert et al. 2005
+  logical            :: cal_ecoal      = .true.              ! switch for coalescence efficiency as in Seifert et al. 2005
+  logical            :: lpartdumpp     = .true.        !< Switch for particle dump
    
   ! Particle structure
   type :: particle_record
@@ -1792,10 +1793,10 @@ contains
   !--------------------------------------------------------------------------
   ! Subroutine thermo
   !> Calculates thermodynamic variables at particle position (thl, thv,
-  !> qt, qs, tk, ev)
+  !> qt, qs, tk, p)
   !--------------------------------------------------------------------------
   !
-  subroutine thermo(px,py,pz,thl,thv,rt,rl,tk,ev)
+  subroutine thermo(px,py,pz,thl,thv,rt,rl,tk,prs)
     use thrm,         only : rslf
     use grid,         only : a_pexnr, a_rp, a_theta, a_tp, pi0, pi1,th00, level
     !use grid,         only : tname,nzp,dxi,dyi,dzi_t,nxp,nyp,umean,vmean, a_tp, a_rp, press, th00, a_pexnr, a_theta,pi0,pi1
@@ -1806,7 +1807,7 @@ contains
 
     real, intent(in)  :: px,py,pz
     real, intent(out) :: thl
-    real, intent(out), optional :: thv,rt,rl,tk,ev
+    real, intent(out), optional :: thv,rt,rl,tk,prs
     real, parameter   :: epsln = 1.e-4
     real              :: exner,ploc,tlloc,rsloc,dtx,tx,txi,tx1
     integer           :: iterate
@@ -1846,8 +1847,9 @@ contains
       end if
       
       if(present(tk)) tk = tlloc + alvl/cp*rl
-      if(present(ev)) ev = (rt-rl)*ploc/(ep+rt-rl)
+      !if(present(ev)) ev = (rt-rl)*ploc/(ep+rt-rl)
       thv = i3d(px,py,pz,a_theta) * (1.+ep2*(rt-rl))
+      if(present(prs)) prs=ploc
 
     end if
 
@@ -2179,7 +2181,7 @@ contains
     real, allocatable, dimension(:,:)    :: sb_sorted
     integer, allocatable, dimension(:,:) :: status_array
     integer, allocatable, dimension(:)   :: req
-    real                                 :: thl,thv,rt,rl,p_real
+    real                                 :: thl,thv,rt,rl,prs
     if (.not. lpartic) return
     if(time >= tnextdump) then
 
@@ -2194,6 +2196,7 @@ contains
       if(lpartdrop.and.lpartmass)    nvar = nvar + 4     ! mass,ud,vd,wd
       if(lpartdrop.and.lpartmass.and.var_mtpl) &
                                      nvar = nvar + 1     ! mtpl
+      if(lpartdumpp)                 nvar = nvar + 1     ! pressure
 
       nprocs = nxprocs * nyprocs
       allocate(tosend(0:nprocs-1),toreceive(0:nprocs-1),base(0:nprocs-1),sendbase(0:nprocs-1),receivebase(0:nprocs-1))
@@ -2246,11 +2249,11 @@ contains
    
           if((lpartdumpth .or. lpartdumpmr)) then
             if(level==0) then
-              call thermo(particle%x,particle%y,particle%z,thl)
+              call thermo(particle%x,particle%y,particle%z,thl,prs=prs)
             else if(level==1) then 
-              call thermo(particle%x,particle%y,particle%z,thl,thv=thv,rt=rt)
+              call thermo(particle%x,particle%y,particle%z,thl,thv=thv,rt=rt,prs=prs)
             else  
-              call thermo(particle%x,particle%y,particle%z,thl,thv=thv,rt=rt,rl=rl)
+              call thermo(particle%x,particle%y,particle%z,thl,thv=thv,rt=rt,rl=rl,prs=prs)
             end if
           end if
 
@@ -2299,9 +2302,13 @@ contains
 	      nvl = nvl + 4
               if(var_mtpl) then
 	        sendbuff(base(p)+nvl+1) = particle%mtpl
+		nvl = nvl + 1
 	      end if
             end if
           end if
+	  if(lpartdumpp) then
+	    sendbuff(base(p)+nvl+1)   = prs
+	  end if
 
           base(p)             = base(p) + nvar
       
@@ -2404,9 +2411,13 @@ contains
 	    nvl = nvl + 4
             if(var_mtpl) then
 	      sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
+	      nvl = nvl + 1
 	    end if
           end if
         end if
+	if(lpartdumpp) then
+	  sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
+	end if
 
         ii = ii + nvar
 
@@ -2473,8 +2484,12 @@ contains
 	  nvl = nvl + 4
           if(var_mtpl) then
 	    call writevar_nc(ncpartid,'mtpl',sb_sorted(:,nvl+1),ncpartrec)	
+	    nvl = nvl + 1
 	  end if
         end if
+      end if
+      if(lpartdumpp) then
+        call writevar_nc(ncpartid,'p',sb_sorted(:,nvl+1),ncpartrec)
       end if
       stat  = nf90_sync(ncpartid)
 
@@ -2782,7 +2797,7 @@ contains
   !
   subroutine drop_growth(particle)
     use mpi_interface, only : myid
-    use defs,          only : pi,rowt,Rm,alvl
+    use defs,          only : pi,rowt,Rm,alvl,ep
     use grid,          only : dt,dn0,vapor,a_scr1,a_scr2,nxp,nyp,nzp, &
                               a_theta,a_pexnr,pi0,pi1, dxi, dyi, dzi_t
     use mcrp,          only : Kt, Dv, nu_l
@@ -2791,7 +2806,7 @@ contains
     
     type (particle_record), pointer:: particle
     real               :: r0, K, Fk, Fd, S, es
-    real               :: thl,thv,rt,rl,tk,ev
+    real               :: thl,thv,rt,rl,tk,ev,prs
     real               :: v_rel, rmax, f_v, X_ven, dzi
     logical            :: longkernel=.false.
     real, parameter :: &
@@ -2800,7 +2815,7 @@ contains
 
     dzi = dzi_t(floor(particle%z))
 
-    call thermo(particle%x,particle%y,particle%z,thl,thv=thv,rt=rt,rl=rl,tk=tk,ev=ev)
+    call thermo(particle%x,particle%y,particle%z,thl,thv=thv,rt=rt,rl=rl,tk=tk,prs=prs)
     !if (myid==0) write(*,*) myid,'mass old: ',particle%mass
   
     ! drop growth by accretion
@@ -2826,7 +2841,8 @@ contains
     mbalid = mbalid + rl * i1d(particle%z,dn0) * K * dt *real(particle%mtpl)
     
     ! drop evaporation
-
+    
+    ev = (rt-rl)*prs/(ep+rt-rl)
     es = esl(tk)
     
     Fk = (alvl/(Rm*tk)-1)*alvl*rowt/(Kt*tk)
@@ -3837,6 +3853,9 @@ contains
       if(var_mtpl) then
         call addvar_nc(ncpartid,'mtpl','multiplicity','#',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)        
       end if
+    end if
+    if(lpartdumpp) then
+      call addvar_nc(ncpartid,'p','pressure','Pa',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
     end if
 
   end subroutine initparticledump
