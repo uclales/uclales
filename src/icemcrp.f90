@@ -333,8 +333,8 @@ contains
     !
 !as    if(firsttime) call initmcrp(level,firsttime)
     allocate(convice(n1),convliq(n1))
-    if(lpartdrop .and. nstep==3) allocate(a_npauto(nzp,nxp,nyp))
-    if(lpartdrop .and. nstep==3) a_npauto(:,:,:) = 0.
+    if(lpartdrop .and. nstep==1) allocate(a_npauto(nzp,nxp,nyp))
+    if(lpartdrop .and. nstep==1) a_npauto(:,:,:) = 0.
     do j=3,n3-2
        do i=3,n2-2
           call resetvar(rain,rp(1:n1,i,j),np(1:n1,i,j))
@@ -769,7 +769,14 @@ contains
           np(k) = np(k) + au/cldw%x_max
 	  
 	  ! For particles: a_npauto in #/(kg*dt)
-	  if(lpartdrop .and. nstep==3) a_npauto(k,i,j) = au*dn0(k)
+	  if(lpartdrop .and. nstep==1) a_npauto(k,i,j) = a_npauto(k,i,j) + (rkalpha(1) + rkbeta(2))* au*dn0(k)
+	  if(lpartdrop .and. nstep==2) a_npauto(k,i,j) = a_npauto(k,i,j) + (rkalpha(2) + rkbeta(3))* au*dn0(k)
+	  if(lpartdrop .and. nstep==3) a_npauto(k,i,j) = a_npauto(k,i,j) + (rkalpha(3)            )* au*dn0(k)
+	  if(lpartdrop .and. nstep==3 .and. a_npauto(k,i,j).lt.0.) then
+	    a_npauto(k,i,j) = 0.
+	  end if
+	  !if(lpartdrop) a_npauto(k,i,j) = a_npauto(k,i,j) + 1./3. * au*dn0(k)
+	  !if(lpartdrop .and. nstep==3) a_npauto(k,i,j) = au*dn0(k)
        end if
     end do
 
@@ -2742,6 +2749,9 @@ contains
     if (present(firsttime)) then
        firsttime = .false.
     end if
+
+    !if(lpartdrop) allocate(a_npauto(nzp,nxp,nyp))
+    !if(lpartdrop) a_npauto(:,:,:) = 0.
 
     if (level/=3) lwaterbudget = .false.
     if (level==2) then

@@ -134,6 +134,9 @@ module modparticles
   ! Interpolation
   real, dimension(4,4)                :: t2t
   real, dimension(4)                  :: t2o
+  
+  ! Mass balance
+  real    :: mbal = 0, mbalid = 0
 
 contains
   !
@@ -254,7 +257,8 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine grow_drops
-    use modnetcdf, only : fillvalue_double
+    use modnetcdf, only     : fillvalue_double
+    use mpi_interface, only : ierror, mpi_double_precision, mpi_sum, mpi_comm_world, myid
     implicit none
     type (particle_record), pointer :: particle
 
@@ -271,6 +275,9 @@ contains
       ! Self-collection of Lagrangian drops
       if (selfcollection) call self_coll
     end if
+    
+    call mpi_allreduce(mbalid,mbal,1,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+    if (myid==0) write (*,*) 'mass balance: ',mbal
   
   end subroutine grow_drops
 
@@ -2571,9 +2578,10 @@ contains
     particle => head
     do while(associated(particle))
       if(particle%x.ne.fillvalue_double.and. &
-      !(particle%mass.lt.(5.2e-10).or.particle%z<=(1+zmax))) then  !r0=50mum
+      !(particle%mass.lt.(0.13*rain%x_min).or.particle%z<=(1+zmax))) then
       (particle%mass.lt.(rain%x_min).or.particle%z<=(1+zmax))) then
         ndel = ndel + 2
+	mbalid = mbalid - particle%mass*real(particle%mtpl)
       end if
       particle => particle%next
     end do 
@@ -2583,7 +2591,7 @@ contains
     particle => head
     do while(associated(particle))
       if(particle%x.ne.fillvalue_double.and. &
-      !(particle%mass.lt.(5.2e-10).or.particle%z<=(1+zmax))) then !r0=50mum
+      !(particle%mass.lt.(0.13*rain%x_min).or.particle%z<=(1+zmax))) then
       (particle%mass.lt.(rain%x_min).or.particle%z<=(1+zmax))) then
         ndel_n(ndel+1) = particle%unique
 	ndel_n(ndel+2) = particle%nd
@@ -2745,6 +2753,7 @@ contains
 		  particle%tau            = 0.
 		  particle%mtpl           = nint(1./nppd)
                   newp = newp + 1
+		  mbalid = mbalid + particle%mass*real(particle%mtpl)
                   !write(*,*) 're-activate: unique',particle%unique,'nd',particle%nd
                 end if
                 particle => particle%next
@@ -2814,7 +2823,7 @@ contains
     
     particle%mass = particle%mass + rl * i1d(particle%z,dn0) * K * dt
     !if (myid==0) write(*,*) myid,'mass acc: ',particle%mass
-
+    mbalid = mbalid + rl * i1d(particle%z,dn0) * K * dt *real(particle%mtpl)
     
     ! drop evaporation
 
@@ -2842,7 +2851,7 @@ contains
     
     particle%mass = particle%mass + f_v* 4.*pi*r0* rowt*(S-1) / (Fk+Fd) * dt
     !if (myid==0) write(*,*) myid,'mass eva: ',particle%mass
-    
+    mbalid = mbalid + f_v* 4.*pi*r0* rowt*(S-1) / (Fk+Fd) * dt *real(particle%mtpl)
     
     !add drop breakup at 3mm to 6mm?! 
         
@@ -3293,7 +3302,7 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine init_particles(hot,hfilin)
-    use mpi_interface, only : wrxid, wryid, nxg, nyg, myid, nxprocs, nyprocs, appl_abort, ierror,mpi_double_precision,mpi_comm_world,mpi_min
+    use mpi_interface, only : wrxid, wryid, nxg, nyg, myid, nxprocs, nyprocs, appl_abort, ierror,mpi_double_precision,mpi_comm_world,mpi_min,mpi_double_precision, mpi_sum
     use grid, only : zm, deltax, deltay, zt,dzi_t, nzp, nxp, nyp
     use grid, only : a_up, a_vp, a_wp
     use modnetcdf, only : fillvalue_double
@@ -3334,7 +3343,11 @@ contains
         end do
       end do
     end if
-	
+
+    mbalid = 0.	
+    call mpi_allreduce(mbalid,mbal,1,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+    if (myid==0) write (*,*) 'mass balance id init: ',mbalid
+    if (myid==0) write (*,*) 'mass balance init: ',mbal
     
     if(hot) then
     ! ------------------------------------------------------
@@ -3399,6 +3412,11 @@ contains
 	particle%tau            = pt
 	particle%mtpl           = int(1.e9)  !pmtpl  !int(1.e9)
 	if(pts < firststartl) firststartl = pts
+	
+	if (particle%mass.ne.fillvalue_double) then
+	  mbalid = mbalid + particle%mass*particle%mtpl
+          write (*,*) 'particle mass: ',particle%mass,', mtpl',particle%mtpl
+        end if
       end do
       close(666)
 
@@ -3408,6 +3426,11 @@ contains
       else
         tnextrand = 9e9
       end if
+   
+      if (myid==0) write (*,*) 'mass balance id init: ',mbalid
+      call mpi_allreduce(mbalid,mbal,1,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
+      if (myid==0) write (*,*) 'ierror: ',ierror      
+      if (myid==0) write (*,*) 'mass balance init: ',mbal
 
     else
     ! ------------------------------------------------------
