@@ -322,11 +322,6 @@ contains
     xtime = time/86400. + strtim
     call timedep(time,timmax, sst)
 
-!    !new for mass budget
-!    if(lpartic .and. lpartdrop .and. lpartmass) call grow_drops
-!    if(lpartic .and. lpartdrop) call deactivate_drops(time+dt)
-!    if(lpartic .and. lpartdrop) call activate_drops(time+dt)
-
     do nstep = 1,3
 
        ! Add additional criteria to ensure that some profile statistics that are
@@ -337,7 +332,6 @@ contains
           sflg = .True.
        end if
 
-       ! old position not suitable for mass budget
        if (lpartic) then
          call particles(time,timmax)
        end if
@@ -384,14 +378,8 @@ contains
        call poisson
        call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
        
-!       !new position for mass budget
-!       if (lpartic) then
-!         call particles(time,timmax)
-!       end if
-
     end do
 
-    !old not suitable for mass budget
     if(lpartic .and. lpartdrop .and. lpartmass) call grow_drops
     if(lpartic .and. lpartdrop) call deactivate_drops(time+dt)
     if(lpartic .and. lpartdrop) call activate_drops(time+dt)

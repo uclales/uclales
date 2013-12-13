@@ -46,6 +46,7 @@ module modparticles
   logical            :: lpartdumpui    = .false.        !< Switch for writing velocities to dump
   logical            :: lpartdumpth    = .false.        !< Switch for writing temperatures (liquid water / virtual potential T) to dump
   logical            :: lpartdumpmr    = .false.        !< Switch for writing moisture (total / liquid (+rain if level==3) water mixing ratio) to dump
+  logical            :: lpartdumpp     = .false.        !< Switch for particle dump
   real               :: frqpartdump    =  3600          !< Time interval for particle dump
   integer            :: int_part       =  1             !< Interpolation scheme, 1=linear, 3=3rd order Lagrange
   real               :: ldropstart     = 0.             !< Earliest time to start drops
@@ -60,10 +61,9 @@ module modparticles
   logical            :: lpartmass = .true.              ! hard code switch to turn on/off drop mass 
                                                         ! used only in combination with lpartdrop = .true. (namelist)
   logical            :: selfcollection = .true.         ! switch for enabling self-collection of LD
-  logical            :: var_mtpl       = .true.               ! switch to use a variable multiplicity in self-collection
+  logical            :: var_mtpl       = .true.         ! switch to use a variable multiplicity in self-collection
                                                         ! used only in combination with lpartmass = .true.
-  logical            :: cal_ecoal      = .true.              ! switch for coalescence efficiency as in Seifert et al. 2005
-  logical            :: lpartdumpp     = .true.        !< Switch for particle dump
+  logical            :: cal_ecoal      = .true.         ! switch for coalescence efficiency as in Seifert et al. 2005
    
   ! Particle structure
   type :: particle_record
@@ -136,8 +136,6 @@ module modparticles
   real, dimension(4,4)                :: t2t
   real, dimension(4)                  :: t2o
   
-  ! Mass balance
-  real    :: mbal = 0, mbalid = 0
 
 contains
   !
@@ -276,10 +274,7 @@ contains
       ! Self-collection of Lagrangian drops
       if (selfcollection) call self_coll
     end if
-    
-    call mpi_allreduce(mbalid,mbal,1,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-    if (myid==0) write (*,*) 'mass balance: ',mbal
-  
+      
   end subroutine grow_drops
 
 
@@ -2596,7 +2591,6 @@ contains
       !(particle%mass.lt.(0.13*rain%x_min).or.particle%z<=(1+zmax))) then
       (particle%mass.lt.(rain%x_min).or.particle%z<=(1+zmax))) then
         ndel = ndel + 2
-	mbalid = mbalid - particle%mass*real(particle%mtpl)
       end if
       particle => particle%next
     end do 
@@ -2768,7 +2762,6 @@ contains
 		  particle%tau            = 0.
 		  particle%mtpl           = nint(1./nppd)
                   newp = newp + 1
-		  mbalid = mbalid + particle%mass*real(particle%mtpl)
                   !write(*,*) 're-activate: unique',particle%unique,'nd',particle%nd
                 end if
                 particle => particle%next
@@ -2816,7 +2809,6 @@ contains
     dzi = dzi_t(floor(particle%z))
 
     call thermo(particle%x,particle%y,particle%z,thl,thv=thv,rt=rt,rl=rl,tk=tk,prs=prs)
-    !if (myid==0) write(*,*) myid,'mass old: ',particle%mass
   
     ! drop growth by accretion
     
@@ -2837,8 +2829,6 @@ contains
     end if
     
     particle%mass = particle%mass + rl * i1d(particle%z,dn0) * K * dt
-    !if (myid==0) write(*,*) myid,'mass acc: ',particle%mass
-    mbalid = mbalid + rl * i1d(particle%z,dn0) * K * dt *real(particle%mtpl)
     
     ! drop evaporation
     
@@ -2855,19 +2845,8 @@ contains
     else
       f_v = 0.78 + 0.308*X_ven
     end if
-    !if (myid==0.and.S.lt.0.9) then
-    !  write(*,*) 'S  : ',S
-    !  write(*,*) 'r0 : ',r0
-    !  write(*,*) 'NSc: ',(nu_l/Dv)**(1./3.)
-    !  write(*,*) 'NRe: ',(2. *r0 * v_rel / nu_l)**(1./2.)
-    !  write(*,*) 'vr : ',v_rel
-    !  write(*,*) 'X  : ',X_ven
-    !  write(*,*) 'fv : ',f_v
-    !end if
-    
+   
     particle%mass = particle%mass + f_v* 4.*pi*r0* rowt*(S-1) / (Fk+Fd) * dt
-    !if (myid==0) write(*,*) myid,'mass eva: ',particle%mass
-    mbalid = mbalid + f_v* 4.*pi*r0* rowt*(S-1) / (Fk+Fd) * dt *real(particle%mtpl)
     
     !add drop breakup at 3mm to 6mm?! 
         
@@ -3359,11 +3338,6 @@ contains
         end do
       end do
     end if
-
-    mbalid = 0.	
-    call mpi_allreduce(mbalid,mbal,1,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-    if (myid==0) write (*,*) 'mass balance id init: ',mbalid
-    if (myid==0) write (*,*) 'mass balance init: ',mbal
     
     if(hot) then
     ! ------------------------------------------------------
@@ -3429,10 +3403,6 @@ contains
 	particle%mtpl           = int(1.e9)  !pmtpl  !int(1.e9)
 	if(pts < firststartl) firststartl = pts
 	
-	if (particle%mass.ne.fillvalue_double) then
-	  mbalid = mbalid + particle%mass*particle%mtpl
-          write (*,*) 'particle mass: ',particle%mass,', mtpl',particle%mtpl
-        end if
       end do
       close(666)
 
@@ -3443,10 +3413,6 @@ contains
         tnextrand = 9e9
       end if
    
-      if (myid==0) write (*,*) 'mass balance id init: ',mbalid
-      call mpi_allreduce(mbalid,mbal,1,mpi_double_precision,mpi_sum,mpi_comm_world,ierror)
-      if (myid==0) write (*,*) 'ierror: ',ierror      
-      if (myid==0) write (*,*) 'mass balance init: ',mbal
 
     else
     ! ------------------------------------------------------
