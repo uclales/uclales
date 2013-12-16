@@ -1824,11 +1824,11 @@ contains
       rsloc   = rslf(ploc,tlloc)                     ! Saturation vapor mixing ratio
       rt      = i3d(px,py,pz,a_rp)                   ! Total water mixing ratio
       rl      = max(rt-rsloc,0.)                     ! Liquid water mixing ratio
+      tx      = tlloc
 
       if(rl > 0.) then
         dtx          = 2. * epsln
         iterate      = 1
-        tx           = tlloc
         do while(dtx > epsln .and. iterate < 20)
           txi        = alvl / (cp * tx)
           tx1        = tx - (tx - tlloc * (1. + txi  * rl)) / &
@@ -1841,10 +1841,11 @@ contains
         end do
       end if
       
-      if(present(tk)) tk = tlloc + alvl/cp*rl
+      if(present(tk)) tk = tx
       !if(present(ev)) ev = (rt-rl)*ploc/(ep+rt-rl)
-      thv = i3d(px,py,pz,a_theta) * (1.+ep2*(rt-rl))
       if(present(prs)) prs=ploc
+      thv = tx/exner * (1.+ep2*(rt-rl))
+
 
     end if
 
@@ -2793,19 +2794,20 @@ contains
     use defs,          only : pi,rowt,Rm,alvl,ep
     use grid,          only : dt,dn0,vapor,a_scr1,a_scr2,nxp,nyp,nzp, &
                               a_theta,a_pexnr,pi0,pi1, dxi, dyi, dzi_t
-    use mcrp,          only : Kt, Dv, nu_l
-    use thrm,          only : fll_tkrs,esl
+    use mcrp,          only : Kt, nu_l !Dv
+    use thrm,          only : fll_tkrs,esl, rslf
     implicit none
     
     type (particle_record), pointer:: particle
     real               :: r0, K, Fk, Fd, S, es
-    real               :: thl,thv,rt,rl,tk,ev,prs
+    real               :: thl,thv,rt,rl,tk,rs,prs,ev
     real               :: v_rel, rmax, f_v, X_ven, dzi
     logical            :: longkernel=.false.
     real, parameter :: &
          wr     = 33.,      &   ! S13
 	 E_c     = 1.
-
+    real, parameter :: Dv = 25.0e-6    ! in SI [m/s]
+    
     dzi = dzi_t(floor(particle%z))
 
     call thermo(particle%x,particle%y,particle%z,thl,thv=thv,rt=rt,rl=rl,tk=tk,prs=prs)
@@ -2832,12 +2834,14 @@ contains
     
     ! drop evaporation
     
-    ev = (rt-rl)*prs/(ep+rt-rl)
+    !ev = (rt-rl)*prs/(ep+rt-rl)
     es = esl(tk)
+    rs = rslf(prs,tk)
     
     Fk = (alvl/(Rm*tk)-1)*alvl*rowt/(Kt*tk)
     Fd = rowt*Rm*tk/(Dv*es)
-    S  = ev/es
+    !S  = ev/es
+    S = (rt-rl)/rs
     
     X_ven = (nu_l/Dv)**(1./3.) * (2. *r0 * v_rel / nu_l)**(1./2.)
     if (X_ven.lt.1.4) then           !ventilation effect PK97 (eq.13.60/61)
