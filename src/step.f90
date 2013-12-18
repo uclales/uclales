@@ -66,7 +66,7 @@ contains
 
     use mpi_interface, only : myid, broadcast_dbl, double_scalar_par_max,mpi_get_time
     use grid, only : dt, dtlong, zt, zm, nzp, dn0, u0, v0, level, &
-         write_hist
+         write_hist, runtype
     use ncio, only : write_anal, close_anal
     use modcross, only : triggercross, exitcross, lcross
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
@@ -101,7 +101,7 @@ contains
        !if(myid .eq. 0 .and. statflg) print*,'     sampling stat at t=',time+dt
 
        ! TEST BVS------------------------
-       if(get_first_cfl) then
+       if(get_first_cfl .and. (runtype.eq.'INITIAL')) then
          call cfl(cflmax)
          call double_scalar_par_max(cflmax,gcflmax)
          dt = min(dtlong,dt*gcfl/(gcflmax+epsilon(1.)))
