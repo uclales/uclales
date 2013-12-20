@@ -557,7 +557,7 @@ contains
               start=ibegsfc, count=icntsfc)
        !print*,myid,sanal(nn+4),nn+9
        !if (iret.ne.nf90_noerr) print*,myid,nf90_strerror(iret),nn+9
-
+       nn = nn+9
     end if 
 
     
