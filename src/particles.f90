@@ -51,7 +51,7 @@ module modparticles
   integer            :: int_part       =  1             !< Interpolation scheme, 1=linear, 3=3rd order Lagrange
   real               :: ldropstart     = 0.             !< Earliest time to start drops
 
-  real               :: nppd = 1./(1.e9)               ! number of Lagrangian particles per real drops
+  real               :: nppd = 1./(5.e8)               ! number of Lagrangian particles per real drops
   character(30)      :: startfile
   integer            :: ifinput        = 1
   integer(kind=long) :: np
@@ -733,10 +733,6 @@ contains
           dlam = Dmax/lambda
           xi_drop = exp(-dlam) + (1.0 - exp(-dlam)) * (1.0/(1.0+dlam))
         end do
-        if (j.gt.10) print*,'j=',j
-        if (j.gt.10) print*,'DD  =',Dmax-Dold
-	if (j.gt.10) print*,'D0  =',D0
-	if (j.gt.10) print*,'Dmax=',Dmax
       else                            ! approximate solution for Dmax (Eq. 2 in Seifert et al. 2013)
         Dmax = D0*exp(wr*D0)                                   
         dlam = Dmax/lambda
@@ -2697,8 +2693,13 @@ contains
     real               :: randnr(5), max_auto, sum_auto
     !real               :: zmax = 1.                  ! Max height in grid coordinates
     real               :: xsizelocal, ysizelocal
-    integer            :: nprocs,i,j,k,newp,np_old,cntp
+    integer            :: nprocs,i,j,k,newp,np_old,cntp, distr
     integer(kind=long) :: npac
+    
+    distr = 2    !select distribution of initial mass
+                 ! 1: delta distribution (mi = m0 = rain%x_min)
+		 ! 2: uniform distribution between m0 and 2m0
+		 ! 3: linear decreasing distribution between m0 and 2m0
 
     nprocs = nxprocs * nyprocs
     np_old = npmyid
@@ -2713,7 +2714,14 @@ contains
         do k=2,nzp-2
           if (a_npauto(k,i,j)>0) then
 	  
-	    a_npauto(k,i,j) = a_npauto(k,i,j)/(rain%x_min*1.5)*nppd/dxi/dyi/dzi_t(k)
+            select case (distr)
+            case(1)
+	      a_npauto(k,i,j) = a_npauto(k,i,j)/(rain%x_min)*nppd/dxi/dyi/dzi_t(k)
+            case(2)
+	      a_npauto(k,i,j) = a_npauto(k,i,j)/(rain%x_min*1.5)*nppd/dxi/dyi/dzi_t(k)
+            case(3)
+	      a_npauto(k,i,j) = a_npauto(k,i,j)/(rain%x_min*4./3.)*nppd/dxi/dyi/dzi_t(k)
+	    end select
 
             call random_number(randnr)          ! Random seed has been called from init_particles...
 
@@ -2747,8 +2755,14 @@ contains
                   particle%vsgs_prev      = 0.
                   particle%wsgs_prev      = 0.
                   particle%sigma2_sgs     = 0.
-		  particle%mass           = rain%x_min*(1.+randnr(5))  ! uniform distribution between 40 mum und 50 mum
-                  !particle%mass           = 5.2e-10   !r0=50mum
+                  select case (distr)
+                  case(1)
+                    particle%mass           = rain%x_min
+                  case(2)
+                    particle%mass           = rain%x_min * (1.+randnr(5))
+                  case(3)
+		    particle%mass           = rain%x_min * (2. - sqrt(1. - randnr(5)))
+	          end select
 		  particle%partstep       = 0
                   particle%nd             = particle%nd + 1
                   particle%udrop          = particle%ures
@@ -2837,20 +2851,22 @@ contains
     !ev = (rt-rl)*prs/(ep+rt-rl)
     es = esl(tk)
     rs = rslf(prs,tk)
-    
-    Fk = (alvl/(Rm*tk)-1)*alvl*rowt/(Kt*tk)
-    Fd = rowt*Rm*tk/(Dv*es)
     !S  = ev/es
     S = (rt-rl)/rs
     
-    X_ven = (nu_l/Dv)**(1./3.) * (2. *r0 * v_rel / nu_l)**(1./2.)
-    if (X_ven.lt.1.4) then           !ventilation effect PK97 (eq.13.60/61)
-      f_v = 1.0  + 0.108*X_ven**2.
-    else
-      f_v = 0.78 + 0.308*X_ven
-    end if
+    if (S.lt.1) then
+      Fk = (alvl/(Rm*tk)-1)*alvl*rowt/(Kt*tk)
+      Fd = rowt*Rm*tk/(Dv*es)
+    
+      X_ven = (nu_l/Dv)**(1./3.) * (2. *r0 * v_rel / nu_l)**(1./2.)
+      if (X_ven.lt.1.4) then           !ventilation effect PK97 (eq.13.60/61)
+        f_v = 1.0  + 0.108*X_ven**2.
+      else
+        f_v = 0.78 + 0.308*X_ven
+      end if
    
-    particle%mass = particle%mass + f_v* 4.*pi*r0* rowt*(S-1) / (Fk+Fd) * dt
+      particle%mass = particle%mass + f_v* 4.*pi*r0* rowt*(S-1) / (Fk+Fd) * dt
+    end if
     
     !add drop breakup at 3mm to 6mm?! 
         

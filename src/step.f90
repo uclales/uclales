@@ -321,7 +321,7 @@ contains
 
     xtime = time/86400. + strtim
     call timedep(time,timmax, sst)
-
+    
     do nstep = 1,3
 
        ! Add additional criteria to ensure that some profile statistics that are
