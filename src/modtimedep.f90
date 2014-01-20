@@ -61,7 +61,7 @@ contains
     character (1) :: chmess1
     integer       :: k,t, ierr, ifinput = 19
     real          :: dummyr, fac
-    real          :: highheight, highugt, highvgt, highwflst, highdthldt, highdqtdt
+    real          :: highheight, highugt, highvgt, highwflst, highdthldt, highdqtdt, dummy
     real          :: lowheight,  lowugt,  lowvgt,  lowwflst,  lowdthldt,  lowdqtdt
 
     firsttime = .false.
@@ -145,8 +145,8 @@ contains
       end do
       if(myid==0) write (*,*) 'timels = ',timels(t)
       if(t==1 .and. timels(t) > time_end) exit
-      read (ifinput,*)  lowheight , lowugt,  lowvgt,  lowwflst,  lowdthldt,  lowdqtdt
-      read (ifinput,*)  highheight, highugt, highvgt, highwflst, highdthldt, highdqtdt
+      read (ifinput,*)  lowheight , lowugt,  lowvgt,  lowwflst,  dummy, dummy, lowdqtdt,  lowdthldt
+      read (ifinput,*)  highheight, highugt, highvgt, highwflst, dummy, dummy, highdqtdt, highdthldt
 
       do k=2,nzp
         if (highheight<zt(k)) then
@@ -156,7 +156,7 @@ contains
           lowwflst     = highwflst
           lowdthldt    = highdthldt
           lowdqtdt     = highdqtdt
-          read (ifinput,*) highheight, highugt, highvgt, highwflst, highdthldt, highdqtdt
+          read (ifinput,*) highheight, highugt, highvgt, highwflst, dummy, dummy, highdqtdt, highdthldt
         end if
         fac            = (highheight-zt(k))/(highheight - lowheight)
         ugt(k,t)       = fac*lowugt    + (1-fac)*highugt
@@ -166,8 +166,6 @@ contains
         dqtdtlst(k,t)  = fac*lowdqtdt  + (1-fac)*highdqtdt
       end do
     end do
-
-
 
     if (timels(1) > time_end) then
       if(myid==0) then

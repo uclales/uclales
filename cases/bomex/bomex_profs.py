@@ -91,10 +91,10 @@ for t in tvar:
 
 for t in tvar:
   ls.write('\n')
-  ls.write('#{0:>9s} {1:>10s} {2:>10s} {3:>10s} {4:>10s} {5:>10s}  \n'.format('zf [m]','Ug [m/s]','Vg [m/s]','ws [m/s]','dq/dt','dT/dt'))
+  ls.write('#{0:>9s} {1:>10s} {2:>10s} {3:>10s} {4:>10s} {5:>10s} {6:>10s} {7:>10s}\n'.format('zf [m]','Ug [m/s]','Vg [m/s]','ws [m/s]','dummy','dummy','dq/dt','dT/dt'))
   ls.write('# {0:<10.2F} \n'.format(t))
   for k in range(len(zo)):
-    ls.write('{0:+10.2F} {1:+10.5F} {2:+10.5F} {3:+10.5F} {4:+10.5E} {5:+10.5E}\n'.format(zo[k],ug[k],vg[k],wo[k]/100.,dqo[k]*1.e-8,qro[k]/86400.))
+    ls.write('{0:+10.2F} {1:+10.5F} {2:+10.5F} {3:+10.5F} {4:+10.5E} {5:+10.5E} {6:+10.5E} {7:+10.5E}\n'.format(zo[k],ug[k],vg[k],wo[k]/100.,0.,0.,dqo[k]*1.e-8,qro[k]/86400.))
 ls.close()
 
 
