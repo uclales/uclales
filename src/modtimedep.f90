@@ -54,7 +54,7 @@ save
 
 contains
   subroutine inittimedep(time,time_end)
-    use grid, only : nzp, zt
+    use grid, only : nzp, zt, umean, vmean
     use mpi_interface, only : myid
     real, intent(in) :: time,time_end
     character (80):: chmess
@@ -159,8 +159,8 @@ contains
           read (ifinput,*) highheight, highugt, highvgt, highwflst, dummy, dummy, highdqtdt, highdthldt
         end if
         fac            = (highheight-zt(k))/(highheight - lowheight)
-        ugt(k,t)       = fac*lowugt    + (1-fac)*highugt
-        vgt(k,t)       = fac*lowvgt    + (1-fac)*highvgt
+        ugt(k,t)       = (fac*lowugt    + (1-fac)*highugt) - umean
+        vgt(k,t)       = (fac*lowvgt    + (1-fac)*highvgt) - vmean
         wflst(k,t)     = fac*lowwflst  + (1-fac)*highwflst
         dthldtlst(k,t) = fac*lowdthldt + (1-fac)*highdthldt
         dqtdtlst(k,t)  = fac*lowdqtdt  + (1-fac)*highdqtdt
