@@ -1,0 +1,59 @@
+&model
+! GRID --------------------
+  nxp          = 36
+  nyp          = 36
+  nzp          = 60
+  deltax       = 100
+  deltay       = 100
+  deltaz       = 50
+  igrdtyp      = 1
+
+! TIME --------------------
+  runtype      = "INITIAL"
+  timmax       = 1800.
+  wctime       = 27000.
+  dtlong       = 15.
+  istpfl       = 10
+
+! PHYSICS -----------------
+  iradtyp      = 0 
+  isfctyp      = 0
+  level        = 2
+  nfpt         = 6
+  distim       = 100.
+  corflg       = .true.
+  prndtl       = 0.3333333
+  cntlat       = 18.
+  ltimedep     = .true.
+  th00         = 310.
+  sst          = 9999.
+
+  iadv_mom     = 22
+  iadv_scal    = 22    
+  gcfl         = 1.0 
+  cfllim       = 1.2  
+
+! INIT --------------------
+  zrand        = 100
+  itsflg       = 1
+  ipsflg       = 1
+  irsflg       = 1
+  umean        = 4
+  vmean        = 0.
+
+! STAT --------------------
+  hfilin       = 'bomex.rst'
+  filprf       = 'bomex'
+  frqhis       = 3600. 
+  frqanl       = 999999.
+  savg_intvl   = 900.
+  ssam_intvl   = 60.
+  lcross       = .false.
+  frqcross     = 900.
+  lxy          = .true.
+  lxz          = .true.
+  lyz          = .true.
+  xcross       = 0.
+  ycross       = 0.
+  zcross(1)    = 1
+/
