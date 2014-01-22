@@ -64,7 +64,9 @@ module modparticles
   logical            :: var_mtpl       = .true.         ! switch to use a variable multiplicity in self-collection
                                                         ! used only in combination with lpartmass = .true.
   logical            :: cal_ecoal      = .true.         ! switch for coalescence efficiency as in Seifert et al. 2005
-   
+  logical            :: sc_zsort       = .false.        ! switch to use a selfcollection that depends on the LD's
+                                                        ! vertical position (similar to Soelch and Kaercher, 2010)
+  
   ! Particle structure
   type :: particle_record
     real             :: unique, tstart
@@ -2696,6 +2698,8 @@ contains
     integer            :: nprocs,i,j,k,newp,np_old,cntp, distr
     integer(kind=long) :: npac
     
+    if (allocated(a_npauto)) then
+    
     distr = 2    !select distribution of initial mass
                  ! 1: delta distribution (mi = m0 = rain%x_min)
 		 ! 2: uniform distribution between m0 and 2m0
@@ -2795,6 +2799,8 @@ contains
     end if
         
     deallocate(a_npauto)
+
+    end if
     
   end subroutine activate_drops
 
@@ -2946,9 +2952,24 @@ contains
                     ecoal = 1.0
 		  end if
 		  
-		  pij = (dxi * dyi * dzi) * max(pred_p%mtpl,prey_p%mtpl) &
+		  if (sc_zsort) then
+		    !if (( (r_pred.ge.r_prey) .and. (pred_p%z.ge.prey_p%z) &
+		    !     .and. ((deltav*dt).ge.(pred_p%z-prey_p%z)) ).or. &
+		    !    ( (r_prey.gt.r_pred) .and. (prey_p%z.ge.pred_p%z) &
+		    !     .and. ((deltav*dt).ge.(prey_p%z-pred_p%z)) )) then
+		    if ( ((pred_p%z-prey_p%z)/(prey_p%wdrop-pred_p%wdrop).gt.0.) .and. &
+		         ((pred_p%z-prey_p%z)/(prey_p%wdrop-pred_p%wdrop).le.dt) ) then  
+		      pij = (dxi * dyi) * max(pred_p%mtpl,prey_p%mtpl) &
+		                   * ecoal * pi * (r_pred+r_prey)**2. 
+		    else
+		      pij = 0.
+		    end if
+		  else
+		    pij = (dxi * dyi * dzi) * max(pred_p%mtpl,prey_p%mtpl) &
 		                   * ecoal * pi * (r_pred+r_prey)**2. * deltav * dt
-                  !write(*,*) myid,'prob: ',pij
+                  end if
+		  
+		  !write(*,*) myid,'prob: ',pij
                   !do a self-collection
 	          call random_number(randnr)          ! Random seed has been called from init_particles...
                   if(randnr<pij) then
@@ -3382,7 +3403,7 @@ contains
       do
         read (666,iostat=io) pu,pts,pstp,pnd,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs, &
 	                     pzp,pwr,pwrp,pus,pvs,pws,pusp,pvsp,pwsp,psg2,pm,pud,pvd,pwd, &
-			     pudr,pvdr,pwdr,pudrp,pvdrp,pwdrp,pt !,pmtpl
+			     pudr,pvdr,pwdr,pudrp,pvdrp,pwdrp,pt,pmtpl
         if(io .ne. 0) exit
         call add_particle_end(particle)
         particle%unique         = pu
@@ -3420,7 +3441,7 @@ contains
         particle%vdrop_rkprev   = pvdrp
         particle%wdrop_rkprev   = pwdrp
 	particle%tau            = pt
-	particle%mtpl           = int(1.e9)  !pmtpl  !int(1.e9)
+	particle%mtpl           = pmtpl  !int(1.e9)
 	if(pts < firststartl) firststartl = pts
 	
       end do
