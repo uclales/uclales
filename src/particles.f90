@@ -64,7 +64,7 @@ module modparticles
   logical            :: var_mtpl       = .true.         ! switch to use a variable multiplicity in self-collection
                                                         ! used only in combination with lpartmass = .true.
   logical            :: cal_ecoal      = .true.         ! switch for coalescence efficiency as in Seifert et al. 2005
-  logical            :: sc_zsort       = .false.        ! switch to use a selfcollection that depends on the LD's
+  logical            :: sc_zsort       = .true.         ! switch to use a selfcollection that depends on the LD's
                                                         ! vertical position (similar to Soelch and Kaercher, 2010)
   
   ! Particle structure
@@ -2894,8 +2894,8 @@ contains
     
     type (particle_record), pointer:: pred_p,prey_p
     type (sc_el), pointer  :: pred_sc, prey_sc, pred_free
-    integer                :: i,j,k
-    real                   :: r_pred, r_prey, deltav, dzi, randnr, pij, Dgr, Dkl, x, ecoal, dv
+    integer                :: i,j,k,x
+    real                   :: r_pred, r_prey, deltav, dzi, randnr, pij, Dgr, Dkl, ecoal, dv
     real                   :: thl,thv,rt,rl,tk
     real, parameter        :: eps = 1.0e-30, Dmin = 300e-6, Dmax = 600e-6
 
@@ -2905,13 +2905,24 @@ contains
         do k=2,nzp-1 
 	 
           pred_sc => sc_3d(k,i,j)
-	  do while(associated(pred_sc%next))!predloop
+	  do while(associated(pred_sc))!predloop
+	  if (associated(pred_sc%ptr)) then
             pred_p => pred_sc%ptr
 	    if (pred_p%mass.ne.0.and.pred_p%mass.ne.fillvalue_double) then
 	      dzi = dzi_t(floor(pred_p%z))
-	      prey_sc => pred_sc%next
+	      x = 0
+	      
+	      if (associated(pred_sc%next)) then
+	        prey_sc => pred_sc%next
+	      elseif (sc_zsort.and.(k.gt.2).and. associated(sc_3d(k-1,i,j)%ptr)) then
+		prey_sc=>sc_3d(k-1,i,j)
+		x = 1
+	      else
+	        nullify(prey_sc)
+	      end if
 	    
 	      preyloop: do while(associated(prey_sc))
+	      if (associated(prey_sc%ptr)) then
 	        prey_p => prey_sc%ptr
 	        if (prey_p%mass.ne.0.and.prey_p%mass.ne.fillvalue_double) then
 
@@ -2932,18 +2943,12 @@ contains
 		    call thermo(pred_p%x,pred_p%y,pred_p%z,thl,thv=thv,rt=rt,rl=rl,tk=tk)
 		    !if (Dkl.lt.Dmin) then
                       ecoal = max(ecoalOchs(Dgr,Dkl,dv,tk),ecoalBeard(Dgr,Dkl))
-		    !  write(*,*) myid,'in:',Dgr,Dkl,dv,tk
-		    !  write(*,*) myid,'ecoal O: ',ecoalOchs(Dgr,Dkl,dv,tk)
-		    !  write(*,*) myid,'ecoal B: ',ecoalBeard(Dgr,Dkl)
-		    !  write(*,*) myid,'ecoal BO: ',ecoal
                     !elseif (Dkl.ge.Dmin.and.Dkl.lt.Dmax) then
                     !  x = (Dkl - Dmin) / (Dmax - Dmin)
                     !  ecoal = sin(pi/2.0*x)**2 * ecoalLowList(Dgr,Dkl,dv,tk) + &
                     !          sin(pi/2.0*(1 - x))**2 * ecoalOchs(Dgr,Dkl,dv,tk)
-		    !  write(*,*) myid,'ecoal mix: ',ecoal
                     !elseif (Dkl.ge.Dmax) then
                     !  ecoal = ecoalLowList(Dgr,Dkl,deltav,tk)
-		    !  write(*,*) myid,'ecoal LL: ',ecoal
                     !else
                     !  ecoal = 1.0
                     !endif
@@ -2953,10 +2958,6 @@ contains
 		  end if
 		  
 		  if (sc_zsort) then
-		    !if (( (r_pred.ge.r_prey) .and. (pred_p%z.ge.prey_p%z) &
-		    !     .and. ((deltav*dt).ge.(pred_p%z-prey_p%z)) ).or. &
-		    !    ( (r_prey.gt.r_pred) .and. (prey_p%z.ge.pred_p%z) &
-		    !     .and. ((deltav*dt).ge.(prey_p%z-pred_p%z)) )) then
 		    if ( ((pred_p%z-prey_p%z)/(prey_p%wdrop-pred_p%wdrop).gt.0.) .and. &
 		         ((pred_p%z-prey_p%z)/(prey_p%wdrop-pred_p%wdrop).le.dt) ) then  
 		      pij = (dxi * dyi) * max(pred_p%mtpl,prey_p%mtpl) &
@@ -2999,12 +3000,21 @@ contains
 		    end if
 	          end if
 	        end if
+		end if
 	        prey_sc => prey_sc%next
+		if (sc_zsort.and.(.not.associated(prey_sc)).and.(x.eq.0).and.(k.gt.2)) then
+		  prey_sc=>sc_3d(k-1,i,j)
+		  x = 1
+		end if
 	      end do preyloop
+	    end if
 	    end if
 	    pred_sc => pred_sc%next
 	  end do !predloop
 	  
+	end do ! k
+	
+	do k=2,nzp-1
 	  !deallocate
 	  pred_sc => sc_3d(k,i,j)%next
 	  do while(associated(pred_sc))
@@ -3013,11 +3023,11 @@ contains
 	    deallocate(pred_free)
 	  end do
 	  nullify(sc_3d(k,i,j)%next)
-	  nullify(sc_3d(k,i,j)%ptr)
-	  	    
+	  nullify(sc_3d(k,i,j)%ptr)  	    
         end do
-      end do
-    end do
+	
+      end do ! i
+    end do ! j
 
   end subroutine self_coll
 

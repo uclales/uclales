@@ -322,7 +322,7 @@ contains
     xtime = time/86400. + strtim
     call timedep(time,timmax, sst)
 
-    ! for COTI run
+    ! for TRVT run
     !if(lpartic .and. lpartdrop .and. lpartmass) call grow_drops
     !if(lpartic .and. lpartdrop) call deactivate_drops(time+dt)
     !if(lpartic .and. lpartdrop) call activate_drops(time+dt)
