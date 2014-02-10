@@ -36,7 +36,7 @@ ps  = 1015.
 # Output grid:
 zo  = np.arange(0,3000.01,25)
 # IMPORTANT, input UCLA in W/m2 so conversion needed:
-dns = 1.136    
+dns = 1.1358360490330544    
 tvar = ([0,432000])
 # --------------------------------------------------------
 
@@ -87,7 +87,7 @@ ls.write('# See Siebesma et al, 2003\n')
 
 ls.write('#{0:>9s} {1:>10s} {2:>10s} {3:>10s} {4:>10s} {5:>10s}  \n'.format('time [s]','H [W/m2]','LE [W/m2]','Ts [K]','qs [g/kg]','Ps [pa]'))
 for t in tvar:
-  ls.write('{0:10.2F} {1:10.5E} {2:10.5E} {3:6.1F} {4:6.1F} {5:10.2F}\n'.format(t,wt*dns*1005.,wq*dns*2.45e6,-9999.,-9999.,ps*100.))
+  ls.write('{0:10.2F} {1:10.5E} {2:10.5E} {3:6.1F} {4:6.1F} {5:10.2F}\n'.format(t,wt*dns*1005.,wq*dns*2.5e6,-9999.,-9999.,ps*100.))
 
 for t in tvar:
   ls.write('\n')

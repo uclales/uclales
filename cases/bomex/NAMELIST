@@ -1,19 +1,19 @@
 &model
 ! GRID --------------------
-  nxp          = 36
-  nyp          = 36
-  nzp          = 60
-  deltax       = 100
-  deltay       = 100
+  nxp          = 132
+  nyp          = 132
+  nzp          = 61
+  deltax       = 50
+  deltay       = 50
   deltaz       = 50
   igrdtyp      = 1
 
 ! TIME --------------------
   runtype      = "INITIAL"
-  timmax       = 1800.
+  timmax       = 7200.
   wctime       = 27000.
   dtlong       = 15.
-  istpfl       = 10
+  istpfl       = 1
 
 ! PHYSICS -----------------
   iradtyp      = 0 
@@ -27,6 +27,7 @@
   ltimedep     = .true.
   th00         = 310.
   sst          = 9999.
+  ubmin        = -0.28
 
   iadv_mom     = 22
   iadv_scal    = 22    
@@ -46,8 +47,8 @@
   filprf       = 'bomex'
   frqhis       = 3600. 
   frqanl       = 999999.
-  savg_intvl   = 900.
-  ssam_intvl   = 60.
+  savg_intvl   = 100.
+  ssam_intvl   = 100.
   lcross       = .false.
   frqcross     = 900.
   lxy          = .true.
