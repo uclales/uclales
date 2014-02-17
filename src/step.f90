@@ -687,21 +687,24 @@ contains
     gover2  = 0.5*g
 
     do j=3,n3-2
-       do i=3,n2-2
-          if (level >= 2) then
-             do k=1,n1
-                scr(k,i,j)=gover2*((th(k,i,j)*(1.+ep2*rv(k,i,j))-th00)       &
-                     /th00-(rl(k,i,j)))
-             end do
-          else
-             do k=1,n1
-                scr(k,i,j)=gover2*(th(k,i,j)/th00-1.)
-             end do
-          end if
-
-          do k=2,n1-2
-             wt(k,i,j)=wt(k,i,j)+scr(k,i,j)+scr(k+1,i,j)
+      do i=3,n2-2
+        if(level == 0) then
+          do k=1,n1
+            scr(k,i,j)=gover2*(th(k,i,j)/th00-1.)
           end do
+        else if(level == 1) then
+          do k=1,n1
+            scr(k,i,j)=gover2*((th(k,i,j)*(1.+ep2*rv(k,i,j))-th00)/th00)
+          end do
+        else
+          do k=1,n1
+            scr(k,i,j)=gover2*((th(k,i,j)*(1.+ep2*rv(k,i,j))-th00)/th00-(rl(k,i,j)))
+          end do
+        end if
+
+        do k=2,n1-2
+          wt(k,i,j)=wt(k,i,j)+scr(k,i,j)+scr(k+1,i,j)
+        end do
        end do
     end do
 
