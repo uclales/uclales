@@ -15,35 +15,69 @@
 ! along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !
 ! Copyright 1999-2007, Bjorn B. Stevens, Dep't Atmos and Ocean Sci, UCLA
+! Dynamic SGSM: Jerry Hsin-Yuan Huang, Dep't C&EE and JIFRESSE, UCLA
 !----------------------------------------------------------------------------
 !
+! NOTE: the dynamic SGSM (module dyna.f90 in src) is not included 
+!       with the default distribution of UCLA-LES......
+!
+!----------------------------------------------------------------------------
 module sgsm
 
   use stat, only : sflg, updtst, acc_tend, sgsflxs, sgs_vel
   use util, only : tridiff
   implicit none
-!
-! setting the prandtl number to a value less than zero enforces an exponential
-! decay in its value as a function of height from the surface with a scale
-! height of 100m.  This is the default
-!
 
-  real, parameter     :: tkemin=1.e-20
-  real :: csx = 0.23
-  real :: prndtl = 0.3333333333
-  real :: clouddiff = -1.
-  real, allocatable, dimension (:,:) :: sxy1, sxy2, sxy3, sxz1, sxz2, sxz3    &
-       , sxz4, sxz5, sxz6  ,szx1, szx2, szx3, szx4, szx5
+  ! Sub-grid scheme:
+  ! 1 = Smagorinsky
+  ! 2 = Deardorff TKE scheme 
+  integer         :: isgstyp = 1
+  
+  ! Options for Smagorinsky:
+  ! 0 = fixed csx & prdtl number
+  ! 1 = Scale invariant dynamic sub-grid scheme  (beta = 1)
+  ! 2 = Scale dependent    "     "   "     "     (beta = variable)
+  integer         :: idynsgs = 0
+
+  ! Averaging of dynamic sub-grid scheme
+  ! 0 = Lagrangian
+  ! 1 = Planar
+  integer         :: idynav = 0
+
+  ! Wall damping (e.g. Mason & Thomson 1992)
+  ! Should be disabled for dynamic SGSM's
+  logical         :: wald = .true.
+
+  real, parameter :: tkemin = 1.e-20
+  real            :: csx = 0.23
+
+  ! setting the prandtl number to a value less than zero enforces an exponential
+  ! decay in its value as a function of height from the surface with a scale
+  ! height of 100m.  This is the default
+  real            :: prndtl = 0.3333333333
+  real            :: clouddiff = -1.
+
+  real, allocatable, dimension (:,:)   :: sxy1, sxy2, sxy3, sxz1, sxz2, sxz3, sxz4, &
+                                          sxz5, sxz6, szx1, szx2, szx3, szx4, szx5
   real, allocatable, dimension (:,:,:) :: szxy 
-  real, allocatable, dimension (:)   :: sz1, sz2, sz3, sz4, sz5, sz6, sz7, sz8
+  real, allocatable, dimension (:)     :: sz1, sz2, sz3, sz4, sz5, sz6, sz7, sz8
 
-  integer :: k, i, j, indh, req(16)
-  real    :: dti, dfact
-  logical, save :: Initialized = .false.
+  real, allocatable, dimension (:,:,:) :: thforpr, rtforpr, csxp, mlen
+
+  integer         :: k, i, j, indh, req(16)
+  real            :: dti, dfact
+  logical, save   :: Initialized = .false.
 
 contains 
 
+  !
+  ! ---------------------------------------------------------------------
+  ! SUBROUTINE DIFFUSE_INIT: allocate variables 
+  !
   subroutine diffuse_init(n1,n2,n3)
+
+    use grid, only : cs,prt,prq,Immm,Ilmm,Innm,Iqnm,betam,Immt,Ilmt,Innt,& 
+                                Iqnt, betat, Immq, Ilmq, Innq, Iqnq, betaq
 
     integer, intent (in) :: n1, n2, n3
 
@@ -53,6 +87,22 @@ contains
     allocate(szx1(n1,n2), szx2(n1,n2), szx3(n1,n2), szx4(n1,n2), szx5(n1,n2))
     allocate(sz1(n1),sz2(n1),sz3(n1),sz4(n1),sz5(n1),sz6(n1),sz7(n1),sz8(n1))
 
+    !if(isgstyp==1) 
+    allocate(cs(n1,n2,n3),prt(n1,n2,n3),prq(n1,n2,n3),mlen(n1,n2,n3))
+
+    if(idynsgs>0) then
+      allocate(Immm (n1,n2,n3), Ilmm (n1,n2,n3), Innm (n1,n2,n3), Iqnm(n1,n2,n3),&
+               betam(n1,n2,n3), Immt (n1,n2,n3), Ilmt (n1,n2,n3), Innt(n1,n2,n3), &
+               Iqnt (n1,n2,n3), betat(n1,n2,n3), Immq (n1,n2,n3), Ilmq(n1,n2,n3), &
+               Innq (n1,n2,n3), Iqnq (n1,n2,n3), betaq(n1,n2,n3))
+      allocate(thforpr(n1,n2,n3),rtforpr(n1,n2,n3),csxp(n1,n2,n3))
+    end if
+
+    ! Some initial values for starting the dynamic models
+    !cs(:,:,:)  = csx
+    !prt(:,:,:) = prndtl
+    !prq(:,:,:) = prndtl
+
     initialized = .true.
   end subroutine
 
@@ -61,24 +111,29 @@ contains
   ! SUBROUTINE DIFFUSE: Driver for calculating sub-grid fluxes (thus it
   ! includes call to surface routines) 
   !
-  subroutine diffuse(timein)
+  subroutine diffuse(timein,istpin)
 
     use grid, only : newvar, nstep, a_up, a_ut, a_vp, a_vt, a_wp, a_wt       &
          ,a_rp, a_tp, a_sp, a_st, vapor, a_pexnr, a_theta,a_km               &
          , a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7, nscl, nxp, nyp    &
          , nzp, nxyp, nxyzp, zm, dxi, dyi, dzi_t, dzi_m, dt, th00, dn0           &
-         , pi0, pi1, level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,liquid, a_cvrxp, trac_sfc
+         , pi0, pi1, level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,liquid, a_cvrxp, trac_sfc, &
+           cs, prt, prq
 
     use util, only         : atob, azero, get_avg3
     use mpi_interface, only: cyclics, cyclicc
     use thrm, only         : bruvais, fll_tkrs
 
-    real, intent(in)       :: timein 
-    integer :: n
+    ! BvS Dynamic sub-grid scheme
+    use dyna, only          : compcoef, startdyn, rundyn
+
+    real, intent(in) :: timein 
+    integer, intent(in) :: istpin 
+    integer          :: n
+    real             :: scp1(nzp),scp2(nzp),scp3(nzp)
 
     ! Hack BvS: slowly increase smago constant...
     !csx = min(timein*0.23/3600.,0.23)    
-
 
     if (.not.Initialized) call diffuse_init(nzp, nxp, nyp)
 
@@ -86,7 +141,6 @@ contains
     ! ----------
     ! Calculate Deformation and stability for SGS calculations
     !
-
     if(level>0) then
       call fll_tkrs(nzp,nxp,nyp,a_theta,a_pexnr,pi0,pi1,a_scr1,rs=a_scr2)
       call bruvais(nzp,nxp,nyp,level,a_theta,a_tp,a_scr3,dzi_m,th00,a_rp,a_scr2)
@@ -94,16 +148,32 @@ contains
       call fll_tkrs(nzp,nxp,nyp,a_theta,a_pexnr,pi0,pi1,a_scr1)
       call bruvais(nzp,nxp,nyp,level,a_theta,a_tp,a_scr3,dzi_m,th00)
     end if
-
     !
     !
     call deform(nzp,nxp,nyp,dzi_m,dzi_t,dxi,dyi,a_up,a_vp,a_wp,a_scr5,a_scr6     &
          ,a_scr4,a_scr2)
 
     ! ----------
-    ! Calculate Eddy Viscosity/Diffusivity 
+    ! Calculate Eddy Viscosity/Diffusivity according to isgstyp
     !
-    call smagor(nzp,nxp,nyp,sflg,dxi,dyi,dn0,a_scr3,a_scr2,a_km,a_scr7,zm)
+    select case(isgstyp)
+      ! Smagorinsky
+      case(1) 
+        if(idynsgs == 0) then ! Fixed Cs, prndtl 'constants'
+          cs(:,:,:)  = csx
+          prt(:,:,:) = prndtl
+          prq(:,:,:) = prndtl
+        else if(idynsgs == 1 .or. idynsgs == 2) then
+          print*, 'DYNSGS'
+        end if
+      ! Deardorff sgs-TKE
+      case(2)
+        stop('Deardorff sgs TKE not yet there....')
+      case default 
+        stop('Invalid option for isgstyp in sgsm.f90')
+    end select
+
+    call smagor(nzp,nxp,nyp,sflg,dxi,dyi,dn0,a_scr3,a_scr2,a_km,a_scr7,zm,cs,prt,prq)
     !
     ! Diffuse momentum
     !
@@ -139,7 +209,6 @@ contains
     !
     ! Diffuse scalars
     !
-
     do n=4,nscl
        call newvar(n,istep=nstep)
        call azero(nxyp,sxy1)
@@ -191,9 +260,9 @@ contains
     real, intent(out)   :: s(n1,n2,n3), s22(n1,n2,n3)
     real, intent(out)   :: s12(n1,n2,n3),s23(n1,n2,n3)
 
-    integer :: ip,im,jp,jm,kp
-    real    :: y1a,y2a,y3a,y1b,y2b,y3b
-    real    :: s11_wpt,s22_wpt,s33_wpt,s12_wpt,s13_wpt,s23_wpt
+    integer             :: ip,im,jp,jm,kp
+    real                :: y1a,y2a,y3a,y1b,y2b,y3b
+    real                :: s11_wpt,s22_wpt,s33_wpt,s12_wpt,s13_wpt,s23_wpt
 
     !
     ! calculate components of the stress tensor at their natural locations
@@ -254,7 +323,7 @@ contains
   ! timsteps, SGS energy, dissipation, viscosity, diffusivity and 
   ! lengthscales are stored.
   !
-  subroutine smagor(n1,n2,n3,sflg,dxi,dyi,dn0,ri,kh,km,szxy,zm)
+  subroutine smagor(n1,n2,n3,sflg,dxi,dyi,dn0,ri,kh,km,szxy,zm,cs,prt,prq)
       
     use defs, only          : pi, vonk
     use stat, only          : tke_sgs
@@ -267,40 +336,56 @@ contains
     logical, intent(in) :: sflg
     integer, intent(in) :: n1,n2,n3
     real, intent(in)    :: dxi,dyi,zm(n1),dn0(n1)
+    real, intent(in)    :: cs(n1,n2,n3), prt(n1,n2,n3), prq(n1,n2,n3)   
     real, intent(inout) :: ri(n1,n2,n3),kh(n1,n2,n3)
     real, intent(out)   :: km(n1,n2,n3),szxy(n1,n2,n3)
     integer             :: cb, ct
-    real    :: delta,pr,labn
+    !real                :: delta,pr,labn
+    real                :: dnloc, deltap(n1), csprof(n1), pr, delta, labn
 
-    pr    = abs(prndtl)
-    
-    delta = 1./dxi
-    delta = (zm(2)/dxi/dyi)**0.333333333
+    !pr = abs(prndtl)
+    !delta = 1./dxi
+    !delta = (zm(2)/dxi/dyi)**0.333333333
+
+    do k=1,n1-1
+      deltap(k) = ((zm(k+1)-zm(k))/dxi/dxi)**0.333333333
+    end do
+    deltap(n1) = deltap(n1-1)
 
     do j=3,n3-2
        do i=3,n2-2
           do k=2,n1-2
-             ri(k,i,j) = max( -1., ri(k,i,j)/(kh(k,i,j) + 1.e-12) )
              !
              ! variable km represents what is commonly known as Km, the eddy viscosity
              ! variable kh represents strain rate factor S^2 (dummy variable)
              !
-             
              ! Original Bjorn:
              !km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) &
              !     *0.5*(dn0(k)+dn0(k+1))/(1./(delta*csx)**2+1./(zm(k)*vonk)**2)
+             ! Old without dynamic SGSM
+             !labn      = (1./(delta*csx)**2.+1./(zm(k)*vonk)**2.)
+             !km(k,i,j) = (dn0(k)+dn0(k+1))/2.*sqrt(max(0.,kh(k,i,j))) * sqrt(max(0.,(1.-ri(k,i,j)/pr))) / labn 
 
              ! BvS: split out wall damping and stability correction
-             labn      = (1./(delta*csx)**2.+1./(zm(k)*vonk)**2.)
-             km(k,i,j) =  (dn0(k)+dn0(k+1))/2. * sqrt(max(0.,kh(k,i,j))) * sqrt(max(0.,(1.-ri(k,i,j)/pr))) / labn 
-             !
+             dnloc     = 0.5 * (dn0(k) + dn0(k+1))
+
+             if (wald) then
+               mlen(k,i,j) = 1./(1./(deltap(k)*cs(k,i,j))**2 + 1./(zm(k)*vonk)**2)
+             else
+               mlen(k,i,j) = (deltap(k)*cs(k,i,j))**2.
+             end if
+
+             ri(k,i,j)   = max(-1., ri(k,i,j)/(kh(k,i,j) + 1.e-12))
+             km(k,i,j)   = dnloc*mlen(k,i,j)*sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/prt(k,i,j))))
+
              ! after kh is multiplied with the factor (1-ri/pr), the product of kh 
              ! and km represents the dissipation rate epsilon 
-             !
-             kh(k,i,j) = kh(k,i,j) *(1.-(ri(k,i,j)/pr))             
+             kh(k,i,j) = kh(k,i,j) *(1.-(ri(k,i,j)/prt(k,i,j)))             
+
           enddo
           kh(1,i,j)    = kh(2,i,j)
           kh(n1,i,j)   = kh(n1-2,i,j)
+          kh(n1-1,i,j) = kh(n1-2,i,j)
           km(1,i,j)    = km(2,i,j)
           km(n1,i,j)   = km(n1-2,i,j)
           km(n1-1,i,j) = km(n1-2,i,j)    
@@ -310,14 +395,16 @@ contains
     call cyclics(n1,n2,n3,km,req)
     call cyclicc(n1,n2,n3,km,req)
 
-
     if (sflg) then
-       call get_cor3(n1,n2,n3,km,km,sz1)
+       call get_cor3(n1,n2,n3,km,km,sz1)   ! calc (1)
        ! 
        ! The product km and kh represent the local dissipation rate
        ! 
-       call get_cor3(n1,n2,n3,km,kh,sz2)
-       call updtst(n1,'sgs',-2,sz2,1)      ! dissipation averaged over domain
+       call get_cor3(n1,n2,n3,km,kh,sz2)   ! calc (2) 
+       call updtst(n1,'sgs',-2,sz2,1)      ! write (2)
+       call get_avg3(n1,n2,n3,cs,csprof)   ! Calculate mean profile cs
+       call get_avg3(n1,n2,n3,mlen,sz3)    ! Calculate mean profile mixing length
+
        do k=1,n1
           !
           ! the factor 1/pi^2 probably represents the ratio of the constants
@@ -325,12 +412,15 @@ contains
           ! will cancel out with the csx^2 that appears in the numerator of  
           ! variable sz1 which corresponds to Km^2.
           !
-          tke_sgs(k) = sz1(k)/(delta*pi*(csx**2))**2
-          sz1(k) = 1./sqrt(1./(delta*csx)**2.+1./(zm(k)*vonk+0.001)**2.)
+          tke_sgs(k) = sz1(k)/(deltap(k)*pi*(csx**2))**2
+
+          ! BvS: Mixing length now directly from mlen (for spatial changing Cs)
+          !sz1(k) = 1./sqrt(1./(delta*csx)**2.+1./(zm(k)*vonk+0.001)**2.)
        end do
-       call updtst(n1,'sgs',-1,tke_sgs,1) ! sgs tke
-       call updtst(n1,'sgs',-5,sz1,1)      ! mixing length
-       call updtst(n1,'sgs',-6,sz1,1)      ! dissipation lengthscale
+
+       call updtst(n1,'sgs',-1,tke_sgs,1)  ! sgs tke
+       call updtst(n1,'sgs',-5,sz3,    1)  ! mixing length
+       call updtst(n1,'sgs',-7,csprof, 1)  ! smagorinsky constant
     end if
 
     do j=3,n3-2
@@ -343,13 +433,15 @@ contains
             !
             ! What is known as the 'physical' eddy diffusivity, Kh, is yet calculated from Km 
             !
-            kh(k,i,j) = km(k,i,j)/pr
-            if (prndtl < 0.) then
-               kh(k,i,j) = kh(k,i,j) * exp(zm(k)/(-100.))
-            end if
+            kh(k,i,j) = km(k,i,j)/prt(k,i,j)
+            !khq(k,i,j) = km(k,i,j)/prq(k,i,j)
+
+            ! BvS negative prdndt disabled for now...
+            !if (prndtl < 0.) kh(k,i,j) = kh(k,i,j) * exp(zm(k)/(-100.))
           enddo
        enddo
     enddo
+
     if (clouddiff> 0) then ! Additional diffusion outside of the clouds - but in the cloud layer
       call calclevel(liquid, cb, 'base')
       call calclevel(liquid, ct, 'top')    

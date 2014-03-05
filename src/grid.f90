@@ -87,22 +87,28 @@ module grid
        wspd
   integer, dimension(10) :: prc_lev = -1
   integer :: nv1, nv2, nsmp = 0
-
+  !
   !Malte: variables to restart the land surface
+  !
   real, dimension (:,:,:),  allocatable :: a_tsoil, a_phiw,                   &
                             a_sflxd_avn, a_sflxu_avn, a_lflxd_avn, a_lflxu_avn
   real, dimension (:,:),    allocatable :: a_tskin, a_qskin, a_Wl, a_Qnet, a_G0
-
   !
   ! 3D Arrays
-  !irina
+  !
   real, dimension (:,:,:), allocatable ::                                     &
        a_theta, a_pexnr, press, vapor, a_rflx, a_sflx, liquid, rsi,           &
        a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7,                &
        a_lflxu, a_lflxd, a_sflxu, a_sflxd,a_km, &
        prc_c, prc_r, prc_i, prc_s, prc_g, prc_h , prc_acc,               &
        a_lflxu_ca, a_lflxd_ca, a_sflxu_ca, a_sflxd_ca
-
+  !
+  ! BvS Arrays for the (dynamic) sub-grid scheme
+  !
+  real, dimension(:,:,:), allocatable :: cs, prt, prq
+  real, dimension(:,:,:), allocatable :: Immm,Ilmm,Innm,Iqnm,betam,Immt,Ilmt,Innt, &
+                                         Iqnt, betat, Immq, Ilmq, Innq, Iqnq, betaq
+  !
   real, dimension (:,:), allocatable :: svctr
   real, dimension (:)  , allocatable :: ssclr
   !
@@ -118,12 +124,14 @@ module grid
        a_ngrp,   a_ngrt,    &
        a_rhailp, a_rhailt,  & ! hail
        a_nhailp, a_nhailt, a_rct, a_cld, a_cvrxp, a_cvrxt
- ! linda,b, output of tendencies
+  !
+  ! linda,b, output of tendencies
+  !
   real, dimension (:,:,:), allocatable :: &
         mp_qt, mp_qr, mp_qi, mp_qs, mp_qg, mp_qh, &
         mp_nqt, mp_nqr, mp_nqi, mp_nqs, mp_nqg, mp_nqh, &
         mp_tlt
-! linda, e 
+  ! linda, e 
 
   character(40)      :: zname      = 'zt'
   character(40)      :: zhname     = 'zm'

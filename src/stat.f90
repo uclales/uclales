@@ -30,7 +30,7 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 72, nvar2 = 120 ! number of time series and profiles
+  integer, parameter :: nvar1 = 72, nvar2 = 121 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2
   real, save         :: fsttm, lsttm
 
@@ -73,7 +73,8 @@ module stat
        'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel', & !97
        'rsup   ','prc_c  ','prc_i  ','prc_s  ','prc_g  ','prc_h  ', & !103
        'hail   ','qt_th  ','s_1    ','s_2    ','s_3    ','RH     ', & !109
-       'lwuca  ','lwdca  ','swuca  ','swdca  ','tot_tvw','sgs_tvw'/)            !115
+       'lwuca  ','lwdca  ','swuca  ','swdca  ','tot_tvw','sgs_tvw', & !115
+       'csmago '/)                                          !121
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:)
@@ -1455,6 +1456,8 @@ contains
     select case (routine)
     case("sgs")
        select case (nfld)
+       case (-7)
+          nn = 121 ! Smago constant
        case (-6)
           nn = 31 ! dissipation length-scale
        case (-5)
