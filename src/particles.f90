@@ -3451,7 +3451,7 @@ contains
         particle%vdrop_rkprev   = pvdrp
         particle%wdrop_rkprev   = pwdrp
 	particle%tau            = pt
-	particle%mtpl           = pmtpl  !int(1.e9)
+	particle%mtpl           = pmtpl  !nint(1./nppd)   ! 
 	if(pts < firststartl) firststartl = pts
 	
       end do
@@ -3473,7 +3473,7 @@ contains
     ! ------------------------------------------------------
     ! Cold start -> start with deactivated particles in drop-mode
       nprocs = nxprocs * nyprocs
-      npmyid = floor((nxp-4) * (nyp-4) * nzp * 3.)   ! use 3. particles per grid box
+      npmyid = floor((nxp-4) * (nyp-4) * nzp * 2.)   ! use 2. particles per grid box
       np = nprocs * npmyid               ! only valid if all proc use the same domainsize?!
       if(myid==0) write(*,*) 'Number of Particles ',np
       if(myid==0) write(*,*) 'Number of Particles on each proc ',npmyid

@@ -164,7 +164,7 @@ contains
         longname =  'Zonal wind'
         unit = 'm/s'
         iscross = .true.
-     case('v')
+      case('v')
         loc = (/ictr, ictr, ihlf/)
         longname =  'Meridional wind'
         unit = 'm/s'

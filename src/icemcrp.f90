@@ -139,6 +139,12 @@ module mcrp
   real, parameter :: rain_cmu3 = 1.10d-3   ! D_eq,breakup
   real, parameter :: rain_cmu4 = 1.0        
 
+    ! Milbrandt and Yau (2005, JAS) mu-Dm-relation for raindrops
+  real, parameter :: cmy1 = 19.0    
+  real, parameter :: cmy2 = 0.6e+3 
+  real, parameter :: cmy3 = 1.8e-3  
+  real, parameter :: cmy4 = 17.0  
+
   ! look-up table for phillips et al. nucleation
   integer, parameter :: &
     ttmax  = 30,      &  ! sets limit for temperature in look-up table
@@ -566,8 +572,12 @@ contains
     real, parameter :: a2 = 9.65       ! in SI [m/s]
     real, parameter :: c2 = 6e2        ! in SI [1/m]
     real, parameter :: Dv = 25.0e-6    ! in SI [m/s]
+    real, parameter :: cmur1 = 10.0    ! mu-Dm-relation for rain following
+    real, parameter :: cmur2 = 1.20e+3 ! Milbrandt&Yau 2005, JAS, but with
+    real, parameter :: cmur3 = 1.5e-3  ! revised constants
 
     logical, parameter :: oldevaporation = .false.
+    logical, parameter :: mue_SB = .false.
 
     real :: mue,lam,gfak,f_q,gamma_eva,b2
 
@@ -606,13 +616,19 @@ contains
              Dp  = ( Xp / prw )**(1./3.)
              G = 1.0 / ( alvl**2 / (Kt * Rm * tk(k)**2) + Rm * tk(k) / (Dv * esl(tk(k))) )
 
-             IF (Dp.LE.rain_cmu3) THEN ! see Seifert (2008)            
-                mue = rain_cmu0*TANH((4.*rain_cmu2*(Dp-rain_cmu3))**2) &
-                     & + rain_cmu4
-             ELSE
-                mue = rain_cmu1*TANH((1.*rain_cmu2*(Dp-rain_cmu3))**2) &
-                     & + rain_cmu4
-             ENDIF
+             if (mue_SB) then
+               IF (Dp.LE.rain_cmu3) THEN ! see Seifert (2008)            
+                  mue = rain_cmu0*TANH((4.*rain_cmu2*(Dp-rain_cmu3))**2) &
+                       & + rain_cmu4
+               ELSE
+                  mue = rain_cmu1*TANH((1.*rain_cmu2*(Dp-rain_cmu3))**2) &
+                       & + rain_cmu4
+               ENDIF
+	     else
+	       !mue = cmur1*(1.+tanh(cmur2*(Dp-cmur3)))   !MY05 revised constants
+	       mue = cmy1*tanh(cmy2*(Dp-cmy3))+cmy4       !MY05 original constants
+	       !mue = 1.
+	     end if
 
              lam = (pi/6.* rowt &
                   &      * (mue+3.0)*(mue+2.0)*(mue+1.0) / Xp)**(1./3.)
@@ -881,7 +897,7 @@ contains
     real    :: b2, Xp, Dp, Dm, mu, flxdiv, tot,sk, mini, maxi, cc, zz, cmax
     real, dimension(n1) :: nslope,rslope,dn,dr, rfl, nfl, vn, vr, cn, cr
 
-    logical, parameter :: oldsedimentation = .false.
+    logical, parameter :: oldsedimentation = .true.
 
     b2 = a2*exp(c2*Dv)
 
@@ -899,8 +915,9 @@ contains
         !
         Dm = ( 6. / (rowt*pi) * Xp )**(1./3.)
 	if (oldsedimentation) then
-          mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))
-	  !mu = 10.
+          !mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))    !MY05 revised constants
+	  mu = cmy1*tanh(cmy2*(Dp-cmy3))+cmy4       !MY05 original constants
+	  !mu = 1.
 	else
 	  IF (Dm.LE.rain_cmu3) THEN ! see Seifert (2008)            
              mu = rain_cmu0*TANH((4.*rain_cmu2*(Dm-rain_cmu3))**2) &
