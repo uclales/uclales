@@ -359,7 +359,7 @@ contains
        call surface(sst,xtime)
        xtime = xtime + strtim
 
-       call diffuse(time,nstep)
+       call diffuse(time,istp)
 
        !if (adv=='monotone') then
        !elseif ((adv=='second').or.(adv=='third').or.(adv=='fourth')) then

@@ -46,7 +46,7 @@ module sgsm
 
   ! Wall damping (e.g. Mason & Thomson 1992)
   ! Should be disabled for dynamic SGSM's
-  logical         :: wald = .true.
+  logical         :: waldamp = .true.
 
   real, parameter :: tkemin = 1.e-20
   real            :: csx = 0.23
@@ -99,9 +99,9 @@ contains
     end if
 
     ! Some initial values for starting the dynamic models
-    !cs(:,:,:)  = csx
-    !prt(:,:,:) = prndtl
-    !prq(:,:,:) = prndtl
+    cs(:,:,:)  = csx
+    prt(:,:,:) = prndtl
+    prq(:,:,:) = prndtl
 
     initialized = .true.
   end subroutine
@@ -117,8 +117,10 @@ contains
          ,a_rp, a_tp, a_sp, a_st, vapor, a_pexnr, a_theta,a_km               &
          , a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7, nscl, nxp, nyp    &
          , nzp, nxyp, nxyzp, zm, dxi, dyi, dzi_t, dzi_m, dt, th00, dn0           &
-         , pi0, pi1, level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,liquid, a_cvrxp, trac_sfc, &
-           cs, prt, prq
+         , pi0, pi1, level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,liquid, a_cvrxp, trac_sfc &
+         , cs, prt, prq, umean, vmean, dt &
+         , Immm,Ilmm,Innm,Iqnm,betam,Immt,Ilmt,Innt & 
+         , Iqnt, betat, Immq, Ilmq, Innq, Iqnq, betaq
 
     use util, only         : atob, azero, get_avg3
     use mpi_interface, only: cyclics, cyclicc
@@ -157,21 +159,67 @@ contains
     ! Calculate Eddy Viscosity/Diffusivity according to isgstyp
     !
     select case(isgstyp)
+      ! ---------------------------------
       ! Smagorinsky
       case(1) 
         if(idynsgs == 0) then ! Fixed Cs, prndtl 'constants'
           cs(:,:,:)  = csx
           prt(:,:,:) = prndtl
           prq(:,:,:) = prndtl
-        else if(idynsgs == 1 .or. idynsgs == 2) then
-          print*, 'DYNSGS'
+        else if((idynsgs == 1) .or. (idynsgs == 2)) then
+          if(nstep==1 .and. mod(istpin,rundyn)==0 .and. istpin>=startdyn) then
+            call compcoef(1,nzp,nxp,nyp,dzi_m,dxi,dyi,a_up,a_vp,a_wp,umean,vmean,idynsgs, &
+                            csx,dt,istpin,thforpr,csxp,Immm,Ilmm,Innm,Iqnm,betam,cs)
+            csxp(:,:,:)=cs(:,:,:)
+            call compcoef(2,nzp,nxp,nyp,dzi_m,dxi,dyi,a_up,a_vp,a_wp,umean,vmean,idynsgs, &
+                            prndtl,dt,istpin,thforpr,csxp,Immt,Ilmt,Innt,Iqnt,betat,prt)
+            call compcoef(3,nzp,nxp,nyp,dzi_m,dxi,dyi,a_up,a_vp,a_wp,umean,vmean,idynsgs, &
+                            prndtl,dt,istpin,rtforpr,csxp,Immq,Ilmq,Innq,Iqnq,betaq,prq)
+            ! Debugging:
+            if(.false.) then
+              call get_avg3(nzp,nxp,nyp,cs, scp1)
+              call get_avg3(nzp,nxp,nyp,prt,scp2)
+              call get_avg3(nzp,nxp,nyp,prq,scp3)
+              print*,'cs,prt,prq='
+              
+              do k=1,nzp/2
+                print*,k,scp1(k),scp2(k),scp3(k)
+              end do
+            end if
+       
+          end if
         end if
+      ! ---------------------------------
       ! Deardorff sgs-TKE
       case(2)
         stop('Deardorff sgs TKE not yet there....')
+      ! ---------------------------------
       case default 
         stop('Invalid option for isgstyp in sgsm.f90')
     end select
+
+    ! Notes BvS:
+    ! 2. Smagorinsky itself
+    ! old call:
+    ! a_scr3 = ri
+    ! a_scr2 = kh
+    ! a_km   = km
+    ! a_scr7 = szxy = k*kh  -> needed for ice microphysics
+    !
+    ! Jerry:
+    ! a_scr3 = khq
+    ! a_scr2 = kht
+    ! a_scr1 = km  
+    !
+    ! New UCLA:
+    ! a_scr3 = ri
+    ! a_scr2 = kh (temperature)
+    ! a_scr8 = kh (moisture)
+    ! a_km   = km
+    ! a_scr7 = szxy = k*kh  -> needed for ice microphysics
+    ! prndt  = prandtl number t
+    ! prndq  = prandtl number q
+    ! cs     = smagorinksy constant
 
     call smagor(nzp,nxp,nyp,sflg,dxi,dyi,dn0,a_scr3,a_scr2,a_km,a_scr7,zm,cs,prt,prq)
     !
@@ -369,7 +417,7 @@ contains
              ! BvS: split out wall damping and stability correction
              dnloc     = 0.5 * (dn0(k) + dn0(k+1))
 
-             if (wald) then
+             if (waldamp) then
                mlen(k,i,j) = 1./(1./(deltap(k)*cs(k,i,j))**2 + 1./(zm(k)*vonk)**2)
              else
                mlen(k,i,j) = (deltap(k)*cs(k,i,j))**2.

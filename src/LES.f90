@@ -74,7 +74,7 @@ contains
 
     use util, only : fftinix,fftiniy
     use defs, only : SolarConstant
-    use sgsm, only : csx, prndtl, clouddiff
+    use sgsm, only : csx, prndtl, clouddiff, idynsgs, waldamp 
     !use advf, only : lmtr !,advs
     !use advl, only : advm
     ! BvS
@@ -128,7 +128,7 @@ contains
                   iradtyp, radfrq , strtim , sfc_albedo, & ! radiation type flag
          isfctyp, ubmin  , zrough , & ! surface parameterization type
          sst    , dthcon , drtcon , & ! SSTs, surface flx parameters
-         csx    , prndtl ,          & ! SGS model type, parameters
+         csx    , prndtl , idynsgs, waldamp,  & ! SGS model type, parameters
          ipsflg , itsflg , irsflg,  & ! sounding flags
          hs     , ps     , ts    ,  & ! sounding heights, pressure, temperature
          us     , vs     , rts   ,  & ! sounding E/W winds, water vapor
