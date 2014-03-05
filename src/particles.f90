@@ -1991,7 +1991,7 @@ contains
           sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
           nvl = nvl + 1
           if(level>0) then
-            sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+2)
+            sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
             nvl = nvl + 1
           end if
         end if
@@ -1999,7 +1999,7 @@ contains
           sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
           nvl = nvl + 1
           if(level>1) then
-            sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+2)
+            sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
             nvl = nvl + 1
           end if
         end if
@@ -2657,7 +2657,7 @@ contains
               particle%unique         = real(npmyid) + real(myid)/real(nprocs)    
               particle%x              = (xstart - (float(wrxid) * xsizelocal)) / deltax + 3.  ! +3 here for ghost cells.
               particle%y              = (ystart - (float(wryid) * ysizelocal)) / deltay + 3.  ! +3 here for ghost cells.
-              do k=kmax,1,1
+              do k=kmax,1,-1
                 if ( zm(k)<zstart ) exit
               end do
               particle%z              = k + (zstart-zm(k))*dzi_t(k)

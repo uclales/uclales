@@ -64,7 +64,7 @@ contains
           !
           ! open input file.
           !
-          unit = 300 + wryid-wryid/nyp1 + nyp1*wrxid
+          unit = 3000 + wryid-wryid/nyp1 + nyp1*wrxid
           seedct = wryid + nyp1*wrxid +1
 
           write(filename,'(i4.4,a1,i4.4)') wrxid,'_',wryid
@@ -77,8 +77,9 @@ contains
              open (unit,file=trim(filename),status='old',form='unformatted')
              read (unit) time,th00,umean,vmean,dt,lvlx,iradtyp,nzpx,nxpx,nypx,nsclx
              read (unit) nseed
-             ! the seed is redistributed to the new fields. If nxp2>nxp1 then the seed from 
-             ! adjacent domains is taken, if nxp2<nyp1 some seeds inbetween are dropped. 
+             ! the seed is redistributed to the new fields. If nxp2>nxp1 then a new seed 
+             ! is given, if nxp2<nyp1 some seeds inbetween are dropped. 
+             ! This insures that the fields don't get symmetric.
              if (xid==1.and.yid==1) then
                 allocate(seed_arr(nseed, nxp1*nyp1))
              end if

@@ -47,7 +47,7 @@ contains
           !
           ! open input file.
           !
-          unit = 300 + wryid-wryid/nyp1 + nyp1*wrxid
+          unit = 3000 + wryid-wryid/nyp1 + nyp1*wrxid
 
           inquire (unit=unit,exist=UNITOK,opened=UNITOP)
           if (.not.UNITOK) then

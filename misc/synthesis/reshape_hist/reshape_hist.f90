@@ -9,6 +9,11 @@ Program reshape_hist
 ! In order to save memory the programm reads only in a part of the restart    !
 ! files and puts that to the new files immediately.                           !
 !                                                                             !
+! For the write one file after another needs to be opened and close again.    !
+! This is necessesarry since there is an upper limit on the number of files   !
+! that are allowed to be open at the same time. Thus, the write continues     !
+! after reopening where it stopped before closing.                            !
+!                                                                             !
 ! Compilation: 1. compile the modules separately:                             !
 !                 ifort -c -r8 read_hist_1.f90                                !
 !              2. compile the main program and link the modules:              !
@@ -24,12 +29,10 @@ Program reshape_hist
 
   use readhist_1
   use readhist_srfc
-  use readhist_srfc_rad
   use readhist_2
   use readhist_3
   use writehist_1
   use writehist_srfc
-  use writehist_srfc_rad
   use writehist_2
   use writehist_3
 
@@ -52,7 +55,7 @@ Program reshape_hist
   character(len=40) :: hname
   integer           :: nscl = 4
   integer           :: iblank, nv2, nsmp
-  logical           :: lwaterbudget, lcouvreux
+  logical           :: lwaterbudget, lcouvreux, lbendian
 
   real, dimension(:), allocatable ::  &
        xt,  &
@@ -97,6 +100,10 @@ Program reshape_hist
   real, dimension (:,:,:), allocatable:: &
        a_xp
   integer, dimension(:,:), allocatable :: seed_arr
+
+  ! on some machines (e.g. blizzard) files need to be big endian.
+  ! If so, set to .true.
+  lbendian = .false.
 
   !--------------------------------------------------------------------------
   ! Read the parameters of the restart file
@@ -180,7 +187,7 @@ Program reshape_hist
   ! Determine size of subdomain of each processor
 
   nx1 = (nxt-4) / nxp1 +4
-  ny1 = (nyt-4) / nxp1 +4
+  ny1 = (nyt-4) / nyp1 +4
   nx2 = (nxt-4) / nxp2 +4
   ny2 = (nyt-4) / nyp2 +4
 
@@ -231,7 +238,7 @@ Program reshape_hist
   call write_hist_1(time, hname, nxp2, nyp2, nx2, ny2, nxt, nyt, nz, nscl,&
        umean, vmean, th00, level, isfctyp, lwaterbudget, iradtyp, xt, xm, yt,   &
        ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf, seed_arr, nseed, dt,      &
-       a_ustar, a_tstar, a_rstar, a_pexnr, nxp1, nyp1)
+       a_ustar, a_tstar, a_rstar, a_pexnr, nxp1, nyp1, lbendian)
 
   ! Deallocate the first part of the fields of the large gathered domain
 
@@ -273,8 +280,8 @@ Program reshape_hist
      call read_hist_srfc(nxp1, nyp1, nx1, ny1, nxt, nyt,   &
           a_tsoil, a_phiw, a_tskin, a_qskin, a_wl)
 
-     call write_hist_srfc(nxp2, nyp2, nx2, ny2, nxt, nyt,   &
-          a_tsoil, a_phiw, a_tskin, a_qskin, a_wl)
+     call write_hist_srfc(nxp2, nyp2, nx2, ny2, nxt, nyt, hname,  &
+          a_tsoil, a_phiw, a_tskin, a_qskin, a_wl, lbendian)
 
      deallocate (a_tsoil)
      deallocate (a_phiw)
@@ -282,13 +289,22 @@ Program reshape_hist
      deallocate (a_qskin)
      deallocate (a_Wl)
 
-     allocate (a_flx(100,nxt,nyt))
-
-     a_flx(:,:,:) = 0.
      ! loop through the radiation fields separately, memory issues!
-     do n=1,8
-        call read_hist_srfc_rad(nxp1, nyp1, nx1, ny1, nxt, nyt, a_flx)
-        call write_hist_srfc_rad(nxp2, nyp2, nx2, ny2, nxt, nyt, a_flx)
+     allocate (a_flx(nz,nxt,nyt))
+     a_flx(:,:,:) = 0.
+
+     do n=1,4
+        print*,'n = ',n,' of 8'
+        call read_hist_2(nxp1, nyp1, nx1, ny1, nxt, nyt, nz, a_flx)
+        call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, nz, hname, a_flx, lbendian)
+     end do
+     deallocate (a_flx)
+     allocate (a_flx(100,nxt,nyt))
+     a_flx(:,:,:) = 0.
+     do n=1,4
+        print*,'n = ',n+4,' of 8'
+        call read_hist_2(nxp1, nyp1, nx1, ny1, nxt, nyt, 100, a_flx)
+        call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, 100, hname, a_flx, lbendian)
      end do
      deallocate (a_flx)
 
@@ -307,7 +323,7 @@ Program reshape_hist
   do n=1,nscl
      print*,'n = ',n 
      call read_hist_2(nxp1, nyp1, nx1, ny1, nxt, nyt, nz, a_xp)
-     call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, nz, a_xp)
+     call write_hist_2(nxp2, nyp2, nx2, ny2, nxt, nyt, nz, hname, a_xp, lbendian)
   end do
 
   deallocate (a_xp)
@@ -343,10 +359,10 @@ Program reshape_hist
   print*,'***************************************************'
 
   if (.not.lwaterbudget) then
-     call write_hist_3(hname, nxp2, nyp2, nx2, ny2, nxt, nyt, nz, level, &
+     call write_hist_3(hname, lbendian, nxp2, nyp2, nx2, ny2, nxt, nyt, nz, level, &
           nv2, nsmp, svctr, prc_acc, rev_acc)
   else
-     call write_hist_3(hname, nxp2, nyp2, nx2, ny2, nxt, nyt, nz, level, &
+     call write_hist_3(hname, lbendian, nxp2, nyp2, nx2, ny2, nxt, nyt, nz, level, &
           nv2, nsmp, svctr, prc_acc, rev_acc, cnd_acc, cev_acc)
   end if
 

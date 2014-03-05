@@ -290,8 +290,8 @@ contains
              !km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) &
              !     *0.5*(dn0(k)+dn0(k+1))/(1./(delta*csx)**2+1./(zm(k)*vonk)**2)
 
-             ! BvS: split out wall damping and stability correction 
-             labn      = (1./(delta*csx)**2+1./(zm(k)*vonk)**2)
+             ! BvS: split out wall damping and stability correction
+             labn      = (1./(delta*csx)**2.+1./(zm(k)*vonk)**2.)
              km(k,i,j) =  (dn0(k)+dn0(k+1))/2. * sqrt(max(0.,kh(k,i,j))) * sqrt(max(0.,(1.-ri(k,i,j)/pr))) / labn 
              !
              ! after kh is multiplied with the factor (1-ri/pr), the product of kh 
@@ -326,7 +326,7 @@ contains
           ! variable sz1 which corresponds to Km^2.
           !
           tke_sgs(k) = sz1(k)/(delta*pi*(csx**2))**2
-          sz1(k) = 1./sqrt(1./(delta*csx)**1+1./(zm(k)*vonk+0.001)**1)
+          sz1(k) = 1./sqrt(1./(delta*csx)**2.+1./(zm(k)*vonk+0.001)**2.)
        end do
        call updtst(n1,'sgs',-1,tke_sgs,1) ! sgs tke
        call updtst(n1,'sgs',-5,sz1,1)      ! mixing length

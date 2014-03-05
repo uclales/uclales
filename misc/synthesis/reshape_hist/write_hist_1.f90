@@ -3,7 +3,7 @@ contains
   subroutine write_hist_1(time, hname, nxp2, nyp2, nx2, ny2, nxt, nyt, nz, nscl,&
        umean, vmean, th00, level, isfctyp, lwaterbudget, iradtyp, xt, xm, yt,   &
        ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf, seed_arr, nseed, dt,      &
-       a_ustar, a_tstar, a_rstar, a_pexnr, nxp1, nyp1)
+       a_ustar, a_tstar, a_rstar, a_pexnr, nxp1, nyp1, lbendian)
 
     implicit none
 
@@ -17,7 +17,8 @@ contains
     character (len=40), intent(in) :: hname
     integer :: n, nseed, nxpx, nypx, nzpx, iradtyp
     integer, dimension(:,:), allocatable :: seed_arr
-    logical :: exans, lwaterbudget
+    integer, dimension(:), allocatable :: seed
+    logical :: exans, lwaterbudget, lbendian
     real    :: umean, vmean, th00, dt, psrf
     integer :: isfctyp, level, nsmp
 
@@ -51,6 +52,9 @@ contains
 
     real, dimension (nz,nx2,ny2) :: & 
        a_pexnr_l
+
+    integer               :: iseed = 0
+    real, dimension(2)    :: r
 
     ! Loop over all the processors
 
@@ -124,19 +128,38 @@ contains
              print *,'ABORTING: History file', trim(filename),' exists already'
              stop
           else
-             open (unit,file=trim(filename),status='new',form='unformatted')
+             if (.not.lbendian) then
+                open (unit,file=trim(filename),status='new',form='unformatted')
+             else
+                open (unit,file=trim(filename),status='new',form='unformatted',convert='BIG_ENDIAN')
+             end if
              write (unit) time,th00,umean,vmean,dt,level,iradtyp,nz,nx2,ny2,nscl
              write (unit) nseed
-             write (unit) seed_arr(:,seedct)
-
+             ! if the number of processors decreases use the old seed,
+             ! otherwise generate a new one
+             if (nxp2.le.nxp1) then
+                write (unit) seed_arr(:,seedct)
+             else
+                if (xid==1.and.yid==1) then
+                   allocate(seed(nseed))
+                end if
+                seed(:) = iseed * (/ (i, i = 1, n) /) + seedct +1
+                call random_seed(put=seed)
+                call random_number(r)
+                call random_seed(get=seed)
+                print*,'seed= ',seed, seedct
+             end if
              write (unit) xt_l, xm_l, yt_l, ym_l, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf
              write (unit) a_ustar_l, a_tstar_l, a_rstar_l
              write (unit) a_pexnr_l
 
              print "('Wrote history to: ',A60)",filename
+             close(unit)
           end if
        end do
     end do
-
+    if (nxp2.gt.nxp1) then
+       deallocate(seed)
+    end if
   end subroutine write_hist_1
 end module writehist_1
