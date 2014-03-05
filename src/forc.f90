@@ -169,7 +169,7 @@ contains
     end if
 
 !cgils: Nudging
-    call nudge(time_in)
+    call nudge(time_in_2)
 
     if (case_name == 'squall') then
 

@@ -343,6 +343,12 @@ module modtrack
       tmp  => cell%previous
       tmp%next=> cell%next
     elseif (associated(cell%next)) then
+      tmp => cell
+      do
+        ierr = nextcell(tmp)
+        if (ierr== -1) exit
+        tmp%head => cell%next
+      end do
       tmp  => cell%next
       tmp%previous=> cell%previous
     end if
@@ -399,7 +405,6 @@ module modtrack
 
     oldcell => cell
     if(cell%nelements> 10000000) write (*,*) 'Begin Splitcell'
-
     allocate(list(4,oldcell%nelements))
     allocate(newlist(4,oldcell%nelements))
     allocate(endlist(4,oldcell%nelements))
@@ -946,7 +951,7 @@ module modtrack
     integer :: i, j, t
     write (*,*) '.. entering tracking'
 
-    allocate(cellloc(3,ceiling(min(0.3*(huge(1)-2),0.5*real(nx)*real(ny)*real(nt-tstart)))))
+    allocate(cellloc(3,ceiling(min(0.3*(huge(1)-2),0.5*real(nx)*real(ny)*real(nt-tstart+1)))))
 print *, 'cellloc',shape(cellloc),0.3*huge(1), 0.5*real(nx)*real(ny)*real(nt-tstart)
     nullify(cell)
     do t = tstart, nt
@@ -1137,15 +1142,15 @@ real :: time
         vol  = 0.
         allocate(val (bucket_max(n), bucketsize(n)))
         val  = 0.
-!         allocate(xcenter (bucket_max(n), bucketsize(n)))
-!         xcenter = fillvalue_r
-!         allocate(ycenter (bucket_max(n), bucketsize(n)))
-!         ycenter = fillvalue_r
-!         allocate(icenter(bucket_max(n)))
-!         allocate(jcenter(bucket_max(n)))
-!         allocate(ianchor(bucket_max(n)))
-!         allocate(janchor(bucket_max(n)))
-!         allocate(npts   (bucket_max(n)))
+        allocate(xcenter (bucket_max(n), bucketsize(n)))
+        xcenter = fillvalue_r
+        allocate(ycenter (bucket_max(n), bucketsize(n)))
+        ycenter = fillvalue_r
+        allocate(icenter(bucket_max(n)))
+        allocate(jcenter(bucket_max(n)))
+        allocate(ianchor(bucket_max(n)))
+        allocate(janchor(bucket_max(n)))
+        allocate(npts   (bucket_max(n)))
 
         allocate(duration(bucketsize(n)))
         allocate(mintime(bucketsize(n)))
@@ -1196,37 +1201,37 @@ real :: time
               area(tt, nn) = area(tt, nn) + 1.
               recon(floor(rbase/dz)+1:floor(rtop/dz)+1,tt) = recon(floor(rbase/dz)+1:floor(rtop/dz)+1,tt) + 1.
               val (tt, nn) = val(tt, nn) +  real(cell%value(ivalue,nel))
-!               !Calculate the center of the cloud
-!               if (npts(tt) == 0) then
-!                 ianchor(tt) = i
-!                 janchor(tt) = j
-!               end if
-!               npts(tt) = npts(tt) + 1
-!               idev = i-ianchor(tt)
-!               icenter(tt) = icenter(tt) + idev
-!               if (abs(idev) > nx/2) then
-!                 icenter(tt) = icenter(tt) - sign(nx,idev)
-!               end if
-!               jdev = j-janchor(tt)
-!               jcenter(tt) = jcenter(tt) + jdev
-!               if (abs(jdev) > ny/2) then
-!                 jcenter(tt) = jcenter(tt) - sign(ny,jdev)
-!               end if
+              !Calculate the center of the cloud
+              if (npts(tt) == 0) then
+                ianchor(tt) = i
+                janchor(tt) = j
+              end if
+              npts(tt) = npts(tt) + 1
+              idev = i-ianchor(tt)
+              icenter(tt) = icenter(tt) + idev
+              if (abs(idev) > nx/2) then
+                icenter(tt) = icenter(tt) - sign(nx,idev)
+              end if
+              jdev = j-janchor(tt)
+              jcenter(tt) = jcenter(tt) + jdev
+              if (abs(jdev) > ny/2) then
+                jcenter(tt) = jcenter(tt) - sign(ny,jdev)
+              end if
             end do
             do tt = 1, tmax-tmin+1
-!               xcenter(tt,nn) = (real(ianchor(tt))+real(icenter(tt))/real(npts(tt)) - 0.5*(nx-1))*dx
-!               if (xcenter(tt,nn) < -0.5*real(nx)*dx) then
-!                 xcenter(tt,nn) = xcenter(tt,nn)+real(nx)*dx
-!               elseif (xcenter(tt,nn) > 0.5*real(nx)*dx) then
-!                 xcenter(tt,nn) = xcenter(tt,nn) - real(nx)*dx
-!               end if
-!
-!               ycenter(tt,nn) = (real(janchor(tt))+real(jcenter(tt))/real(npts(tt)) - 0.5*(ny-1))*dy
-!               if (ycenter(tt,nn) < -0.5*real(ny)*dy) then
-!                 ycenter(tt,nn) = ycenter(tt,nn)+real(ny)*dy
-!               elseif (ycenter(tt,nn) > 0.5*real(ny)*dy) then
-!                 ycenter(tt,nn) = ycenter(tt,nn) - real(ny)*dy
-!               end if
+              xcenter(tt,nn) = (real(ianchor(tt))+real(icenter(tt))/real(npts(tt)) - 0.5*(nx-1))*dx
+              if (xcenter(tt,nn) < -0.5*real(nx)*dx) then
+                xcenter(tt,nn) = xcenter(tt,nn)+real(nx)*dx
+              elseif (xcenter(tt,nn) > 0.5*real(nx)*dx) then
+                xcenter(tt,nn) = xcenter(tt,nn) - real(nx)*dx
+              end if
+
+              ycenter(tt,nn) = (real(janchor(tt))+real(jcenter(tt))/real(npts(tt)) - 0.5*(ny-1))*dy
+              if (ycenter(tt,nn) < -0.5*real(ny)*dy) then
+                ycenter(tt,nn) = ycenter(tt,nn)+real(ny)*dy
+              elseif (ycenter(tt,nn) > 0.5*real(ny)*dy) then
+                ycenter(tt,nn) = ycenter(tt,nn) - real(ny)*dy
+              end if
               maxarea(tt,nn) = maxval(recon(:,tt)) *dx*dy
               maxarealoc(tt,nn) = maxloc(recon(:,tt),1)*dz
             end do
@@ -1303,19 +1308,19 @@ real :: time
         ovar%dimids(1) = timenc%dimids(1)
         ovar%dimids(2) = nrnc%dimids(1)
 !
-!         !Write to netcdf file: Cell base
-!         ovar%name     = trim(nrnc%name)//'x'
-!         ovar%longname = trim(nrnc%longname)//' x coordinate of the center of mass'
-!         ovar%units    = 'm'
-!         call define_ncvar(fid, ovar, nf90_float)
-!         call write_ncvar(fid, ovar, xcenter)
-!
-!         !Write to netcdf file: Cell base
-!         ovar%name     = trim(nrnc%name)//'y'
-!         ovar%longname = trim(nrnc%longname)//' y coordinate of the center of mass'
-!         ovar%units    = 'm'
-!         call define_ncvar(fid, ovar, nf90_float)
-!         call write_ncvar(fid, ovar, ycenter)
+        !Write to netcdf file: Cell base
+        ovar%name     = trim(nrnc%name)//'x'
+        ovar%longname = trim(nrnc%longname)//' x coordinate of the center of mass'
+        ovar%units    = 'm'
+        call define_ncvar(fid, ovar, nf90_float)
+        call write_ncvar(fid, ovar, xcenter)
+
+        !Write to netcdf file: Cell base
+        ovar%name     = trim(nrnc%name)//'y'
+        ovar%longname = trim(nrnc%longname)//' y coordinate of the center of mass'
+        ovar%units    = 'm'
+        call define_ncvar(fid, ovar, nf90_float)
+        call write_ncvar(fid, ovar, ycenter)
 
         !Write to netcdf file: Cell base
         ovar%name     = trim(nrnc%name)//'base'
@@ -1369,7 +1374,7 @@ real :: time
         deallocate(ovar%dim, ovar%dimids)
 
         deallocate(base, top, area, maxarea, maxarealoc, recon, vol, val)
-!         deallocate(icenter,jcenter, xcenter, ycenter,ianchor, janchor, npts)
+        deallocate(icenter,jcenter, xcenter, ycenter,ianchor, janchor, npts)
         deallocate(duration, mintime, maxtime, id)
 
 
@@ -1635,7 +1640,7 @@ program tracking
             cgval
 
 
-  lwpthres = 0.01
+  lwpthres = 0.001
   corethres = 0.5
   thermthres = 300.
 

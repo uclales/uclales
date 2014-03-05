@@ -1,6 +1,6 @@
 module writehist_3
 contains
-  subroutine write_hist_3(hname, nxp2, nyp2, nx2, ny2, nxt, nyt, nz, level, &
+  subroutine write_hist_3(hname, lbendian, nxp2, nyp2, nx2, ny2, nxt, nyt, nz, level, &
        nv2, nsmp, svctr, prc_acc, rev_acc, cnd_acc, cev_acc)
 
     implicit none
@@ -10,6 +10,7 @@ contains
 
     character(len=40)              :: filename
     character (len=40), intent(in) :: hname
+    logical :: exans, lbendian
 
     integer :: level, nsmp
 
@@ -95,18 +96,29 @@ contains
           unit = 10 + wryid-wryid/nyp2 + nyp2*wrxid
           write(filename,'(i4.4,a1,i4.4)') wrxid,'_',wryid
           filename = './out/'//trim(filename)//'.'//trim(hname)
-          if(level>=3) then
-             write(unit) prc_acc_l, rev_acc_l
-          end if
-          if(present(cnd_acc)) then
-             write(unit) cnd_acc_l, cev_acc_l
-          end if
-          write(unit) nv2, nsmp
-          write(unit) svctr
+          inquire(file=trim(filename),exist=exans)
+          if (.not.exans) then
+             print *,'ABORTING: History file', trim(filename),' does not exist'
+             stop
+          else
+             if (.not.lbendian) then
+                open (unit,file=trim(filename),status='old',form='unformatted',position='append')
+             else
+                open (unit,file=trim(filename),status='old',form='unformatted',position='append',convert='BIG_ENDIAN')
+             end if
+             if(level>=3) then
+                write(unit) prc_acc_l, rev_acc_l
+             end if
+             if(present(cnd_acc)) then
+                write(unit) cnd_acc_l, cev_acc_l
+             end if
+             write(unit) nv2, nsmp
+             write(unit) svctr
 
-          close(unit)
+             close(unit)
 
-          print "('Closed file: ',A60)",filename
+             print "('Closed file: ',A60)",filename
+          end if
        end do
     end do
 

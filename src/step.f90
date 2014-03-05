@@ -359,17 +359,17 @@ contains
        call surface(sst,xtime)
        xtime = xtime + strtim
 
-       call diffuse(time)
+       call diffuse(time,nstep)
 
-       if (adv=='monotone') then
-          call fadvect
-       elseif ((adv=='second').or.(adv=='third').or.(adv=='fourth')) then
-          call advection_scalars(adv)
-       else 
-          print *, 'wrong specification for advection scheme'
-          call appl_abort(0)
-       endif
+       !if (adv=='monotone') then
+       !elseif ((adv=='second').or.(adv=='third').or.(adv=='fourth')) then
+       !   call advection_scalars(adv)
+       !else 
+       !   print *, 'wrong specification for advection scheme'
+       !   call appl_abort(0)
+       !endif
 
+       call fadvect
        call ladvect
 
        if (level >= 1) then

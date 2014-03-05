@@ -557,7 +557,7 @@ contains
               start=ibegsfc, count=icntsfc)
        !print*,myid,sanal(nn+4),nn+9
        !if (iret.ne.nf90_noerr) print*,myid,nf90_strerror(iret),nn+9
-
+       nn = nn+9
     end if 
 
     
@@ -966,6 +966,10 @@ contains
     case('lmbde')
        if (itype==0) ncinfo = 'Dissipation lengthscale'
        if (itype==1) ncinfo = 'm'
+       if (itype==2) ncinfo = 'ttmt'
+    case('csmago')
+       if (itype==0) ncinfo = 'Smagorinsky constant'
+       if (itype==1) ncinfo = '-'
        if (itype==2) ncinfo = 'ttmt'
     case('sfs_tke')
        if (itype==0) ncinfo = 'Sub-filter scale TKE'
