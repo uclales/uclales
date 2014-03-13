@@ -34,6 +34,7 @@ module radiation
   integer :: k,i,j, npts
   real    :: ee, u0, day, time, alat, zz
   logical :: fixed_sun = .false.
+  logical :: radMcICA = .true.
 !   real    :: radius = 1.03
   real    :: rad_eff_radius = 1.
   contains
@@ -137,10 +138,10 @@ module radiation
 
             if (present(ice).and.present(grp)) then
                call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
-                    fds, fus, fdir, fuir, plwc=plwc, pre=pre, piwc=piwc, pde=pde, pgwc=pgwc, useMcICA=.true.)
+                    fds, fus, fdir, fuir, plwc=plwc, pre=pre, piwc=piwc, pde=pde, pgwc=pgwc, useMcICA=radMcICA)
             else
                call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
-                    fds, fus, fdir, fuir, plwc=plwc, pre=pre, useMcICA=.true.)
+                    fds, fus, fdir, fuir, plwc=plwc, pre=pre, useMcICA=radMcICA)
             end if
 
             do k=1,n1

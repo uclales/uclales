@@ -9004,7 +9004,7 @@ CONTAINS
                 mult_2 = MAX(0.d0,MIN(mult_2,1.d0))
                 mult_n = C_mult * mult_1 * mult_2 * rime_q
                 mult_q = mult_n * ice%x_min
-                mult_q = MIN(rime_qr,mult_q)
+                mult_q = MIN(rime_q,mult_q)
 
                 n_ice(i,j,k)  = n_ice(i,j,k)  + mult_n
                 q_ice(i,j,k)  = q_ice(i,j,k)  + mult_q

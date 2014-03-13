@@ -88,13 +88,13 @@ contains
     use forc, only : lstendflg, sfc_albedo
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
-         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype,             &
+         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, lspongeinit, runtype,             &
          CCN, lwaterbudget, lcouvreux, prc_lev, isfctyp, sfc_albedo, lrad_ca
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,irsflg, iseed, hfilin,   &
          zrand,lhomrestart,mag_pert_q,mag_pert_t
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
-    use radiation, only : u0, fixed_sun, rad_eff_radius
+    use radiation, only : u0, fixed_sun, rad_eff_radius, radMcICA
     use modnudge, only : lnudge,tnudgefac, qfloor, zfloor, znudgemin, znudgeplus, &
          lnudge_bound
     use modtimedep, only : ltimedep
@@ -112,6 +112,7 @@ contains
          ssam_intvl,                         & ! integral accumulate/ts print frequency
          corflg , cntlat ,                   & ! coriolis flag
          nfpt   , distim ,                   & ! rayleigh friction points, dissipation time
+         lspongeinit     , & ! Sponge back to initial profile or bulk values
          level  , CCN    ,                   & ! Microphysical model Number of CCN per kg of air
          iseed  , zrand  ,                   & ! random seed
          mag_pert_q , mag_pert_t ,            & ! Magnitude of pertubations
@@ -139,7 +140,7 @@ contains
          lnudge, tnudgefac, ltimedep, qfloor, zfloor,znudgemin, znudgeplus,  &             !thijs: Nudging
          lnudge_bound, &               ! LINDA, relaxation boundaries
          rh_srf, drag, &
-         SolarConstant,u0,fixed_sun, rad_eff_radius, & ! SolarConstant (In case of prescribed TOA radiation
+         SolarConstant,u0,fixed_sun, rad_eff_radius, radMcICA, & ! SolarConstant (In case of prescribed TOA radiation
          lrandommicro, microseq,timenuc ,nin_set,cloud_type, &  !thijs: sequence of variables for microphysics
          lwaterbudget, &                 ! axel: flag for liquid water budget diagnostics (only level=3)
          lcouvreux , tau , &                    ! The Couvreux 'radioactive' scalar

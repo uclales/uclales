@@ -749,22 +749,61 @@ contains
   subroutine sponge
 
     use grid, only : u0, v0, a_up, a_vp, a_wp, a_tp, a_ut, a_vt, a_wt, a_tt,&
-         nfpt, spngt, spngm, nzp, nxp, nyp, th0, th00
+         nfpt, spngt, spngm, nzp, nxp, nyp, th0, th00, lspongeinit
+    use mpi_interface, only : double_array_par_sum,nxpg,nypg
 
     integer :: i, j, k, kk
+    real :: tbarg(nfpt),tbarl(nfpt),ubarg(nfpt),ubarl(nfpt),vbarg(nfpt),vbarl(nfpt)
+    real :: ngrid  
 
     if (maxval(spngt) > epsilon(1.) .and. nfpt > 1) then
-       do j=3,nyp-2
-          do i=3,nxp-2
-             do k=nzp-nfpt,nzp-1
-                kk = k+1-(nzp-nfpt)
-                a_tt(k,i,j)=a_tt(k,i,j)-spngt(kk)*(a_tp(k,i,j)-th0(k)+th00)
-                a_ut(k,i,j)=a_ut(k,i,j)-spngt(kk)*(a_up(k,i,j)-u0(k))
-                a_vt(k,i,j)=a_vt(k,i,j)-spngt(kk)*(a_vp(k,i,j)-v0(k))
-                a_wt(k,i,j)=a_wt(k,i,j)-spngm(kk)*(a_wp(k,i,j))
-             end do
-          end do
-       end do
+
+       if(lspongeinit) then ! BvS: nudge sponge layer back to initial profile (default)
+         do j=3,nyp-2
+            do i=3,nxp-2
+               do k=nzp-nfpt,nzp-1
+                  kk = k+1-(nzp-nfpt)
+                  a_tt(k,i,j)=a_tt(k,i,j)-spngt(kk)*(a_tp(k,i,j)-th0(k)+th00)
+                  a_ut(k,i,j)=a_ut(k,i,j)-spngt(kk)*(a_up(k,i,j)-u0(k))
+                  a_vt(k,i,j)=a_vt(k,i,j)-spngt(kk)*(a_vp(k,i,j)-v0(k))
+                  a_wt(k,i,j)=a_wt(k,i,j)-spngm(kk)*(a_wp(k,i,j))
+               end do
+            end do
+         end do
+
+       else                 ! BvS: nudge sponge layer to bulk value
+
+         do k = nzp-nfpt,nzp-1
+           kk        = k+1-(nzp-nfpt)
+           tbarl(kk) = sum(a_tp(k,3:nxp-2,3:nyp-2)) 
+           ubarl(kk) = sum(a_up(k,3:nxp-2,3:nyp-2))
+           vbarl(kk) = sum(a_vp(k,3:nxp-2,3:nyp-2))
+         end do
+
+         call double_array_par_sum(tbarl,tbarg,nfpt)
+         call double_array_par_sum(ubarl,ubarg,nfpt)
+         call double_array_par_sum(vbarl,vbarg,nfpt)
+
+         ngrid = (nxpg-4)*(nypg-4)
+         do k = 1,nfpt
+           tbarg(k) = tbarg(k) / ngrid 
+           ubarg(k) = ubarg(k) / ngrid
+           vbarg(k) = vbarg(k) / ngrid
+         end do
+
+         do j=3,nyp-2
+            do i=3,nxp-2
+               do k=nzp-nfpt,nzp-1
+                  kk = k+1-(nzp-nfpt)
+                  a_tt(k,i,j)=a_tt(k,i,j)-spngt(kk)*(a_tp(k,i,j)-tbarg(kk))
+                  a_ut(k,i,j)=a_ut(k,i,j)-spngt(kk)*(a_up(k,i,j)-ubarg(kk))
+                  a_vt(k,i,j)=a_vt(k,i,j)-spngt(kk)*(a_vp(k,i,j)-vbarg(kk))
+                  a_wt(k,i,j)=a_wt(k,i,j)-spngm(kk)*(a_wp(k,i,j))
+               end do
+            end do
+         end do
+       end if
+
     end if
 
   end subroutine sponge
