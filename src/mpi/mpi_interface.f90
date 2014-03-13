@@ -29,11 +29,11 @@ module mpi_interface
   !    ycomm, commyid - communicator for y side processors and rank wrt it
   !    nxnzp = nx*nzp
   !    nynzp = ny*nzp
-  !    wrxid, wryid, nxprocs,nyprocs: (wrxid,wryid)=myid in 
+  !    wrxid, wryid, nxprocs,nyprocs: (wrxid,wryid)=myid in
   !        ranktable (nxprocs,nyprocs)
-  !    nxpa,nypa: arrays containing nxp and nyp for all nxprocs and nyprocs 
+  !    nxpa,nypa: arrays containing nxp and nyp for all nxprocs and nyprocs
   !         respectively
-  !    nynza, nxnza: arrays containing nynzp and nxnzp on nxprocs and nyprocs 
+  !    nynza, nxnza: arrays containing nynzp and nxnzp on nxprocs and nyprocs
   !         respectively
   !
 
@@ -45,13 +45,15 @@ module mpi_interface
   integer, allocatable, dimension(:) :: xoffset, yoffset, nxpa, nypa, &
        nynza, nxnza
 
-  ! these are the parameters used in the alltoallw call in the fft
+  ! these are the parameters used in the alltoallw2 call in the fft
 
   integer, allocatable, dimension(:,:) :: ranktable,xtype,ytype,xdisp,&
        ydisp,xcount,ycount
 
   integer :: stridetype,xstride,ystride,xystride,xylarry,xyzlarry,&
        fxytype,fxyztype
+
+  integer ierror
 
 contains
   !
@@ -60,11 +62,10 @@ contains
   !
   subroutine init_mpi
 
-    integer ierror
     character (len=8) date
 
-    call mpi_init(ierror)  
-    call mpi_comm_size(MPI_COMM_WORLD, pecount, ierror)    
+    call mpi_init(ierror)
+    call mpi_comm_size(MPI_COMM_WORLD, pecount, ierror)
     call mpi_comm_rank(MPI_COMM_WORLD, myid, ierror)
 
     select case (kind(0.0))
@@ -115,7 +116,7 @@ contains
        if( (nyp-4)/nyprocs.lt.5 .or. nxpart) then
           nyprocs=int(sqrt(real(pecount)))
           nxprocs=pecount/nyprocs
-          do while (nyprocs*nxprocs .ne. pecount)
+          do while (nyprocs*nxprocs .ne. pecount .and. mod(nxprocs,nxp-4) == 0 .and. mod(nyprocs,nyp-4) == 0)
              nyprocs=nyprocs+1
              nxprocs=pecount/nyprocs
           end do
@@ -149,7 +150,7 @@ contains
        if( (nxp-4)/nxprocs.lt.5 .or. nxpart) then
           nxprocs=int(sqrt(real(pecount)))
           nyprocs=pecount/nxprocs
-          do while (nyprocs*nxprocs .ne. pecount)
+          do while (nyprocs*nxprocs .ne. pecount .and. mod(nxprocs,nxp-4) == 0 .and. mod(nyprocs,nyp-4) == 0)
              nxprocs=nxprocs+1
              nyprocs=pecount/nxprocs
           end do
@@ -219,7 +220,7 @@ contains
        ranktable(i, -1) = ranktable(i, nyprocs - 1)
        ranktable(i, nyprocs) = ranktable(i, 0)
     enddo
-    do j = 0, nyprocs-1 
+    do j = 0, nyprocs-1
        ranktable(-1, j) = ranktable(nxprocs - 1, j)
        ranktable(nxprocs, j) = ranktable(0, j)
     enddo
@@ -315,7 +316,7 @@ contains
   end subroutine define_decomp
   !
   !----------------------------------------------------------------------
-  ! INIT_ALLTOALL_REORDERXY: Defines the mpi derived types to do a data 
+  ! INIT_ALLTOALL_REORDERXY: Defines the mpi derived types to do a data
   ! movement of the form A(m,n/p,z) -> B(n,m/p,z) for data of type MY_CMPLX
   !
   subroutine init_alltoall_reorder(nxp,nyp,nzp)
@@ -323,7 +324,6 @@ contains
     integer, intent(in) :: nxp,nyp,nzp
 
     integer :: nx, ny, i, j, k, ii, jj, ierr, cnt, typesize,nynzg, nxnzg
-
 
     nx = max(1,nxp-4)
     ny = max(1,nyp-4)
@@ -351,7 +351,7 @@ contains
        if(i .lt. jj) nypa(i)=nypa(i)+1
     enddo
 
-    nynzg=ny*nzp    
+    nynzg=ny*nzp
     ii = nynzg/nxprocs
     ii= nynzg - nxprocs*ii
     do i=0,nxprocs-1
@@ -359,7 +359,7 @@ contains
        if (i .lt. ii) nynza(i)=nynza(i)+1
     enddo
 
-    nxnzg=nx*nzp    
+    nxnzg=nx*nzp
     jj = nxnzg/nyprocs
     jj= nxnzg - nyprocs*jj
     do i=0,nyprocs-1
@@ -526,15 +526,15 @@ contains
   end subroutine appl_finalize
 
   subroutine xshuffle(a,atmp,nx,ny,nz,isign)
-
+  implicit none
     integer, intent(in):: nx,ny,nz,isign
     complex, intent(inout):: a(nx,ny,nz),atmp((nx+1)*(ny+1)*(nz+1))
     integer ierr,ll,i,j,k
 
     if(isign .eq. 1) then
        if(nxprocs .ne. 1)then
-          call mpi_alltoallw( a,xcount(0:,1) , xdisp(0:,1), xtype(0:,1), atmp, &
-               xcount(0:,2), xdisp(0:,2),xtype(0:,2),xcomm,ierr)
+          call mpi_alltoallw( a,xcount(0 ,1) , xdisp(0 ,1), xtype(0 ,1), atmp, &
+               xcount(0 ,2), xdisp(0 ,2),xtype(0 ,2),xcomm,ierr)
        else
           ll=0
           do k=1,nz
@@ -549,8 +549,8 @@ contains
        endif
     else
        if(nxprocs .ne. 1)then
-          call mpi_alltoallw(atmp,xcount(0:,2),xdisp(0:,2),xtype(0:,2),a, &
-               xcount(0:,1), xdisp(0:,1),xtype(0:,1),xcomm,ierr)
+          call mpi_alltoallw(atmp,xcount(0 ,2),xdisp(0 ,2),xtype(0 ,2),a, &
+               xcount(0 ,1), xdisp(0 ,1),xtype(0 ,1),xcomm,ierr)
        else
           ll=0
           do k=1,nz
@@ -568,15 +568,15 @@ contains
   end subroutine xshuffle
 
   subroutine yshuffle(a,atmp,nx,ny,nz,isign)
-
+    implicit none
     integer, intent(in):: nx,ny,nz,isign
     complex, intent(inout):: a(ny,nx,nz),atmp((nx+1)*(ny+1)*(nz+1))
     integer ierr,ll,i,j,k
 
     if(isign .eq. 1) then
        if(nyprocs .ne. 1)then
-          call mpi_alltoallw( a,ycount(0:,1),ydisp(0:,1),ytype(0:,1),atmp, &
-               ycount(0:,2),ydisp(0:,2),ytype(0:,2),ycomm,ierr)
+          call mpi_alltoallw( a,ycount(0 ,1),ydisp(0 ,1),ytype(0 ,1),atmp, &
+               ycount(0 ,2),ydisp(0 ,2),ytype(0 ,2),ycomm,ierr)
        else
           ll=0
           do k=1,nz
@@ -590,8 +590,8 @@ contains
        endif
     else
        if(nyprocs .ne. 1)then
-          call mpi_alltoallw(atmp,ycount(0:,2),ydisp(0:,2),ytype(0:,2),a, &
-               ycount(0:,1),ydisp(0:,1),ytype(0:,1),ycomm,ierr)
+          call mpi_alltoallw(atmp,ycount(0 ,2),ydisp(0 ,2),ytype(0 ,2),a, &
+               ycount(0,1),ydisp(0,1),ytype(0,1),ycomm,ierr)
        else
           ll=0
           do k=1,nz
@@ -679,6 +679,16 @@ contains
    integer :: ierror
    call mpi_bcast(val, 1, mpi_double_precision, procsend, mpi_comm_world, ierror)
   end subroutine broadcast
+  subroutine broadcast_dbl(val, procsend)
+   integer, intent(in) :: procsend
+   double precision, intent(inout) :: val
+   integer :: ierror
+   call mpi_bcast(val, 1, mpi_double_precision, procsend, mpi_comm_world, ierror)
+  end subroutine broadcast_dbl
+  subroutine mpi_get_time(val)
+   double precision, intent(out) :: val
+          val = MPI_Wtime()
+  end subroutine mpi_get_time
 
 
 end module mpi_interface

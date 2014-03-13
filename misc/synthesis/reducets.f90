@@ -6,8 +6,8 @@
 ! Compile with ifort -o reducets reducets.f90 -L/sw/sles9-x64/netcdf-3.6.2-intel/lib -lnetcdf
 ! -I/sw/sles9-x64/netcdf-3.6.2-intel/include on tornado
 ! Assume number of time steps nt smaller than 10000 and number of variables nv smaller than 35 ! otherwise need to be changes
-        
-        integer, parameter :: nv=50,nma=7,nmi=2,nsu=28
+
+        integer, parameter :: nv=100,nma=7,nmi=2,nsu=28
         integer :: nt
         character(100) stem,nm,nm2
         character(20) pref,name,dimname,cnx,cny
@@ -66,6 +66,7 @@
         maxnms(5)="bflxmx    "
         maxnms(6)="bflxrmx   "
         maxnms(7)="precip_m  "
+        maxnms(8)="zc        "
         minnms(1)="bflxmn    "
         minnms(2)="bflxrmn   "
         sumnms(1)="wr_cs1    "
@@ -121,12 +122,12 @@
           end if
           nm=trim(stem)//".ts."//ysuf//xsuf//".nc"
           print*,trim(nm)
-           
+
 !*Open file
           status=nf90_open(nm,nf90_nowrite,ncid)
            if (status.ne.nf90_noerr) print*,nf90_strerror(status)
 
-!*Get Variable names, dims, attributes. Do this only once at it is the same for all files  
+!*Get Variable names, dims, attributes. Do this only once at it is the same for all files
 !*Also set the flag according to compute mean (0), max (2), min (3), sum (1)
           if ((i.eq.1).and.(j.eq.1)) then
            flag(:)=0
@@ -146,11 +147,11 @@
              if (status.ne.nf90_noerr) print*,nf90_strerror(status)
                 if (status.ne.nf90_noerr) print*,nf90_strerror(status)
             status=nf90_get_att(ncid,k,'_FillValue',fval(k))
-             if (status.ne.nf90_noerr) then 
+             if (status.ne.nf90_noerr) then
                print*,nf90_strerror(status)
                fval(k) = -999.
              end if
-          
+
             do kk=1,nma
               if (trim(name).eq.trim(maxnms(kk))) flag(k)=2
             end do
@@ -200,7 +201,7 @@
          end do
         end do
 !*End of looping over the files
-  
+
        do k=1,nvar
          if (flag(k).eq.0) then
            varout(k,:)=varout(k,:)/cnt(k,:)

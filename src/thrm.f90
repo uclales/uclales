@@ -38,24 +38,28 @@ contains
     integer, intent (in), optional :: opt
 
     select case (level)
-    case default
-       call drythrm(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,   &
-            pi1,th00,a_rp,vapor)
-    case (2,3)
-       if (present(opt)) then ! for lwaterbudget = .true.
-          call satadjst(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
-               pi1,th00,a_rp,vapor,liquid,a_scr2, &
-               cloud=a_cld,tcond=cnd_acc,tevap=cev_acc,zm=zm,rho=dn0,nstep=nstep)
-       else
-          call satadjst(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
-               pi1,th00,a_rp,vapor,liquid,a_scr2)
-       end if
-    case (4,5)
-       call satadjst(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
-            pi1,th00,a_rp,vapor,liquid,a_scr2,rsi=rsi)
+      case default
+         call drythrm(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,   &
+              pi1,th00)
+      case (1)
+         call drythrm(nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,   &
+              pi1,th00,a_rp,vapor)
+      case (2,3)
+         if (present(opt)) then ! for lwaterbudget = .true.
+            call satadjst(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
+                 pi1,th00,a_rp,vapor,liquid,a_scr2, &
+                 cloud=a_cld,tcond=cnd_acc,tevap=cev_acc,zm=zm,rho=dn0,nstep=nstep)
+         else
+            call satadjst(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
+                 pi1,th00,a_rp,vapor,liquid,a_scr2)
+         end if
+      case (4,5)
+         call satadjst(level,nzp,nxp,nyp,a_pexnr,press,a_tp,a_theta,a_scr1,pi0,  &
+              pi1,th00,a_rp,vapor,liquid,a_scr2,rsi=rsi)
     end select
-! stop    
+
   end subroutine thermo
+
 !
 ! -------------------------------------------------------------------------
 ! update_pi1:  this routine updates a pressure associated with the 
@@ -77,10 +81,11 @@ contains
     end do
 
   end subroutine update_pi1
+
 !
 ! -------------------------------------------------------------------------
-! DRYTHRM:  this routine calculates theta, and pressure for
-! the case when no moisture is present
+! DRYTHRM:  this routine calculates theta, pressure and optionally
+! moisture (vapor phase only)
 ! 
   subroutine drythrm(n1,n2,n3,pp,p,thil,theta,t,pi0,pi1,th00,rt,rv)
 
@@ -88,8 +93,11 @@ contains
 
   integer, intent (in) :: n1,n2,n3
   real, intent (in)    :: pi0(n1),pi1(n1),th00
-  real, intent (in)    :: pp(n1,n2,n3),thil(n1,n2,n3),rt(n1,n2,n3)
-  real, intent (out)   :: p(n1,n2,n3),theta(n1,n2,n3),rv(n1,n2,n3),t(n1,n2,n3)
+  real, intent (in)    :: pp(n1,n2,n3),thil(n1,n2,n3)
+  real, intent (out)   :: p(n1,n2,n3),theta(n1,n2,n3),t(n1,n2,n3)
+  real, intent (in), optional  :: rt(n1,n2,n3)
+  real, intent (out), optional :: rv(n1,n2,n3)
+  !logical, intent(in)  :: moist
 
   integer :: k,i,j
   real    :: exner
@@ -97,16 +105,18 @@ contains
   do j=3,n3-2
     do i=3,n2-2
       do k=1,n1
-        exner  = (pi0(k)+pi1(k)+pp(k,i,j))/cp
-        p(k,i,j) = p00 * (exner)**cpr
-        theta(k,i,j)=thil(k,i,j)+th00
-        t(k,i,j)=theta(k,i,j)*exner
-        rv(k,i,j)=rt(k,i,j)
+        exner        = (pi0(k)+pi1(k)+pp(k,i,j))/cp
+        p(k,i,j)     = p00 * (exner)**cpr
+        theta(k,i,j) = thil(k,i,j)+th00
+        t(k,i,j)     = theta(k,i,j)*exner
+        if(present(rv)) rv(k,i,j) = rt(k,i,j)
       enddo
     enddo
   enddo
 
   end subroutine drythrm
+
+
 
 ! 
 ! -------------------------------------------------------------------------
@@ -185,10 +195,6 @@ contains
              if (level>3) rsi(k,i,j) = rix
              tk(k,i,j)=tx
              th(k,i,j)=tk(k,i,j)/exner
-! if (i == 15 .and. j == 15) then
-!   print *, k,tx, exner
-! 
-! end if
           enddo
        enddo
     enddo
@@ -307,66 +313,149 @@ contains
 ! BRUVAIS:  Cacluates the brunt-vaisaila frequency in accordance with the
 ! thermodynamic level
 ! 
-  subroutine bruvais(n1,n2,n3,level,th,tl,rt,rs,en2,dzi_m,th00)
+  subroutine bruvais(n1,n2,n3,level,th,tl,en2,dzi_m,th00,rt,rs)
 
   use defs, only : g, R, cp, alvl, ep, ep2
 
   integer, intent (in) ::  n1, n2, n3, level
-  real, intent (in)    ::  th(n1,n2,n3), tl(n1,n2,n3), rt(n1,n2,n3),         &
-                           rs(n1,n2,n3), dzi_m(n1), th00
+  real, intent (in)    ::  th(n1,n2,n3), tl(n1,n2,n3),dzi_m(n1), th00
+  real, intent (in), optional :: rt(n1,n2,n3), rs(n1,n2,n3)
   real, intent (out)   ::  en2(n1,n2,n3)
 
   integer :: i, k, j, kp1
   real    :: c1, c2, c3, tvk, tvkp1, rtbar, rsbar, aa, bb
 
+  select case(level)
+  case(0)
+    do j=3,n3-2
+       do i=3,n2-2
+          ! Inner loop vectorized
+          do k=1,n1-1
+             c1=(1.+ep*alvl/R/th(k,i,j))/ep
+             c2=ep*alvl*alvl/(R*cp*th(k,i,j)*th(k,i,j))
+             c3=alvl/(cp*th(k,i,j))
+             en2(k,i,j)=g*dzi_m(k)*((th(k+1,i,j)-th(k,i,j))/th00)
+          end do
+          en2(n1,i,j)=en2(n1-1,i,j)
+       end do
+    end do
+  case(1)
+    do j=3,n3-2
+       do i=3,n2-2
+          ! Inner loop vectorized
+          do k=1,n1-1
+             c1=(1.+ep*alvl/R/th(k,i,j))/ep
+             c2=ep*alvl*alvl/(R*cp*th(k,i,j)*th(k,i,j))
+             c3=alvl/(cp*th(k,i,j))
+             tvk=th(k,i,j)*(1.+ep2*rt(k,i,j))
+             tvkp1=th(k+1,i,j)*(1.+ep2*rt(k+1,i,j))
+             en2(k,i,j)=g*dzi_m(k)*(tvkp1-tvk)/th00
+          end do
+          en2(n1,i,j)=en2(n1-1,i,j)
+       end do
+    end do
+  case(2)
+    do j=3,n3-2
+       do i=3,n2-2
+          ! Not vectorized -> if statement...
+          do k=1,n1-1
+             c1=(1.+ep*alvl/R/th(k,i,j))/ep
+             c2=ep*alvl*alvl/(R*cp*th(k,i,j)*th(k,i,j))
+             c3=alvl/(cp*th(k,i,j))
+             rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
+             rsbar=0.5*(rs(k,i,j)+rs(k+1,i,j))
+             kp1=min(n1-1,k+1)
+             if (rt(k,i,j) > rs(k,i,j) .and. rt(kp1,i,j) > rs(kp1,i,j)) then
+                aa=(1. - rtbar + rsbar*c1)/(1. + c2*rsbar)
+                bb=(c3*aa - 1.)
+             else
+                aa=(1.00 + ep2*rtbar)
+                bb=ep2
+             end if
+             en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
+                  + bb*(rt(k+1,i,j)-rt(k,i,j)))
+          end do
+          en2(n1,i,j)=en2(n1-1,i,j)
+       end do
+    end do
+  case(3,4,5)
+    do j=3,n3-2
+       do i=3,n2-2
+          ! Not vectorized -> if statement...
+          do k=1,n1-1
+             c1=(1.+ep*alvl/R/th(k,i,j))/ep
+             c2=ep*alvl*alvl/(R*cp*th(k,i,j)*th(k,i,j))
+             c3=alvl/(cp*th(k,i,j))
+             rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
+             rsbar=0.5*(rs(k,i,j)+rs(k+1,i,j))
+             kp1=min(n1-1,k+2)
+             if (rt(k,i,j) > rs(k,i,j) .and. rt(kp1,i,j) > rs(kp1,i,j)) then
+                aa=(1. - rtbar + rsbar*c1)/(1. + c2*rsbar)
+                bb=(c3*aa - 1.)
+             else
+                aa=(1.00 + ep2*rtbar)
+                bb=ep2
+             end if
+             en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
+                  + bb*(rt(k+1,i,j)-rt(k,i,j)))
+          end do
+          en2(n1,i,j)=en2(n1-1,i,j)
+       end do
+    end do
+  case default
+    WRITE (*,*) 'level=',level,', not supported in bruvais'
+    stop 
+  end select
 
-  do j=3,n3-2
-     do i=3,n2-2
-        do k=1,n1-1
-           c1=(1.+ep*alvl/R/th(k,i,j))/ep
-           c2=ep*alvl*alvl/(R*cp*th(k,i,j)*th(k,i,j))
-           c3=alvl/(cp*th(k,i,j))
-           select case(level) 
-           case (0)
-              en2(k,i,j)=g*dzi_m(k)*((th(k+1,i,j)-th(k,i,j))/th00)
-           case (1)
-              tvk=th(k,i,j)*(1.+ep2*rt(k,i,j))
-              tvkp1=th(k+1,i,j)*(1.+ep2*rt(k+1,i,j))
-              en2(k,i,j)=g*dzi_m(k)*(tvkp1-tvk)/th00
-           case (2)
-              rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
-              rsbar=0.5*(rs(k,i,j)+rs(k+1,i,j))
-              kp1=min(n1-1,k+1)
-              if (rt(k,i,j) > rs(k,i,j) .and. rt(kp1,i,j) > rs(kp1,i,j)) then
-                 aa=(1. - rtbar + rsbar*c1)/(1. + c2*rsbar)
-                 bb=(c3*aa - 1.)
-              else
-                 aa=(1.00 + ep2*rtbar)
-                 bb=ep2
-              end if
-              en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
-                   + bb*(rt(k+1,i,j)-rt(k,i,j)))
-           case (3,4,5)
-              rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
-              rsbar=0.5*(rs(k,i,j)+rs(k+1,i,j))
-              kp1=min(n1-1,k+2)
-              if (rt(k,i,j) > rs(k,i,j) .and. rt(kp1,i,j) > rs(kp1,i,j)) then
-                 aa=(1. - rtbar + rsbar*c1)/(1. + c2*rsbar)
-                 bb=(c3*aa - 1.)
-              else
-                 aa=(1.00 + ep2*rtbar)
-                 bb=ep2
-              end if
-              en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
-                   + bb*(rt(k+1,i,j)-rt(k,i,j)))
-           case default 
-              WRITE (*,*) 'level=',level,', not supported in bruvais'
-              stop 
-           end select
-        end do
-        en2(n1,i,j)=en2(n1-1,i,j)
-     end do
-  end do
+  ! BvS: code doesn't vectorize with select statement in loop
+  ! With vectorization, level 0,1 factor 15 faster 
+  !do j=3,n3-2
+  !   do i=3,n2-2
+  !      do k=1,n1-1
+  !         c1=(1.+ep*alvl/R/th(k,i,j))/ep
+  !         c2=ep*alvl*alvl/(R*cp*th(k,i,j)*th(k,i,j))
+  !         c3=alvl/(cp*th(k,i,j))
+  !         select case(level) 
+  !         case (0)
+  !            en2(k,i,j)=g*dzi_m(k)*((th(k+1,i,j)-th(k,i,j))/th00)
+  !         case (1)
+  !            tvk=th(k,i,j)*(1.+ep2*rt(k,i,j))
+  !            tvkp1=th(k+1,i,j)*(1.+ep2*rt(k+1,i,j))
+  !            en2(k,i,j)=g*dzi_m(k)*(tvkp1-tvk)/th00
+  !         case (2)
+  !            rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
+  !            rsbar=0.5*(rs(k,i,j)+rs(k+1,i,j))
+  !            kp1=min(n1-1,k+1)
+  !            if (rt(k,i,j) > rs(k,i,j) .and. rt(kp1,i,j) > rs(kp1,i,j)) then
+  !               aa=(1. - rtbar + rsbar*c1)/(1. + c2*rsbar)
+  !               bb=(c3*aa - 1.)
+  !            else
+  !               aa=(1.00 + ep2*rtbar)
+  !               bb=ep2
+  !            end if
+  !            en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
+  !                 + bb*(rt(k+1,i,j)-rt(k,i,j)))
+  !         case (3,4,5)
+  !            rtbar=0.5*(rt(k,i,j)+rt(k+1,i,j))
+  !            rsbar=0.5*(rs(k,i,j)+rs(k+1,i,j))
+  !            kp1=min(n1-1,k+2)
+  !            if (rt(k,i,j) > rs(k,i,j) .and. rt(kp1,i,j) > rs(kp1,i,j)) then
+  !               aa=(1. - rtbar + rsbar*c1)/(1. + c2*rsbar)
+  !               bb=(c3*aa - 1.)
+  !            else
+  !               aa=(1.00 + ep2*rtbar)
+  !               bb=ep2
+  !            end if
+  !            en2(k,i,j)=g*dzi_m(k)*(aa*(tl(k+1,i,j)-tl(k,i,j))/th00        &
+  !                 + bb*(rt(k+1,i,j)-rt(k,i,j)))
+  !         case default 
+  !            WRITE (*,*) 'level=',level,', not supported in bruvais'
+  !            stop 
+  !         end select
+  !      end do
+  !      en2(n1,i,j)=en2(n1-1,i,j)
+  !   end do
+  !end do
 
   end subroutine bruvais
 

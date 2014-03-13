@@ -1,0 +1,41 @@
+% \author{Thijs Heus}
+% \lecture[Dry CBL]{The Dry Convective Boundary Layer}{drycbl}
+\begin{frame}{The Dry Convective Boundary Layer}
+\begin{itemize}
+ \item Run the code with \code{uclales/misc/initfiles/namelist\_drycbl}
+ \item Process the statistics with \code{reduceps} and \code{reducets}
+ \item Stitch the crosssections together with \code{cdo gather} 
+ \item Plot with \code{ncview}, \code{ncl}, the scripts in \code{uclales/misc/analysis}, or your program of choice
+\end{itemize}
+\end{frame}
+
+\begin{frame}[allowframebreaks]{Questions}
+ \begin{itemize}
+  \item What are the profiles of the 3 velocity components? Do you understand that?
+  \item There are 3 different ways of defining the boundary layer height \code{zi}:
+\begin{itemize}
+ \item The maximum gradient in $\theta_l$
+ \item The maximum variance in $\theta_l$
+ \item The minimum buoyancy flux
+\end{itemize}
+ \item What are the differences? 
+ \item The encroachment rate is equal to: \[z_{enc}(t) = \sqrt{\frac{2 F t}{\Gamma}}\] with $F$ the surface heat flux and $\Gamma$ the temperature lapse rate. How does $z_i$ compare with $z_{enc}$? What is the difference?
+
+ \item Look at the variances: \code{u2, w2, t2}. What do they look like? What is/is not with what you expect from Boundary Layer theory?
+ \item Look at the vertical flux profiles, and in particular \code{tot\_tw} and \code{sfs\_tw}. 
+ \item Finally, compare the advective tendency (\code{adv\_u}) with the diffusion(\code{dff\_u}). What do you notice? Would you say that the LES is well resolved? Where / why (not)?
+\pagebreak
+ \item \textbf{Optional, to be done after the Statistics class:} It would be very useful to have conditional sampling of the thermal updrafts. Unfortunately, they are not in the \code{.ps} file at the moment. As a (lengthier) exercise, we are going to do that here.
+ \item Open the files \code{ncio.f90} and \code{stat.f90}. First, have a look at \code{stat.f90}
+ \item The name of a \code{ps} variable is defined in \code{s2} from line 52 on. This includes the \code{cs2} variables for buoyant cloud conditional sampling. Append \code{cs3} variables for (at least) $w$ and $tv$ at the end of the array. Raise \code{nvar2} at l.33 accordingly.
+ \item Make sure you know the number of your new variables.
+ \item The conditional sampling for cloud water is done in subroutine \code{accum\_lvl2} between lines 604 and 658. Look at those in depth.
+ \item The function \code{get\_avg} creates an average over the 2 horizontal direction out of a 3D array.
+ \item The function \code{get\_csum} creates a conditional sum over an array, on places where  the final array is 1
+ \item Use these lines for a conditional sampling of dry thermals. Put it in subroutine \code{accum\_lvl1}
+ \item In \code{ncio.f90} the variable output names, longnames and units are provided. Use the code from line 989 on as an example to add your variables.
+ \item That should be all: Try and compile. Now it gets time to debug.
+ \end{itemize}
+
+\end{frame}
+

@@ -130,7 +130,7 @@ contains
           if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
           do while(ncall < nrec .and. &
                    xtimes(ncall) /= fillvalue_double .and. &
-                   xtimes(ncall) < rtimee - spacing(1.)) ! Step through the time dimension; stop when one is bigger
+                   xtimes(ncall) <= rtimee - spacing(1.)) ! Step through the time dimension; stop when one is bigger
               ncall=ncall+1
           end do
           ldef = ensuredata_nc(ncid)
@@ -454,6 +454,9 @@ contains
     iret = nf90_inquire_variable(ncid,varid,dimids=dimids)
     if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
     iret = nf90_inquire_dimension(ncid,dimids(1),len=dimsize(1))
+    !if(ncname .EQ. 'particles') then
+    !  dimsize(1) = size(var) 
+    !end if
     if (iret /= nf90_noerr) call nchandle_error(ncid, iret)
     if (present(nrec)) then
       allocate(loc(2))

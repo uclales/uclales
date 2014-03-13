@@ -40,7 +40,7 @@ module mcrp
        a_rhailp, a_rhailt,  & ! hail mass
        a_nhailp, a_nhailt,  & ! hail number
        prc_c, prc_r, prc_i, prc_s, prc_g, prc_h, & 
-       lwaterbudget, prc_acc, rev_acc, a_rct, cnd_acc, cev_acc, a_cld
+       lwaterbudget, prc_acc, rev_acc, a_rct, cnd_acc, cev_acc, a_cld,prc_lev, lmptend
 
   USE parallele_umgebung, ONLY: isIO,double_global_maxval,global_maxval,global_minval,global_maxval_stdout,global_sumval_stdout
   USE modcross, ONLY: calcintpath
@@ -49,7 +49,10 @@ module mcrp
   use util, only : get_avg3, azero, sclrset
   implicit none
 
-  logical, parameter :: droplet_sedim = .False., khairoutdinov = .False., turbulence = .False.,ice_multiplication = .TRUE.
+  logical            :: lpartdrop      = .false.        !< Switch for rain drop like particles
+
+  logical, parameter :: droplet_sedim = .False., khairoutdinov = .false., turbulence = .False., &
+                        ice_multiplication = .TRUE., kessler = .false., khairoutdinov_au = .false.
   integer            :: nprocess,nprocwarm=5,nprocice=18
 
   integer,parameter  :: iwtrdff = 3,iauto = 1,iaccr = 2,isedimrd = 4,isedimcd = 5, &
@@ -62,6 +65,7 @@ module mcrp
   logical :: lrandommicro = .false.
   real :: timenuc = 60
   real :: nin_set = 1.7e3
+  real, dimension(:,:,:),allocatable :: a_npauto
   !
   ! drop sizes definition is based on vanZanten (2005)
   ! cloud droplets' diameter: 2-50 e-6 m
@@ -182,7 +186,7 @@ contains
          &          hlp1,hlp2,hlp3,hlp4,hlp5,hlp6,hlp7,hlp8,hsum
     integer, optional :: istp
     real, dimension(3:nxp-2,3:nyp-2) :: tmp
-
+    integer :: n
 
     if (present(istp)) istep = istp
 
@@ -204,11 +208,15 @@ contains
        if (.not.lwaterbudget) then
           call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
                a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r)
+          do n =1,count(prc_lev>0)
+            prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(n,:,:)+prc_r(n,:,:)) * dt / 3.
+          end do
        else
           call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
                a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r,rct=a_rct)
-
-          prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)) * dt / 3.
+            do n =1,count(prc_lev>0)
+              prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(n,:,:)+prc_r(n,:,:)) * dt / 3.
+            end do
 
           if (debug.and.lwaterbudget.and. .false.) then
              ! standard output of liquid water budget
@@ -231,7 +239,7 @@ contains
              hsum = sum(cnd_acc) ; call double_scalar_par_sum(hsum,hlp1)
              hsum = sum(cev_acc) ; call double_scalar_par_sum(hsum,hlp2)
              hsum = sum(rev_acc) ; call double_scalar_par_sum(hsum,hlp3)
-             hsum = sum(prc_acc) ; call double_scalar_par_sum(hsum,hlp4)
+             hsum = sum(prc_acc(:,:,1)) ; call double_scalar_par_sum(hsum,hlp4)
              call calcintpath(liquid,tmp)
              hsum = sum(tmp)     ; call double_scalar_par_sum(hsum,hlp5)
              call calcintpath(a_rpp,tmp)       
@@ -254,7 +262,9 @@ contains
             a_npp,a_rt,a_rpt,a_npt,a_scr7, prc_r,rsi, a_ricet,a_nicet,a_rsnowt,a_rgrt,&
             a_ricep,a_nicep,a_rsnowp,a_rgrp, &
             prc_i, prc_s, prc_g)
-       prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)+prc_i(2,:,:)+prc_s(2,:,:)+prc_g(2,:,:)) * dt / 3.
+      do n =1,count(prc_lev>0)
+        prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(n,:,:)+prc_r(n,:,:)+prc_i(n,:,:)+prc_s(n,:,:)+prc_g(n,:,:)) * dt / 3.
+      end do
     case(5)
        call mcrph_sb(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,a_wp,vapor,liquid, &
             a_rpp,    a_npp    , & ! rain
@@ -269,9 +279,11 @@ contains
             a_rgrt,   a_ngrt,    & ! graupel
             a_rhailt, a_nhailt,  & ! hail
             prc_c, prc_r, prc_i, prc_s, prc_g, prc_h)
-       prc_acc = prc_acc + (prc_c(2,:,:)+prc_r(2,:,:)+prc_i(2,:,:)          &
-                           +prc_s(2,:,:)+prc_g(2,:,:)+prc_h(2,:,:)) * dt / 3.
-    end select
+      do n =1,count(prc_lev>0)
+        prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(n,:,:)+prc_r(n,:,:)+prc_i(n,:,:)          &
+                           +prc_s(n,:,:)+prc_g(n,:,:)+prc_h(n,:,:)) * dt / 3.
+       end do
+   end select
 
   end subroutine micro
   !
@@ -314,6 +326,8 @@ contains
     !
 !as    if(firsttime) call initmcrp(level,firsttime)
     allocate(convice(n1),convliq(n1))
+    if(lpartdrop .and. nstep==3) allocate(a_npauto(nzp,nxp,nyp))
+    if(lpartdrop .and. nstep==3) a_npauto(:,:,:) = 0.
     do j=3,n3-2
        do i=3,n2-2
           call resetvar(rain,rp(1:n1,i,j),np(1:n1,i,j))
@@ -324,7 +338,7 @@ contains
           rs = rsat(1:n1,i,j)
           rrain = rp(1:n1,i,j)
           nrain = np(1:n1,i,j)
-          convliq = alvl/cp*(pi0+pi1+exner(1:n1,i,j))/cp
+          convliq = alvl/(cp*(pi0+pi1+exner(1:n1,i,j))/cp)
           if (level == 4) then
              rsi = rsati(1:n1,i,j)
              call resetvar(ice,ricep(1:n1,i,j),nicep(1:n1,i,j))
@@ -351,7 +365,7 @@ contains
              end where
              nin_active = nice + nsnow + ngrp
 
-             convice = alvi/cp*(pi0+pi1+exner(1:n1,i,j))/cp
+             convice = alvi/(cp*(pi0+pi1+exner(1:n1,i,j))/cp)
           end if
           if (lrandommicro) call shuffle(microseq)
           do n=1,nprocess
@@ -359,15 +373,11 @@ contains
              case(iwtrdff)
                 call resetvar(cldw,rc)
                 call resetvar(rain,rrain,nrain)
-                if (lwaterbudget) then
-                   call wtr_dff_SB(n1,dn0,rrain,nrain,rc,rs,rv,tl,temp,ev=rev_acc(i,j),zm=zm)
-                else
-                   call wtr_dff_SB(n1,dn0,rrain,nrain,rc,rs,rv,tl,temp)
-                end if
+                call wtr_dff_SB(n1,dn0,rrain,nrain,rc,rs,rv,tl,temp,ev=rev_acc(i,j),zm=zm)
              case(iauto)
                 call resetvar(cldw,rc)
                 call resetvar(rain,rrain,nrain)
-                call auto_SB(n1,dn0,rc,rrain,nrain,tl,dissip(1:n1,i,j))
+                call auto_SB(n1,dn0,rc,rrain,nrain,tl,dissip(1:n1,i,j),i,j)
              case(iaccr)
                 call resetvar(cldw,rc)
                 call resetvar(rain,rrain,nrain)
@@ -451,9 +461,9 @@ contains
                 call resetvar(ice,rice,nice)
                 call resetvar(snow,rsnow)
                 call resetvar(graupel,rgrp)
-                call sedimentation (n1,ice, rice,nice,rrate = prc_i(1:n1,i,j))
-                call sedimentation (n1,snow, rsnow, rrate = prc_s(1:n1,i,j))
-                call sedimentation (n1,graupel, rgrp, rrate = prc_g(1:n1,i,j))
+                call sedimentation (n1,dn0,ice, rice,nice,rrate = prc_i(1:n1,i,j))
+                call sedimentation (n1,dn0,snow, rsnow, rrate = prc_s(1:n1,i,j))
+                call sedimentation (n1,dn0,graupel, rgrp, rrate = prc_g(1:n1,i,j))
                 prc_i(1:n1,i,j) = prc_i(1:n1,i,j)
                 prc_s(1:n1,i,j) = prc_s(1:n1,i,j)
                 prc_g(1:n1,i,j) = prc_g(1:n1,i,j)
@@ -568,7 +578,7 @@ contains
     end do
 
   end subroutine wtr_dff_SB
-  subroutine auto_SB(n1,dn0,rc,rp,np,tl,diss)
+  subroutine auto_SB(n1,dn0,rc,rp,np,tl,diss,i,j)
     !
     ! ---------------------------------------------------------------------
     ! AUTO_SB:  calculates the evolution of mass- and number mxg-ratio for
@@ -577,8 +587,8 @@ contains
     ! be reformulated for f(x)=A*x**(nu_c)*exp(-Bx**(mu)), where formu=1/3
     ! one would get a gamma dist in drop diam -> faster rain formation.
     !
-
-    integer, intent (in) :: n1
+    
+    integer, intent (in) :: n1,i,j
     real, intent (in)    :: dn0(n1), diss(n1)
     real, intent (inout) :: rc(n1), rp(n1), np(n1),tl(n1)
 
@@ -603,6 +613,9 @@ contains
     real, parameter :: kc_bet = 0.00174
     real, parameter :: csx = 0.23
     real, parameter :: ce = 0.93
+    
+    real, parameter :: alpha = 1.e-3 ! s-1 Kessler scheme
+    real, parameter :: rc0 = 1.e-3   ! kg/kg Kessler scheme
 
     integer :: k
     real    :: k_au0,k_au, Xc, Dc, au, tau, phi, kc_alf, kc_rad, kc_sig, k_c, Re, epsilon, l
@@ -665,16 +678,26 @@ contains
           !
           ! Khairoutdinov and Kogan
           !
-          if (khairoutdinov) then
+          if (khairoutdinov_au) then
              Dc = ( Xc / prw )**(1./3.)
              au = Cau * (Dc * mmt / 2.)**Eau
           end if
+	  if (kessler) then
+	     if (rc(k) > rc0) then
+	        au = alpha * (rc(k) -rc0)
+	     else
+	        au = 0.
+	     end if
+	  end if
           au    = au * dt
           au    = min(au,rc(k))
           rp(k) = rp(k) + au
           rc(k) = rc(k) - au
           tl(k) = tl(k) + convliq(k)*au
           np(k) = np(k) + au/cldw%x_max
+	  
+	  ! For particles: a_npauto in #/(kg*dt)
+	  if(lpartdrop .and. nstep==3) a_npauto(k,i,j) = au/cldw%x_max*dn0(k)
        end if
     end do
 
@@ -740,10 +763,11 @@ contains
              rc(k) = rc(k) - ac
              tl(k) = tl(k) + convliq(k)*ac
 
+
+             sc = k_rr * np(k) * rp(k) * sqrt(rho_0*dn0(k))
+             sc = min(sc, np(k))
+             np(k) = np(k) - sc
           end if
-          sc = k_rr * np(k) * rp(k) * sqrt(rho_0*dn0(k)) * sc
-          sc = min(sc, np(k))
-          np(k) = np(k) - sc
        end if
     end do
 
@@ -783,30 +807,38 @@ contains
 
     nfl(n1) = 0.
     rfl(n1) = 0.
+    vn = 0.
+    vr = 0.
     do k=n1-1,2,-1
+      if (rp(k) > rthres) then
+        Xp = rp(k) / np(k)
+        xp = MIN(MAX(xp,rain%x_min),rain%x_max)
+     
+        !
+        ! Adjust Dm and mu-Dm and Dp=1/lambda following Milbrandt & Yau
+        !
+        Dm = ( 6. / (rowt*pi) * Xp )**(1./3.)
+        mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))
+        Dp = (Dm**3/((mu+3.)*(mu+2.)*(mu+1.)))**(1./3.)
 
-       Xp = rp(k) / (np(k)+eps0)
-       !
-       ! Adjust Dm and mu-Dm and Dp=1/lambda following Milbrandt & Yau
-       !
-       Dm = ( 6. / (rowt*pi) * Xp )**(1./3.)
-       mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))
-       Dp = (Dm**3/((mu+3.)*(mu+2.)*(mu+1.)))**(1./3.)
+        vn(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
+        vr(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
+        !
+        ! Set fall speeds following Khairoutdinov and Kogan
 
-       vn(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
-       vr(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
-       !
-       ! Set fall speeds following Khairoutdinov and Kogan
-
-       !              if (khairoutdinov) then
-       !                 vn(k) = max(0.,an * Dp + bn)
-       !                 vr(k) = max(0.,aq * Dp + bq)
-       !              end if
-       !irina-olivier
-       if (khairoutdinov) then
-          vn(k) = max(0.,an * Dp + bn)
-          vr(k) = max(0.,aq * Dp + bq)
-       end if
+        !              if (khairoutdinov) then
+        !                 vn(k) = max(0.,an * Dp + bn)
+        !                 vr(k) = max(0.,aq * Dp + bq)
+        !              end if
+        !irina-olivier
+        if (khairoutdinov) then
+            vn(k) = max(0.,an * Dp + bn)
+            vr(k) = max(0.,aq * Dp + bq)
+        end if
+        vn(k) = min(max(vn(k),0.1),20.)
+        vr(k) = min(max(vr(k),0.1),20.)
+      end if
+      
     end do
 
     do k=2,n1-1
@@ -845,8 +877,8 @@ contains
             &                                     2.*(maxi-rp(k)))
     enddo
 
-    rfl(n1-1) = 0.
-    nfl(n1-1) = 0.
+    rfl = 0.
+    nfl = 0.
     do k=n1-2,2,-1
 
        kk = k
@@ -859,6 +891,7 @@ contains
           kk  = kk + 1
           cc  = min(1.,cn(kk) - zz*dzi_t(kk))
        enddo
+       tot = min(tot,dn0(k)/dzi_t(k) * np(k) - nfl(k+1) * dt - rthres)  
        nfl(k) = -tot /dt
 
        kk = k
@@ -871,6 +904,7 @@ contains
           kk  = kk + 1
           cc  = min(1.,cr(kk) - zz*dzi_t(kk))
        enddo
+       tot = min(tot,dn0(k)/dzi_t(k) * rp(k) - rfl(k+1) * dt - rthres)
        rfl(k) = -tot /dt
 
        kp1=k+1
@@ -909,19 +943,21 @@ contains
     !
     ! calculate the precipitation flux and its effect on r_t and theta_l
     !
-    rfl(n1) = 0.
+    rfl = 0.
     do k=n1-1,2,-1
-       Xc = rc(k) / (cldw%nr+eps0)
-       Dc = ( Xc / prw )**(1./3.)
-       vc = min(c*(Dc*0.5)**2 * exp(4.5*(log(sgg))**2),1./(dzi_t(k)*dt))
-       !               vc = min(c*(Dc*0.5)**2 * exp(5*(log(1.3))**2),1./(dzi_t(k)*dt))
-       rfl(k) = - rc(k) * vc
-       !
-       kp1=k+1
-       flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)
-       rc(k) = rc(k)-flxdiv*dt
-       tl(k) = tl(k)+flxdiv*convliq(k)*dt
-       rrate(k)    = -rfl(k)
+      if (rc(k) > 0.) then
+        Xc = rc(k) / cldw%nr
+        Dc = ( Xc / prw )**(1./3.)
+        vc = min(c*(Dc*0.5)**2 * exp(4.5*(log(sgg))**2),1./(dzi_t(k)*dt))
+        !               vc = min(c*(Dc*0.5)**2 * exp(5*(log(1.3))**2),1./(dzi_t(k)*dt))
+        rfl(k) = - rc(k) * vc
+        !
+      end if
+      kp1=k+1
+      flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)
+      rc(k) = rc(k)-flxdiv*dt
+      tl(k) = tl(k)+flxdiv*convliq(k)*dt
+      rrate(k)    = -rfl(k)
     end do
 
   end subroutine sedim_cd
@@ -1967,11 +2003,12 @@ contains
     enddo
   end subroutine ice_collection
 
-  subroutine sedimentation(n1,meteor,rp,nr,rrate,dtopt)
+  subroutine sedimentation(n1,dn0,meteor,rp,nr,rrate,dtopt)
     integer, intent(in) :: n1
     real, dimension(n1), intent(inout) :: rp
     type(particle),  intent(in) :: meteor
     real, dimension(n1), intent(inout),optional :: nr
+    real, dimension(n1), intent(in),optional :: dn0
     real, intent(in), optional :: dtopt
     real, intent (out)  , dimension(n1) :: rrate
 
@@ -2001,12 +2038,12 @@ contains
        vlimit = 2.0
     case('graupel')
        metnr = 3
-       vmin   = 1.0
-       vlimit = 10.0
+       vmin   = 0.1
+       vlimit = 30.0
     case('hail')
        metnr = 4
-       vmin   = 1.0
-       vlimit = 10.0
+       vmin   = 0.1
+       vlimit = 30.0
     case default
        WRITE (0,*) 'icrmcrp: stopped in sedimentation ',meteor%name
        stop
@@ -2023,25 +2060,30 @@ contains
        alfq(metnr) = meteor%a_vel * gfct((meteor%nu+meteor%b_vel+2.0)/meteor%mu)&
             &                / gfct((meteor%nu+2.0)/meteor%mu)
        c_lam(metnr) = gfct((meteor%nu+1.0)/meteor%mu)/gfct((meteor%nu+2.0)/meteor%mu)
-       WRITE(0,'(a,i5,3a,e9.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  alfn = ',alfn(metnr)
-       WRITE(0,'(a,i5,3a,e9.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  alfq = ',alfq(metnr)
-       WRITE(0,'(a,i5,3a,e9.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  clam = ',c_lam(metnr)
+       WRITE(0,'(a,i5,3a,e11.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  alfn = ',alfn(metnr)
+       WRITE(0,'(a,i5,3a,e11.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  alfq = ',alfq(metnr)
+       WRITE(0,'(a,i5,3a,e11.3)') 'sedim: myid = ',myid,' meteor = ',meteor%name,',  clam = ',c_lam(metnr)
        firsttime(metnr) =.false.
     end if
 
     do k=n1-1,2,-1
-
-       Xp = rp(k) / (np(k)+eps0)
+      if ((rp(k) > rthres).and.(np(k).ne.0.)) then
+       Xp = rp(k) / np(k)
+       xp = MIN(MAX(xp,meteor%x_min),meteor%x_max)
        lam = ( c_lam(metnr) * xp )**(meteor%b_vel)
        vr(k) = alfq(metnr) * lam
        vr(k) = max(vr(k),vmin)
        vr(k) = min(vr(k),vlimit)
        !      vr(k) = -vr(k)
 
-       vn(k) = alfn(metnr) * lam
+       vn(k) = alfn(metnr) * lam * (dn0(1)/dn0(k))**0.5
        vn(k) = max(vn(k),vmin)
        vn(k) = min(vn(k),vlimit)
        !      vn(k) = -vn(k)
+      else
+        vr(k) = 0.
+        vn(k) = 0.
+      end if
     end do
     do k=2,n1-1
        kp1 = min(k+1,n1-1)
@@ -2098,6 +2140,7 @@ contains
           kk  = kk + 1
           cc  = min(1.,cn(kk) - zz*dzi_t(kk))
        enddo
+       tot = min(tot,dn0(k)/dzi_t(k) * np(k) - nfl(k+1) * dtsedi - rthres)  
        nfl(k) = -tot /dtsedi
 
        kk = k
@@ -2111,6 +2154,7 @@ contains
           kk  = kk + 1
           cc  = min(1.,cr(kk) - zz*dzi_t(kk))
        enddo
+       tot = min(tot,dn0(k)/dzi_t(k) * rp(k) - rfl(k+1) * dtsedi - rthres)
        rfl(k) = -tot /dtsedi
 
        kp1=k+1
@@ -2588,9 +2632,9 @@ contains
     real, dimension(:), intent(inout) :: mass
     real, dimension(:), intent(inout), optional :: num
 
-    if (any(mass < 0.)) then
-      print *, trim(meteor%name), 'below zero', mass
-    end if
+ !   if (any(mass < 0.)) then
+ !     print *, trim(meteor%name), 'below zero', mass
+ !   end if
     where (mass < rthres)
        mass = 0.
     end where
@@ -2748,7 +2792,10 @@ contains
     ! UCLA-LES modules
 
     use defs, only : cpr,p00,alvl,alvi
-    use grid, only : dt,dzi_t,zm
+    use grid, only : dt,dzi_t,zm, &
+!LINDA
+         nstep, mp_qt, mp_qr, mp_qi, mp_qs, mp_qg, mp_qh, &
+         mp_nqr, mp_nqi, mp_nqs, mp_nqg, mp_nqh, mp_tlt
     use thrm, only : rsif
 
     ! KAMM2 modules
@@ -3060,7 +3107,7 @@ contains
           jj = jlm(i)
           kk = klm(i)
            
-          hlp = R_l * (1.0 +  (R_l/R_d-1.0) * qv(kk,jj,ii)) 
+          hlp = R_l * (1.0 +  (R_d/R_l-1.0) * qv(kk,jj,ii)) 
 
           ! ... dynamics
           T_0(i,j,k)      = tk(kk,jj,ii)
@@ -3261,12 +3308,20 @@ contains
           q_ice_old = qi(kk,jj,ii) + qs(kk,jj,ii) + qg(kk,jj,ii) + qh(kk,jj,ii)
 
           ! ... temperature tendency (for liquid water potential temperature)
-          convice = alvi/cp*(pi0(kk)+pi1(kk)+exner(kk,jj,ii))/cp
-          convliq = (alvl-alvi)/cp*(pi0(kk)+pi1(kk)+exner(kk,jj,ii))/cp
+          convice = alvi/(cp*(pi0(kk)+pi1(kk)+exner(kk,jj,ii))/cp)
+          convliq = (alvl-alvi)/(cp*(pi0(kk)+pi1(kk)+exner(kk,jj,ii))/cp)
           tlt(kk,jj,ii) = tlt(kk,jj,ii) &
                &      - convice * (q_vap_new - q_vap_old) / dt  &
                &      + convliq * (q_liq_new - q_liq_old) / dt
 
+          ! LINDA, b, write out tendencies
+          if (lmptend) then
+            if (nstep==1) mp_tlt(kk,jj,ii)=0.0
+            mp_tlt(kk,jj,ii) = mp_tlt(kk,jj,ii)                          & 
+                              - convice * (q_vap_new - q_vap_old) / dt  &
+                              + convliq * (q_liq_new - q_liq_old) / dt
+          end if
+          ! LINDA, e
           ! ... mass densities to mixing ratios with actual density:
           qv(kk,jj,ii) = q_v
           qc(kk,jj,ii) = hlp * q_cloud(i,j,k)
@@ -3362,16 +3417,16 @@ contains
     prec_g = 0.0
     DO j=3,je-2
       DO i=3,ie-2
-         IF (ANY(qi(1:ke,j,i).gt.0.0)) call sedimentation (ke,pice, qi(1:ke,j,i),qni(1:ke,j,i),rrate = prec_i(1:ke,j,i))
-         IF (ANY(qs(1:ke,j,i).gt.0.0)) call sedimentation (ke,psnow,qs(1:ke,j,i),qns(1:ke,j,i),rrate = prec_s(1:ke,j,i))
+         IF (ANY(qi(1:ke,j,i).gt.0.0)) call sedimentation (ke,dn0,pice, qi(1:ke,j,i),qni(1:ke,j,i),rrate = prec_i(1:ke,j,i))
+         IF (ANY(qs(1:ke,j,i).gt.0.0)) call sedimentation (ke,dn0,psnow,qs(1:ke,j,i),qns(1:ke,j,i),rrate = prec_s(1:ke,j,i))
       end do
     end do
-    ntsedi = 2
+    ntsedi = 3
     DO j=3,je-2
       DO i=3,ie-2
         IF (ANY(qg(1:ke,j,i).gt.0.0)) THEN
           DO ii=1,ntsedi
-            call sedimentation (ke,pgraupel,qg(1:ke,j,i),qng(1:ke,j,i),rrate = prec_g(1:ke,j,i),dtopt=dt/ntsedi)
+            call sedimentation (ke,dn0,pgraupel,qg(1:ke,j,i),qng(1:ke,j,i),rrate = prec_g(1:ke,j,i),dtopt=dt/ntsedi)
           end do
         ENDIF
       end do
@@ -3379,12 +3434,12 @@ contains
     end if
     if (cloud_type.ge.2000) then
     prec_h = 0.0
-    ntsedi = 2
+    ntsedi = 3
     DO j=3,je-2
       DO i=3,ie-2
         IF (ANY(qh(1:ke,j,i).gt.0.0)) THEN
           DO ii=1,ntsedi
-            call sedimentation (ke,phail,qh(1:ke,j,i),qnh(1:ke,j,i),rrate = prec_h(1:ke,j,i),dtopt=dt/ntsedi)
+            call sedimentation (ke,dn0,phail,qh(1:ke,j,i),qnh(1:ke,j,i),rrate = prec_h(1:ke,j,i),dtopt=dt/ntsedi)
           end do
         ENDIF
       end do
@@ -3474,6 +3529,39 @@ contains
              qnstend(k,j,i) = qnstend(k,j,i) + (qns(k,j,i) - qnsin(k,j,i))/dt
              qngtend(k,j,i) = qngtend(k,j,i) + (qng(k,j,i) - qngin(k,j,i))/dt
              qnhtend(k,j,i) = qnhtend(k,j,i) + (qnh(k,j,i) - qnhin(k,j,i))/dt
+! LINDA, b, write out tendenties
+             if (lmptend) then
+                if (nstep==1) then
+                    mp_qt(k,j,i) = 0.0
+                    mp_qr(k,j,i) = 0.0
+                    mp_qi(k,j,i) = 0.0
+                    mp_qs(k,j,i) = 0.0
+                    mp_qg(k,j,i) = 0.0
+                    mp_qh(k,j,i) = 0.0
+
+                    mp_nqr(k,j,i) = 0.0
+                    mp_nqi(k,j,i) = 0.0
+                    mp_nqs(k,j,i) = 0.0
+                    mp_nqg(k,j,i) = 0.0
+                    mp_nqh(k,j,i) = 0.0
+                endif
+
+                mp_qt  (k,j,i) = mp_qt(k,j,i)                 &
+                                + (qv(k,j,i) - qvin(k,j,i))/dt &
+                                + (qc(k,j,i) - qcin(k,j,i))/dt
+                mp_qr  (k,j,i) = mp_qr(k,j,i) + (qr(k,j,i) - qrin(k,j,i))/dt
+                mp_qi  (k,j,i) = mp_qi(k,j,i) + (qi(k,j,i) - qiin(k,j,i))/dt
+                mp_qs  (k,j,i) = mp_qs(k,j,i) + (qs(k,j,i) - qsin(k,j,i))/dt
+                mp_qg  (k,j,i) = mp_qg(k,j,i) + (qg(k,j,i) - qgin(k,j,i))/dt
+                mp_qh  (k,j,i) = mp_qh(k,j,i) + (qh(k,j,i) - qhin(k,j,i))/dt
+
+                mp_nqr (k,j,i) = mp_nqr(k,j,i) + (qnr(k,j,i) - qnrin(k,j,i))/dt
+                mp_nqi (k,j,i) = mp_nqi(k,j,i) + (qni(k,j,i) - qniin(k,j,i))/dt
+                mp_nqs (k,j,i) = mp_nqs(k,j,i) + (qns(k,j,i) - qnsin(k,j,i))/dt
+                mp_nqg (k,j,i) = mp_nqg(k,j,i) + (qng(k,j,i) - qngin(k,j,i))/dt
+                mp_nqh (k,j,i) = mp_nqh(k,j,i) + (qnh(k,j,i) - qnhin(k,j,i))/dt
+              end if
+              ! LINDA, e
           END DO
        END DO
     END DO

@@ -19,61 +19,61 @@
 !
 module forc
 
-  use defs, only      : cp
-  use radiation, only : d4stream
+  use defs, only      : cp, pi
+  use radiation, only : d4stream,surfacerad
   !irina
-  use rad_gcss, only : gcss_rad
+  use rad_gcss, only  : gcss_rad
   !cgils
-  use grid, only : wfls,dthldtls,dqtdtls
-  use modnudge, only : nudge 
+  use grid, only      : wfls, dthldtls, dqtdtls, sfc_albedo, lrad_ca
+  use modnudge, only  : nudge, nudge_bound, lnudge_bound !LINDA 
+  use stat, only : sflg
   implicit none
 
-   !character (len=5), parameter :: case_name = 'xxxx'
-   !irina
-   !initializes the large scale forcing
-   integer, parameter    :: nls = 500
-   real, dimension(nls)  :: t_ls=0.
-   real, dimension(nls)  :: div_ls=0.
-   real, dimension(nls)  :: sst_ls=0.
-   real, dimension(nls)  :: ugeo_ls=0.
-   real, dimension(nls)  :: vgeo_ls=0.
-   real :: sfc_albedo = 0.05
-!cgils
-   logical :: lstendflg=.false.
+  !character (len=5), parameter :: case_name = 'xxxx'
+  !irina
+  !initializes the large scale forcing
+  integer, parameter    :: nls = 500
+  real, dimension(nls)  :: t_ls=0.
+  real, dimension(nls)  :: div_ls=0.
+  real, dimension(nls)  :: sst_ls=0.
+  real, dimension(nls)  :: ugeo_ls=0.
+  real, dimension(nls)  :: vgeo_ls=0.
+  !cgils
+  logical :: lstendflg=.false.
 
-
-    
 contains
   !
   ! -------------------------------------------------------------------
   ! subroutine forcings:  calls the appropriate large-scale forcings
   !irina
-  subroutine forcings(time_in, cntlat, sst,div, case_name)
+  subroutine forcings(time_in, cntlat, sst, div, case_name,time_in_2)
 
 !irina
-    use grid, only: nxp, nyp, nzp, zm, zt, dzi_t, dzi_m, dn0, iradtyp, liquid  &
+    use grid, only: nxp, nyp, nzp, zm, zt, dzi_t, dzi_m, dn0, iradtyp, isfctyp, liquid  &
          , a_rflx, a_sflx, albedo, a_tt, a_tp, a_rt, a_rp, a_pexnr, a_scr1 &
          , vapor, a_rpp,a_ricep,a_nicep,a_rgrp, CCN, pi0, pi1, level, a_ut, a_up, a_vt, a_vp,a_theta,&
-          a_lflxu, a_lflxd, a_sflxu, a_sflxd,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa
+          a_lflxu, a_lflxd, a_sflxu, a_sflxd,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa,a_lflxu_ca, a_lflxd_ca, a_sflxu_ca, a_sflxd_ca, lflxd_toa_ca, lflxu_toa_ca, sflxd_toa_ca, sflxu_toa_ca, a_wt, xt
 
     use mpi_interface, only : myid, appl_abort
+    use util, only : get_avg
 
 !irina
-    real, optional, intent (in) :: time_in, cntlat, sst,div
+    real, optional, intent (in) :: time_in, cntlat, sst, div, time_in_2
+    real, dimension (nzp):: um,vm
 
-   character (len=5), intent (in) :: case_name
-!irina
-    real :: xref1, xref2
+    character (len=8), intent (in) :: case_name
     integer :: i, j, k, kp1
-
+    real, dimension(nzp,nxp,nyp) :: dum0, dum1, dum2, dum3, dum4
 
 !irina
+    real :: alpha, beta, gamma, delta, uinf !linda
+
     select case(iradtyp)
     case (1)
         call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt)
     case (2)
        select case(level)
-       case(1) 
+       case(1)
           call smoke_rad(nzp, nxp, nyp, dn0, a_rflx, zm, dzi_t,a_tt,a_rp)
        case(2)
           call gcss_rad(nzp, nxp, nyp, cntlat, time_in, case_name, div, sst, liquid, dn0,   &
@@ -87,8 +87,8 @@ contains
             ,a_rt, a_rp, a_ut, a_up, a_vt, a_vp)
     case (4)
        if (present(time_in) .and. present(cntlat) .and. present(sst)) then
-          !irina 
-          !a_scr1 = a_theta/a_pexnr 
+          !irina
+          !a_scr1 = a_theta/a_pexnr
           select case (level)
           case(3)
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,   &
@@ -101,35 +101,56 @@ contains
                   dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt,&
                   a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
                   rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
-                  lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
-            !old      
-            ! call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
-            !      dn0, pi0, pi1, dzi_t, a_pexnr, a_scr1, vapor, liquid, a_tt,&
-            !      a_rflx, a_sflx, albedo, rr=a_rpp)
+                  lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa,ice=a_ricep,nice=a_nicep,grp=a_rgrp)
           case default
-             xref1 = 0.
-             xref2 = 0.
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,    &
                   dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt, &
                   a_rflx, a_sflx,a_lflxu, a_lflxd,a_sflxu,a_sflxd,albedo, &
                   sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
                   lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
-             !call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,    &
-             !     dn0, pi0, pi1, dzi_t, a_pexnr, a_scr1, vapor, liquid, a_tt, &
-             !     a_rflx, a_sflx, albedo)
-             xref1 = xref1 + a_sflx(nzp,3,3)/albedo(3,3)
-             xref2 = xref2 + a_sflx(nzp,3,3)
-             albedo(3,3) = xref2/xref1
           end select
-
-       else
+          if (sflg .and. lrad_ca) then
+            dum0 = 0.
+            dum1 = 0.
+            dum2 = 0.
+            dum3 = 0.
+            dum4 = 0.
+            call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, 0.05, CCN,   &
+               dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, dum0, dum1,&
+               dum2, dum3, a_lflxu_ca, a_lflxd_ca,a_sflxu_ca,a_sflxd_ca, albedo, &
+               rr=dum4,sflxu_toa=sflxu_toa_ca,sflxd_toa=sflxd_toa_ca,&
+               lflxu_toa=lflxu_toa_ca,lflxd_toa=lflxd_toa_ca)
+          end if
+        else
           if (myid == 0) print *, '  ABORTING: inproper call to radiation'
           call appl_abort(0)
        end if
-       
-    end select 
-!cgils: Nudging
-    call nudge(time_in)
+
+    ! BvS: Simple parameterized surface radiation
+    ! Sw-up/down = f(lat,lon,doy,tUTC,albedo)
+    ! Lw-up/down = Boltzman
+    case (5)
+      if(isfctyp .ne. 5) then
+        print*,'surface rad only works with interactive land surface'
+        stop
+      end if
+      if (present(time_in) .and. present(cntlat)) then
+        call surfacerad(cntlat,time_in)
+      else
+        print*,'improper call surfacrad, stopping'
+        stop
+      end if
+
+
+    end select
+!irina
+          !
+          ! subsidence
+          !
+!cgils
+! LINDA, b
+    if (lnudge_bound) call nudge_bound
+! LINDA, e
     if (lstendflg) then
 
       do j=3,nyp-2
@@ -145,11 +166,42 @@ contains
        enddo
     end if
 
-    
+
+!cgils: Nudging
+    call nudge(time_in)
+
+    if (case_name == 'squall') then
+
+       ! add u forcing to initialize squall line. Proposed change from George Bryan, 12-12-12
+
+      alpha = 0.1
+
+      IF(time_in_2.le.3600.0)THEN
+        gamma = 1.0
+        if(time_in_2.ge.3300.0)THEN
+           gamma = 1.0-(time_in_2-3300.0)/(3600.0-3300.0)
+        endif
+        do k=1,nzp
+           do j=3,nyp
+              do i=3,nxp
+                 beta  = (xt(i)-0.)/10000.0
+                 delta = (zt(k)-0.)/10000.0
+                 if((abs(beta).lt.1.0).and.(abs(delta).lt.1.0)) then
+                    a_ut(k,i,j)=a_ut(k,i,j)+alpha*gamma*cos(0.5*pi*beta)*(cosh(2.5*delta))**(-2.)
+                 endif
+              enddo
+           enddo
+        enddo
+      ENDIF
+
+
+    endif
+
+
   end subroutine forcings
   !
   ! -------------------------------------------------------------------
-  ! subroutine smoke_rad:  call simple radiative parameterization for 
+  ! subroutine smoke_rad:  call simple radiative parameterization for
   ! the smoke cloud
   !
   subroutine smoke_rad(n1,n2,n3,dn0,flx,zm,dzi_t,tt,rt)
@@ -207,7 +259,7 @@ contains
 
     select case (trim(case_name))
     case('rico')
-       
+
        !
        ! calculate subsidence factor (wsub / dz)
        !
@@ -215,7 +267,7 @@ contains
           if (zt(k) < zmx_sub) then
              sf(k) =  -0.005*zt(k)/zmx_sub
           else
-             sf(k) =  -0.005 
+             sf(k) =  -0.005
           end if
           sf(k) = sf(k)*dzi_t(k)
        end do
@@ -225,7 +277,7 @@ contains
              do k=2,n1-2
                 !
                 ! subsidence
-                ! 
+                !
                 kp1 = k+1
                 tt(k,i,j)  =  tt(k,i,j) - ( tl(kp1,i,j) - tl(k,i,j) )*sf(k)
                 rtt(k,i,j) = rtt(k,i,j) - ( rt(kp1,i,j) - rt(k,i,j) )*sf(k)
@@ -374,6 +426,6 @@ contains
     enddo
 
   end subroutine bellon
-  
+
 
 end module forc

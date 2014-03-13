@@ -8,13 +8,13 @@
   implicit none
   private
 
-  public :: open_nc, define_nc, init_anal, close_anal, write_anal
+  public :: open_nc, define_nc, init_anal, close_anal, write_anal, deflate_level
 
   integer, private, save  :: nrec0, nvar0, nbase=15
-  integer, save           :: ncid0,ncid_s, ncid_cross
+  integer, save           :: ncid0,ncid_s, ncid_cross, deflate_level
   integer, save           :: crossx, crossy, crossz
   character (len=7), dimension(30) :: crossnames
-  character (len=7),  private :: v_snm='sxx    ' 
+  character (len=7),  private :: v_snm='sxx    '
   character (len=80), private :: fname
 
 contains
@@ -54,7 +54,7 @@ contains
        iret = nf90_put_att(ncid,NF90_GLOBAL,'history','Created on '//date)
        iret = nf90_put_att(ncid, NF90_GLOBAL, 'Source','UCLA-LES Version 2.0')
        iret = nf90_put_att(ncid, NF90_GLOBAL, 'Author','Bjorn Stevens')
- !      iret = nf90_put_att(ncid, NF90_GLOBAL, '_FillValue',-999.)
+      !iret = nf90_put_att(ncid, NF90_GLOBAL, '_FillValue',-999.)
        iret = nf90_put_att(ncid, NF90_GLOBAL, 'NPTS',npts)
        iret = nf90_put_att(ncid, NF90_GLOBAL, 'NPROCS',pecount)
        iret = nf90_put_att(ncid, NF90_GLOBAL, 'PROCID',myid)
@@ -89,8 +89,9 @@ contains
     character (len=7), intent (in) :: sx(nVar)   ! table with var names
 
     integer, save :: timeID=0, ztID=0, zmID=0, xtID=0, xmID=0, ytID=0, ymID=0,&
-         dim_mttt(4) = 0, dim_tmtt(4) = 0, dim_ttmt(4) = 0, dim_tttt(4) = 0  ,&
-         dim_tt(2)  = 0, dim_mt(2)  = 0
+         zsoilID=0, dim_mttt(4)=0, dim_tmtt(4) = 0, dim_ttmt(4) = 0,          &
+         dim_tttt(4) = 0, dim_tt(2)  = 0, dim_mt(2)  = 0, dim_mmt(3) = 0, &
+         dim_soilmmt(4) = 0
 
     character (len=7) :: xnm
     integer :: iret, n, VarID
@@ -100,6 +101,7 @@ contains
        if (present(n1)) then
           iret = nf90_def_dim(ncID, 'zt', n1, ztID)
           iret = nf90_def_dim(ncID, 'zm', n1, zmID)
+          iret = nf90_def_dim(ncID, 'zsoil', 4, zsoilID)
        end if
        if (present(n2)) then
           iret = nf90_def_dim(ncID, 'xt', n2, xtID)
@@ -111,10 +113,12 @@ contains
        end if
        dim_tt = (/ztId,timeId/)
        dim_mt = (/zmId,timeId/)
-       dim_tttt= (/ztID,xtID,ytID,timeId/)  ! thermo point
-       dim_mttt= (/zmID,xtID,ytID,timeId/)  ! wpoint
-       dim_tmtt= (/ztID,xmID,ytID,timeId/)  ! upoint
-       dim_ttmt= (/ztId,xtID,ymID,timeId/)  ! vpoint
+       dim_tttt= (/ztID,xtID,ytID,timeId/)       ! thermo point
+       dim_mttt= (/zmID,xtID,ytID,timeId/)       ! wpoint
+       dim_tmtt= (/ztID,xmID,ytID,timeId/)       ! upoint
+       dim_ttmt= (/ztId,xtID,ymID,timeId/)       ! vpoint
+       dim_mmt= (/xmID,ymID,timeId/)             ! srfc point
+       dim_soilmmt= (/zsoilID,xmID,ymID,timeId/) ! soil point
 
        do n=1,nVar
           select case(trim(ncinfo(2,sx(n))))
@@ -134,7 +138,7 @@ contains
              iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,ymID    ,VarID)
           case ('tttt')
              if (present(n2) .and. present(n3)) then
-                iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tttt,VarID)
+                iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tttt,VarID)!, deflate_level = deflate_level)
              else
                 iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_tt,VarID)
              end if
@@ -216,6 +220,10 @@ contains
              else
                 iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_mt,VarID)
              end if
+          case ('mmt')
+             iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_mmt,VarID)
+          case ('soilmmt') 
+             iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_soilmmt,VarID)
           case default
              if (myid == 0) print *, '  ABORTING: Bad dimensional information'
              call appl_abort(0)
@@ -252,30 +260,34 @@ contains
 
     use mpi_interface, only :myid
 
-!irina
-    integer, parameter :: nnames = 31
+    integer, parameter :: nnames = 46
     character (len=7), save :: sbase(nnames) =  (/ &
-         'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,&
-         'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,&  
-         'w      ','t      ','p      ','q      ','l      ','r      '   ,'n      ',&
-         'rice   ','nice   ','rsnow  ','rgrp   ',&
-         'nsnow  ','ngrp   ','rhail  ','nhail  ',          &
-         'stke   ','rflx   ','lflxu  ','lflxd  '/)
+         'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,& !1
+         'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,& !7 
+         'w      ','t      ','p      ','q      ','l      ','r      '   ,& !13
+         'n      ','rice   ','nice   ','rsnow  ','rgrp   ','nsnow  '   ,& !19
+         'ngrp   ','rhail  ','nhail  ','rflx   ','lflxu  ','lflxd  '   ,& !25
+         'shf    ','lhf    ','ustars ','a_tskin','a_qskin','tsoil  '   ,& !31
+         'phiw   ','a_Qnet ','a_G0   ','mp_tlt ','mp_qt  ','mp_qr  '   ,& !37
+         'mp_qi  ','mp_qs  ','mp_qg  ','mp_qh  '/)  !43-46
+
+
 
     real, intent (in) :: time
     integer           :: nbeg, nend
 
-    nvar0 = nbase + naddsc    
+    nvar0 = nbase + naddsc
     if (level  >= 1) nvar0 = nvar0+1
     if (level  >= 2) nvar0 = nvar0+1
     if (level  >= 3) nvar0 = nvar0+2
     if (level  >= 4) nvar0 = nvar0+4
     if (level  >= 5) nvar0 = nvar0+4
     if (iradtyp > 1) nvar0 = nvar0+3
+    if (isfctyp == 5) nvar0 = nvar0+9
+    if (lmptend)      nvar0 = nvar0+7
 
     allocate (sanal(nvar0))
     sanal(1:nbase) = sbase(1:nbase)
-
 
     nvar0 = nbase
     !
@@ -322,13 +334,49 @@ contains
     end if
     if (iradtyp > 1) then
        nvar0 = nvar0+1
+       sanal(nvar0) = sbase(28)
+       nvar0 = nvar0+1
        sanal(nvar0) = sbase(29)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(30)
-       nvar0 = nvar0+1
-       sanal(nvar0) = sbase(31)
     end if
 
+    if (isfctyp == 5) then
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(31)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(32)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(33)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(34)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(35)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(36)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(37)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(38)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(39)
+    end if
+    if (lmptend) then
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(40)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(41)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(42)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(43)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(44)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(45)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(46)
+    end if
 
     nbeg = nvar0+1
     nend = nvar0+naddsc
@@ -364,15 +412,20 @@ contains
 
     use netcdf
     use mpi_interface, only : myid, appl_abort
+    use defs, only : cp, alvl
 
     real, intent (in) :: time
 
     integer :: iret, VarID, nn, n
     integer :: ibeg(4), icnt(4), i1, i2, j1, j2
+    integer :: icntsfc(3),icntsoil(4),ibegsfc(3)
 
-    !return 
-    icnt = (/nzp,nxp-4,nyp-4,1   /)
+    !return
+    icnt = (/nzp,nxp-4,nyp-4,1/)
+    icntsfc = (/nxp-4,nyp-4,1/)
+    icntsoil = (/4,nxp-4,nyp-4,1/)
     ibeg = (/1  ,1  ,1  ,nrec0/)
+    ibegsfc = (/1,1,nrec0/)
     i1 = 3
     i2 = nxp-2
     j1 = 3
@@ -409,47 +462,135 @@ contains
     iret = nf90_put_var(ncid0, VarID, a_wp(:,i1:i2,j1:j2), start=ibeg,    &
          count=icnt)
     iret = nf90_inq_varid(ncid0, sanal(14), VarID)
-    iret = nf90_put_var(ncid0, VarID, a_theta(:,i1:i2,j1:j2), start=ibeg, &
+    iret = nf90_put_var(ncid0, VarID, a_tp(:,i1:i2,j1:j2)+th00, start=ibeg, &
          count=icnt)
     iret = nf90_inq_varid(ncid0, sanal(15), VarID)
     iret = nf90_put_var(ncid0, VarID, press(:,i1:i2,j1:j2), start=ibeg, &
          count=icnt)
-    iret = nf90_inq_varid(ncid0, sanal(16), VarID)
-    iret = nf90_put_var(ncid0, VarID, a_rp(:,i1:i2,j1:j2), start=ibeg, &
-         count=icnt)
-
-
+    if (level > 0) then
+       iret = nf90_inq_varid(ncid0, sanal(16), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_rp(:,i1:i2,j1:j2), start=ibeg, &
+           count=icnt)
+    end if 
     if (level >= 2)  then
-!        nn = nn+1
        iret = nf90_inq_varid(ncid0, sanal(17), VarID)
        iret = nf90_put_var(ncid0, VarID, liquid(:,i1:i2,j1:j2), start=ibeg, &
             count=icnt)
     end if
     nn = nbase+2
-!     if (level >=3) then
-      do n = nbase+2, nvar0-1
-       nn = nn+1
-       call newvar(nn-12)
-       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
-       iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
-            count=icnt)
+
+    if (level >=3) then
+      do n = nbase+2, 18
+        nn = nn+1
+        call newvar(nn-12)
+        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
+               count=icnt)
+         !if (myid==0) print*,"sanal(nn):",sanal(nn),nn
+       end do
+    endif  
+
+    if (level >=4) then
+      do n = 20, 23
+        nn = nn+1
+        call newvar(nn-12)
+        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
+               count=icnt)
+        !if (myid==0) print*,"sanal(nn):",sanal(nn),nn
       end do
-! 
-!     if (iradtyp > 1)  then
-!        nn = nn+1
-!        iret = nf90_inq_varid(ncid0, 'rflx', VarID)
-!        iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
-!             count=icnt)
-!   !irina          
-!        nn = nn+1
-!        iret = nf90_inq_varid(ncid0, 'lflxu', VarID)
-!        iret = nf90_put_var(ncid0, VarID, a_lflxu(:,i1:i2,j1:j2), start=ibeg, &
-!             count=icnt)
-!        nn = nn+1
-!        iret = nf90_inq_varid(ncid0, 'lflxd', VarID)
-!        iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
-!             count=icnt)
-!     end if
+    endif  
+
+    if (level >=5) then
+      do n = 24, 27
+        nn = nn+1
+        call newvar(nn-12)
+        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
+             count=icnt)
+        !if (myid==0) print*,"sanal(nn):",sanal(nn),nn
+      end do
+    endif  
+
+    if (iradtyp > 1)  then
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)  
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_lflxu(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+    end if
+    !Malte: Land Surface Output for isfctyp=5
+    if (isfctyp == 5) then 
+       iret = nf90_inq_varid(ncid0, sanal(nn+1), VarID)
+       iret = nf90_put_var(ncid0, VarID, wt_sfc(i1:i2,j1:j2)*cp*(dn0(1)+dn0(2))*0.5, &
+              start=ibegsfc, count=icntsfc)
+       iret = nf90_inq_varid(ncid0, sanal(nn+2), VarID)
+       iret = nf90_put_var(ncid0, VarID, wq_sfc(i1:i2,j1:j2)*alvl*(dn0(1)+dn0(2))*0.5, &
+              start=ibegsfc, count=icntsfc)
+       iret = nf90_inq_varid(ncid0, sanal(nn+3), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_ustar(i1:i2,j1:j2), &
+              start=ibegsfc, count=icntsfc)
+       iret = nf90_inq_varid(ncid0, sanal(nn+4), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_tskin(i1:i2,j1:j2), &
+              start=ibegsfc, count=icntsfc)
+       iret = nf90_inq_varid(ncid0, sanal(nn+5), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_qskin(i1:i2,j1:j2), &
+              start=ibegsfc, count=icntsfc)
+       iret = nf90_inq_varid(ncid0, sanal(nn+6), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_tsoil(:,i1:i2,j1:j2), &
+              start=ibeg, count=icntsoil)
+       iret = nf90_inq_varid(ncid0, sanal(nn+7), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_phiw(:,i1:i2,j1:j2), &
+              start=ibeg, count=icntsoil)
+       iret = nf90_inq_varid(ncid0, sanal(nn+8), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_Qnet(i1:i2,j1:j2), &
+              start=ibegsfc, count=icntsfc)
+       iret = nf90_inq_varid(ncid0, sanal(nn+9), VarID)
+       iret = nf90_put_var(ncid0, VarID, a_G0(i1:i2,j1:j2), &
+              start=ibegsfc, count=icntsfc)
+       !print*,myid,sanal(nn+4),nn+9
+       !if (iret.ne.nf90_noerr) print*,myid,nf90_strerror(iret),nn+9
+
+    end if 
+
+    
+    if (lmptend)  then
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, mp_tlt(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, mp_qt(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, mp_qr(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, mp_qi(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, mp_qs(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, mp_qg(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, mp_qh(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+      end if
 
 !     if (nn /= nvar0) then
 !        if (myid == 0) print *, 'ABORTING:  Anal write error'
@@ -457,7 +598,7 @@ contains
 !     end if
 
     if (myid==0) print "(//' ',12('-'),'   Record ',I3,' to: ',A60)",    &
-         nrec0,fname 
+         nrec0,fname
 
     iret  = nf90_sync(ncid0)
     nrec0 = nrec0+1
@@ -487,7 +628,7 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('time')
        if (itype==0) ncinfo = 'Time'
-       if (itype==1) ncinfo = 's'
+       if (itype==1) ncinfo = 'seconds since 2000-00-00 0000'
        if (itype==2) ncinfo = 'time'
     case('zt')
        if (itype==0) ncinfo = 'Vertical displacement of cell centers'
@@ -605,10 +746,6 @@ contains
        if (itype==0) ncinfo = 'Rain-drop number mixing ratio'
        if (itype==1) ncinfo = '#/kg'
        if (itype==2) ncinfo = 'tttt'
-    case('stke')
-       if (itype==0) ncinfo = 'Sub-filter scale TKE'
-       if (itype==1) ncinfo = 'J/kg'
-       if (itype==2) ncinfo = 'mttt'
     case('cfl')
        if (itype==0) ncinfo = 'Courant number'
        if (itype==1) ncinfo = '-'
@@ -633,7 +770,7 @@ contains
        if (itype==0) ncinfo = 'Vertical integral of total TKE'
        if (itype==1) ncinfo = 'kg/s'
        if (itype==2) ncinfo = 'time'
-!irina
+       !irina
     case('tkeint')
        if (itype==0) ncinfo = 'Vertical integral of total TKE non-weighted'
        if (itype==1) ncinfo = 'm3/s2'
@@ -648,6 +785,10 @@ contains
        if (itype==2) ncinfo = 'time'
     case('tsrf')
        if (itype==0) ncinfo = 'Surface temperature'
+       if (itype==1) ncinfo = 'K'
+       if (itype==2) ncinfo = 'time'
+    case('tsair')
+       if (itype==0) ncinfo = 'Surface air temperature'
        if (itype==1) ncinfo = 'K'
        if (itype==2) ncinfo = 'time'
     case('ustar')
@@ -686,7 +827,6 @@ contains
        if (itype==0) ncinfo = 'Cloud-base height'
        if (itype==1) ncinfo = 'm'
        if (itype==2) ncinfo = 'time'
-!irina
     case('zcmn')
        if (itype==0) ncinfo = 'Mean Cloud-top height'
        if (itype==1) ncinfo = 'm'
@@ -709,15 +849,15 @@ contains
        if (itype==2) ncinfo = 'time'
     case('rwp_bar')
        if (itype==0) ncinfo = 'Rain-water path'
-     !  if (itype==1) ncinfo = 'kg/m^2'
+       !if (itype==1) ncinfo = 'kg/m^2'
        !irina
        if (itype==1) ncinfo = 'g/m^2'
        if (itype==2) ncinfo = 'time'
     case('prcp')
        if (itype==0) ncinfo = 'Surface precipitation rate'
-    !irina
+       !irina
        if (itype==1) ncinfo = 'kg/kg m/s'
-      ! if (itype==1) ncinfo = 'W/m^2'
+       !if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
     case('pfrac')
        if (itype==0) ncinfo = 'Precipitation fraction'
@@ -737,15 +877,15 @@ contains
        if (itype==2) ncinfo = 'time'
     case('fsttm')
        if (itype==0) ncinfo = 'First sample time'
-       if (itype==1) ncinfo = 'kg/m^3'
+       if (itype==1) ncinfo = 's'
        if (itype==2) ncinfo = 'time'
     case('lsttm')
-       if (itype==0) ncinfo = 'Basic state density'
-       if (itype==1) ncinfo = 'kg/m^3'
+       if (itype==0) ncinfo = 'Last sample time'
+       if (itype==1) ncinfo = 's'
        if (itype==2) ncinfo = 'time'
     case('nsmp')
-       if (itype==0) ncinfo = 'Basic state density'
-       if (itype==1) ncinfo = 'kg/m^3'
+       if (itype==0) ncinfo = 'Sample time counts'
+       if (itype==1) ncinfo = '#'
        if (itype==2) ncinfo = 'time'
     case('u_2')
        if (itype==0) ncinfo = 'Variance of u wind'
@@ -796,7 +936,7 @@ contains
        if (itype==1) ncinfo = 'm^2/s^2'
        if (itype==2) ncinfo = 'ttmt'
     case('tot_ww')
-       if (itype==0) ncinfo = 'Total vertical flux of v-wind'
+       if (itype==0) ncinfo = 'Total vertical flux of w-wind'
        if (itype==1) ncinfo = 'm^2/s^2'
        if (itype==2) ncinfo = 'ttmt'
     case('sfs_ww')
@@ -908,60 +1048,108 @@ contains
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
     case('rflx')
-       if (itype==0) ncinfo =  'Total Radiative flux'
+       if (itype==0) ncinfo = 'Total Radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
        !irina
     case('lflxu')
-       if (itype==0) ncinfo =  'Longwave Radiative flux UP'
+       if (itype==0) ncinfo = 'Longwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('lflxd')
-       if (itype==0) ncinfo =  'Longwave Radiative flux DW'
+       if (itype==0) ncinfo = 'Longwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
+    case('mp_tlt')
+       if (itype==0) ncinfo = 'T tendency from microphysics'
+       if (itype==1) ncinfo = 'K/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('mp_qt')
+       if (itype==0) ncinfo = 'Qt tendency from microphysics'
+       if (itype==1) ncinfo = 'kg/kg/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('mp_qr')
+       if (itype==0) ncinfo = 'Qr tendency from microphysics'
+       if (itype==1) ncinfo = 'kg/kg/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('mp_qi')
+       if (itype==0) ncinfo = 'Qi tendency from microphysics'
+       if (itype==1) ncinfo = 'kg/kg/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('mp_qs')
+       if (itype==0) ncinfo = 'Qs tendency from microphysics'
+       if (itype==1) ncinfo = 'kg/kg/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('mp_qg')
+       if (itype==0) ncinfo = 'Qg tendency from microphysics'
+       if (itype==1) ncinfo = 'kg/kg/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('mp_qh')
+       if (itype==0) ncinfo = 'Qh tendency from microphysics'
+       if (itype==1) ncinfo = 'kg/kg/s'
+       if (itype==2) ncinfo = 'tttt'
     case('lwuca')
-       if (itype==0) ncinfo =  'Clear Air Longwave Radiative flux UP'
+       if (itype==0) ncinfo = 'Clear Air Longwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('lwdca')
-       if (itype==0) ncinfo =  'Clear Air Longwave Radiative flux DW'
+       if (itype==0) ncinfo = 'Clear Air Longwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
-    case('lflxut')
-       if (itype==0) ncinfo =  'Top of Atmosphere Longwave Radiative flux UP'
-       if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'time'
+       if (itype==2) ncinfo = 'tttt'
     case('lflxdt')
        if (itype==0) ncinfo =  'Top of Atmosphere Longwave Radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('lflxut')
+       if (itype==0) ncinfo = 'Top of Atmosphere Longwave Radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('lflxutc')
+       if (itype==0) ncinfo =  'Clear AirTop of Atmosphere Longwave Radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('lflxds')
+       if (itype==0) ncinfo =  'Surface Longwave Radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('lflxus')
+       if (itype==0) ncinfo =  'Surface Longwave Radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('lflxdsc')
+       if (itype==0) ncinfo =  'Clear AirSurface Longwave Radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('lflxusc')
+       if (itype==0) ncinfo =  'Clear AirSurface Longwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
     case('rflx2')
        if (itype==0) ncinfo = 'Variance of total radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('sflx')
        if (itype==0) ncinfo = 'Shortwave radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
-    !irina
+       if (itype==2) ncinfo = 'tttt'
+       !irina
     case('sflxu')
        if (itype==0) ncinfo = 'Shortwave radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('sflxd')
        if (itype==0) ncinfo = 'Shortwave radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('swuca')
-       if (itype==0) ncinfo =  'Clear Air Shortwave Radiative flux UP'
+       if (itype==0) ncinfo = 'Clear Air Shortwave Radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
     case('swdca')
-       if (itype==0) ncinfo =  'Clear Air Shortwave Radiative flux DW'
+       if (itype==0) ncinfo = 'Clear Air Shortwave Radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
-   case('sflxut')
+       if (itype==2) ncinfo = 'tttt'
+    case('sflxut')
        if (itype==0) ncinfo = 'Top of Atmosphere Shortwave radiative flux UP'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
@@ -969,10 +1157,31 @@ contains
        if (itype==0) ncinfo = 'Top of Atmosphere Shortwave radiative flux DW'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'time'
+    case('sflxutc')
+       if (itype==0) ncinfo = 'Clear Air Top of Atmosphere Shortwave radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('sflxds')
+       if (itype==0) ncinfo =  'Surface Shortwave Radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('sflxus')
+       if (itype==0) ncinfo =  'Surface Shortwave Radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('sflxdsc')
+       if (itype==0) ncinfo =  'Clear AirSurface Shortwave Radiative flux DW'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('sflxusc')
+       if (itype==0) ncinfo =  'Clear AirSurface Shortwave Radiative flux UP'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
     case('sflx2')
        if (itype==0) ncinfo = 'Variance of shortwave radiative flux'
        if (itype==1) ncinfo = 'W/m^2'
-       if (itype==2) ncinfo = 'ttmt'
+       if (itype==2) ncinfo = 'tttt'
+
     case('l_2')
        if (itype==0) ncinfo = 'Variance of liquid'
        if (itype==1) ncinfo = 'kg^2/kg^2'
@@ -1249,7 +1458,90 @@ contains
        if (itype==0) ncinfo = 'EDMF Liquid water content'
        if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
-
+    case('Qnet')    
+       if (itype==0) ncinfo = 'Qnet'
+       if (itype==1) ncinfo = 'w/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('G0')    
+       if (itype==0) ncinfo = 'Ground heat flux'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('tndskin')    
+       if (itype==0) ncinfo = 'Skin heat tendency'
+       if (itype==1) ncinfo = 'w/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('ra')    
+       if (itype==0) ncinfo = 'Aerodynamic resistance'
+       if (itype==1) ncinfo = 's/m'
+       if (itype==2) ncinfo = 'time'
+    case('rsurf')    
+       if (itype==0) ncinfo = 'Surface resistance'
+       if (itype==1) ncinfo = 's/m'
+       if (itype==2) ncinfo = 'time'
+    case('rsveg')    
+       if (itype==0) ncinfo = 'Vegetation resistance'
+       if (itype==1) ncinfo = 's/m'
+       if (itype==2) ncinfo = 'time'
+    case('rssoil')    
+       if (itype==0) ncinfo = 'Soil resistance'
+       if (itype==1) ncinfo = 's/m'
+       if (itype==2) ncinfo = 'time'
+    case('tskinav')    
+       if (itype==0) ncinfo = 'Average skin potential temperature'
+       if (itype==1) ncinfo = 'K'
+       if (itype==2) ncinfo = 'time'
+    case('qskinav')    
+       if (itype==0) ncinfo = 'Average skin specific humidity'
+       if (itype==1) ncinfo = 'kg/kg'
+       if (itype==2) ncinfo = 'time'
+    case('obl')    
+       if (itype==0) ncinfo = 'Monin Obukhov Length'
+       if (itype==1) ncinfo = 'm'
+       if (itype==2) ncinfo = 'time'
+    case('cliq')    
+       if (itype==0) ncinfo = 'Fraction of vegetated surface covered with liquid water'
+       if (itype==1) ncinfo = '-'
+       if (itype==2) ncinfo = 'time'
+    case('a_Wl')    
+       if (itype==0) ncinfo = 'Liquid water reservoir'
+       if (itype==1) ncinfo = '-'
+       if (itype==2) ncinfo = 'time'
+    case('shf')    
+       if (itype==0) ncinfo = 'Surface Sensible Heat Flux'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'mmt'
+    case('lhf')    
+       if (itype==0) ncinfo = 'Surface Latent Heat Flux'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'mmt'
+    case('ustars')    
+       if (itype==0) ncinfo = 'Surface Friction Velocity'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'mmt'
+    case('a_tskin')    
+       if (itype==0) ncinfo = 'Surface Skin Temperature'
+       if (itype==1) ncinfo = 'K'
+       if (itype==2) ncinfo = 'mmt'
+    case('a_qskin')    
+       if (itype==0) ncinfo = 'Surface Skin Specific Humidity'
+       if (itype==1) ncinfo = 'kg/kg'
+       if (itype==2) ncinfo = 'mmt'
+    case('tsoil')    
+       if (itype==0) ncinfo = 'Soil Temperature'
+       if (itype==1) ncinfo = 'K'
+       if (itype==2) ncinfo = 'soilmmt'
+    case('phiw')    
+       if (itype==0) ncinfo = 'Soil Moisture'
+       if (itype==1) ncinfo = '-'
+       if (itype==2) ncinfo = 'soilmmt'
+    case('a_Qnet')    
+       if (itype==0) ncinfo = 'Surface Net Radiation'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'mmt'
+    case('a_G0')    
+       if (itype==0) ncinfo = 'Surface Ground Heat Flux'
+       if (itype==1) ncinfo = 'W/m^2'
+       if (itype==2) ncinfo = 'mmt'
     case default
        if (myid==0) print *, 'ABORTING: variable not found in ncinfo, ',trim(short_name)
        call appl_abort(0)

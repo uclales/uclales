@@ -1,0 +1,93 @@
+###############################################################
+#
+# Type of code to build $CNFG, location of code (in $ROOT) and 
+# location where model is to be built $BIN
+#
+ROOT      = ..
+BIN       = $(ROOT)/bin
+ARCH      := $(shell uname)
+#
+# Note that so far I have only been able to use the Intel compiler on
+# tornado. You need the netcdf libraries installed with the intel compiler
+# using the f90 interface.
+#
+# Generic Variables
+#
+SRC     =$(ROOT)/src
+
+ECHO    = /bin/echo
+RM      = /bin/rm -f
+
+ifeq ($(ARCH),AIX)
+#  On c1a of ECMWF 
+#    module load netcdf4/4.1.2
+#  sets all the path names NETCDF_INCLUDE, NETCDF_LIB
+  ARCHIVE   = ar rs
+  RANLIB    =:
+  F90       = xlf95_r 
+  MPIF90    = mpxlf95_r
+# debug-compile-flags
+#  DEBUG     = -WF,-DFPEABORT \
+#              -g -qfullpath -qinitauto=ff -qcheck -qflttrap=ZERO:INV:EN -qsigtrap
+#             -g -qfullpath -qinitauto=ff -qcheck -qflttrap=OV:ZERO:INV:EN -qsigtrap
+# debug-link-flags
+#  LDFLG     = -g -qfullpath -lmass -bmaxdata:2048000000 -bnoobjreorder
+  LDFLG     = 
+  FFLAGS    = -qsuffix=cpp=F90 -qextname -q64 -qrealsize=8 -O4 \
+              -qnoipa -qstrict=none:exceptions -qarch=pwr7 -qsimd $(EC_FFLAGS) -I/usr/local/apps/netcdf4/4.1.3/LP64/include -I/usr/local/apps/hdf5/1.8.8/LP64/include -I/usr/local/apps/zlib/1.2.7/LP64/include -I/usr/local/apps/szip/2.1/LP64/include
+  MPIFFLAGS = -qmoddir=$(SRC)/mpi -I$(SRC)/mpi
+  SEQFFLAGS = -qmoddir=$(SRC)/seq -I$(SRC)/seq
+#  LIBS      = $(EC_CLDFLAGS)
+#  LIBS      = $(EC_CLDFLAGS) -L/usr/local/apps/hdf5/1.8.6/LP64/lib -lhdf5_hl -lhdf5 -lmassv -lmass
+#  LIBS      = -lm -I/usr/local/apps/jasper/1.900.1/LP64/include -I/usr/local/apps/nag/23/LP64/nag_interface_blocks/noext -I/opt/freeware/include -I/usr/local/apps/netcdf4/4.1.3/LP64/include
+ LIBS      = -L/usr/local/apps/netcdf4/4.1.3/LP64/lib -lnetcdff -lnetcdf -L/usr/local/apps/hdf5/1.8.8/LP64/lib -lhdf5_hl -lhdf5  -L/usr/local/apps/zlib/1.2.7/LP64/lib -lz -lm -lhdf5_hl -lhdf5 -lz  -L/usr/local/apps/szip/2.1/LP64/lib -lsz -lhdf5_hl -lhdf5 -lz -lmassv -lmass
+ MPILIBS   = -lblacssmp -lpesslsmp $(LIBS)
+  F77FLAGS  = -qextname -qfixed
+endif
+
+LES_ARC_MPI=$(BIN)/libles_mpi.a
+LES_OUT_MPI=$(BIN)/WORK/les.mpi
+
+LES_ARC_SEQ=$(BIN)/libles_seq.a
+LES_OUT_SEQ=$(BIN)/les.seq
+
+default: mpi
+
+all:  mpi seq
+
+seq: $(LES_OUT_SEQ)
+
+mpi: $(LES_OUT_MPI)
+
+$(LES_OUT_SEQ): $(SRC)/LES.f90 $(LES_ARC_SEQ)  
+        $(F90) $(FFLAGS) $(SEQFFLAGS) -o $@ $< $(LES_ARC_SEQ) $(LIBS)
+
+$(LES_OUT_MPI): $(SRC)/LES.f90 $(LES_ARC_MPI)  
+        $(MPIF90) $(FFLAGS) $(MPIFFLAGS) -o $@ $< $(LES_ARC_MPI) $(MPILIBS)
+
+$(LES_ARC_SEQ): FORCE
+        cd $(SRC) ; $(MAKE) LES_ARC=$(LES_ARC_SEQ) \
+        FFLAGS='$(FFLAGS) $(SEQFFLAGS)' F90=$(F90) ARCHIVE='$(ARCHIVE)' \
+        RANLIB=$(RANLIB) F77FLAGS='$(F77FLAGS)'
+
+$(LES_ARC_MPI): FORCE
+        cd $(SRC) ; $(MAKE) LES_ARC=$(LES_ARC_MPI) \
+        FFLAGS='$(FFLAGS) $(MPIFFLAGS)' F90='$(MPIF90)' ARCHIVE='$(ARCHIVE)' \
+        RANLIB='$(RANLIB)' F77FLAGS='$(F77FLAGS)'
+#
+# cleaning
+# --------------------
+#
+clean: cleanmpi cleanseq 
+        $(RM) $(SRC)/*mod $(SRC)/*.o
+
+cleanmpi:
+        $(ECHO) "cleaning mpi model"
+        $(RM) core $(LES_OUT_MPI) $(SRC)/mpi/*mod $(LES_ARC_MPI)
+
+cleanseq:
+        $(ECHO) "clean sequential model"
+        $(RM) core $(LES_OUT_SEQ) $(SRC)/seq/*mod $(LES_ARC_SEQ)
+
+FORCE: 
+.PRECIOUS: $(LIBS)

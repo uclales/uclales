@@ -31,7 +31,7 @@ module sgsm
   real, parameter     :: tkemin=1.e-20
   real :: csx = 0.23
   real :: prndtl = 0.3333333333
-
+  real :: clouddiff = -1.
   real, allocatable, dimension (:,:) :: sxy1, sxy2, sxy3, sxz1, sxz2, sxz3    &
        , sxz4, sxz5, sxz6  ,szx1, szx2, szx3, szx4, szx5
   real, allocatable, dimension (:,:,:) :: szxy 
@@ -61,7 +61,7 @@ contains
   ! SUBROUTINE DIFFUSE: Driver for calculating sub-grid fluxes (thus it
   ! includes call to surface routines) 
   !
-  subroutine diffuse
+  subroutine diffuse(timein)
 
     use grid, only : newvar, nstep, a_up, a_ut, a_vp, a_vt, a_wp, a_wt       &
          ,a_rp, a_tp, a_sp, a_st, vapor, a_pexnr, a_theta,a_km               &
@@ -73,7 +73,12 @@ contains
     use mpi_interface, only: cyclics, cyclicc
     use thrm, only         : bruvais, fll_tkrs
 
+    real, intent(in)       :: timein 
     integer :: n
+
+    ! Hack BvS: slowly increase smago constant...
+    !csx = min(timein*0.23/3600.,0.23)    
+
 
     if (.not.Initialized) call diffuse_init(nzp, nxp, nyp)
 
@@ -82,10 +87,14 @@ contains
     ! Calculate Deformation and stability for SGS calculations
     !
 
-    call fll_tkrs(nzp,nxp,nyp,a_theta,a_pexnr,pi0,pi1,a_scr1,rs=a_scr2)
+    if(level>0) then
+      call fll_tkrs(nzp,nxp,nyp,a_theta,a_pexnr,pi0,pi1,a_scr1,rs=a_scr2)
+      call bruvais(nzp,nxp,nyp,level,a_theta,a_tp,a_scr3,dzi_m,th00,a_rp,a_scr2)
+    else
+      call fll_tkrs(nzp,nxp,nyp,a_theta,a_pexnr,pi0,pi1,a_scr1)
+      call bruvais(nzp,nxp,nyp,level,a_theta,a_tp,a_scr3,dzi_m,th00)
+    end if
 
-
-    call bruvais(nzp,nxp,nyp,level,a_theta,a_tp,a_rp,a_scr2,a_scr3,dzi_m,th00)
     !
     !
     call deform(nzp,nxp,nyp,dzi_m,dzi_t,dxi,dyi,a_up,a_vp,a_wp,a_scr5,a_scr6     &
@@ -130,6 +139,7 @@ contains
     !
     ! Diffuse scalars
     !
+
     do n=4,nscl
        call newvar(n,istep=nstep)
        call azero(nxyp,sxy1)
@@ -182,6 +192,7 @@ contains
     integer :: ip,im,jp,jm,kp
     real    :: y1a,y2a,y3a,y1b,y2b,y3b
     real    :: s11_wpt,s22_wpt,s33_wpt,s12_wpt,s13_wpt,s23_wpt
+
     !
     ! calculate components of the stress tensor at their natural locations
     !
@@ -245,8 +256,9 @@ contains
       
     use defs, only          : pi, vonk
     use stat, only          : tke_sgs
-    use util, only          : get_avg3, get_cor3
+    use util, only          : get_avg3, get_cor3, calclevel
     use mpi_interface, only : cyclics, cyclicc
+    use grid, only          : liquid
 
     implicit none
 
@@ -255,8 +267,8 @@ contains
     real, intent(in)    :: dxi,dyi,zm(n1),dn0(n1)
     real, intent(inout) :: ri(n1,n2,n3),kh(n1,n2,n3)
     real, intent(out)   :: km(n1,n2,n3),szxy(n1,n2,n3)
-
-    real    :: delta,pr
+    integer             :: cb, ct
+    real    :: delta,pr,labn
 
     pr    = abs(prndtl)
     
@@ -271,8 +283,14 @@ contains
              ! variable km represents what is commonly known as Km, the eddy viscosity
              ! variable kh represents strain rate factor S^2 (dummy variable)
              !
-             km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) &
-                  *0.5*(dn0(k)+dn0(k+1))/(1./(delta*csx)**2+1./(zm(k)*vonk)**2)
+             
+             ! Original Bjorn:
+             !km(k,i,j) = sqrt(max(0.,kh(k,i,j)*(1.-ri(k,i,j)/pr))) &
+             !     *0.5*(dn0(k)+dn0(k+1))/(1./(delta*csx)**2+1./(zm(k)*vonk)**2)
+
+             ! BvS: split out wall damping and stability correction 
+             labn      = (1./(delta*csx)**2+1./(zm(k)*vonk)**2)
+             km(k,i,j) =  (dn0(k)+dn0(k+1))/2. * sqrt(max(0.,kh(k,i,j))) * sqrt(max(0.,(1.-ri(k,i,j)/pr))) / labn 
              !
              ! after kh is multiplied with the factor (1-ri/pr), the product of kh 
              ! and km represents the dissipation rate epsilon 
@@ -306,7 +324,7 @@ contains
           ! variable sz1 which corresponds to Km^2.
           !
           tke_sgs(k) = sz1(k)/(delta*pi*(csx**2))**2
-          sz1(k) = 1./sqrt(1./(delta*csx)**2+1./(zm(k)*vonk+0.001)**2)
+          sz1(k) = 1./sqrt(1./(delta*csx)**1+1./(zm(k)*vonk+0.001)**1)
        end do
        call updtst(n1,'sgs',-1,tke_sgs,1) ! sgs tke
        call updtst(n1,'sgs',-5,sz1,1)      ! mixing length
@@ -330,6 +348,21 @@ contains
           enddo
        enddo
     enddo
+    if (clouddiff> 0) then ! Additional diffusion outside of the clouds - but in the cloud layer
+      call calclevel(liquid, cb, 'base')
+      call calclevel(liquid, ct, 'top')    
+      do j=3,n3-2
+        do i=3,n2-2
+            do k=cb,ct
+              if (liquid(k,i,j) <1e-10) then
+                kh(k,i,j) = clouddiff * kh(k,i,j) 
+              end if
+            enddo
+        enddo
+      enddo
+        
+    
+    end if
     call cyclics(n1,n2,n3,kh,req)
     call cyclicc(n1,n2,n3,kh,req)
 
@@ -645,6 +678,7 @@ contains
     ! Coefficients need only be calculated once and can be used repeatedly
     ! for other scalars
     !
+
     dti       = 1.0/dt
     do k=1,n1
        sz7(k)   = 0.
