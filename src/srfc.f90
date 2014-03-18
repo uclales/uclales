@@ -280,6 +280,8 @@ contains
        sst      = tskinavg*(psrf/p00)**(rcp)
        call srfcscls(nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,a_ustar,a_tstar,obl,drt=drdz,rstar=a_rstar)
 
+       !print*,'surf1 ',a_ustar(10,10),a_tstar(10,10),obl(10,10)
+
        !Calculate the drag coefficients and aerodynamic resistance
        do j=3,nyp-2
          do i=3,nxp-2
@@ -293,6 +295,8 @@ contains
          end do
        end do
 
+       !print*,'surf2 ',cm(10,10),cs(10,10),ra(10,10)
+
        !Get skin temperature and humidity from land surface model (van Heerwaarden)
        call lsm
 
@@ -303,6 +307,8 @@ contains
        else
          !Insert filter method here
        end if
+
+       !print*,'surf3 ',tskinav(10,10),qskinav(10,10)
 
        !Calculate the surface fluxes with bulk law (Fairall, 2003)
        !Fluxes in kinematic form with units [K m/s] and [kg/kg m/s]
@@ -494,7 +500,7 @@ contains
     Hg     = (Hg     / ((nxpg-4)*(nypg-4))) * cp * (dn0(1)+dn0(2))/2.
     Gg     = (Gg     / ((nxpg-4)*(nypg-4))) 
     oblg   = (oblg   / ((nxpg-4)*(nypg-4))) 
-    ustarg = (ustarg / ((nxpg-4)*(nypg-4))) 
+    ustarg = (ustarg / ((nxpg-4)*(nypg-4)))
 
   end subroutine srfcstat
 
@@ -992,12 +998,10 @@ contains
     real     :: fH, fLE, fLEveg, fLEsoil, fLEliq, LEveg, LEsoil, LEliq
     real     :: Wlmx, rk3coef=0
 
-
     thetaavg  = sum(a_theta(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
     pair      = psrf*exp(-1.*g*(zt(2)-zt(1))/2/R/thetaavg)
     exner     = (psrf/p00)**rcp
     exnerair  = (pair/p00)**rcp   
-
 
     !"1.0 - Compute water content per layer
     do j = 3,nyp-2

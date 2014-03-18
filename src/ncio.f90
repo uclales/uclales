@@ -260,31 +260,27 @@ contains
 
     use mpi_interface, only :myid
 
-    integer, parameter :: nnames = 46
+    integer, parameter :: nnames = 37
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,& !1
          'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,& !7 
          'w      ','t      ','p      ','q      ','l      ','r      '   ,& !13
          'n      ','rice   ','nice   ','rsnow  ','rgrp   ','nsnow  '   ,& !19
          'ngrp   ','rhail  ','nhail  ','rflx   ','lflxu  ','lflxd  '   ,& !25
-         'shf    ','lhf    ','ustars ','a_tskin','a_qskin','tsoil  '   ,& !31
-         'phiw   ','a_Qnet ','a_G0   ','mp_tlt ','mp_qt  ','mp_qr  '   ,& !37
-         'mp_qi  ','mp_qs  ','mp_qg  ','mp_qh  '/)  !43-46
-
-
+         'mp_tlt ','mp_qt  ','mp_qr  ','mp_qi  ','mp_qs  ','mp_qg  '   ,& !31
+         'mp_qh  '/)  !37
 
     real, intent (in) :: time
     integer           :: nbeg, nend
 
     nvar0 = nbase + naddsc
-    if (level  >= 1) nvar0 = nvar0+1
-    if (level  >= 2) nvar0 = nvar0+1
-    if (level  >= 3) nvar0 = nvar0+2
-    if (level  >= 4) nvar0 = nvar0+4
-    if (level  >= 5) nvar0 = nvar0+4
+    if (level  >= 1)                   nvar0 = nvar0+1
+    if (level  >= 2)                   nvar0 = nvar0+1
+    if (level  >= 3)                   nvar0 = nvar0+2
+    if (level  >= 4)                   nvar0 = nvar0+4
+    if (level  >= 5)                   nvar0 = nvar0+4
     if (iradtyp > 1 .and. iradtyp < 5) nvar0 = nvar0+3
-    if (isfctyp == 5) nvar0 = nvar0+9
-    if (lmptend)      nvar0 = nvar0+7
+    if (lmptend)                       nvar0 = nvar0+7
 
     allocate (sanal(nvar0))
     sanal(1:nbase) = sbase(1:nbase)
@@ -312,6 +308,7 @@ contains
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(nbase+4)
     end if
+
     if (level >= 4) then
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(20)
@@ -322,6 +319,7 @@ contains
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(23)
     end if
+
     if (level >= 5) then
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(24)
@@ -332,6 +330,7 @@ contains
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(27)
     end if
+
     if (iradtyp > 1 .and. iradtyp < 5) then
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(28)
@@ -341,41 +340,21 @@ contains
        sanal(nvar0) = sbase(30)
     end if
 
-    if (isfctyp == 5) then
-       nvar0 = nvar0+1
-       sanal(nvar0)=sbase(31)
-       nvar0 = nvar0+1
-       sanal(nvar0)=sbase(32)
-       nvar0 = nvar0+1
-       sanal(nvar0)=sbase(33)
-       nvar0 = nvar0+1
-       sanal(nvar0)=sbase(34)
-       nvar0 = nvar0+1
-       sanal(nvar0)=sbase(35)
-       nvar0 = nvar0+1
-       sanal(nvar0)=sbase(36)
-       nvar0 = nvar0+1
-       sanal(nvar0)=sbase(37)
-       nvar0 = nvar0+1
-       sanal(nvar0)=sbase(38)
-       nvar0 = nvar0+1
-       sanal(nvar0)=sbase(39)
-    end if
     if (lmptend) then
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(40)
+       sanal(nvar0) = sbase(31)
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(41)
+       sanal(nvar0) = sbase(32)
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(42)
+       sanal(nvar0) = sbase(33)
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(43)
+       sanal(nvar0) = sbase(34)
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(44)
+       sanal(nvar0) = sbase(35)
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(45)
+       sanal(nvar0) = sbase(36)
        nvar0 = nvar0+1
-       sanal(nvar0) = sbase(46)
+       sanal(nvar0) = sbase(37)
     end if
 
     nbeg = nvar0+1
@@ -467,11 +446,13 @@ contains
     iret = nf90_inq_varid(ncid0, sanal(15), VarID)
     iret = nf90_put_var(ncid0, VarID, press(:,i1:i2,j1:j2), start=ibeg, &
          count=icnt)
+
     if (level > 0) then
        iret = nf90_inq_varid(ncid0, sanal(16), VarID)
        iret = nf90_put_var(ncid0, VarID, a_rp(:,i1:i2,j1:j2), start=ibeg, &
            count=icnt)
     end if 
+
     if (level >= 2)  then
        iret = nf90_inq_varid(ncid0, sanal(17), VarID)
        iret = nf90_put_var(ncid0, VarID, liquid(:,i1:i2,j1:j2), start=ibeg, &
@@ -486,7 +467,7 @@ contains
         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
         iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
                count=icnt)
-         !if (myid==0) print*,"sanal(nn):",sanal(nn),nn
+         if (myid==0) print*,"sanal(nn):",sanal(nn),nn
        end do
     endif  
 
@@ -497,7 +478,7 @@ contains
         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
         iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
                count=icnt)
-        !if (myid==0) print*,"sanal(nn):",sanal(nn),nn
+        if (myid==0) print*,"sanal(nn):",sanal(nn),nn
       end do
     endif  
 
@@ -508,7 +489,7 @@ contains
         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
         iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
              count=icnt)
-        !if (myid==0) print*,"sanal(nn):",sanal(nn),nn
+        if (myid==0) print*,"sanal(nn):",sanal(nn),nn
       end do
     endif  
 
@@ -526,41 +507,7 @@ contains
        iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
             count=icnt)
     end if
-    !Malte: Land Surface Output for isfctyp=5
-    if (isfctyp == 5) then 
-       iret = nf90_inq_varid(ncid0, sanal(nn+1), VarID)
-       iret = nf90_put_var(ncid0, VarID, wt_sfc(i1:i2,j1:j2)*cp*(dn0(1)+dn0(2))*0.5, &
-              start=ibegsfc, count=icntsfc)
-       iret = nf90_inq_varid(ncid0, sanal(nn+2), VarID)
-       iret = nf90_put_var(ncid0, VarID, wq_sfc(i1:i2,j1:j2)*alvl*(dn0(1)+dn0(2))*0.5, &
-              start=ibegsfc, count=icntsfc)
-       iret = nf90_inq_varid(ncid0, sanal(nn+3), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_ustar(i1:i2,j1:j2), &
-              start=ibegsfc, count=icntsfc)
-       iret = nf90_inq_varid(ncid0, sanal(nn+4), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_tskin(i1:i2,j1:j2), &
-              start=ibegsfc, count=icntsfc)
-       iret = nf90_inq_varid(ncid0, sanal(nn+5), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_qskin(i1:i2,j1:j2), &
-              start=ibegsfc, count=icntsfc)
-       iret = nf90_inq_varid(ncid0, sanal(nn+6), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_tsoil(:,i1:i2,j1:j2), &
-              start=ibeg, count=icntsoil)
-       iret = nf90_inq_varid(ncid0, sanal(nn+7), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_phiw(:,i1:i2,j1:j2), &
-              start=ibeg, count=icntsoil)
-       iret = nf90_inq_varid(ncid0, sanal(nn+8), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_Qnet(i1:i2,j1:j2), &
-              start=ibegsfc, count=icntsfc)
-       iret = nf90_inq_varid(ncid0, sanal(nn+9), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_G0(i1:i2,j1:j2), &
-              start=ibegsfc, count=icntsfc)
-       !print*,myid,sanal(nn+4),nn+9
-       !if (iret.ne.nf90_noerr) print*,myid,nf90_strerror(iret),nn+9
-       nn = nn+9
-    end if 
 
-    
     if (lmptend)  then
          nn = nn+1
          iret = nf90_inq_varid(ncid0, sanal(nn), VarID)

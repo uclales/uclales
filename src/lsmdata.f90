@@ -226,8 +226,8 @@ module lsmdata
     !allocate(obl(nxp,nyp))
     allocate(ra(nxp,nyp))
     allocate(rsurf(nxp,nyp))
-    !allocate(z0m(nxp,nyp))
-    !allocate(z0h(nxp,nyp))
+    allocate(z0m(nxp,nyp))
+    allocate(z0h(nxp,nyp))
     allocate(cm(nxp,nyp))
     allocate(cs(nxp,nyp))
 
@@ -305,8 +305,8 @@ module lsmdata
        a_Wl             = Wlav
     end if 
 
-    z0m       = z0mav
-    z0h       = z0hav
+    z0m(:,:)       = z0mav
+    z0h(:,:)       = z0hav
     
     !COSMO config from Linda
     dzsoil(1) = 0.07    !z = 0.07 m 

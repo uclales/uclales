@@ -380,7 +380,7 @@ contains
           end if
        end if
 
-       call forcings(xtime,cntlat,sst,div,case_name)
+       call forcings(xtime,cntlat,sst,div,case_name,time)
 
        if (level >= 1) then
           call micro(level,istp)
@@ -723,7 +723,7 @@ contains
 
     do j=3,n3-2
       do i=3,n2-2
-        do k=1,n1
+        do k=2,n1-2
           wt(k,i,j)=wt(k,i,j)+scr(k,i,j)+scr(k+1,i,j)
         end do
       end do
