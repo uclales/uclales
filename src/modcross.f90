@@ -30,7 +30,7 @@ implicit none
   character(len=7),  dimension(10) :: hname
   character(len=80), dimension(10) :: hlname
   character(len=7) :: hname_prc
-  integer, parameter :: nvar_all = 55
+  integer, parameter :: nvar_all = 56
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
          'l      ','rp     ','np     ','tv     ','ricep  ', & !6-10
@@ -42,7 +42,8 @@ implicit none
          'wdev_cl','wdev_sc','w_cld  ','tdev_cl','tdev_sc', & !36-40
          't_cld  ','qdev_cl','qdev_sc','q_cld  ','tv_cl  ', & !41-45
          'tv_sc  ','tv_cld ','core   ','th_e   ','H0     ', & !46-50
-         'G0     ','tsoil  ','tsurf  ','ra     ','usurf  '/)  !51-55
+         'LE0    ','G0     ','tsoil  ','tsurf  ','ra     ', & !51-55
+         'usurf  '/)  !56-
 
   integer :: nccrossxzid,nccrossyzid,nccrossxyid,nccrossrec,nvar
 
@@ -373,6 +374,11 @@ contains
         loc = (/ihlf, ictr, ictr/)
         longname =  'surface sensible heat flux'
         unit = 'W/m2'
+      case ('LE0')
+        if (isfctyp /= 5) return
+        loc = (/ihlf, ictr, ictr/)
+        longname =  'surface latent heat flux'
+        unit = 'W/m2'
       case ('G0')
         if (isfctyp < 5) return
         loc = (/ihlf, ictr, ictr/)
@@ -505,11 +511,11 @@ contains
     use grid,      only : level,nxp, nyp, nzp, tname, zt, zm, dzi_m, dzi_t, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
        prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta, pi0, pi1, a_pexnr, prc_lev, umean, vmean, th00, &
-       wt_sfc, a_G0, dn0, a_tsoil, a_tskin, wspd
+       wt_sfc, wq_sfc, a_G0, dn0, a_tsoil, a_tskin, wspd
     use lsmdata,   only : ra
     use modnetcdf, only : writevar_nc, fillvalue_double
     use util,      only : get_avg3, get_var3, calclevel
-    use defs,      only : ep2,cp,cpr, p00
+    use defs,      only : ep2,cp,cpr, p00,alvl
     use thrm,      only: rslf
     real, intent(in) :: rtimee
     real             :: tstar, exner, tk, dnsurf
@@ -783,14 +789,17 @@ contains
       case ('H0')
         dnsurf = 0.5*(dn0(1)+dn0(2))
         call writecross(crossname(n), wt_sfc(3:nxp-2, 3:nyp-2)*dnsurf*cp)
+      case ('LE0')
+        dnsurf = 0.5*(dn0(1)+dn0(2))
+        call writecross(crossname(n), wq_sfc(3:nxp-2, 3:nyp-2)*dnsurf*alvl)
       case ('G0')
         call writecross(crossname(n), a_G0(3:nxp-2, 3:nyp-2))
       case ('tsoil')
         call writecross(crossname(n), a_tsoil(1,3:nxp-2, 3:nyp-2))
       case ('tsurf')
         call writecross(crossname(n), a_tskin(3:nxp-2, 3:nyp-2))
-      case ('ra')
-        call writecross(crossname(n), ra(3:nxp-2, 3:nyp-2))
+      !case ('ra')
+      !  call writecross(crossname(n), ra(3:nxp-2, 3:nyp-2))
       case ('usurf')
         call writecross(crossname(n), wspd(3:nxp-2, 3:nyp-2))
       end select
