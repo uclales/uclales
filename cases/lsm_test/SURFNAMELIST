@@ -1,0 +1,27 @@
+ &SURFNAMELIST
+ local         = true
+ hetero        = false
+
+ tsoilav(1)    = 291.14
+ tsoilav(2)    = 291.09
+ tsoilav(3)    = 290.86
+ tsoilav(4)    = 289.92
+ tsoildeepav   = 281.56
+ 
+ phiwav(1)     = 0.2730
+ phiwav(2)     = 0.2744
+ phiwav(3)     = 0.2764
+ phiwav(4)     = 0.3359
+
+ z0mav         = 0.04
+ z0hav         = 0.008
+ LAIav         = 2.96
+ cvegav        = 1.
+ Qnetav        = 450.
+ gDav          = 0.
+ rsminav       = 150.
+ rssoilminav   = 50.
+ Cskinav       = 20000.
+ lambdaskinav  = 5.
+ Wlav          = 0.
+/
