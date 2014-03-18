@@ -65,8 +65,11 @@ module modparticles
                                                         ! used only in combination with lpartmass = .true.
   logical            :: cal_ecoal      = .true.         ! switch for coalescence efficiency as in Seifert et al. 2005
   logical            :: sc_zsort       = .true.         ! switch to use a selfcollection that depends on the LD's
-                                                        ! vertical position (similar to Soelch and Kaercher, 2010)
-  
+                                                        ! vertical position 
+  logical            :: sc_sk10        = .false.         ! switch to use a selfcollection according to Soelch and Kaercher, 2010
+                                                        ! (only valid if sc_zsort=.true.)
+
+ 
   ! Particle structure
   type :: particle_record
     real             :: unique, tstart
@@ -2895,7 +2898,7 @@ contains
     type (particle_record), pointer:: pred_p,prey_p
     type (sc_el), pointer  :: pred_sc, prey_sc, pred_free
     integer                :: i,j,k,x
-    real                   :: r_pred, r_prey, deltav, dzi, randnr, pij, Dgr, Dkl, ecoal, dv
+    real                   :: r_pred, r_prey, deltav, dzi, randnr, pij, Dgr, Dkl, ecoal, dv, deltaw
     real                   :: thl,thv,rt,rl,tk
     real, parameter        :: eps = 1.0e-30, Dmin = 300e-6, Dmax = 600e-6
 
@@ -2958,10 +2961,19 @@ contains
 		  end if
 		  
 		  if (sc_zsort) then
+		    ! take the LD's vertical position into account
 		    if ( ((pred_p%z-prey_p%z)/(prey_p%wdrop-pred_p%wdrop).gt.0.) .and. &
 		         ((pred_p%z-prey_p%z)/(prey_p%wdrop-pred_p%wdrop).le.dt) ) then  
-		      pij = (dxi * dyi) * max(pred_p%mtpl,prey_p%mtpl) &
-		                   * ecoal * pi * (r_pred+r_prey)**2. 
+		      if (sc_sk10) then
+                        ! Soelch and Kaercher 2010
+		        pij = (dxi * dyi) * max(pred_p%mtpl,prey_p%mtpl) &
+		                     * ecoal * pi * (r_pred+r_prey)**2. 
+		      else
+		        ! take horizontal velocity into account
+                        deltaw = abs(prey_p%wdrop-pred_p%wdrop)/dzi
+		        pij = (dxi * dyi) * max(pred_p%mtpl,prey_p%mtpl) &
+		                     * ecoal * pi * (r_pred+r_prey)**2. *deltav / deltaw
+                      end if
 		    else
 		      pij = 0.
 		    end if

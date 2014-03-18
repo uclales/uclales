@@ -577,7 +577,7 @@ contains
     real, parameter :: cmur3 = 1.5e-3  ! revised constants
 
     logical, parameter :: oldevaporation = .false.
-    logical, parameter :: mue_SB = .false.
+    logical, parameter :: mue_SB = .true.
 
     real :: mue,lam,gfak,f_q,gamma_eva,b2
 
@@ -897,7 +897,7 @@ contains
     real    :: b2, Xp, Dp, Dm, mu, flxdiv, tot,sk, mini, maxi, cc, zz, cmax
     real, dimension(n1) :: nslope,rslope,dn,dr, rfl, nfl, vn, vr, cn, cr
 
-    logical, parameter :: oldsedimentation = .true.
+    logical, parameter :: oldsedimentation = .false.
 
     b2 = a2*exp(c2*Dv)
 
