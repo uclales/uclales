@@ -30,7 +30,7 @@ implicit none
   character(len=7),  dimension(10) :: hname
   character(len=80), dimension(10) :: hlname
   character(len=7) :: hname_prc
-  integer, parameter :: nvar_all = 56
+  integer, parameter :: nvar_all = 60
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
          'l      ','rp     ','np     ','tv     ','ricep  ', & !6-10
@@ -43,7 +43,7 @@ implicit none
          't_cld  ','qdev_cl','qdev_sc','q_cld  ','tv_cl  ', & !41-45
          'tv_sc  ','tv_cld ','core   ','th_e   ','H      ', & !46-50
          'LE     ','G      ','tsoil  ','tsurf  ','ra     ', & !51-55
-         'usurf  '/)  !56-
+         'usurf  ','swd_s  ','swu_s  ','lwd_s  ','lwu_s  '/)  !56-60
 
   integer :: nccrossxzid,nccrossyzid,nccrossxyid,nccrossrec,nvar
 
@@ -148,7 +148,7 @@ contains
                             yname, ylongname, yunit, &
                             tname, tlongname, tunit, &
                             lwaterbudget, lcouvreux, prc_lev, &
-                            isfctyp
+                            isfctyp, iradtyp
 
     character (*), intent(in)    :: name
     character (40), dimension(3) :: dimname, dimlongname, dimunit
@@ -403,6 +403,26 @@ contains
         loc = (/ihlf, ictr, ictr/)
         longname =  'surface wind at cell center'
         unit = 'm/s'
+      case ('swd_s')
+        if (iradtyp < 4) return
+        loc = (/ihlf, ictr, ictr/)
+        longname =  'surface downward shortwave radiation'
+        unit = 'W/m2'
+      case ('swu_s')
+        if (iradtyp < 4) return
+        loc = (/ihlf, ictr, ictr/)
+        longname =  'surface upward shortwave radiation'
+        unit = 'W/m2'
+      case ('lwd_s')
+        if (iradtyp < 4) return
+        loc = (/ihlf, ictr, ictr/)
+        longname =  'surface downward longwave radiation'
+        unit = 'W/m2'
+      case ('lwu_s')
+        if (iradtyp < 4) return
+        loc = (/ihlf, ictr, ictr/)
+        longname =  'surface upward longwave radiation'
+        unit = 'W/m2'
       case default
         return
       end select
@@ -511,7 +531,7 @@ contains
     use grid,      only : level,nxp, nyp, nzp, tname, zt, zm, dzi_m, dzi_t, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
        prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta, pi0, pi1, a_pexnr, prc_lev, umean, vmean, th00, &
-       wt_sfc, wq_sfc, a_G0, dn0, a_tsoil, a_tskin, wspd
+       wt_sfc, wq_sfc, a_G0, dn0, a_tsoil, a_tskin, wspd, a_lflxu,a_lflxd,a_sflxu,a_sflxd
     use lsmdata,   only : ra
     use modnetcdf, only : writevar_nc, fillvalue_double
     use util,      only : get_avg3, get_var3, calclevel
@@ -802,6 +822,14 @@ contains
         call writecross(crossname(n), ra(3:nxp-2, 3:nyp-2))
       case ('usurf')
         call writecross(crossname(n), wspd(3:nxp-2, 3:nyp-2))
+      case ('swd_s')
+        call writecross(crossname(n), a_sflxd(2,3:nxp-2, 3:nyp-2))
+      case ('swu_s')
+        call writecross(crossname(n), a_sflxu(2,3:nxp-2, 3:nyp-2))
+      case ('lwd_s')
+        call writecross(crossname(n), a_lflxd(2,3:nxp-2, 3:nyp-2))
+      case ('lwu_s')
+        call writecross(crossname(n), a_lflxu(2,3:nxp-2, 3:nyp-2))
       end select
     end do
 

@@ -20,12 +20,12 @@
   vs       =    0.0,    0.0,
   savg_intvl = 100.
   ssam_intvl =  100.
-  frqanl = 99999 
+  frqanl   = 99999 
 
-  istpfl = 20
+  istpfl   = 20
 
-  isfctyp  = 5
-  iradtyp  = 5
+  isfctyp  = 0
+  iradtyp  = 0
   strtim = 180.3
   lspongeinit = .false.
 
