@@ -57,23 +57,18 @@ module lsmdata
   ! Spatially varying properties
   real, allocatable :: lambda  (:,:,:)    !<  Heat conductivity soil layer [W/m/K]
   real, allocatable :: lambdah (:,:,:)    !<  Heat conductivity soil layer half levels [W/m/K]
-
   real, allocatable :: lambdas (:,:,:)    !<  Soil moisture diffusivity soil layer 
   real, allocatable :: lambdash(:,:,:)    !<  Soil moisture diffusivity soil half levels 
-
   real, allocatable :: gammas  (:,:,:)    !<  Soil moisture conductivity soil layer 
   real, allocatable :: gammash (:,:,:)    !<  Soil moisture conductivity soil half levels 
-
   real, allocatable :: rootf   (:,:,:)    !<  Root fraction per soil layer [-]
   real              :: rootfav (ksoilmax) !<  Average root fraction per soil layer [-]
-
   real              :: phiwav  (ksoilmax) !<  Average water content soil matrix [-]
   real, allocatable :: phiwm   (:,:,:)    !<  Water content soil matrix previous time step [-]
   real, allocatable :: phifrac (:,:,:)    !<  Relative water content per layer [-]
   real, allocatable :: phitot  (:,:)      !<  Total soil water content [-]
   real, allocatable :: pCs     (:,:,:)    !<  Volumetric heat capacity [J/m3/K]
   real, allocatable :: Dh      (:,:,:)    !<  Heat diffusivity
-
   real, allocatable :: tsoilm  (:,:,:)    !<  Soil temperature previous time step [K]
   real              :: tsoilav (ksoilmax) !<  Average Soil temperature [K]
   real, allocatable :: tsoildeep (:,:)    !<  Deep soil temperature [K]
@@ -83,14 +78,11 @@ module lsmdata
   real, parameter   :: phi       = 0.472  !<  volumetric soil porosity [-]
   real, parameter   :: phifc     = 0.323  !<  volumetric moisture at field capacity [-]
   real, parameter   :: phiwp     = 0.171  !<  volumetric moisture at wilting point [-]
-
   real, parameter   :: pCm       = 2.19e6 !<  Volumetric soil heat capacity [J/m3/K]
   real, parameter   :: pCw       = 4.2e6  !<  Volumetric water heat capacity [J/m3/K]
-
   real, parameter   :: lambdadry = 0.190  !<  Heat conductivity dry soil [W/m/K]
   real, parameter   :: lambdasm  = 3.11   !<  Heat conductivity soil matrix [W/m/K]
   real, parameter   :: lambdaw   = 0.57   !<  Heat conductivity water [W/m/K]
-
   real, parameter   :: bc        = 6.04     !< Clapp and Hornberger non-dimensional exponent [-]
   real, parameter   :: gammasat  = 0.57e-6  !< Hydraulic conductivity at saturation [m s-1]
   real, parameter   :: psisat    = -0.388   !< Matrix potential at saturation [m]
@@ -101,30 +93,23 @@ module lsmdata
   ! Surface properties
   real, allocatable :: z0m        (:,:) !<  Roughness length for momentum [m]
   real              :: z0mav    = 0.1
-
   real, allocatable :: z0h        (:,:) !<  Roughness length for heat [m]
   real              :: z0hav    = 0.025
-
   real, allocatable :: LAI        (:,:) !<  Leaf area index vegetation [-]
   real, allocatable :: LAIG       (:,:) !<  Global leaf area index vegetation [-]
   real              :: LAIav    = 4.    !<  Average leaf area index [-]
   real              :: LAImin   = 2.    !<  Minimum leaf area index [-]  
   real              :: LAImax   = 6.    !<  Maximum leaf area index [-]
-
   real, allocatable :: Cskin      (:,:) !<  Heat capacity skin layer [J]
   real              :: Cskinav  = 20000.
-
   real, allocatable :: cveg       (:,:) !<  Vegetation cover [-]
   real              :: cvegav   = 0.9
-
   real, allocatable :: lambdaskin (:,:) !<  Heat conductivity skin layer [W/m/K]
   real              :: lambdaskinav = 5.
-
   real              :: Wlav     = 0.                          
   real, parameter   :: Wmax     = 0.0002 !<  Maximum layer of liquid water on surface [m]
   real, allocatable :: Wlm        (:,:) !<  Liquid water reservoir previous timestep [m]
   real, allocatable :: cliq       (:,:) !<  Fraction of vegetated surface covered with liquid water 
-
   real, allocatable :: tskinm     (:,:) !<  Skin temperature previous timestep [K]
   real              :: tskinavg = 0.    !<  Slab average of tskin used by srfcsclrs 
 
@@ -132,19 +117,14 @@ module lsmdata
   real              :: Qnetav   = 300.
   real, allocatable :: Qnetm    (:,:)   !<  Net radiation previous timestep [W/m2]
   real, allocatable :: Qnetn    (:,:)   !<  Net radiation dummy [W/m2]
-
   real, allocatable :: rsmin    (:,:)   !<  Minimum vegetation resistance [s/m]
   real              :: rsminav = 110.
-
   real, allocatable :: rssoilmin(:,:)   !<  Minimum soil evaporation resistance [s/m]
   real              :: rssoilminav = 50.
-
   real, allocatable :: gD       (:,:)   !<  Response factor vegetation to vapor pressure deficit [-]
   real              :: gDav = 0.
-
   real, allocatable :: LE       (:,:)   !<  Latent heat flux [W/m2]
   real, allocatable :: H        (:,:)   !<  Sensible heat flux [W/m2]
-
   real, allocatable :: ra       (:,:)   !<  Aerodynamic resistance [s/m]
   real, allocatable :: rsurf    (:,:)   !<  Composite resistance [s/m]
   real, allocatable :: rsveg    (:,:)   !<  Vegetation resistance [s/m]
@@ -158,7 +138,6 @@ module lsmdata
   real              :: oblav            !<  Spatially averaged obukhov length [m]
   real, allocatable :: cm      (:,:)    !<  Drag coefficient for momentum [-]
   real, allocatable :: cs      (:,:)    !<  Drag coefficient for scalars [-]
-
   real              :: u0av             !<  Mean u-wind component
   real              :: v0av             !<  Mean v-wind component
   real, allocatable :: u0bar    (:,:,:) !<  Filtered u-wind component
@@ -171,15 +150,14 @@ module lsmdata
   ! Bart: for simple LSM
   real, dimension(:,:,:), allocatable :: soiltendm !< previous soil temperature tendency 
   real              :: lambdab, labsk, rhoCs 
-  integer           :: imostloc = 0   ! 0=local, 1=local average, 2=global average 
-  logical           :: dolsm   = .true.
+  integer           :: imostloc = 0     ! 0=local, 1=local average, 2=global average 
+  logical           :: dolsm    = .true.
 
   contains
-
   !
   ! ----------------------------------------------------------
   ! Malte: initialize LSM and surface layer
-  ! Adopted from DALES (vanHeerwaarden)
+  ! Adopted from DALES (van Heerwaarden)
   !
   subroutine initlsm(sst,time_in)
     
@@ -286,7 +264,6 @@ module lsmdata
     ! --------------------------------------------------------
     ! Initialize arrays
     ! 
-
     if ((time_in*86400.) .le. dt) then
 
        a_tskin          = sst
@@ -303,6 +280,9 @@ module lsmdata
        a_tsoil(4,:,:)   = tsoilav(4)
 
        a_Wl             = Wlav
+
+       ! BvS Init some variables at zero for crosses
+       ra(:,:)          = 0
     end if 
 
     z0m(:,:)       = z0mav
@@ -363,6 +343,8 @@ module lsmdata
     cveg       = cvegav
 
     deallocate(LAIG)
+
+    init_lsm = .false.
 
   end subroutine initlsm
 

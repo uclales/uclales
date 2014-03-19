@@ -246,10 +246,10 @@ contains
     ! Malte: Get surface fluxes using a land surface model (van Heerwarden)
     !
     case(5)
-       !Initialize Land Surface 
+       !Initialize Land Surface -> BvS called from init.f90 
        if (init_lsm) then
-          call initlsm(sst,time_in)
-          init_lsm = .false.
+         call initlsm(sst,time_in)
+         init_lsm = .false.
        end if
 
        !Local or filtered variables for flux calculation
@@ -280,8 +280,6 @@ contains
        sst      = tskinavg*(psrf/p00)**(rcp)
        call srfcscls(nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,a_ustar,a_tstar,obl,drt=drdz,rstar=a_rstar)
 
-       !print*,'surf1 ',a_ustar(10,10),a_tstar(10,10),obl(10,10)
-
        !Calculate the drag coefficients and aerodynamic resistance
        do j=3,nyp-2
          do i=3,nxp-2
@@ -295,8 +293,6 @@ contains
          end do
        end do
 
-       !print*,'surf2 ',cm(10,10),cs(10,10),ra(10,10)
-
        !Get skin temperature and humidity from land surface model (van Heerwaarden)
        call lsm
 
@@ -307,8 +303,6 @@ contains
        else
          !Insert filter method here
        end if
-
-       !print*,'surf3 ',tskinav(10,10),qskinav(10,10)
 
        !Calculate the surface fluxes with bulk law (Fairall, 2003)
        !Fluxes in kinematic form with units [K m/s] and [kg/kg m/s]
@@ -325,8 +319,6 @@ contains
            a_tstar(i,j) = - wt_sfc(i,j)/a_ustar(i,j)
          end do
        end do
-
-       !print*,tskinav(10,10),thetaav(10,10),wt_sfc(10,10)*1.2*1004,wq_sfc(10,10)*1.2*2.45e6
 
     !
     ! ----------------------------------------------------------------------
@@ -361,7 +353,6 @@ contains
          end do
        end do
 
-       
        if (dolsm) then ! --------------------------------------------------
          ! Solve surface temperature from SEB
          do j=3,nyp-2
@@ -652,23 +643,12 @@ contains
   ! Code writen March, 1999 by Bjorn Stevens
   !
 
- !call srfcscls(      nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,a_ustar,a_tstar,obl,drt=drdz,rstar=a_rstar)
-  subroutine srfcscls(n2, n3, z,    z0,    th00,    u,   dth, ustar,  tstar,  obl,drt,rstar)
-
+  subroutine srfcscls(n2,n3,z,z0,th00,u,dth,ustar,tstar,obl,drt,rstar)
     use defs, only : vonk, g, ep2
-    use grid ,only: nstep, runtype, level, a_theta, vapor
+    use grid ,only: nstep, runtype, level, a_theta, vapor, isfctyp
     use mpi_interface, only : myid
 
     implicit none
-
-    !real, parameter     :: ah   =  4.7   ! stability function parameter
-    !real, parameter     :: bh   = 16.0   !   "          "         "
-    !real, parameter     :: am   =  4.7   !   "          "         "
-    !real, parameter     :: bm   = 16.0   !   "          "         "
-    !real, parameter     :: ah   =  7.8   ! stability function parameter
-    !real, parameter     :: bh   = 12.0   !   "          "         "
-    !real, parameter     :: am   =  4.8   !   "          "         "
-    !real, parameter     :: bm   = 19.3   !   "          "         "
     real, parameter     :: pr   =  0.74  ! prandlt number
     real, parameter     :: eps  = 1.e-10 ! non-zero, small number
 
@@ -684,12 +664,12 @@ contains
     real, intent(in),optional     :: drt(n2,n3)    ! qt(z) - qt(z0)
     real, intent(inout), optional :: rstar(n2,n3)  ! scale value of qt
 
-    logical, save :: first_call=.True.
-    integer       :: i,j,iterate,iter
-    real          :: lnz, klnz, betg
-    real          :: zeta, lmo, dtv
-    real          :: thv,Rib,Lstart,Lend,Lold,fx,fxdif,Ldif,zeff
-    logical       :: exititer
+    logical, save       :: first_call=.True.
+    integer             :: i,j,iterate,iter
+    real                :: lnz, klnz, betg
+    real                :: zeta, lmo, dtv
+    real                :: thv,Rib,Lstart,Lend,Lold,fx,fxdif,Ldif,zeff,cs0
+    logical             :: exititer
 
     lnz   = log(z/z0)
     klnz  = vonk/lnz
@@ -740,22 +720,33 @@ contains
                if ((dtv > 0) .and. (lmo < +0.001)) lmo = +0.001777
 
                ! BvS : Following ECMWF, limit z/L for very stable conditions
-               if(z/lmo > 5.) then
-                 zeff = lmo * 5.
-                 exititer = .true.
-               else
-                 zeff = z
-               end if
+               !if(z/lmo > 5.) then
+               !  zeff = lmo * 5.
+               !  exititer = .true.
+               !else
+               !  zeff = z
+               !end if
 
-               zeta       = zeff/lmo
-               ustar(i,j) = u(i,j)*vonk/(log(zeff/z0) - psim(zeta))
-               if(ustar(i,j)<0.) ustar(i,j) = 0.1
-               tstar(i,j) = (dtv*vonk/pr)/(log(zeff/z0) - psih(zeta))
+               !zeta       = zeff/lmo
+               !ustar(i,j) = u(i,j)*vonk/(log(zeff/z0) - psim(zeta))
+               !if(ustar(i,j)<0.) ustar(i,j) = 0.1
+               !tstar(i,j) = (dtv*vonk/pr)/(log(zeff/z0) - psih(zeta))
 
-               if(exititer) then
-                 lmo        = zeff/5. 
-                 exit
+               !if(exititer) then
+               !  lmo        = zeff/5. 
+               !  exit
+               !end if
+
+               if (isfctyp==5) then  ! Use local values for z0m, z0h
+                 cs0 = vonk**2. / (log(z/z0m(i,j)) - psim(z/lmo) + psim(z0m(i,j)/lmo)) / &
+                                  (log(z/z0h(i,j)) - psih(z/lmo) + psih(z0h(i,j)/lmo))
+                 ustar(i,j) = vonk*u(i,j) / (log(z/z0m(i,j)) - psim(z/lmo) + psim(z0m(i,j)/lmo))
+               else                  ! Use global values for z0
+                 cs0 = vonk**2. / (log(z/z0) - psim(z/lmo) + psim(z0/lmo)) / &
+                                  (log(z/z0) - psih(z/lmo) + psih(z0/lmo))
+                 ustar(i,j) = vonk*u(i,j) / (log(z/z0) - psim(z/lmo) + psim(z0/lmo))
                end if
+               tstar(i,j) = dtv * cs0 * u(i,j) / ustar(i,j)    
 
                iter = iter + 1
 

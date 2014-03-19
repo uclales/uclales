@@ -61,7 +61,8 @@ contains
     use modcross, only : initcross, triggercross
     use grid, only : nzp, dn0, u0, v0, zm, zt, isfctyp
     use modparticles, only: init_particles, lpartic, lpartdump, lpartstat, initparticledump, initparticlestat, write_particle_hist, particlestat
-    use lsmdata, only : initlsm_simple
+    use lsmdata, only : initlsm_simple, initlsm
+    use step, only : sst
 
     implicit none
 
@@ -74,15 +75,14 @@ contains
     integer :: k, i, j
 
     if (runtype == 'INITIAL') then
-       time=0.
+       time = 0.
        call random_init
        call arrsnd
        call basic_state
        call fldinit
+
        if (lanom) then
-
           call larm_init_anom (nzp,nxp-4,nyp-4,t_ano,q_ano,u_ano,v_ano,w_ano)
-
           do k=1,nzp
             do i=3,nxp-2
               do j=3,nyp-2
@@ -109,6 +109,7 @@ contains
 
     call initmcrp(level)
 
+    if(isfctyp==5)  call initlsm(sst,time)
     if(isfctyp==55) call initlsm_simple
 
     call init_stat(time+dt,filprf,expnme,nzp)

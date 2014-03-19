@@ -2,8 +2,8 @@
   nxp      = 20
   nyp      = 20
   nzp      = 42
-  deltax   = 100
-  deltay   = 100
+  deltax   = 50
+  deltay   = 50
   deltaz   = 50
   dtlong   = 20.
   timmax   = 10800.

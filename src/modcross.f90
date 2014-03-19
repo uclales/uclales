@@ -41,8 +41,8 @@ implicit none
          'rwptop ','tracer ','trcpath','trcbase','trctop ', & !31-35
          'wdev_cl','wdev_sc','w_cld  ','tdev_cl','tdev_sc', & !36-40
          't_cld  ','qdev_cl','qdev_sc','q_cld  ','tv_cl  ', & !41-45
-         'tv_sc  ','tv_cld ','core   ','th_e   ','H0     ', & !46-50
-         'LE0    ','G0     ','tsoil  ','tsurf  ','ra     ', & !51-55
+         'tv_sc  ','tv_cld ','core   ','th_e   ','H      ', & !46-50
+         'LE     ','G      ','tsoil  ','tsurf  ','ra     ', & !51-55
          'usurf  '/)  !56-
 
   integer :: nccrossxzid,nccrossyzid,nccrossxyid,nccrossrec,nvar
@@ -369,17 +369,17 @@ contains
         longname = 'equivalent potential temperature'
         unit = 'K'
         iscross = .true.
-      case ('H0')
+      case ('H')
         if (isfctyp < 5) return
         loc = (/ihlf, ictr, ictr/)
         longname =  'surface sensible heat flux'
         unit = 'W/m2'
-      case ('LE0')
+      case ('LE')
         if (isfctyp /= 5) return
         loc = (/ihlf, ictr, ictr/)
         longname =  'surface latent heat flux'
         unit = 'W/m2'
-      case ('G0')
+      case ('G')
         if (isfctyp < 5) return
         loc = (/ihlf, ictr, ictr/)
         longname =  'soil heat flux'
@@ -786,20 +786,20 @@ contains
       case ('core')
         call calcmax(tv, liquid, tmp)
         call writecross(crossname(n), tmp)
-      case ('H0')
+      case ('H')
         dnsurf = 0.5*(dn0(1)+dn0(2))
         call writecross(crossname(n), wt_sfc(3:nxp-2, 3:nyp-2)*dnsurf*cp)
-      case ('LE0')
+      case ('LE')
         dnsurf = 0.5*(dn0(1)+dn0(2))
         call writecross(crossname(n), wq_sfc(3:nxp-2, 3:nyp-2)*dnsurf*alvl)
-      case ('G0')
+      case ('G')
         call writecross(crossname(n), a_G0(3:nxp-2, 3:nyp-2))
       case ('tsoil')
         call writecross(crossname(n), a_tsoil(1,3:nxp-2, 3:nyp-2))
       case ('tsurf')
         call writecross(crossname(n), a_tskin(3:nxp-2, 3:nyp-2))
-      !case ('ra')
-      !  call writecross(crossname(n), ra(3:nxp-2, 3:nyp-2))
+      case ('ra')
+        call writecross(crossname(n), ra(3:nxp-2, 3:nyp-2))
       case ('usurf')
         call writecross(crossname(n), wspd(3:nxp-2, 3:nyp-2))
       end select

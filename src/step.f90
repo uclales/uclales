@@ -40,7 +40,7 @@ module step
   logical :: statflg = .false.
   real    :: tau = 900.
 !irina
-  real    :: sst=292.
+  real    :: sst = 292.
   real    :: div = 3.75e-6
   logical :: lsvarflg = .false.
   character (len=8) :: case_name = 'astex'
