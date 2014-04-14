@@ -334,10 +334,10 @@ llstcu = .false.
 
 !-- factor used in updraft initialization --
 do jl=kidia,kfdia
-  zpdffacw(jl)   = 0.2_jprb
-  zpdffacphi(jl) = 0.2_jprb
-  !zpdffacw(jl)   = 1.0_jprb
-  !zpdffacphi(jl) = 1.0_jprb
+  !zpdffacw(jl)   = 0.2_jprb
+  !zpdffacphi(jl) = 0.2_jprb
+  zpdffacw(jl)   = 1.0_jprb
+  zpdffacphi(jl) = 1.0_jprb
 enddo  
 
 !-- updraft precip evaporation constant --
@@ -1657,7 +1657,7 @@ endif
     zfrac(jl,kptop(jl,1):klev-1,1) = 0.0001_jprb
     pextra(jl,:,15) = 1000._jprb * ceiling(zfrac(jl,:,1)) * ( pqtuh(jl,:,1)  - zqtenh(jl,:) )
     pextra(jl,:,16) = ceiling(zfrac(jl,:,1)) * ( pslguh(jl,:,1) - zslgenh(jl,:) )/rcpd 
-    pextra(jl,:,17) = zwu2h(jl,:,1)
+    pextra(jl,:,17) = max(0._jprb,zwu2h(jl,:,1))**0.5
     pextra(jl,:,18) = zeps(jl,:,1)
     pextra(jl,:,19) = 1000._jprb * zqcuh(jl,:,1)
     pextra(jl,1:klev,20) = zbuof(jl,:,1)
@@ -1684,8 +1684,8 @@ endif
     pextra(jl,:,35) = ceiling(zfrac(jl,:,3)) * ( pslguh(jl,:,3) - zslgenh(jl,:) )/rcpd 
     pextra(jl,:,36) = zwu2h(jl,:,2)
     pextra(jl,:,37) = zwu2h(jl,:,3)
-    pextra(jl,:,26) = max(0._jprb,zwu2h(jl,:,2))**0.5 / max(0.01_jprb,zwstar(jl))
-    pextra(jl,:,27) = max(0._jprb,zwu2h(jl,:,1))**0.5 / max(0.01_jprb,zwstar(jl))
+    pextra(jl,:,26) = max(0._jprb,zwu2h(jl,:,2))**0.5
+    pextra(jl,:,27) = max(0._jprb,zwu2h(jl,:,3))**0.5
 
     !  updraft fractions
     pextra(jl,:,38) = 100._jprb * zfrac(jl,:,2)

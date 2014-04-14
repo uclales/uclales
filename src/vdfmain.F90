@@ -2,7 +2,8 @@
 ! 
 module vdf
 implicit none
-logical :: ledmfdiag = .false., leddiag = .false.
+!logical :: ledmfdiag = .false., leddiag = .false.
+logical :: ledmfdiag = .true., leddiag = .true.
 
 
 contains
@@ -32,13 +33,14 @@ use grid,  only : nzp, nxp, nyp, liquid, a_up, a_vp, a_theta, a_pexnr, pi0, pi1,
 use defs, only : g,alvl, cp, cpr,p00
 use srfc, only : zrough
 use util, only : get_avg3, get_avg
-use stat, only : sflg, updtst !, stat_edmf
+use stat, only : sflg, updtst,updtst_ts!, stat_edmf
 use yomct0, only : rextlhf, rextshf
 use yoevdfs, only : firsttime, suvdfs
 use thrm, only : fll_tkrs
 ! implicit none
 real, dimension(nzp, nxp, nyp) :: a_scr1
 real, dimension(nzp) :: a1
+real :: a2
 real, dimension(nzp-1) ::a1h
 real, intent(in) :: sst
 real(kind=jprb), dimension(1,nzp-2) :: pum1,pvm1,ptm1,pqm1,plm1,pim1,pam1, papm1,pfhpvl, pfhpvn,  pfplvn, psobeta, psoteu, psotev, ptskti,pevapti,pahfsti,pssrflti,&
@@ -190,13 +192,67 @@ real(kind=jprb)   :: pextr2(1,kfldx2), pextra(1,nzp-1,kfldx)
  pdiftq = pdiftq, pdiftl = pdiftl, pdifti = pdifti, pdifts = pdifts &
   )
   if (sflg) then
+
     a1 = 0.
-    a1(2:nzp) = flip(pextra(1,:,39)) !Cloud Fraction
-    call updtst(nzp,'edm',1,a1,1) 
-print *, 'cf',a1    
-    a1(2:nzp) = flip(pextra(1,:,48)) !Liquid water
-    call updtst(nzp,'edm',2,a1,1) 
-print *, 'ql',a1    
+    a2 = 0.
+
+    !--- timeseries ---
+    a2 = pextr2(1,34)               !Test updraft LCL
+    call updtst_ts('u1t',1,a2,1) 
+    !print *, "vdfmain: u1t_1=", a2
+    a2 = pextr2(1,31)               !Test updraft termination height
+    call updtst_ts('u1t',2,a2,1) 
+
+    a2 = pextr2(1,35)               !Dry updraft LCL
+    call updtst_ts('u2t',1,a2,1) 
+    a2 = pextr2(1,32)               !Dry updraft termination height
+    call updtst_ts('u2t',2,a2,1) 
+
+    a2 = pextr2(1,36)               !Moist updraft LCL
+    call updtst_ts('u3t',1,a2,1) 
+    a2 = pextr2(1,33)               !Moist updraft termination height
+    call updtst_ts('u3t',2,a2,1) 
+    
+    !--- profiles ---
+    !a1(2:nzp) = flip(pextra(1,:,39)) !Test updraft area Fraction
+    !call updtst(nzp,'u1p',1,a1,1) 
+    a1(2:nzp) = flip(pextra(1,:,19)) !Test updraft liquid water
+    call updtst(nzp,'u1p',2,a1,1) 
+    a1(2:nzp) = flip(pextra(1,:,17)) !Test updraft w
+    call updtst(nzp,'u1p',3,a1,1) 
+    a1(2:nzp) = flip(pextra(1,:,20)) !Test updraft B
+    call updtst(nzp,'u1p',4,a1,1) 
+    a1(2:nzp) = flip(pextra(1,:,16)) !Test updraft thl excess
+    call updtst(nzp,'u1p',5,a1,1) 
+    a1(2:nzp) = flip(pextra(1,:,15)) !Test updraft qt excess
+    call updtst(nzp,'u1p',6,a1,1) 
+
+    a1(2:nzp) = flip(pextra(1,:,38)) !Dry updraft area Fraction
+    call updtst(nzp,'u2p',1,a1,1) 
+    a1(2:nzp) = flip(pextra(1,:,47)) !Dry updraft liquid water
+    call updtst(nzp,'u2p',2,a1,1) 
+    a1(2:nzp) = flip(pextra(1,:,26)) !Dry updraft w
+    call updtst(nzp,'u2p',3,a1,1) 
+    a1(2:nzp) = flip(pextra(1,:,28)) !Dry updraft B
+    call updtst(nzp,'u2p',4,a1,1) 
+    a1(2:nzp) = flip(pextra(1,:,34)) !Dry updraft thl excess
+    call updtst(nzp,'u2p',5,a1,1) 
+    a1(2:nzp) = flip(pextra(1,:,32)) !Dry updraft qt excess
+    call updtst(nzp,'u2p',6,a1,1) 
+
+    a1(2:nzp) = flip(pextra(1,:,39)) !Moist updraft area Fraction
+    call updtst(nzp,'u3p',1,a1,1) 
+    a1(2:nzp) = flip(pextra(1,:,48)) !Moist updraft liquid water
+    call updtst(nzp,'u3p',2,a1,1) 
+    a1(2:nzp) = flip(pextra(1,:,27)) !Moist updraft w
+    call updtst(nzp,'u3p',3,a1,1) 
+    a1(2:nzp) = flip(pextra(1,:,29)) !Moist updraft B
+    call updtst(nzp,'u3p',4,a1,1) 
+    a1(2:nzp) = flip(pextra(1,:,35)) !Moist updraft thl excess
+    call updtst(nzp,'u3p',5,a1,1) 
+    a1(2:nzp) = flip(pextra(1,:,33)) !Moist updraft qt excess
+    call updtst(nzp,'u3p',6,a1,1) 
+
   end if
 end subroutine vdfouter
 subroutine vdfmain    ( cdconf, &
@@ -1588,8 +1644,8 @@ call vdfincr (kidia  , kfdia  , klon   , klev   , itop   , ztmst  , &
 
 
       !--- t-check ---
-!       if ( ztupd(jl,jk).gt.400._jprb.or.ztupd(jl,jk).lt.100._jprb) then
-      if (jk>46) then
+       if ( ztupd(jl,jk).gt.400._jprb.or.ztupd(jl,jk).lt.100._jprb) then
+!      if (jk>46) then
         write(0,'(a,3i5)')    'vdfmain t alarm:',jl,jk
         write(0,'(a,6i5)')    ' pbl type      : ', kpbltype(jl),kvartop(jl),khpbln(jl), iplcl(jl,:)
         write(0,'(a,2f10.6)')    '        sfluxes: ', zkhfl(jl),zkqfl(jl)

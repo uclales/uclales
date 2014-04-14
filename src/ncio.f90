@@ -121,6 +121,7 @@ contains
        dim_soilmmt= (/zsoilID,xmID,ymID,timeId/) ! soil point
 
        do n=1,nVar
+
           select case(trim(ncinfo(2,sx(n))))
           case ('time')
              iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,timeId  ,VarID)
@@ -1450,12 +1451,100 @@ contains
        if (itype==0) ncinfo = 'Third moment of s (extended liquid water specific humidity)'
        if (itype==1) ncinfo = ''
        if (itype==2) ncinfo = 'tttt'
-    case('edmf_cf')    
-       if (itype==0) ncinfo = 'EDMF Cloud Fraction'
+    case('up1zlcl')    
+       if (itype==0) ncinfo = 'EDMF test updraft LCL'
+       if (itype==1) ncinfo = 'm'
+       if (itype==2) ncinfo = 'time'
+    case('up1ztop')    
+       if (itype==0) ncinfo = 'EDMF test updraft termination height'
+       if (itype==1) ncinfo = 'm'
+       if (itype==2) ncinfo = 'time'
+    case('up2zlcl')    
+       if (itype==0) ncinfo = 'EDMF dry updraft LCL'
+       if (itype==1) ncinfo = 'm'
+       if (itype==2) ncinfo = 'time'
+    case('up2ztop')    
+       if (itype==0) ncinfo = 'EDMF dry updraft termination height'
+       if (itype==1) ncinfo = 'm'
+       if (itype==2) ncinfo = 'time'
+    case('up3zlcl')    
+       if (itype==0) ncinfo = 'EDMF moist updraft LCL'
+       if (itype==1) ncinfo = 'm'
+       if (itype==2) ncinfo = 'time'
+    case('up3ztop')    
+       if (itype==0) ncinfo = 'EDMF moist updraft termination height'
+       if (itype==1) ncinfo = 'm'
+       if (itype==2) ncinfo = 'time'
+    case('up1a')    
+       if (itype==0) ncinfo = 'EDMF test updraft area fraction'
        if (itype==1) ncinfo = '%'
        if (itype==2) ncinfo = 'tttt'
-    case('edmf_ql')    
-       if (itype==0) ncinfo = 'EDMF Liquid water content'
+    case('up1ql')    
+       if (itype==0) ncinfo = 'EDMF test updraft condensate'
+       if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('up1w')    
+       if (itype==0) ncinfo = 'EDMF test updraft vertical velocity'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('up1B')    
+       if (itype==0) ncinfo = 'EDMF test updraft buoyancy'
+       if (itype==1) ncinfo = 'm2/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('up1dthl')    
+       if (itype==0) ncinfo = 'EDMF test updraft thl excess'
+       if (itype==1) ncinfo = 'K'
+       if (itype==2) ncinfo = 'tttt'
+    case('up1dqt')    
+       if (itype==0) ncinfo = 'EDMF test updraft qt excess'
+       if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('up2a')    
+       if (itype==0) ncinfo = 'EDMF dry updraft area fraction'
+       if (itype==1) ncinfo = '%'
+       if (itype==2) ncinfo = 'tttt'
+    case('up2ql')    
+       if (itype==0) ncinfo = 'EDMF dry updraft condensate'
+       if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('up2w')    
+       if (itype==0) ncinfo = 'EDMF dry updraft vertical velocity'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('up2B')    
+       if (itype==0) ncinfo = 'EDMF dry updraft buoyancy'
+       if (itype==1) ncinfo = 'm2/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('up2dthl')    
+       if (itype==0) ncinfo = 'EDMF dry updraft thl excess'
+       if (itype==1) ncinfo = 'K'
+       if (itype==2) ncinfo = 'tttt'
+    case('up2dqt')    
+       if (itype==0) ncinfo = 'EDMF dry updraft qt excess'
+       if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('up3a')    
+       if (itype==0) ncinfo = 'EDMF moist updraft area fraction'
+       if (itype==1) ncinfo = '%'
+       if (itype==2) ncinfo = 'tttt'
+    case('up3ql')    
+       if (itype==0) ncinfo = 'EDMF moist updraft condensate'
+       if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('up3w')    
+       if (itype==0) ncinfo = 'EDMF moist updraft vertical velocity'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('up3B')    
+       if (itype==0) ncinfo = 'EDMF moist updraft buoyancy'
+       if (itype==1) ncinfo = 'm2/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('up3dthl')    
+       if (itype==0) ncinfo = 'EDMF moist updraft thl excess'
+       if (itype==1) ncinfo = 'K'
+       if (itype==2) ncinfo = 'tttt'
+    case('up3dqt')    
+       if (itype==0) ncinfo = 'EDMF moist updraft qt excess'
        if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
     case('Qnet')    

@@ -30,9 +30,9 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 68, nvar2 = 120 ! number of time series and profiles
+  integer, parameter :: nvar1 = 74, nvar2 = 136 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2
-  integer, parameter ::nedmf_ts_start=46, nedmf_ts_end=46, nedmf_ps_start=119, nedmf_ps_end= 120! number of time series and profiles
+  integer, parameter ::nedmf_ts_start=69, nedmf_ts_end=74, nedmf_ps_start=119, nedmf_ps_end= 136! number of time series and profiles
   real, save         :: fsttm, lsttm
 
   logical, parameter :: debug = .false.
@@ -53,7 +53,10 @@ module stat
        'ra     ','rsurf  ','rsveg  ','rssoil ','tskinav','qskinav', & !49
        'obl    ','cliq   ','a_Wl   ','lflxutc','sflxutc','tsair  ', & !55
        'sflxds ','sflxus ','lflxds ','lflxus ','sflxdsc','sflxusc', & !61
-       'lflxdsc','lflxusc'/),                                       & !67
+       'lflxdsc','lflxusc', & !67
+       'up1zlcl','up1ztop', & !69
+       'up2zlcl','up2ztop', & !71
+       'up3zlcl','up3ztop'/), & !73
        s2(nvar2)=(/                                                 &
        'time   ','zt     ','zm     ','dn0    ','u0     ','v0     ', & ! 1
        'fsttm  ','lsttm  ','nsmp   ','u      ','v      ','t      ', & ! 7
@@ -74,13 +77,16 @@ module stat
        'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel', & !97
        'rsup   ','prc_c  ','prc_i  ','prc_s  ','prc_g  ','prc_h  ', & !103
        'hail   ','qt_th  ','s_1    ','s_2    ','s_3    ','RH     ', & !109
-       'lwuca  ','lwdca  ','swuca  ','swdca  ','edmf_cf','edmf_ql'/)  !115
+       'lwuca  ','lwdca  ','swuca  ','swdca  ', & !115
+       'up1a   ','up1ql  ','up1w   ','up1B   ','up1dthl','up1dqt ', & !119
+       'up2a   ','up2ql  ','up2w   ','up2B   ','up2dthl','up2dqt ', & !125
+       'up3a   ','up3ql  ','up3w   ','up3B   ','up3dthl','up3dqt '/)  !131
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:)
 
   public :: sflg, ssam_intvl, savg_intvl, statistics, init_stat, write_ps,   &
-       acc_tend, updtst, sfc_stat, close_stat, fill_scalar, tke_sgs, sgsflxs,&
+       acc_tend, updtst, updtst_ts,sfc_stat, close_stat, fill_scalar, tke_sgs, sgsflxs,&
        sgs_vel, comp_tke, get_zi
 
 contains
@@ -179,7 +185,8 @@ contains
 
     if (nsmp == 0.) fsttm = time
     nsmp=nsmp+1
-    ssclr(14:nvar1) = -999
+    !ssclr(14:nvar1) = -999
+    ssclr(14:68) = -999
     !
     ! profile statistics
     !
@@ -1506,12 +1513,55 @@ contains
        case default
           nn = 0
        end select
-    case("edm")
+    case("u1p")
        select case (nfld)
        case (1)
          nn = 119
        case (2)
          nn = 120
+         !print *, 'stat.f90: up1ql ', nn 
+       case (3)
+         nn = 121
+       case (4)
+         nn = 122
+       case (5)
+         nn = 123
+       case (6)
+         nn = 124
+       case default
+         nn = 0
+       end select
+    case("u2p")
+       select case (nfld)
+       case (1)
+         nn = 125
+       case (2)
+         nn = 126
+       case (3)
+         nn = 127
+       case (4)
+         nn = 128
+       case (5)
+         nn = 129
+       case (6)
+         nn = 130
+       case default
+         nn = 0
+       end select
+    case("u3p")
+       select case (nfld)
+       case (1)
+         nn = 131
+       case (2)
+         nn = 132
+       case (3)
+         nn = 133
+       case (4)
+         nn = 134
+       case (5)
+         nn = 135
+       case (6)
+         nn = 136
        case default
          nn = 0
        end select
@@ -1527,6 +1577,60 @@ contains
     end if
 
   end subroutine updtst
+  !
+  !---------------------------------------------------------------------
+  ! subroutine updtst_ts: updates appropriate statistical arrays - timeseries 
+  !   Note: non time-averaged (see write_ts and write_ps subroutines
+  !
+  subroutine updtst_ts(routine,nfld,value,ic)
+
+    integer, intent(in)            :: nfld,ic
+    real, intent (in)              :: value
+    character (len=3), intent (in) :: routine
+
+    integer :: nn
+    nn = 0
+    select case (routine)
+    case("u1t")
+       select case (nfld)
+       case (1)
+         nn = 69
+         !print *, 'stat.f90: updtst_ts: up1zlcl ', nn, value 
+       case (2)
+         nn = 70
+         !print *, 'stat.f90: updtst_ts: up1ztop ', nn, value 
+       case default
+         nn = 0
+       end select
+    case("u2t")
+       select case (nfld)
+       case (1)
+         nn = 71
+       case (2)
+         nn = 72
+       case default
+         nn = 0
+       end select
+    case("u3t")
+       select case (nfld)
+       case (1)
+         nn = 73
+       case (2)
+         nn = 74
+       case default
+         nn = 0
+       end select
+    case default
+       nn = 0
+    end select
+
+    if (nn > 0) then
+       !if (ic == 0) ssclr(nn)=0.
+       !ssclr(nn)=ssclr(nn)+value
+       ssclr(nn)=value
+    end if
+
+  end subroutine updtst_ts
   !
   ! -------------------------------------------------------------------------
   !
