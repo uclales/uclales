@@ -196,7 +196,14 @@ real(kind=jprb)   :: pextr2(1,kfldx2), pextra(1,nzp-1,kfldx)
 print *, 'cf',a1    
     a1(2:nzp) = flip(pextra(1,:,48)) !Liquid water
     call updtst(nzp,'edm',2,a1,1) 
-print *, 'ql',a1    
+print *, 'ql',a1
+    a1(2:nzp) = flip(pextra(1,:,37))
+    a1(2:nzp) = sqrt(a1(2:nzp))
+    call updtst(nzp,'edm',3,a1,1)
+print*, 'w*2',a1    
+    a1(2:nzp) = flip(pextra(1,:,31)) !Mass flux
+    call updtst(nzp,'edm',4,a1,1) 
+print *, 'mf',a1   
   end if
 end subroutine vdfouter
 subroutine vdfmain    ( cdconf, &
