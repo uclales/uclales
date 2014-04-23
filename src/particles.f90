@@ -66,7 +66,7 @@ module modparticles
   logical            :: cal_ecoal      = .true.         ! switch for coalescence efficiency as in Seifert et al. 2005
   logical            :: sc_zsort       = .true.         ! switch to use a selfcollection that depends on the LD's
                                                         ! vertical position 
-  logical            :: sc_sk10        = .false.         ! switch to use a selfcollection according to Soelch and Kaercher, 2010
+  logical            :: sc_sk10        = .false.        ! switch to use a selfcollection according to Soelch and Kaercher, 2010
                                                         ! (only valid if sc_zsort=.true.)
 
  
@@ -2695,7 +2695,7 @@ contains
 
     real, intent(in)  :: time
     type (particle_record), pointer:: particle
-    real               :: randnr(5), max_auto, sum_auto
+    real               :: randnr(5), max_auto, sum_auto, C_d, vt
     !real               :: zmax = 1.                  ! Max height in grid coordinates
     real               :: xsizelocal, ysizelocal
     integer            :: nprocs,i,j,k,newp,np_old,cntp, distr
@@ -2774,7 +2774,9 @@ contains
                   particle%nd             = particle%nd + 1
                   particle%udrop          = particle%ures
                   particle%vdrop          = particle%vres
-                  particle%wdrop          = particle%wres - 0.1634* dzi_t(floor(particle%z))
+		  call drag_coeff(particle, C_d, vt)
+                  particle%wdrop          = particle%wres - vt* dzi_t(floor(particle%z))
+                  !particle%wdrop          = particle%wres - 0.1634* dzi_t(floor(particle%z))
                   particle%udrop_rk       = 0.
                   particle%vdrop_rk       = 0.
                   particle%wdrop_rk       = 0.
@@ -2980,6 +2982,9 @@ contains
 		  else
 		    pij = (dxi * dyi * dzi) * max(pred_p%mtpl,prey_p%mtpl) &
 		                   * ecoal * pi * (r_pred+r_prey)**2. * deltav * dt
+		    !deltaw = abs(prey_p%wdrop-pred_p%wdrop)/dzi
+		    !pij = (dxi * dyi * dzi) * max(pred_p%mtpl,prey_p%mtpl) &
+		    !               * ecoal * pi * (r_pred+r_prey)**2. * deltaw * dt
                   end if
 		  
 		  !write(*,*) myid,'prob: ',pij

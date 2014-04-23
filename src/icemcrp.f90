@@ -785,12 +785,8 @@ contains
           np(k) = np(k) + au/cldw%x_max
 	  
 	  ! For particles: a_npauto in #/(kg*dt)
-	  !if(lpartdrop .and. nstep==1) a_npauto(k,i,j) = a_npauto(k,i,j) + (rkalpha(1) + rkbeta(2))* au*dn0(k)
-	  !if(lpartdrop .and. nstep==2) a_npauto(k,i,j) = a_npauto(k,i,j) + (rkalpha(2) + rkbeta(3))* au*dn0(k)
-	  !if(lpartdrop .and. nstep==3) a_npauto(k,i,j) = a_npauto(k,i,j) + (rkalpha(3)            )* au*dn0(k)
-	  !if(lpartdrop .and. nstep==3 .and. a_npauto(k,i,j).lt.0.) then
-	  !  a_npauto(k,i,j) = 0.
-	  !end if
+	  !if(lpartdrop .and. nstep==1) a_npauto(k,i,j) = a_npauto(k,i,j) + (rkalpha(1) + rkalpha(2))* au*dn0(k)
+	  !if(lpartdrop .and. nstep==3) a_npauto(k,i,j) = a_npauto(k,i,j) + (rkalpha(3)             )* au*dn0(k)
 	  if(lpartdrop .and. nstep==3) a_npauto(k,i,j) = au*dn0(k)
        end if
     end do
