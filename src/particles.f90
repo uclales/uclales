@@ -176,6 +176,12 @@ contains
         call fsubgrid_local           ! Calculated local   "     "     "      "
       end if
     end if
+    
+    ! calculate sgstke anyway if lpartdumptau is true
+    if (.not.lpartsgs .and. lpartdumptau .and. nstep == 1) then
+      call calc_sgstke                ! Estimates SGS-TKE
+    end if
+    
 
     ! Randomize particles lowest grid level
     if (lrandsurf .and. .not. lpartdrop .and. nstep==1 .and. time > tnextrand) then
@@ -1451,7 +1457,7 @@ contains
     TYPE (particle_record), POINTER:: particle
     TYPE (sc_el), POINTER :: tmp, tmp2
     integer :: i,j,k
-
+    
     particle%zprev = particle%z
         
     particle%x     = particle%x + rkalpha(nstep) * (particle%udrop_rk) * dt &
@@ -3782,7 +3788,7 @@ contains
     end if
     close(ifinput)
 
-    if(lpartsgs)  allocate(sgse(nzp,nxp,nyp),rese(nzp,nxp,nyp),fs_local(nzp,nxp,nyp),fs(nzp),diss(nzp,nxp,nyp))
+    if(lpartsgs.or.lpartdumptau)  allocate(sgse(nzp,nxp,nyp),rese(nzp,nxp,nyp),fs_local(nzp,nxp,nyp),fs(nzp),diss(nzp,nxp,nyp))
 !     call init_random_seed()
 
     ! Check interpolation option
