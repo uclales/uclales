@@ -375,8 +375,15 @@ contains
                end if
                gkp   = -lambdab * ((tsoilm(k+1,i,j) - tsoilm(k,i,j))   / (zsoilc(k+1) - zsoilc(k)))
                soiltend = -(gkp - gkm) / (zsoil(k+1) - zsoil(k)) 
-               a_tsoil(k,i,j) = a_tsoil(k,i,j) + rkalpha(nstep) * (dt/rhoCs) * soiltend &
-                                               + rkbeta(nstep)  * (dt/rhoCs) * soiltendm(k,i,j)
+
+               if(nstep == 2) then
+                 a_tsoil(k,i,j) = a_tsoil(k,i,j) + rkbeta(nstep)  * (dt/rhoCs) * soiltend &
+                                                 + rkalpha(nstep) * (dt/rhoCs) * soiltendm(k,i,j)
+               else
+                 a_tsoil(k,i,j) = a_tsoil(k,i,j) + rkalpha(nstep) * (dt/rhoCs) * soiltend &
+                                                 + rkbeta(nstep)  * (dt/rhoCs) * soiltendm(k,i,j)
+               end if
+
                if(nstep==3) then
                  soiltendm(k,i,j) = 0.
                else                              
