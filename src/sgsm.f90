@@ -127,7 +127,7 @@ contains
     use thrm, only         : bruvais, fll_tkrs
 
     ! BvS Dynamic sub-grid scheme
-    use dyna, only          : compcoef, startdyn, rundyn
+    !use dyna, only          : compcoef, startdyn, rundyn
 
     real, intent(in) :: timein 
     integer, intent(in) :: istpin 
@@ -166,28 +166,28 @@ contains
           cs(:,:,:)  = csx
           prt(:,:,:) = prndtl
           prq(:,:,:) = prndtl
-        else if((idynsgs == 1) .or. (idynsgs == 2)) then
-          if(nstep==1 .and. mod(istpin,rundyn)==0 .and. istpin>=startdyn) then
-            call compcoef(1,nzp,nxp,nyp,dzi_m,dxi,dyi,a_up,a_vp,a_wp,umean,vmean,idynsgs, &
-                            csx,dt,istpin,thforpr,csxp,Immm,Ilmm,Innm,Iqnm,betam,cs)
-            csxp(:,:,:)=cs(:,:,:)
-            call compcoef(2,nzp,nxp,nyp,dzi_m,dxi,dyi,a_up,a_vp,a_wp,umean,vmean,idynsgs, &
-                            prndtl,dt,istpin,thforpr,csxp,Immt,Ilmt,Innt,Iqnt,betat,prt)
-            call compcoef(3,nzp,nxp,nyp,dzi_m,dxi,dyi,a_up,a_vp,a_wp,umean,vmean,idynsgs, &
-                            prndtl,dt,istpin,rtforpr,csxp,Immq,Ilmq,Innq,Iqnq,betaq,prq)
-            ! Debugging:
-            if(.false.) then
-              call get_avg3(nzp,nxp,nyp,cs, scp1)
-              call get_avg3(nzp,nxp,nyp,prt,scp2)
-              call get_avg3(nzp,nxp,nyp,prq,scp3)
-              print*,'cs,prt,prq='
-              
-              do k=1,nzp/2
-                print*,k,scp1(k),scp2(k),scp3(k)
-              end do
-            end if
+        !else if((idynsgs == 1) .or. (idynsgs == 2)) then
+        !  if(nstep==1 .and. mod(istpin,rundyn)==0 .and. istpin>=startdyn) then
+        !    call compcoef(1,nzp,nxp,nyp,dzi_m,dxi,dyi,a_up,a_vp,a_wp,umean,vmean,idynsgs, &
+        !                    csx,dt,istpin,thforpr,csxp,Immm,Ilmm,Innm,Iqnm,betam,cs)
+        !    csxp(:,:,:)=cs(:,:,:)
+        !    call compcoef(2,nzp,nxp,nyp,dzi_m,dxi,dyi,a_up,a_vp,a_wp,umean,vmean,idynsgs, &
+        !                    prndtl,dt,istpin,thforpr,csxp,Immt,Ilmt,Innt,Iqnt,betat,prt)
+        !    call compcoef(3,nzp,nxp,nyp,dzi_m,dxi,dyi,a_up,a_vp,a_wp,umean,vmean,idynsgs, &
+        !                    prndtl,dt,istpin,rtforpr,csxp,Immq,Ilmq,Innq,Iqnq,betaq,prq)
+        !    ! Debugging:
+        !    if(.false.) then
+        !      call get_avg3(nzp,nxp,nyp,cs, scp1)
+        !      call get_avg3(nzp,nxp,nyp,prt,scp2)
+        !      call get_avg3(nzp,nxp,nyp,prq,scp3)
+        !      print*,'cs,prt,prq='
+        !      
+        !      do k=1,nzp/2
+        !        print*,k,scp1(k),scp2(k),scp3(k)
+        !      end do
+        !    end if
        
-          end if
+        !  end if
         end if
       ! ---------------------------------
       ! Deardorff sgs-TKE

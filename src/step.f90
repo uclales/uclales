@@ -93,6 +93,7 @@ contains
     t2      = 0.
     call mpi_get_time(t0)
     call broadcast_dbl(t0, 0)
+
     do while (time < timmax .and. (t2-t0) < wctime)
        call mpi_get_time(t1)
        istp = istp + 1
