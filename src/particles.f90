@@ -1418,12 +1418,16 @@ contains
     use grid, only : rkalpha, rkbeta, nstep, dt, dxi, dyi, dzi_t
     implicit none
     TYPE (particle_record), POINTER:: particle
+    real    ::  rka(3), rkb(3)
+    
+    rka =  (/rkalpha(1), rkbeta(2) , rkalpha(3) /)
+    rkb =  (/rkbeta(1) , rkalpha(2), rkbeta(3)  /)
 
     particle%zprev = particle%z
 
-    particle%x     = particle%x + rkalpha(nstep) * (particle%ures + particle%usgs) * dt + rkbeta(nstep) * (particle%ures_prev + particle%usgs_prev) * dt
-    particle%y     = particle%y + rkalpha(nstep) * (particle%vres + particle%vsgs) * dt + rkbeta(nstep) * (particle%vres_prev + particle%vsgs_prev) * dt
-    particle%z     = particle%z + rkalpha(nstep) * (particle%wres + particle%wsgs) * dt + rkbeta(nstep) * (particle%wres_prev + particle%wsgs_prev) * dt
+    particle%x     = particle%x + rka(nstep) * (particle%ures + particle%usgs) * dt + rkb(nstep) * (particle%ures_prev + particle%usgs_prev) * dt
+    particle%y     = particle%y + rka(nstep) * (particle%vres + particle%vsgs) * dt + rkb(nstep) * (particle%vres_prev + particle%vsgs_prev) * dt
+    particle%z     = particle%z + rka(nstep) * (particle%wres + particle%wsgs) * dt + rkb(nstep) * (particle%wres_prev + particle%wsgs_prev) * dt
 
     particle%ures_prev = particle%ures
     particle%vres_prev = particle%vres
@@ -1457,15 +1461,19 @@ contains
     TYPE (particle_record), POINTER:: particle
     TYPE (sc_el), POINTER :: tmp, tmp2
     integer :: i,j,k
+    real    ::  rka(3), rkb(3)
     
+    rka =  (/rkalpha(1), rkbeta(2) , rkalpha(3) /)
+    rkb =  (/rkbeta(1) , rkalpha(2), rkbeta(3)  /)
+
     particle%zprev = particle%z
         
-    particle%x     = particle%x + rkalpha(nstep) * (particle%udrop_rk) * dt &
-                     + rkbeta(nstep) * (particle%udrop_rkprev) * dt
-    particle%y     = particle%y + rkalpha(nstep) * (particle%vdrop_rk) * dt &
-                     + rkbeta(nstep) * (particle%vdrop_rkprev) * dt
-    particle%z     = particle%z + rkalpha(nstep) * (particle%wdrop_rk) * dt &
-                     + rkbeta(nstep) * (particle%wdrop_rkprev) * dt
+    particle%x     = particle%x + rka(nstep) * (particle%udrop_rk) * dt &
+                     + rkb(nstep) * (particle%udrop_rkprev) * dt
+    particle%y     = particle%y + rka(nstep) * (particle%vdrop_rk) * dt &
+                     + rkb(nstep) * (particle%vdrop_rkprev) * dt
+    particle%z     = particle%z + rka(nstep) * (particle%wdrop_rk) * dt &
+                     + rkb(nstep) * (particle%wdrop_rkprev) * dt
 
     particle%udrop_rkprev = particle%udrop_rk
     particle%vdrop_rkprev = particle%vdrop_rk
