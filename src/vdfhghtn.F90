@@ -1,5 +1,5 @@
 !options xopt(hsfun)
-subroutine vdfhghtn (kidia   , kfdia   , klon    , klev   , kdraft  , ptmst  , kstep    , &
+subroutine vdfhghtn (pcog    , pnog    , kidia   , kfdia   , klon    , klev   , kdraft  , ptmst  , kstep    , &
                    & pum1    , pvm1    , ptm1    , pqm1   , plm1    , pim1   , pam1     ,&
                    & paphm1  , papm1   , pgeom1  , pgeoh  , pvervel , pqe    , pte      , &
                    & pkmfl   , pkhfl   , pkqfl   , pmflx  , &
@@ -133,7 +133,7 @@ implicit none
 
 !*         0.1    global variables
 
-integer(kind=jpim),intent(in)    :: klon 
+integer(kind=jpim),intent(in)    :: klon, pcog, pnog
 integer(kind=jpim),intent(in)    :: klev 
 integer(kind=jpim),intent(in)    :: kdraft
 integer(kind=jpim),intent(in)    :: kidia 
@@ -185,7 +185,7 @@ real(kind=jprb)   ,intent(in)    :: pqe(klon,klev)
 
 !diagnostic output
 integer(kind=jpim),intent(in) :: kfldx2, klevx, kfldx
-real(kind=jprb)   ,intent(inout) :: pextr2(klon,kfldx2), pextra(klon,klevx,kfldx)
+real(kind=jprb)   ,intent(inout) :: pextr2(pnog,kfldx2), pextra(pnog,klevx,kfldx)
 
 
 
@@ -450,9 +450,9 @@ enddo
 !--- reset output stuff ---
 if (lldiag) then
 
-  do jl=kidia,kfdia
-    pextr2(jl,1:49) = 0._jprb
-  enddo
+!  do jl=kidia,kfdia
+!    pextr2(jl,1:49) = 0._jprb
+!  enddo
 
   do jk=1,klevx
   do jl=kidia,kfdia
@@ -1628,87 +1628,87 @@ endif
   do jl=kidia,kfdia
   
     !  boundary layer classification
-    pextr2(jl,30) = kpbltype(jl)
+    pextr2(pcog,30) = kpbltype(jl)
 
     !  updraft heights
-    pextr2(jl,31) = pzptop(jl,1)
-    pextr2(jl,32) = pzptop(jl,2)
-    pextr2(jl,33) = pzptop(jl,3)
-    pextr2(jl,34) = pzplcl(jl,1)
-    pextr2(jl,35) = pzplcl(jl,2)
-    pextr2(jl,36) = pzplcl(jl,3)
+    pextr2(pcog,31) = pzptop(jl,1)
+    pextr2(pcog,32) = pzptop(jl,2)
+    pextr2(pcog,33) = pzptop(jl,3)
+    pextr2(pcog,34) = pzplcl(jl,1)
+    pextr2(pcog,35) = pzplcl(jl,2)
+    pextr2(pcog,36) = pzplcl(jl,3)
     
     !pextr2(jl,37) = pwuavg(jl)
     !pextr2(jl,38) = sqrt ( zwu2h(jl,klev-1,1) )
-    
+   
     !  updraft levels
-    pextr2(jl,24) = kplcl(jl,1)
-    pextr2(jl,25) = kplcl(jl,2)
-    pextr2(jl,26) = kplcl(jl,3)
-    pextr2(jl,27) = kptop(jl,1)
-    pextr2(jl,28) = kptop(jl,2)
-    pextr2(jl,29) = kptop(jl,3)
+    pextr2(pcog,24) = kplcl(jl,1)
+    pextr2(pcog,25) = kplcl(jl,2)
+    pextr2(pcog,26) = kplcl(jl,3)
+    pextr2(pcog,27) = kptop(jl,1)
+    pextr2(pcog,28) = kptop(jl,2)
+    pextr2(pcog,29) = kptop(jl,3)
     
     !  various scalings
     !pextr2(jl,45) = 100._jprb*zfracb(jl,3)
-      
+        
     !  test updraft properties   
     zfrac(jl,0:kptop(jl,1)-1,1) = 0._jprb
     zfrac(jl,kptop(jl,1):klev-1,1) = 0.0001_jprb
-    pextra(jl,:,15) = 1000._jprb * ceiling(zfrac(jl,:,1)) * ( pqtuh(jl,:,1)  - zqtenh(jl,:) )
-    pextra(jl,:,16) = ceiling(zfrac(jl,:,1)) * ( pslguh(jl,:,1) - zslgenh(jl,:) )/rcpd 
-    pextra(jl,:,17) = max(0._jprb,zwu2h(jl,:,1))**0.5
-    pextra(jl,:,18) = zeps(jl,:,1)
-    pextra(jl,:,19) = 1000._jprb * zqcuh(jl,:,1)
-    pextra(jl,1:klev,20) = zbuof(jl,:,1)
+    pextra(pcog,:,15) = 1000._jprb * ceiling(zfrac(jl,:,1)) * ( pqtuh(jl,:,1)  - zqtenh(jl,:) )
+    pextra(pcog,:,16) = ceiling(zfrac(jl,:,1)) * ( pslguh(jl,:,1) - zslgenh(jl,:) )/rcpd 
+    pextra(pcog,:,17) = max(0._jprb,zwu2h(jl,:,1))**0.5
+    pextra(pcog,:,18) = zeps(jl,:,1)
+    pextra(pcog,:,19) = 1000._jprb * zqcuh(jl,:,1)
+    pextra(pcog,1:klev,20) = zbuof(jl,:,1)
     
     !pextr2(jl,13) = zcape1(jl)
     !pextr2(jl,18) = pmcu(jl)
     
     !  updraft precip generation
-    pextra(jl,:,21) = pfplvl(jl,:)
-    pextra(jl,:,22) = pfplvn(jl,:)
+    pextra(pcog,:,21) = pfplvl(jl,:)
+    pextra(pcog,:,22) = pfplvn(jl,:)
 
     !  updraft buoyancy
-    pextra(jl,1:klev,28) = zbuof(jl,:,2)
-    pextra(jl,1:klev,29) = zbuof(jl,:,3)
+    pextra(pcog,1:klev,28) = zbuof(jl,:,2)
+    pextra(pcog,1:klev,29) = zbuof(jl,:,3)
 
     !  updraft mass flux
-    pextra(jl,1:klev,30) = pmflx(jl,0:klev-1,2) / (zcfnc1(jl,0:klev-1) * zmgeom(jl,0:klev-1) * zrg )  
-    pextra(jl,1:klev,31) = pmflx(jl,0:klev-1,3) / (zcfnc1(jl,0:klev-1) * zmgeom(jl,0:klev-1) * zrg )
+    pextra(pcog,1:klev,30) = pmflx(jl,0:klev-1,2) / (zcfnc1(jl,0:klev-1) * zmgeom(jl,0:klev-1) * zrg )  
+    pextra(pcog,1:klev,31) = pmflx(jl,0:klev-1,3) / (zcfnc1(jl,0:klev-1) * zmgeom(jl,0:klev-1) * zrg )
     
     !  updraft excesses
-    pextra(jl,:,32) = 1000._jprb * ceiling(zfrac(jl,:,2)) * ( pqtuh(jl,:,2)  - zqtenh(jl,:)  )
-    pextra(jl,:,33) = 1000._jprb * ceiling(zfrac(jl,:,3)) * ( pqtuh(jl,:,3)  - zqtenh(jl,:)  )
-    pextra(jl,:,34) = ceiling(zfrac(jl,:,2)) * ( pslguh(jl,:,2) - zslgenh(jl,:) )/rcpd 
-    pextra(jl,:,35) = ceiling(zfrac(jl,:,3)) * ( pslguh(jl,:,3) - zslgenh(jl,:) )/rcpd 
-    pextra(jl,:,36) = zwu2h(jl,:,2)
-    pextra(jl,:,37) = zwu2h(jl,:,3)
-    pextra(jl,:,26) = max(0._jprb,zwu2h(jl,:,2))**0.5
-    pextra(jl,:,27) = max(0._jprb,zwu2h(jl,:,3))**0.5
+    pextra(pcog,:,32) = 1000._jprb * ceiling(zfrac(jl,:,2)) * ( pqtuh(jl,:,2)  - zqtenh(jl,:)  )
+    pextra(pcog,:,33) = 1000._jprb * ceiling(zfrac(jl,:,3)) * ( pqtuh(jl,:,3)  - zqtenh(jl,:)  )
+    pextra(pcog,:,34) = ceiling(zfrac(jl,:,2)) * ( pslguh(jl,:,2) - zslgenh(jl,:) )/rcpd 
+    pextra(pcog,:,35) = ceiling(zfrac(jl,:,3)) * ( pslguh(jl,:,3) - zslgenh(jl,:) )/rcpd 
+    pextra(pcog,:,36) = zwu2h(jl,:,2)
+    pextra(pcog,:,37) = zwu2h(jl,:,3)
+    pextra(pcog,:,26) = max(0._jprb,zwu2h(jl,:,2))**0.5
+    pextra(pcog,:,27) = max(0._jprb,zwu2h(jl,:,3))**0.5
 
     !  updraft fractions
-    pextra(jl,:,38) = 100._jprb * zfrac(jl,:,2)
-    pextra(jl,:,39) = 100._jprb * zfrac(jl,:,3)
+    pextra(pcog,:,38) = 100._jprb * zfrac(jl,:,2)
+    pextra(pcog,:,39) = 100._jprb * zfrac(jl,:,3)
     
     !  updraft entrainment / detrainment
-    pextra(jl,:,40) = zeps(jl,:,2)
-    pextra(jl,:,41) = zeps(jl,:,3)
+    pextra(pcog,:,40) = zeps(jl,:,2)
+    pextra(pcog,:,41) = zeps(jl,:,3)
     
     !  updraft qt flux
-    pextra(jl,1:klev,44) =  rlvtt * ( pmflx(jl,0:klev-1,2) * (pqtuh(jl,0:klev-1,2) - zqtenh(jl,0:klev-1)) ) / (zcfnc1(jl,0:klev-1) * zmgeom(jl,0:klev-1) * zrg )
-    pextra(jl,1:klev,45) =  rlvtt * ( pmflx(jl,0:klev-1,3) * (pqtuh(jl,0:klev-1,3) - zqtenh(jl,0:klev-1)) ) / (zcfnc1(jl,0:klev-1) * zmgeom(jl,0:klev-1) * zrg )
-    pextra(jl,1:klev,46) =  rlvtt * ( pmflx(jl,0:klev-1,2) * (pqtuh(jl,0:klev-1,2) - zqtenh(jl,0:klev-1)) + &
+    pextra(pcog,1:klev,44) =  rlvtt * ( pmflx(jl,0:klev-1,2) * (pqtuh(jl,0:klev-1,2) - zqtenh(jl,0:klev-1)) ) / (zcfnc1(jl,0:klev-1) * zmgeom(jl,0:klev-1) * zrg )
+    pextra(pcog,1:klev,45) =  rlvtt * ( pmflx(jl,0:klev-1,3) * (pqtuh(jl,0:klev-1,3) - zqtenh(jl,0:klev-1)) ) / (zcfnc1(jl,0:klev-1) * zmgeom(jl,0:klev-1) * zrg )
+    pextra(pcog,1:klev,46) =  rlvtt * ( pmflx(jl,0:klev-1,2) * (pqtuh(jl,0:klev-1,2) - zqtenh(jl,0:klev-1)) + &
                     &  pmflx(jl,0:klev-1,3) * (pqtuh(jl,0:klev-1,3) - zqtenh(jl,0:klev-1)) ) / (zcfnc1(jl,0:klev-1) * zmgeom(jl,0:klev-1) * zrg ) 
 
     !  updraft condensate
-    pextra(jl,:,47) = 1000._jprb * zqcuh(jl,:,2)
-    pextra(jl,:,48) = 1000._jprb * zqcuh(jl,:,3)
+    pextra(pcog,:,47) = 1000._jprb * zqcuh(jl,:,2)
+    pextra(pcog,:,48) = 1000._jprb * zqcuh(jl,:,3)
             
     !  updraft thl flux
-    pextra(jl,1:klev,51) =  ( pmflx(jl,0:klev-1,2) * (pslguh(jl,0:klev-1,2) - zslgenh(jl,0:klev-1)) ) / (zcfnc1(jl,0:klev-1) * zmgeom(jl,0:klev-1) * zrg )
-    pextra(jl,1:klev,52) =  ( pmflx(jl,0:klev-1,3) * (pslguh(jl,0:klev-1,3) - zslgenh(jl,0:klev-1)) ) / (zcfnc1(jl,0:klev-1) * zmgeom(jl,0:klev-1) * zrg )
-    pextra(jl,1:klev,53) =  ( pmflx(jl,0:klev-1,2) * (pslguh(jl,0:klev-1,2) - zslgenh(jl,0:klev-1)) + &
+    pextra(pcog,1:klev,51) =  ( pmflx(jl,0:klev-1,2) * (pslguh(jl,0:klev-1,2) - zslgenh(jl,0:klev-1)) ) / (zcfnc1(jl,0:klev-1) * zmgeom(jl,0:klev-1) * zrg )
+    pextra(pcog,1:klev,52) =  ( pmflx(jl,0:klev-1,3) * (pslguh(jl,0:klev-1,3) - zslgenh(jl,0:klev-1)) ) / (zcfnc1(jl,0:klev-1) * zmgeom(jl,0:klev-1) * zrg )
+    pextra(pcog,1:klev,53) =  ( pmflx(jl,0:klev-1,2) * (pslguh(jl,0:klev-1,2) - zslgenh(jl,0:klev-1)) + &
                     &    pmflx(jl,0:klev-1,3) * (pslguh(jl,0:klev-1,3) - zslgenh(jl,0:klev-1)) ) / (zcfnc1(jl,0:klev-1) * zmgeom(jl,0:klev-1) * zrg )
     
   enddo !jl

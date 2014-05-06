@@ -87,7 +87,7 @@ module stat
 
   public :: sflg, ssam_intvl, savg_intvl, statistics, init_stat, write_ps,   &
        acc_tend, updtst, updtst_ts,sfc_stat, close_stat, fill_scalar, tke_sgs, sgsflxs,&
-       sgs_vel, comp_tke, get_zi
+       sgs_vel, comp_tke, get_zi, stat_edmf
 
 contains
   !
@@ -1760,6 +1760,181 @@ contains
     ssclr(57) = sum(a_Wl(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
 
   end subroutine accum_lsm
+
+  !
+  !---------------------------------------------------------------------
+  ! subroutine for creating output of edmf scheme
+  !
+
+  subroutine stat_edmf(a1, a2, pcog, pnog, pextr2, pextra, kfldx2, kfldx, klevx)
+
+  use parkind1 , only : jpim ,jprb
+  use grid,  only : nzp, nxp, nyp, pextrac
+  use vdf, only : flip
+
+   integer(kind=jpim),intent(in) :: kfldx2, kfldx, klevx
+   real(kind=jprb)   ,intent(in) :: pextr2(pnog ,kfldx2), pextra(pnog,klevx,kfldx)
+   integer(kind=jpim),intent(in) :: pcog, pnog
+   real, dimension((nxp-4)*(nyp-4),nzp) :: a1, avg_cond
+   real, dimension((nxp-4)*(nyp-4)) :: a2
+   real, dimension(nzp) :: a3
+   real :: a4
+   integer :: tsps,i,j,k,n
+
+    avg_cond(:,2:nzp) = pextra(:,:,48)       !Moist updraft liquid water
+    a1 = 0.
+    a2 = 0.
+    tsps = 1
+
+    !--- timeseries ---
+
+    a2(:) = pextr2(:,34)                     !Test updraft LCL
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps) 
+    call updtst_ts('u1t',1,a4,1)
+    a2(:) = pextr2(:,31)                     !Test updraft termination height
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps) 
+    call updtst_ts('u1t',2,a4,1)
+
+    a2(:) = pextr2(:,35)                     !Dry updraft LCL
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps) 
+    call updtst_ts('u2t',1,a4,1)
+    a2(:) = pextr2(:,32)                     !Dry updraft termination height
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps) 
+    call updtst_ts('u2t',2,a4,1)
+
+    a2(:) = pextr2(:,36)                     !Moist updraft LCL
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps) 
+    call updtst_ts('u3t',1,a4,1)
+    a2(:) = pextr2(:,33)                     !Moist updraft termination height
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps) 
+    call updtst_ts('u3t',2,a4,1)
+
+    !--- profiles ---
+    tsps = 2
+    !a1(2:nzp) = flip(pextra(1,:,39)) !Test updraft area Fraction
+    !call updtst(nzp,'u1p',1,a1,1) 
+
+    a1(:,2:nzp) = pextra(:,:,19)             !Test updraft liquid water
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+    call updtst(nzp,'u1p',2,a3(:),1)
+    a1(:,2:nzp) = pextra(:,:,17)             !Test updraft w
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+    call updtst(nzp,'u1p',3,a3(:),1)
+    a1(:,2:nzp) = pextra(:,:,20)             !Test updraft B
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+    call updtst(nzp,'u1p',4,a3(:),1)
+    a1(:,2:nzp) = pextra(:,:,16)             !Test updraft thl excess
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+    call updtst(nzp,'u1p',5,a3(:),1)
+    a1(:,2:nzp) = pextra(:,:,15)             !Test updraft qt excess
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+    call updtst(nzp,'u1p',6,a3(:),1)
+ 
+    a1(:,2:nzp) = pextra(:,:,38)             !Dry updraft area Fraction
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+    call updtst(nzp,'u2p',1,a3(:),1)
+    a1(:,2:nzp) = pextra(:,:,47)             !Dry updraft liquid water
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+    call updtst(nzp,'u2p',2,a3(:),1)
+    a1(:,2:nzp) = pextra(:,:,26)             !Dry updraft w
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+    call updtst(nzp,'u2p',3,a3(:),1)
+    a1(:,2:nzp) = pextra(:,:,28)             !Dry updraft B
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+    call updtst(nzp,'u2p',4,a3(:),1)
+    a1(:,2:nzp) = pextra(:,:,34)             !Dry updraft thl excess
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+    call updtst(nzp,'u2p',5,a3(:),1)
+    a1(:,2:nzp) = pextra(:,:,32)             !Dry updraft qt excess
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+    call updtst(nzp,'u2p',6,a3(:),1)
+
+    a1(:,2:nzp) = pextra(:,:,39)             !Moist updraft area Fraction
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+    call updtst(nzp,'u3p',1,a3(:),1)
+    a1(:,2:nzp) = pextra(:,:,48)             !Moist updraft liquid water
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+    call updtst(nzp,'u3p',2,a3(:),1) 
+    a1(:,2:nzp) = pextra(:,:,27)             !Moist updraft w
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+    call updtst(nzp,'u3p',3,a3(:),1)  
+    a1(:,2:nzp) = pextra(:,:,29)             !Moist updraft B
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+    call updtst(nzp,'u3p',4,a3(:),1) 
+    a1(:,2:nzp) = pextra(:,:,35)             !Moist updraft thl excess
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+    call updtst(nzp,'u3p',5,a3(:),1) 
+    a1(:,2:nzp) = pextra(:,:,33)             !Moist updraft qt excess
+    call avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+    call updtst(nzp,'u3p',6,a3(:),1) 
+
+!assign output for crosssections
+  n = 0
+  pextrac = 0.
+  do j=3,nyp-2
+    do i=3,nxp-2
+      n = n+1
+      pextrac (i-2,j-2,1) = pextr2(n,33)                 !Moist updraft termination height
+!print*, 'pextr2(n,33),n: ',pextr2(n,33),n
+      pextrac (i-2,j-2,2) = pextra(n,nzp-5,39)           !Moist updraft area Fraction
+      do k=2,nzp
+        pextrac (i,j,3) = pextrac (i,j,3) + (pextra(n,k,27))**2   !Moist updraft w² integrated
+      enddo
+      do k=2,nzp-2
+        pextrac (i,j,4) = pextrac (i,j,4) + pextra(n,k,33)   !Moist updraft qt excess integrated
+      enddo
+      do k=2,nzp-2
+        pextrac (i,j,5) = pextrac (i,j,5) + pextra(n,k,29)   !Moist updraft B integrated
+      enddo
+      pextrac (i-2,j-2,6) = pextr2(n,32)                 !Dry updraft termination height
+    enddo
+  enddo
+
+!print*, 'pextrac (i,j,1): ', pextrac (:,:,4)
+
+  end subroutine stat_edmf
+
+  !
+  !---------------------------------------------------------------------
+  ! subroutine for averaging output of edmf scheme
+  !
+  subroutine avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
+   use parkind1 , only : jpim
+   use grid,  only : nzp, nxp, nyp
+   use vdf, only : flip
+
+   integer(kind=jpim),intent(in) :: pcog
+   real, dimension((nxp-4)*(nyp-4),nzp),intent(in) :: a1, avg_cond
+   real, dimension((nxp-4)*(nyp-4)),intent(in) :: a2
+   real, dimension(nzp),intent(out) :: a3
+   real, intent(out) :: a4
+   integer, intent(in) :: tsps
+   real, dimension(nzp) :: a1aux, a1aux2
+   real :: a2aux
+   integer :: n, i
+
+   a3 = 0.
+   a4 = 0.
+   a2aux = 0.
+   a1aux = 0.
+   a1aux2 = 0.
+   n = 0
+
+   do i = 1,pcog
+    if (sum(avg_cond(i,2:nzp)) .ne. 0.) then
+     if (tsps .eq. 1) then
+      a2aux = a2aux + a2(i)
+     else if (tsps .eq. 2) then
+      a1aux2(2:nzp) = flip(a1(i,2:nzp))
+      a1aux(2:nzp) = a1aux(2:nzp) + a1aux2(2:nzp)
+     endif
+      n=n+1
+    endif
+   enddo
+   a3(2:nzp) = a1aux(2:nzp)/real(n)
+   a4 = a2aux/real(n)
+
+  end subroutine avg_edmf
 
 end module stat
 

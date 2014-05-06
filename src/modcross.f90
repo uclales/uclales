@@ -29,7 +29,7 @@ implicit none
   character(len=7),  dimension(10) :: hname
   character(len=80), dimension(10) :: hlname
   character(len=7) :: hname_prc
-  integer, parameter :: nvar_all = 49
+  integer, parameter :: nvar_all = 56
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
          'l      ','rp     ','np     ','tv     ','ricep  ', & !6-10
@@ -40,7 +40,9 @@ implicit none
          'rwptop ','tracer ','trcpath','trcbase','trctop ', & !31-35
          'wdev_cl','wdev_sc','w_cld  ','tdev_cl','tdev_sc', & !36-40
          't_cld  ','qdev_cl','qdev_sc','q_cld  ','tv_cl  ', & !41-45
-         'tv_sc  ','tv_cld ','core   ','th_e   '/)            !46-49
+         'tv_sc  ','tv_cld ','core   ','th_e   ','w_int  ', & !46-50
+         'a_moist','zt_mst ','e_mup  ','q_ex   ','buoy   ', & !51-55
+         'zt_dry '/) !56
   integer :: nccrossxzid,nccrossyzid,nccrossxyid, nccrossrec, nvar
 
   interface writecross
@@ -363,6 +365,34 @@ contains
         longname = 'equivalent potential temperature'
         unit = 'K'
         iscross = .true.
+      case ('w_int')
+        if (level < 2) return
+        longname = 'Normalized integrated vertical velocity'
+        unit = 's^-1'
+      case ('a_moist')
+        if (level < 2) return
+        longname = 'edmf moist updraft area fraction'
+        unit = '%'
+      case ('zt_mst')
+        if (level < 2) return
+        longname = 'edmf moist updraft termination height'
+        unit = 'm'
+      case ('e_mup')
+        if (level < 2) return
+        longname = 'edmf normalized energy of moist updraft'
+        unit = 'm'
+      case ('q_ex')
+        if (level < 2) return
+        longname = 'edmf normalized integrated qt excess of moist updraft'
+        unit = 'g/kg'
+      case ('buoy')
+        if (level < 2) return
+        longname = 'edmf normalized buoyancy of moist updraft'
+        unit = 'm2/s'
+      case ('zt_dry')
+        if (level < 2) return
+        longname = 'edmf dry updraft termination height'
+        unit = 'm'
       case default
         return
       end select
@@ -469,14 +499,14 @@ contains
   subroutine triggercross(rtimee)
     use grid,      only : level,nxp, nyp, nzp, tname, zt, zm, dzi_m, dzi_t, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
-       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta, pi0, pi1, a_pexnr, prc_lev, umean, vmean, th00
+       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta, pi0, pi1, a_pexnr, prc_lev, umean, vmean, th00, pextrac
     use modnetcdf, only : writevar_nc, fillvalue_double
     use util,      only : get_avg3, get_var3, calclevel
     use defs,      only : ep2,cp,cpr, p00
     use thrm,      only: rslf
     real, intent(in) :: rtimee
     real             :: tstar, exner, tk
-    real, dimension(3:nxp-2,3:nyp-2) :: tmp
+    real, dimension(3:nxp-2,3:nyp-2) :: tmp, z_top, z_top_mst
     real, dimension(nzp,nxp,nyp) :: tracer, tv, interp, th_e,p
     real, dimension(nzp)         :: c1, thvar, tvbar, tvenv, tvcld
     integer :: n, nn, i, j, k, ct, cb, zi, lcl
@@ -683,6 +713,7 @@ contains
         call writecross(crossname(n), tmp)
       case ('cldtop')
         call calctop(liquid, tmp)
+z_top = tmp
         call writecross(crossname(n), tmp)
       case ('clddept')
         call calcdepth(liquid, tmp)
@@ -746,6 +777,62 @@ contains
         call writecross(crossname(n), tmp)
       case ('core')
         call calcmax(tv, liquid, tmp)
+        call writecross(crossname(n), tmp)
+      case ('w_int')
+        tmp = 0.
+        do j=3,nyp-2
+          do i=3,nxp-2
+            do k=2,nzp
+              if(k .le. nint(z_top(i,j))) then
+               tmp(i,j) = tmp(i,j)+a_wp(k,i,j)
+              endif
+            end do
+          end do
+        end do
+        tmp = tmp/z_top      
+        call writecross(crossname(n), tmp)
+      case ('zt_mst')
+        tmp = pextrac(:,:,1)
+        z_top_mst = tmp
+        call writecross(crossname(n), tmp)
+      case ('a_moist')
+        tmp = pextrac(:,:,2)
+        call writecross(crossname(n), tmp)
+      case ('e_mup')
+        do j=3,nyp-2
+          do i=3,nxp-2
+            if (z_top_mst(i,j) .ne. 0) then
+              tmp(i,j) = pextrac(i,j,3)/z_top_mst(i,j)
+            else
+              tmp(i,j) = 0.
+            endif
+          end do
+        end do
+        call writecross(crossname(n), tmp)
+      case ('q_ex')
+        do j=3,nyp-2
+          do i=3,nxp-2
+            if (z_top_mst(i,j) .ne. 0) then
+              tmp(i,j) = pextrac(i,j,4)/z_top_mst(i,j)
+            else
+              tmp(i,j) = 0.
+            endif
+          end do
+        end do
+        call writecross(crossname(n), tmp)
+      case ('buoy')
+        do j=3,nyp-2
+          do i=3,nxp-2
+            if (z_top_mst(i,j) .ne. 0) then
+              tmp(i,j) = pextrac(i,j,5)/z_top_mst(i,j)
+            else
+              tmp(i,j) = 0.
+            endif
+          end do
+        end do
+        call writecross(crossname(n), tmp)
+      case ('zt_dry')
+        tmp = pextrac(:,:,6)
         call writecross(crossname(n), tmp)
       end select
     end do
@@ -1100,4 +1187,3 @@ contains
 
 
 end module modcross
-

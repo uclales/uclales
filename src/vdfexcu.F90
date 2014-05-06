@@ -1,4 +1,4 @@
-subroutine vdfexcu(kidia  , kfdia  , klon   , klev   , kdraft , ptmst  , pz0mm  , &
+subroutine vdfexcu(pnog   , kidia  , kfdia  , klon   , klev   , kdraft , ptmst  , pz0mm  , &
                   &phrlw  , phrsw  , &
                   &pum1   , pvm1   , ptm1   , pqm1   , plm1   , pim1   , &
                   &paphm1 , papm1  , pgeom1 , pgeoh  , pcptgz , &
@@ -98,7 +98,7 @@ implicit none
 
 !*         0.1    global variables
 
-integer(kind=jpim),intent(in)    :: klon 
+integer(kind=jpim),intent(in)    :: klon , pnog
 integer(kind=jpim),intent(in)    :: klev 
 integer(kind=jpim),intent(in)    :: kidia 
 integer(kind=jpim),intent(in)    :: kfdia 
@@ -138,7 +138,7 @@ real(kind=jprb)   ,intent(inout) :: pmflx(klon,0:klev,kdraft)
 integer(kind=jpim),intent(in)    :: kvartop(klon)
 !          diagnostic output
 integer(kind=jpim),intent(in)     :: kfldx2, klevx, kfldx
-real(kind=jprb)   ,intent(inout)  :: pextr2(klon,kfldx2), pextra(klon,klevx,kfldx)
+real(kind=jprb)   ,intent(inout)  :: pextr2(pnog,kfldx2), pextra(pnog,klevx,kfldx)
 
 !*         0.2    local variables
 

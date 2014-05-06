@@ -150,6 +150,9 @@ module grid
   !
   !
   integer :: nscl = 4
+
+  !Maren, output of edmf cross sections
+  real, dimension (:,:,:), allocatable :: pextrac
   !
 contains
   !
@@ -438,6 +441,10 @@ contains
        print "('   memory to be allocated  -  ',f8.3,' mbytes')", &
             memsize*1.e-6*kind(0.0)
     end if
+
+  !output of edmf cross sections
+  allocate (pextrac(nxp,nyp,10))
+  pextrac = 0.
 
   end subroutine define_vars
   !
@@ -842,4 +849,5 @@ contains
   end subroutine newvar
 
 end module grid
+
 
