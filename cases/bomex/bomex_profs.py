@@ -69,6 +69,11 @@ vg  = np.zeros_like(ug)   # geostrophic wind
 
 # Write output fields
 
+###### HACK HACK
+print 'HACKED BVS -> increase mositure'
+qo[:] += 5.
+
+
 # ------------------------------------------------
 # Input sounding (sound_in): 
 # ------------------------------------------------

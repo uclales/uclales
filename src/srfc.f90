@@ -49,12 +49,12 @@ contains
   !
   subroutine surface(sst,time_in)
 
-    use defs, only: vonk, p00, rcp, g, cp, alvl, ep2
+    use defs, only: vonk, p00, rcp, cpr, g, cp, alvl, ep2
     use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, zt, psrf,   &
          th00, umean, vmean, dn0, level, a_ustar, a_tstar, a_rstar,        &
          uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, nstep, a_tskin, a_qskin,  &
          isfctyp, a_phiw, a_tsoil, a_Wl, obl, &
-         a_lflxu, a_lflxd, a_sflxu, a_sflxd, rkalpha, rkbeta, a_Qnet, dt, a_G0, wspd
+         a_lflxu, a_lflxd, a_sflxu, a_sflxd, rkalpha, rkbeta, a_Qnet, dt, a_G0, wspd, pi0, pi1
     use thrm, only: rslf
     use stat, only: sfc_stat, sflg
     use util, only : get_avg3
@@ -74,8 +74,8 @@ contains
 
     ! BvS: for isfctyp=55 
     !---------------------------------------
-    real     :: tsbar                                    ! Average surface T
-    real     :: rhcpa,gkm,gkp,soiltend,temp(20),zeff
+    real     :: tsbar ! Average surface T
+    real     :: rhcpa,gkm,gkp,soiltend,temp(20),zeff,exnera,exners
 
     drdz(:,:)   = 0.
 
@@ -243,7 +243,7 @@ contains
 
     !
     ! ----------------------------------------------------------------------
-    ! Malte: Get surface fluxes using a land surface model (van Heerwarden)
+    ! Malte: Get surface fluxes using a land surface model (van Heerwaarden, DALES)
     !
     case(5)
        !Initialize Land Surface -> BvS called from init.f90 
@@ -262,7 +262,7 @@ contains
          tskinav(:,:) = a_tskin(:,:)
          qskinav(:,:) = a_qskin(:,:)
        else
-         !Insert filter method here (untested)
+         stop('filtering not supported in LSM')
        end if
 
        !Calculate surface wind for flux calculation
@@ -327,6 +327,9 @@ contains
     case(55)
        if(init_lsm) call initlsm_simple   ! shouldn't be necessary
 
+       exnera = ((p00*((pi0(2)+pi1(2))/cp)**cpr)/p00)**rcp
+       exners = (psrf/p00)**rcp
+
        call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,a_up,a_vp,umean,vmean)
 
        ! Option to filter wind speed
@@ -359,7 +362,7 @@ contains
            do i=3,nxp-2
              a_Qnet(i,j)  = a_lflxd(2,i,j) - a_lflxu(2,i,j) + a_sflxd(2,i,j) - a_sflxu(2,i,j)
              rhcpa        = dn0(2)*cp/ra(i,j)
-             a_tskin(i,j) = (a_Qnet(i,j) + rhcpa * a_theta(2,i,j)*(psrf/p00) + labsk * a_tsoil(1,i,j)) / (rhcpa + labsk)
+             a_tskin(i,j) = (a_Qnet(i,j) + rhcpa * a_theta(2,i,j)*exnera + labsk * a_tsoil(1,i,j)) / (rhcpa + labsk)
            end do
          end do
 
@@ -371,7 +374,7 @@ contains
                if(k==1) then
                  gkm = labsk * (a_tskin(i,j) - tsoilm(k,i,j))
                else
-                 gkm = -lambdab * ((tsoilm(k,i,j)   - tsoilm(k-1,i,j)) / (zsoilc(k) - zsoilc(k-1)))
+                 gkm = -lambdab * ((tsoilm(k,i,j) - tsoilm(k-1,i,j)) / (zsoilc(k) - zsoilc(k-1)))
                end if
                gkp   = -lambdab * ((tsoilm(k+1,i,j) - tsoilm(k,i,j))   / (zsoilc(k+1) - zsoilc(k)))
                soiltend = -(gkp - gkm) / (zsoil(k+1) - zsoil(k)) 
@@ -393,18 +396,20 @@ contains
            end do
          end do
        else ! --------------------------------------------------
-         a_tskin(:,:) = sst *(p00/psrf)**rcp
+         a_tskin(:,:) = sst * (p00/psrf)**rcp
        end if
 
+       a_tskin = a_tskin / exners ! to potential for flux and obl calculation in next t-step
+ 
        ! Calculate surface fluxes
        do j=3, nyp-2
          do i=3, nxp-2
            a_ustar(i,j) = vonk * wspd(i,j)  / (log(zt(2) / z0m(i,j)) - psim(zt(2) / obl(i,j)) + psim(z0m(i,j) / obl(i,j)))
-           wt_sfc(i,j)  = - (a_theta(2,i,j)*(psrf/p00)**rcp - a_tskin(i,j)) / ra(i,j)
+           wt_sfc(i,j)  = - (a_theta(2,i,j) - a_tskin(i,j)) / ra(i,j)
            uw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j) * (a_up(2,i,j)+umean)/wspd(i,j)
            vw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j) * (a_vp(2,i,j)+vmean)/wspd(i,j)
            a_tstar(i,j) = - wt_sfc(i,j)/a_ustar(i,j)
-           if(dolsm) a_G0(i,j)    = labsk * (a_tskin(i,j) - a_tsoil(1,i,j))
+           if(dolsm) a_G0(i,j) = labsk * (a_tskin(i,j)*exners - a_tsoil(1,i,j))
          end do
        end do
 
@@ -974,9 +979,8 @@ contains
 
   !
   ! ----------------------------------------------------------
-  ! Malte: LSM to calculate temperature and moisture at the surface
-  ! DALES (van Heerwaarden)
-  ! "PLEASE NOTE: LSM variables are defined and initialized in lsmdata.f90
+  ! Malte: LSM to calculate temperature and moisture at the surface [DALES (van Heerwaarden)]
+  ! PLEASE NOTE: LSM variables are defined and initialized in lsmdata.f90
   !
   subroutine lsm
 
@@ -1021,9 +1025,9 @@ contains
     do j = 3, nyp-2
       do i = 3, nxp-2
 
-        !" 1.1 - Calculate net radiation (average over nradtime)
-        if((iradtyp .eq. 4) .or. (iradtyp .eq. 5)) then
-          if(nstep == 1) then
+        ! 1.1 - Calculate net radiation (average over nradtime for full radiation)
+        if (iradtyp .eq. 4) then
+          if (nstep == 1) then
 
             a_sflxd_avn(2:nradtime,i,j) = a_sflxd_avn(1:nradtime-1,i,j)
             a_sflxu_avn(2:nradtime,i,j) = a_sflxu_avn(1:nradtime-1,i,j)
@@ -1043,25 +1047,24 @@ contains
           lflxd_av = sum(a_lflxd_avn(:,i,j))/nradtime
           lflxu_av = sum(a_lflxu_avn(:,i,j))/nradtime
 
-          !Surface radiation averaged over domain per timestep
-          !sflxd_av = sum(a_sflxd(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-          !sflxu_av = sum(a_sflxu(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-          !lflxd_av = sum(a_lflxd(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-          !lflxu_av = sum(a_lflxu(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-
           Qnetn(i,j) = (sflxd_av - sflxu_av + lflxd_av - lflxu_av)
-
-          !Switch between homogeneous and heterogeneous net radiation
-          !a_Qnet(:,:) = sum(Qnetm(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
           a_Qnet(i,j) = Qnetn(i,j)
 
-        else
-          !" Not using full radiation: use average radiation from Namelist
+        else if (iradtyp .eq. 5) then ! BvS: simple surface radiation doesn't require averaging
+
+          sflxd_av = a_sflxd(2,i,j)
+          sflxu_av = a_sflxu(2,i,j)
+          lflxd_av = a_lflxd(2,i,j)
+          lflxu_av = a_lflxu(2,i,j)
+
+          Qnetn(i,j) = (sflxd_av - sflxu_av + lflxd_av - lflxu_av)
+          a_Qnet(i,j) = Qnetn(i,j)
+
+        else ! Not using full radiation: use average radiation from Namelist
           a_Qnet(i,j) = Qnetav
         end if
 
         !" 2.1 - Calculate the surface resistance with vegetation
-
         !" a) Stomatal opening as a function of incoming short wave radiation
         if ((iradtyp .eq. 4) .or. (iradtyp .eq. 5)) then
           f1  = 1. /min(1., (0.004 * max(0.,sflxd_av) + 0.05) &

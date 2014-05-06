@@ -6,14 +6,14 @@
   deltay   = 50
   deltaz   = 50
   dtlong   = 20.
-  timmax   = 10800.
+  timmax   = 3600.
   runtype  = 'INITIAL'
   hfilin   = 'dcbl.rst'
   filprf   = 'dcbl_x'
   level    = 2
   th00     = 300.
   zrand    = 100.
-  ps       = 1020.0, 5000.0,
+  ps       = 1000.0, 5000.0,
   ts       =  300.0,  320.0,
   rts      =   10.0,   10.0,
   us       =    5.0,    5.0,
@@ -24,8 +24,8 @@
 
   istpfl   = 20
 
-  isfctyp  = 0
-  iradtyp  = 0
+  isfctyp  = 5
+  iradtyp  = 5
   strtim = 180.3
   lspongeinit = .false.
 
