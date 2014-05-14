@@ -73,7 +73,7 @@ contains
     use thrm, only : thermo
     use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, &
          lpartstat, exitparticlestat, write_particle_hist, particlestat, &
-	 balanced_particledump,frqpartdump, ldropstart
+         balanced_particledump,frqpartdump, ldropstart
 
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5

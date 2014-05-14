@@ -339,8 +339,8 @@ contains
     !
 !as    if(firsttime) call initmcrp(level,firsttime)
     allocate(convice(n1),convliq(n1))
-    if(lpartdrop .and. nstep==3) allocate(a_npauto(nzp,nxp,nyp))
-    if(lpartdrop .and. nstep==3) a_npauto(:,:,:) = 0.
+    if(lpartdrop .and. nstep==1) allocate(a_npauto(nzp,nxp,nyp))
+    if(lpartdrop .and. nstep==1) a_npauto(:,:,:) = 0.
     do j=3,n3-2
        do i=3,n2-2
           call resetvar(rain,rp(1:n1,i,j),np(1:n1,i,j))
@@ -624,11 +624,11 @@ contains
                   mue = rain_cmu1*TANH((1.*rain_cmu2*(Dp-rain_cmu3))**2) &
                        & + rain_cmu4
                ENDIF
-	     else
-	       !mue = cmur1*(1.+tanh(cmur2*(Dp-cmur3)))   !MY05 revised constants
-	       mue = cmy1*tanh(cmy2*(Dp-cmy3))+cmy4       !MY05 original constants
-	       !mue = 1.
-	     end if
+             else
+               !mue = cmur1*(1.+tanh(cmur2*(Dp-cmur3)))   !MY05 revised constants
+               mue = cmy1*tanh(cmy2*(Dp-cmy3))+cmy4       !MY05 original constants
+               !mue = 1.
+             end if
 
              lam = (pi/6.* rowt &
                   &      * (mue+3.0)*(mue+2.0)*(mue+1.0) / Xp)**(1./3.)
@@ -770,24 +770,24 @@ contains
              Dc = ( Xc / prw )**(1./3.)
              au = Cau * (Dc * mmt / 2.)**Eau
           end if
-	  if (kessler) then
-	     if (rc(k) > rc0) then
-	        au = alpha * (rc(k) -rc0)
-	     else
-	        au = 0.
-	     end if
-	  end if
+          if (kessler) then
+             if (rc(k) > rc0) then
+                au = alpha * (rc(k) -rc0)
+             else
+                au = 0.
+             end if
+          end if
           au    = au * dt
           au    = min(au,rc(k))
           rp(k) = rp(k) + au
           rc(k) = rc(k) - au
           tl(k) = tl(k) + convliq(k)*au
           np(k) = np(k) + au/cldw%x_max
-	  
-	  ! For particles: a_npauto in #/(kg*dt)
-	  !if(lpartdrop .and. nstep==1) a_npauto(k,i,j) = a_npauto(k,i,j) + (rkalpha(1) + rkalpha(2))* au*dn0(k)
-	  !if(lpartdrop .and. nstep==3) a_npauto(k,i,j) = a_npauto(k,i,j) + (rkalpha(3)             )* au*dn0(k)
-	  if(lpartdrop .and. nstep==3) a_npauto(k,i,j) = au*dn0(k)
+          
+          ! For particles: a_npauto in #/(kg*dt)
+          if(lpartdrop .and. nstep==1) a_npauto(k,i,j) = a_npauto(k,i,j) + (rkalpha(1) + rkalpha(2))* au*dn0(k)
+          if(lpartdrop .and. nstep==3) a_npauto(k,i,j) = a_npauto(k,i,j) + (rkalpha(3)             )* au*dn0(k)
+          !if(lpartdrop .and. nstep==3) a_npauto(k,i,j) = au*dn0(k)
        end if
     end do
 
@@ -910,19 +910,19 @@ contains
         ! Adjust Dm and mu-Dm and Dp=1/lambda following Milbrandt & Yau
         !
         Dm = ( 6. / (rowt*pi) * Xp )**(1./3.)
-	if (oldsedimentation) then
+        if (oldsedimentation) then
           !mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))    !MY05 revised constants
-	  mu = cmy1*tanh(cmy2*(Dp-cmy3))+cmy4       !MY05 original constants
-	  !mu = 1.
-	else
-	  IF (Dm.LE.rain_cmu3) THEN ! see Seifert (2008)            
+          mu = cmy1*tanh(cmy2*(Dp-cmy3))+cmy4       !MY05 original constants
+          !mu = 1.
+        else
+          IF (Dm.LE.rain_cmu3) THEN ! see Seifert (2008)            
              mu = rain_cmu0*TANH((4.*rain_cmu2*(Dm-rain_cmu3))**2) &
                  & + rain_cmu4
           ELSE
              mu = rain_cmu1*TANH((1.*rain_cmu2*(Dm-rain_cmu3))**2) &
                  & + rain_cmu4
           ENDIF
-	end if
+        end if
         Dp = (Dm**3/((mu+3.)*(mu+2.)*(mu+1.)))**(1./3.)
 
         vn(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
