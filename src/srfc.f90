@@ -1090,7 +1090,7 @@ contains
         !" c) Response of stomata to vapor deficit of atmosphere
         Tatm    = a_theta(2,i,j)*exnerair
         esat = 0.611e3 * exp(17.2694 * (Tatm - 273.16) / (Tatm - 35.86))
-        e    = vapor(2,i,j) * psrf / 0.622
+        e    = vapor(2,i,j) * psrf / (0.622 + vapor(2,i,j))
         f3   = 1. / exp(-gD(i,j) * (esat - e) / 100.)
 
         !" d) Response to temperature
@@ -1115,10 +1115,10 @@ contains
         !"Solve the surface temperature implicitly including variations in LWout
         tsurfm  = tskinm(i,j) * exner
         esat    = 0.611e3 * exp(17.2694 * (tsurfm-273.16) / (tsurfm-35.86))
-        qsat    = 0.622 * esat / psrf
+        qsat    = 0.622 * esat / (psrf-esat)
         desatdT = esat * (17.2694 / (tsurfm-35.86) - 17.2694 *  &
                   (tsurfm-273.16) / (tsurfm-35.86)**2.)
-        dqsatdT = 0.622 * desatdT / psrf
+        dqsatdT = 0.622 * desatdT / (psrf-desatdT)
 
         !" Remove LWup from Qnet calculation (if running without radiation)
         a_Qnet(i,j) = a_Qnet(i,j) + stefan * (tskinm(i,j)*exner)**4.

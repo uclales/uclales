@@ -11,13 +11,15 @@
 ! TIME --------------------
   runtype      = "HISTORY"
   strtim       = 196.625   ! .625
-  timmax       = 28800 !75600.
+  timmax       = 57600 !75600.
   wctime       = 27000.
   dtlong       = 15
   istpfl       = 20
 
 ! PHYSICS -----------------
   iradtyp      = 5
+  fixed_lwin   = .true.
+  flwin        = 300. 
   isfctyp      = 5
   level        = 2
   nfpt         = 8
@@ -50,7 +52,7 @@
   vmean        = 0.
 
 ! STAT --------------------
-  hfilin       = 'dium.0014400s'
+  hfilin       = 'dium.0036000s'
   filprf       = 'dium'
   frqhis       = 7200. 
   frqanl       = 9999999.
