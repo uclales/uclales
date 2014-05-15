@@ -141,7 +141,6 @@ contains
     type (particle_record), pointer:: particle
     real :: u1,u2
 
-
     if (lpartsgs .and. nstep == 1) then
       call calc_sgstke                ! Estimates SGS-TKE
       call fsubgrid                   ! Calculates bulk fraction SGS-TKE / TOTAL-TKE

@@ -74,7 +74,7 @@ contains
     use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, &
          lpartstat, exitparticlestat, write_particle_hist, particlestat, &
          balanced_particledump,frqpartdump, ldropstart
-    use srfc, only : Hg,Gg,oblg,ustarg
+    use srfc, only : Hg,LEg,Gg,oblg,ustarg
 
     use advf, only : gcfl,cfllim
 
@@ -186,7 +186,7 @@ contains
               !         istp, time, dt_prev, t2-t1, wctime-t2+t0
               !end if
 
-              print "(' # =',i6,' time =',f12.2,' dt =',f8.4,' cflm =',f8.4,' CPUt =',f8.3,' WCt =',f10.2,' | H =',f7.2,' G =',f7.2,' L =',e10.2,' u* =',f7.3)", istp,time,dt_prev,cflmax,t2-t1, wctime-t2+t0, Hg, Gg, oblg, ustarg
+              print "(' # =',i6,' time =',f12.2,' dt =',f8.4,' cflm =',f8.4,' CPUt =',f8.3,' WCt =',f10.2,' | H =',f7.2,' LE =',f7.2,' G =',f7.2,' L =',e10.2,' u* =',f7.3)", istp,time,dt_prev,cflmax,t2-t1, wctime-t2+t0, Hg, LEg, Gg, oblg, ustarg
 
           end if
        endif

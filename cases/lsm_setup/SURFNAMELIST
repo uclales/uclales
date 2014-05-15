@@ -21,7 +21,7 @@
  gDav          = 0.
  rsminav       = 150.
  rssoilminav   = 50.
- Cskinav       = 20000.
+ Cskinav       = 0.
  lambdaskinav  = 5.
  Wlav          = 0.
 /

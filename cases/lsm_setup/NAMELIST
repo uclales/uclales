@@ -1,0 +1,73 @@
+&model
+! GRID --------------------
+  nxp          = 20
+  nyp          = 20
+  nzp          = 82
+  deltax       = 100
+  deltay       = 100
+  deltaz       = 25
+  igrdtyp      = 1
+
+! TIME --------------------
+  runtype      = "HISTORY"
+  strtim       = 196.625   ! .625
+  timmax       = 28800 !75600.
+  wctime       = 27000.
+  dtlong       = 15
+  istpfl       = 20
+
+! PHYSICS -----------------
+  iradtyp      = 5
+  isfctyp      = 5
+  level        = 2
+  nfpt         = 8
+  distim       = 300.
+  corflg       = .true.
+  prndtl       = 0.3333333
+  cntlat       = 50.
+  ltimedep     = .false.
+  sfc_albedo   = 0.25
+  th00         = 296.
+  sst          = 291.
+  csx          = 0.17
+
+  iadv_mom     = 44
+  iadv_scal    = 44    
+  gcfl         = 1.0 
+  cfllim       = 1.5  
+
+! INIT --------------------
+  zrand        = 500
+  itsflg       = 0
+  ipsflg       = 1
+  irsflg       = 1
+  ps           = 1000.0,  500.,  5000.,
+  ts           =  290.0,  290.0,  317.,
+  rts          =    8.0,    8.0,    3.5,
+  us           =   10.,    10.,    10.,
+  vs           =    0.,     0.,     0.,
+  umean        = 5.
+  vmean        = 0.
+
+! STAT --------------------
+  hfilin       = 'dium.0014400s'
+  filprf       = 'dium'
+  frqhis       = 7200. 
+  frqanl       = 9999999.
+  savg_intvl   = 300.
+  ssam_intvl   = 300.
+
+! CROSS -------------------
+  lcross       = .true.
+  frqcross     = 3600.
+  lxy          = .true.
+  lxz          = .true.
+  lyz          = .true.
+  lxysurf      = .true.
+  xcross       = 0.
+  ycross       = 0.
+  zcross(1)    = 1
+  zcross(2)    = 50
+/
+
+

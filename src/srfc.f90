@@ -32,7 +32,7 @@ use lsmdata
 
   ! --------------------------
   ! some real-time statistics
-  real    :: Hg,Gg,oblg,ustarg
+  real    :: Hg,LEg,Gg,oblg,ustarg
 
 contains
   !
@@ -484,19 +484,21 @@ contains
   !
   subroutine srfcstat
     use mpi_interface, only : myid,double_scalar_par_sum,nxpg,nypg
-    use grid, only          : wt_sfc, wq_sfc, obl, a_ustar, a_G0, nxp, nyp, dn0
-    use defs, only          : cp
+    use grid, only          : wt_sfc, wq_sfc, obl, a_ustar, a_G0, nxp, nyp, dn0, level
+    use defs, only          : cp, alvl
     implicit none
 
-    real    :: Hl,Gl,obll,ustarl
+    real    :: Hl,Gl,LEl,obll,ustarl
     integer :: i,j
 
     Hl     = sum(wt_sfc (3:nxp-2,3:nyp-2))
+    if(level>0) LEl = sum(wq_sfc(3:nxp-2,3:nyp-2))
     Gl     = sum(a_G0   (3:nxp-2,3:nyp-2))
     obll   = sum(obl    (3:nxp-2,3:nyp-2))
     ustarl = sum(a_ustar(3:nxp-2,3:nyp-2))
     
     call double_scalar_par_sum(Hl,Hg)
+    if(level>0) call double_scalar_par_sum(LEl,LEg)
     call double_scalar_par_sum(Gl,Gg)
     call double_scalar_par_sum(obll,oblg)
     call double_scalar_par_sum(ustarl,ustarg)
@@ -504,6 +506,12 @@ contains
     Gg     = (Gg     / ((nxpg-4)*(nypg-4))) 
     oblg   = (oblg   / ((nxpg-4)*(nypg-4))) 
     ustarg = (ustarg / ((nxpg-4)*(nypg-4)))
+
+    if(level>0) then
+      LEg    = (LEg    / ((nxpg-4)*(nypg-4))) * alvl * (dn0(1)+dn0(2))/2.
+    else
+      LEg    = 0.
+    end if
 
   end subroutine srfcstat
 
@@ -1068,7 +1076,7 @@ contains
         !" a) Stomatal opening as a function of incoming short wave radiation
         if ((iradtyp .eq. 4) .or. (iradtyp .eq. 5)) then
           f1  = 1. /min(1., (0.004 * max(0.,sflxd_av) + 0.05) &
-                   / (0.81 * (0.004 * max(0.,sflxd_av) + 1.)) )
+                  / (0.81 * (0.004 * max(0.,sflxd_av) + 1.)) )
         else
           f1  = 1.
         end if
@@ -1119,7 +1127,7 @@ contains
         if(qsat - vapor(2,i,j) < 0.) then
           rsveg(i,j)  = 0.
           rssoil(i,j) = 0.
-          print*,"Dew fall!!!!!!!!!!!!!!!!!!!!"
+          !print*,"Dew fall!!!!!!!!!!!!!!!!!!!!"
         end if
 
         Wlmx      = LAI(i,j) * Wmax
