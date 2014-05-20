@@ -386,6 +386,10 @@ contains
   !
   subroutine bellon(n1,n2,n3,flx,sflx,zt,dzi_t,dzi_m,tt,tl,rtt,rt, ut,u,vt,v)
 
+    use grid, only : subtendt		!RV
+    use util, only : get_avg, get_cor, get_avg3, get_cor3, get_var3, get_csum   !RV
+    use stat, only : sflg, updtst
+
     integer, intent (in) :: n1,n2, n3
 
     real, dimension (n1), intent (in)            :: zt, dzi_t, dzi_m
@@ -395,6 +399,8 @@ contains
 
     integer :: i,j,k,kp1
     real    :: grad,wk
+    real,dimension(n1) :: res
+    !real, dimension(n1,n2,n3)  :: subtendt
 
     do j=3,n3-2
        do i=3,n2-2
@@ -407,7 +413,8 @@ contains
              kp1 = k+1
              wk = w0*(1.-exp(-zt(k)/H))
              grad = Qrate/wk
-             flx(k,i,j)  = wk*((tl(kp1,i,j)-tl(k,i,j))*dzi_t(k)-grad)
+	     subtendt(k,i,j)  = wk*((tl(kp1,i,j)-tl(k,i,j))*dzi_t(k))  !RV
+             flx(k,i,j)  = subtendt(k,i,j)-(wk*grad)   !RV
              sflx(k,i,j) = wk*((rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)-grad)
              tt(k,i,j) = tt(k,i,j) + flx(k,i,j)
              rtt(k,i,j)=rtt(k,i,j) + &
@@ -423,6 +430,11 @@ contains
           sflx(n1-1,i,j) = 0.
        enddo
     enddo
+
+    if (sflg) then
+       call get_avg3(n1,n2,n3,subtendt,res)
+       call updtst(n1,'tend',1,res,1)
+    end if
 
   end subroutine bellon
 

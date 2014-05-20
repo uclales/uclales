@@ -123,6 +123,8 @@ module grid
         mp_tlt
 ! linda, e 
 
+  real, dimension (:,:,:), allocatable  :: subtendt  !RV: ls tendencies due to subsidence
+
   character(40)      :: zname      = 'zt'
   character(40)      :: zhname     = 'zm'
   character(40)      :: zlongname  = 'Vertical position of cell centers'
@@ -433,6 +435,18 @@ contains
 
     end if
 !linda,e
+
+!RV:allocate tendency arrays
+    if (iradtyp == 3) then
+       allocate(subtendt(nzp,nxp,nyp))
+       !allocate(subtendr(nzp,nxp,nyp))
+
+       memsize = memsize + 1*nxyzp
+
+       subtendt(:,:,:) = 0.            
+    end if !rv
+   
+
     if(myid == 0) then
        print "(//' ',49('-')/,' ',/3x,i3.3,' prognostic scalars')", nscl
        print "('   memory to be allocated  -  ',f8.3,' mbytes')", &

@@ -30,7 +30,7 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 68, nvar2 = 118 ! number of time series and profiles
+  integer, parameter :: nvar1 = 68, nvar2 = 119 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2
   real, save         :: fsttm, lsttm
 
@@ -73,7 +73,7 @@ module stat
        'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel', & !97
        'rsup   ','prc_c  ','prc_i  ','prc_s  ','prc_g  ','prc_h  ', & !103
        'hail   ','qt_th  ','s_1    ','s_2    ','s_3    ','RH     ', & !109
-       'lwuca  ','lwdca  ','swuca  ','swdca  '/)                      !115
+       'lwuca  ','lwdca  ','swuca  ','swdca  ','subtendt'/)           !115
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:)
@@ -1504,6 +1504,13 @@ contains
           nn = 97  !cloud droplet sed flux
        case default
           nn = 0
+       end select
+    case("tend")
+       select case (nfld)
+       case(1)
+	  nn=119   !subtendt
+       case default
+	  nn = 0
        end select
     case default
        nn = 0
