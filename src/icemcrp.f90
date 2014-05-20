@@ -753,6 +753,7 @@ contains
 
           ! which one is correct here?
           !au = k_au * rc(k)**2 * Xc**2
+          ! neglecting density correction:
           au = k_au * dn0(k) * rc(k)**2 * Xc**2
           !
           ! small threshold that should not influence the result
@@ -838,6 +839,7 @@ contains
              phi = (tau/(tau+k_1))**4
 
              ! correct??
+             ! including density correction:
              ac  = k_r * rc(k) * rp(k) * phi * sqrt(rho_0*dn0(k))
 
              !
@@ -924,9 +926,10 @@ contains
           ENDIF
         end if
         Dp = (Dm**3/((mu+3.)*(mu+2.)*(mu+1.)))**(1./3.)
-
-        vn(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
-        vr(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
+        
+        ! including density corrcetion
+        vn(k) = sqrt(rho_0/dn0(k))*(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
+        vr(k) = sqrt(rho_0/dn0(k))*(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
         !
         ! Set fall speeds following Khairoutdinov and Kogan
 
