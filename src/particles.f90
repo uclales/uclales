@@ -714,7 +714,8 @@ contains
     real, intent(out) :: C_d, vt
     real, intent(out), optional :: tau
     real :: D0, Dmax, dlam, xi_drop, alfa, xexp, Xbest, c1, c2, &
-            bracket, b1, a1, zk, bcorr, acorr, re, psi,Dold
+            bracket, b1, a1, zk, bcorr, acorr, re, psi,Dold, &
+            thl, thv, rl, rt, tk, prs, Cp
     integer :: j
     real, parameter :: &
          wr     = 33.,      &   ! S13
@@ -726,11 +727,15 @@ contains
          gam    = pi/4.,    &   ! prefactor in area-size relation
          sig    = 2.0,      &   ! exponent  in area-size relation
          kturb  = 2.0,      &
-         cturb  = 1.6
+         cturb  = 1.6,      &
+         p0     = 1013.25,  &   ! reference for density correction
+         T0     = 288.15        ! reference for density correction
+
     logical, parameter :: &
          lturbulence   = .true.,   &  ! turbulence correction
          lnonspherical = .true.,   &  ! correction for non-spherical drops
-         ldmaxiter     = .true.       ! find dmax iterative
+         ldmaxiter     = .true.,   &  ! find dmax iterative
+         ldensity      = .true.
 
 
     D0  = 2. *(3./(4.*pi) * particle%mass /rowt)**(1./3.)   ! equivalent diameter
@@ -789,6 +794,13 @@ contains
          * ( ( 2.0 * alfa * g ) / ( i1d(particle%z,dn0) * gam ) )**b1   &
          * Dmax**( b1*xexp - 1.0 )
 
+    if (ldensity) then
+      call thermo(particle%x,particle%y,particle%z,thl,thv=thv,rt=rt,rl=rl,tk=tk,prs=prs)
+      psi = 1+0.00285*(tk-273.15);
+      Cp = psi**(1.-2.*b1) * (p0/prs * tk/T0)**(1.-b1);
+      vt = vt*Cp;
+    end if
+    
     re = vt*Dmax/nu_l
     C_d = c_o*(1.0 + d_o/sqrt(re))**2          ! Eq (2.2)
     
@@ -811,18 +823,20 @@ contains
   subroutine drop_vel(particle)
     use grid, only : dxi, dyi, dzi_t, dt, dn0, nstep
     use defs, only : rowt, pi, g
-    use mcrp, only : nu_l
     use mpi_interface, only : myid
     implicit none
 
-    real :: C_d, vt, r0, rmax, dzi, v_rel, tau, upred, vpred, wpred
+    real :: C_d, vt, r0, rmax, dzi, v_rel, tau, upred, vpred, wpred, &
+            nu, thv, thl, rt, rl, tk
     TYPE (particle_record), POINTER:: particle
     logical :: stokes=.false., noinertia=.false., kc05=.false.
     integer :: j
-    real, parameter ::      &
-         wr     = 33.,      &   ! S13
-         delta0 = 9.06,     &   ! Abraham (1970)
-         C0 = 24./delta0**2.    ! Abraham (1970)
+    real, parameter ::            &
+         wr     = 33.,            &   ! S13
+         delta0 = 9.06,           &   ! Abraham (1970)
+         C0     = 24./delta0**2., &   ! Abraham (1970)
+         b      = 1.458e-6,       &   ! temperature dependence of viscosity of air
+         S      = 110.4               ! temperature dependence of viscosity or air
  
     dzi = dzi_t(floor(particle%z))
 
@@ -837,12 +851,14 @@ contains
         v_rel = 1.e-20
       end if
 
+      call thermo(particle%x,particle%y,particle%z,thl,thv=thv,rt=rt,rl=rl,tk=tk) 
+      nu = b*tk**(3./2.) / (tk+S) / i1d(particle%z,dn0)
       if (stokes) then
         !use Stokes drag
-        C_d = 24./ (2.*rmax*v_rel/nu_l)
+        C_d = 24./ (2.*rmax*v_rel/nu)
       else
         !use drag coefficient from Abraham (1970)        
-        C_d = C0 *(1+ delta0/ sqrt(2.*rmax*v_rel/nu_l) )**2.
+        C_d = C0 *(1+ delta0/ sqrt(2.*rmax*v_rel/nu) )**2.
       end if
 
       particle%tau = 8.* r0**3. *rowt / (3. * C_d *i1d(particle%z,dn0) * rmax**2.) / v_rel
@@ -863,9 +879,9 @@ contains
                    (wpred - particle%wres/dzi - particle%wsgs/dzi)**2. )
 
       if (stokes) then
-        C_d = 24./ (2.*rmax*v_rel/nu_l)
+        C_d = 24./ (2.*rmax*v_rel/nu)
       else
-        C_d = C0 *(1+ delta0/ sqrt(2.*rmax*v_rel/nu_l) )**2.
+        C_d = C0 *(1+ delta0/ sqrt(2.*rmax*v_rel/nu) )**2.
       end if
       particle%tau = 0.5 * (particle%tau + &
                      8.* r0**3. *rowt / (3. * C_d *i1d(particle%z,dn0) * rmax**2.) / v_rel)
@@ -881,10 +897,11 @@ contains
         end if
         if (stokes) then
           !use Stokes drag
-          C_d = 24./ (2.*rmax*v_rel/nu_l)
+          C_d = 24./ (2.*rmax*v_rel/nu)
         else
           !use drag coefficient from Abraham (1970)        
-          C_d = C0 *(1+ delta0/ sqrt(2.*rmax*v_rel/nu_l) )**2.
+          C_d = C0 *(1+ delta0/ sqrt(2.*rmax*v_rel/nu) )**2.
+
         end if
         particle%tau_res = 8.* r0**3. *rowt / (3. * C_d *i1d(particle%z,dn0) * rmax**2.) / v_rel
         vt = particle%tau_res *(1-i1d(particle%z,dn0)/rowt)*g
@@ -900,9 +917,9 @@ contains
                      (vpred - particle%vres/dyi)**2. + &
                      (wpred - particle%wres/dzi)**2. )
         if (stokes) then
-          C_d = 24./ (2.*rmax*v_rel/nu_l)
+          C_d = 24./ (2.*rmax*v_rel/nu)
         else
-          C_d = C0 *(1+ delta0/ sqrt(2.*rmax*v_rel/nu_l) )**2.
+          C_d = C0 *(1+ delta0/ sqrt(2.*rmax*v_rel/nu) )**2.
         end if
         particle%tau_res = 0.5 * (particle%tau_res + &
                            8.* r0**3. *rowt / (3. * C_d *i1d(particle%z,dn0) * rmax**2.) / v_rel)
@@ -2221,7 +2238,6 @@ contains
     use grid,          only : tname, deltax, deltay, dzi_t, zm, umean, vmean,level
     use modnetcdf,     only : writevar_nc, fillvalue_double !, nchandle_error
     use netcdf,        only : nf90_sync !,nf90_inq_dimid, nf90_inquire_dimension, nf90_noerr,
-    use mcrp,          only : nu_l
     implicit none
 
     real, intent(in)                     :: time
