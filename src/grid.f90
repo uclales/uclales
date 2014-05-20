@@ -123,7 +123,7 @@ module grid
         mp_tlt
 ! linda, e 
 
-  real, dimension (:,:,:), allocatable  :: subtendt  !RV: ls tendencies due to subsidence
+  real, dimension (:,:,:), allocatable  :: wtendt, wtendr  !RV: ls tendencies due to subsidence
 
   character(40)      :: zname      = 'zt'
   character(40)      :: zhname     = 'zm'
@@ -438,12 +438,13 @@ contains
 
 !RV:allocate tendency arrays
     if (iradtyp == 3) then
-       allocate(subtendt(nzp,nxp,nyp))
-       !allocate(subtendr(nzp,nxp,nyp))
+       allocate(wtendt(nzp,nxp,nyp))
+       allocate(wtendr(nzp,nxp,nyp))
 
-       memsize = memsize + 1*nxyzp
+       memsize = memsize + 2*nxyzp
 
-       subtendt(:,:,:) = 0.            
+       wtendt(:,:,:) = 0.            
+       wtendr(:,:,:) = 0.
     end if !rv
    
 
