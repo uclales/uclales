@@ -840,7 +840,7 @@ contains
 
              ! correct??
              ! including density correction:
-             ac  = k_r * rc(k) * rp(k) * phi * sqrt(rho_0*dn0(k))
+             ac  = k_r * rc(k) * rp(k) * phi * (rho_0/dn0(k))**0.35 * dn0(k)
 
              !
              ! Khairoutdinov and Kogan
@@ -856,7 +856,7 @@ contains
              tl(k) = tl(k) + convliq(k)*ac
 
 
-             sc = k_rr * np(k) * rp(k) * sqrt(rho_0*dn0(k))
+             sc = k_rr * np(k) * rp(k) * (rho_0/dn0(k))**0.35 *dn0(k)
              sc = min(sc, np(k))
              np(k) = np(k) - sc
           end if
@@ -928,8 +928,8 @@ contains
         Dp = (Dm**3/((mu+3.)*(mu+2.)*(mu+1.)))**(1./3.)
         
         ! including density corrcetion
-        vn(k) = sqrt(rho_0/dn0(k))*(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
-        vr(k) = sqrt(rho_0/dn0(k))*(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
+        vn(k) = (rho_0/dn0(k))**0.35 *(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
+        vr(k) = (rho_0/dn0(k))**0.35 *(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
         !
         ! Set fall speeds following Khairoutdinov and Kogan
 
