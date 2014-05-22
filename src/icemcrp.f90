@@ -747,8 +747,8 @@ contains
              tau = MIN(MAX(tau,eps0),1.)
              phi = (tau/(tau+k_1))**4
 
-             ! correct??
-             ac  = k_r * rc(k) * rp(k) * phi * sqrt(rho_0*dn0(k))
+             ! with density correction (for shallow clouds)
+             ac  = k_r * rc(k) * rp(k) * phi * (rho_0/dn0(k))**0.35 *dn0(k)
 
              !
              ! Khairoutdinov and Kogan
@@ -764,7 +764,7 @@ contains
              tl(k) = tl(k) + convliq(k)*ac
 
 
-             sc = k_rr * np(k) * rp(k) * sqrt(rho_0*dn0(k))
+             sc = k_rr * np(k) * rp(k) * (rho_0/dn0(k))**0.35 *dn0(k)
              sc = min(sc, np(k))
              np(k) = np(k) - sc
           end if
@@ -821,8 +821,9 @@ contains
         mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))
         Dp = (Dm**3/((mu+3.)*(mu+2.)*(mu+1.)))**(1./3.)
 
-        vn(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
-        vr(k) = sqrt(dn0(k)/1.2)*(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
+        ! with density correction (for shallow clouds)
+        vn(k) = (rho_0/dn0(k))**0.35 *(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
+        vr(k) = (rho_0/dn0(k))**0.35 *(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
         !
         ! Set fall speeds following Khairoutdinov and Kogan
 
