@@ -30,7 +30,7 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 68, nvar2 = 120 ! number of time series and profiles
+  integer, parameter :: nvar1 = 68, nvar2 = 121 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2
   real, save         :: fsttm, lsttm
 
@@ -73,7 +73,8 @@ module stat
        'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel', & !97
        'rsup   ','prc_c  ','prc_i  ','prc_s  ','prc_g  ','prc_h  ', & !103
        'hail   ','qt_th  ','s_1    ','s_2    ','s_3    ','RH     ', & !109
-       'lwuca  ','lwdca  ','swuca  ','swdca  ','wtendt ','wtendr '/)  !115
+       'lwuca  ','lwdca  ','swuca  ','swdca  ','wtendt ','wtendr ', & !115
+       'sgtendt'/)						      !121
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:)
@@ -1511,6 +1512,10 @@ contains
 	  nn=119   !wtendt
        case(2)
 	  nn=120   !wtendr
+       case(3)
+	  nn=121   !sgtendt
+!       case(4)
+!	  nn=122   !sgtendr
        case default
 	  nn = 0
        end select

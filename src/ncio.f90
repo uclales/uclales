@@ -1537,11 +1537,15 @@ contains
     case('wtendt')    
        if (itype==0) ncinfo = 'ls tendencies of theta_l due to subsidence'
        if (itype==1) ncinfo = 'K/s'
-       if (itype==2) ncinfo = 'time'
+       if (itype==2) ncinfo = 'tttt'
     case('wtendr')    
        if (itype==0) ncinfo = 'ls tendencies of rt due to subsidence'
-       if (itype==1) ncinfo = 'g/(kg*s)'
-       if (itype==2) ncinfo = 'time'
+       if (itype==1) ncinfo = 'g/kg/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('sgtendt')    
+       if (itype==0) ncinfo = 'sgs comp of turbulent flux divergence theta_l'
+       if (itype==1) ncinfo = 'g/kg/s'
+       if (itype==2) ncinfo = 'tttt'
      case default
        if (myid==0) print *, 'ABORTING: variable not found in ncinfo, ',trim(short_name)
        call appl_abort(0)

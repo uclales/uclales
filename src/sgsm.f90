@@ -66,8 +66,9 @@ contains
     use grid, only : newvar, nstep, a_up, a_ut, a_vp, a_vt, a_wp, a_wt       &
          ,a_rp, a_tp, a_sp, a_st, vapor, a_pexnr, a_theta,a_km               &
          , a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7, nscl, nxp, nyp    &
-         , nzp, nxyp, nxyzp, zm, dxi, dyi, dzi_t, dzi_m, dt, th00, dn0           &
-         , pi0, pi1, level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,liquid, a_cvrxp, trac_sfc
+         , nzp, nxyp, nxyzp, zm, dxi, dyi, dzi_t, dzi_m, dt, th00, dn0, pi0, pi1     &
+         ,level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,liquid, a_cvrxp, trac_sfc    & 
+	 , sgtendt, iradtyp
 
     use util, only         : atob, azero, get_avg3
     use mpi_interface, only: cyclics, cyclicc
@@ -139,6 +140,11 @@ contains
     !
     ! Diffuse scalars
     !
+    
+    if(iradtyp==3 .and. nstep==1) then !RV
+       sgtendt = 0.
+       !sgtendr = 0.
+    end if    !rv
 
     do n=4,nscl
        call newvar(n,istep=nstep)
@@ -150,18 +156,28 @@ contains
 
        if (sflg) call azero(nxyzp,a_scr1)
 
-       call diffsclr(nzp,nxp,nyp,dt,dxi,dyi,dzi_m,dzi_t,dn0,sxy1,sxy2   &
-            ,a_sp,a_scr2,a_st,a_scr1)
+       if(iradtyp==3 .and. n==4) then
+          call diffsclr(nzp,nxp,nyp,dt,dxi,dyi,dzi_m,dzi_t,dn0,sxy1,sxy2   & !RV
+               ,a_sp,a_scr2,a_st,a_scr1,sgtendt,nstep)
+       else
+          call diffsclr(nzp,nxp,nyp,dt,dxi,dyi,dzi_m,dzi_t,dn0,sxy1,sxy2   &
+               ,a_sp,a_scr2,a_st,a_scr1)
+       endif
 
        if (sflg) then
 
           call get_avg3(nzp,nxp,nyp,a_scr1,sz1)
-
           call updtst(nzp,'sgs',n-3,sz1,1)
+
           if (associated(a_sp,a_tp))                                          &
              call sgsflxs(nzp,nxp,nyp,level,liquid,vapor,a_theta,a_scr1,'tl')
           if (associated(a_sp,a_rp))                                          &
              call sgsflxs(nzp,nxp,nyp,level,liquid,vapor,a_theta,a_scr1,'rt')
+
+          if (iradtyp==3 .and. n==4) then !RV
+             call get_avg3(nzp,nxp,nyp,sgtendt,sz1)
+             call updtst(nzp,'tend',n-1,sz1,1)
+          endif !rv
 
        endif
        call cyclics(nzp,nxp,nyp,a_st,req)
@@ -665,12 +681,17 @@ contains
   ! a tri-diagnonal solver in the vertical
   !
   subroutine diffsclr(n1,n2,n3,dt,dxi,dyi,dzi_m,dzi_t,dn0,sflx,tflx,scp,xkh,sct &
-       ,flx)
+       ,flx,sgtendt,nstep)
+
+    use grid, only : iradtyp
 
     integer, intent(in) :: n1,n2,n3
     real, intent(in)    :: xkh(n1,n2,n3),scp(n1,n2,n3)
     real, intent(in)    :: sflx(n2,n3),tflx(n2,n3),dn0(n1)
     real, intent(in)    :: dxi,dyi,dzi_m(n1),dzi_t(n1),dt
+
+    real, optional, intent(inout)   :: sgtendt(n1,n2,n3) !,sgtendr(n1,n2,n3) RV
+    integer, optional, intent(in)   :: nstep
 
     real, intent(inout) :: flx(n1,n2,n3),sct(n1,n2,n3)
     !
@@ -729,6 +750,14 @@ contains
                   +xkh(k-1,i,j-1)+xkh(k-1,i,j)))*dyi) /dn0(k)
              if (k<n1-1) flx(k,i,j)=-xkh(k,i,j)*(sxz5(indh,k+1)-sxz5(indh,k)) &
                   *dzi_m(k)
+             if(iradtyp == 3) then   !RV: t&r tendencies stored
+                sgtendt(k,i,j)= sgtendt(k,i,j) + dti*(sxz5(indh,k)-scp(k,i,j))           &
+                     -((szx1(k,i)-szx1(k,i-1))*dxi                                  &
+                     + (-(scp(k,i,j+1)-scp(k,i,j))*dyi*0.25*(xkh(k,i,j)     &
+                     +xkh(k,i,j+1)+xkh(k-1,i,j)+xkh(k-1,i,j+1))+(scp(k,i,j)      &
+                     -scp(k,i,j-1))*dyi*0.25*(xkh(k,i,j-1)+xkh(k,i,j)            &
+                     +xkh(k-1,i,j-1)+xkh(k-1,i,j)))*dyi) /dn0(k)
+             end if !rv
           end do
        enddo
     enddo

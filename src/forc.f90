@@ -387,7 +387,7 @@ contains
   subroutine bellon(n1,n2,n3,flx,sflx,zt,dzi_t,dzi_m,tt,tl,rtt,rt, ut,u,vt,v)
 
     use grid, only : wtendt, wtendr		!RV
-    use util, only : get_avg, get_cor, get_avg3, get_cor3, get_var3, get_csum  
+    use util, only : get_avg3
     use stat, only : sflg, updtst  !rv
 
     integer, intent (in) :: n1,n2, n3
