@@ -1543,7 +1543,11 @@ contains
        if (itype==1) ncinfo = 'g/kg/s'
        if (itype==2) ncinfo = 'tttt'
     case('sgtendt')    
-       if (itype==0) ncinfo = 'sgs comp of turbulent flux divergence theta_l'
+       if (itype==0) ncinfo = 'sgs comp of turbulent flux divergence of theta_l'
+       if (itype==1) ncinfo = 'g/kg/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('sgtendr')    
+       if (itype==0) ncinfo = 'sgs comp of turbulent flux divergence of rt'
        if (itype==1) ncinfo = 'g/kg/s'
        if (itype==2) ncinfo = 'tttt'
      case default

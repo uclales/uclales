@@ -124,7 +124,7 @@ module grid
 ! linda, e 
 
  !RV: ls tendencies due to subsidence, sgs diff & advection
-  real, dimension (:,:,:), allocatable  :: wtendt, wtendr, sgtendt  
+  real, dimension (:,:,:), allocatable  :: wtendt, wtendr, sgtendt, sgtendr
 
   character(40)      :: zname      = 'zt'
   character(40)      :: zhname     = 'zm'
@@ -442,14 +442,14 @@ contains
        allocate(wtendt(nzp,nxp,nyp))
        allocate(wtendr(nzp,nxp,nyp))
        allocate(sgtendt(nzp,nxp,nyp))
-      ! allocate(wtendr(nzp,nxp,nyp))
+       allocate(sgtendr(nzp,nxp,nyp))
 
-       memsize = memsize + 3*nxyzp
+       memsize = memsize + 4*nxyzp
 
        wtendt(:,:,:) = 0.            
        wtendr(:,:,:) = 0.
        sgtendt(:,:,:) = 0.            
-       !sgtendr(:,:,:) = 0.
+       sgtendr(:,:,:) = 0.
     end if !rv
    
 
