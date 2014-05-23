@@ -177,7 +177,8 @@ contains
              call sgsflxs(nzp,nxp,nyp,level,liquid,vapor,a_theta,a_scr1,'rt')
 
           if (iradtyp==3 .and. n<=5) then !RV
-             call get_avg3(nzp,nxp,nyp,sgtendt,sz1)
+             if(n==4) call get_avg3(nzp,nxp,nyp,sgtendt,sz1)
+             if(n==5) call get_avg3(nzp,nxp,nyp,sgtendr,sz1)
              call updtst(nzp,'tend',n-1,sz1,1)
           endif !rv
 
