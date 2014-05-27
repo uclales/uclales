@@ -34,7 +34,7 @@ contains
 
     use grid, only : a_up, a_vp, a_wp, a_sp, a_st, liquid, a_scr1, a_scr2,    &
          dn0 , nxp, nyp, nzp, nxyzp, dt, dzi_t, dzi_m, zt, dxi, dyi, level, nscl, &
-         newvar, nstep, iradtyp, adtendt!, adtendr
+         newvar, nstep, iradtyp, adtendt, adtendr
 
     use stat, only      : sflg, updtst
     use util, only      : atob, get_avg3
@@ -59,7 +59,7 @@ contains
     !
     if(iradtyp==3 .and. nstep==1) then !RV
        adtendt = 0.
-       !adtendr = 0.
+       adtendr = 0.
     end if    !rv
 
     do n=4,nscl
@@ -76,16 +76,16 @@ contains
           call updtst(nzp,'adv',n-3,v1da,1)
        end if
 
-       if(iradtyp==3 .and. n==4) then
+       if(iradtyp==3 .and. n<=5) then
           if(n==4) call advtnd(nzp,nxp,nyp,a_sp,a_scr1,a_st,dt,adtendt)
-         ! if(n==5) call advtnd(nzp,nxp,nyp,a_sp,a_scr1,a_st,dt,adtendr)
+          if(n==5) call advtnd(nzp,nxp,nyp,a_sp,a_scr1,a_st,dt,adtendr)
        else
           call advtnd(nzp,nxp,nyp,a_sp,a_scr1,a_st,dt)
        endif
        
-       if (sflg .and. iradtyp==3 .and. n==4) then !RV
+       if (sflg .and. iradtyp==3 .and. n<=5) then !RV
           if(n==4) call get_avg3(nzp,nxp,nyp,adtendt,v1da)
-          !if(n==5) call get_avg3(nzp,nxp,nyp,adtendr,v1da)
+          if(n==5) call get_avg3(nzp,nxp,nyp,adtendr,v1da)
           call updtst(nzp,'tend',n+1,v1da,1)
        endif !rv
     end do
