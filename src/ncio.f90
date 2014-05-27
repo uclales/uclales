@@ -1558,6 +1558,14 @@ contains
        if (itype==0) ncinfo = 'adv comp of turbulent flux divergence of rt'
        if (itype==1) ncinfo = 'kg/kg/s'
        if (itype==2) ncinfo = 'tttt'
+    case('turtent')    
+       if (itype==0) ncinfo = 'total turbulent flux divergence of theta_l'
+       if (itype==1) ncinfo = 'K/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('turtenr')    
+       if (itype==0) ncinfo = 'total turbulent flux divergence of rt'
+       if (itype==1) ncinfo = 'kg/kg/s'
+       if (itype==2) ncinfo = 'tttt'
      case default
        if (myid==0) print *, 'ABORTING: variable not found in ncinfo, ',trim(short_name)
        call appl_abort(0)

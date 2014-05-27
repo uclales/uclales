@@ -30,7 +30,7 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 68, nvar2 = 124 ! number of time series and profiles
+  integer, parameter :: nvar1 = 68, nvar2 = 126 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2
   real, save         :: fsttm, lsttm
 
@@ -74,7 +74,7 @@ module stat
        'rsup   ','prc_c  ','prc_i  ','prc_s  ','prc_g  ','prc_h  ', & !103
        'hail   ','qt_th  ','s_1    ','s_2    ','s_3    ','RH     ', & !109
        'lwuca  ','lwdca  ','swuca  ','swdca  ','wtendt ','wtendr ', & !115
-       'sgtendt','sgtendr','adtendt','adtendr'/)		      !121
+       'sgtendt','sgtendr','adtendt','adtendr','turtent','turtenr'/) !121
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:)
@@ -1181,6 +1181,7 @@ contains
     use mpi_interface, only : myid
     use netcdf
     use defs, only : alvl, cp
+    use grid, only : iradtyp
 
     integer, intent (in) :: n1
     real, intent (in)    :: time
@@ -1210,6 +1211,10 @@ contains
          else
             svctr(k,49) = 0.
          end if
+	 if(iradtyp==3) then !RV: add adv and sgs component of rt and tl tendencies -> total turb. flux div.
+	    svctr(k,125) = svctr(k,121)+svctr(k,123)
+	    svctr(k,126) = svctr(k,122)+svctr(k,124)
+	 end if !rv
          svctr(k,10:nv2) = svctr(k,10:nv2)/nsmp
       end do
 
