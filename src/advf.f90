@@ -34,12 +34,12 @@ contains
 
     use grid, only : a_up, a_vp, a_wp, a_sp, a_st, liquid, a_scr1, a_scr2,    &
          dn0 , nxp, nyp, nzp, nxyzp, dt, dzi_t, dzi_m, zt, dxi, dyi, level, nscl, &
-         newvar, nstep, iradtyp, adtendt, adtendr
+         newvar, nstep, iradtyp, adtendt, adtendr, rkalpha, rkbeta
 
     use stat, only      : sflg, updtst
     use util, only      : atob, get_avg3
 
-    real    :: v1da(nzp)
+    real    :: v1da(nzp),rk
     integer :: n
     !
     ! diagnose liquid water flux
@@ -60,6 +60,11 @@ contains
     if(iradtyp==3 .and. nstep==1) then !RV
        adtendt = 0.
        adtendr = 0.
+       rk = rkalpha(1)+rkalpha(2)
+    elseif (nstep==2) then
+       rk = rkbeta(2)+rkbeta(3)
+    else
+       rk = rkalpha(3)
     end if    !rv
 
     do n=4,nscl
@@ -77,8 +82,8 @@ contains
        end if
 
        if(iradtyp==3 .and. n<=5) then
-          if(n==4) call advtnd(nzp,nxp,nyp,a_sp,a_scr1,a_st,dt,adtendt)
-          if(n==5) call advtnd(nzp,nxp,nyp,a_sp,a_scr1,a_st,dt,adtendr)
+          if(n==4) call advtnd(nzp,nxp,nyp,a_sp,a_scr1,a_st,dt,adtendt,rk)
+          if(n==5) call advtnd(nzp,nxp,nyp,a_sp,a_scr1,a_st,dt,adtendr,rk)
        else
           call advtnd(nzp,nxp,nyp,a_sp,a_scr1,a_st,dt)
        endif
@@ -95,15 +100,16 @@ contains
   ! ----------------------------------------------------------------------
   ! Subroutine advtnd: Backs out the advective tendencies
   !
-  subroutine advtnd(n1,n2,n3,varo,varn,tnd,dt,tndout)
+  subroutine advtnd(n1,n2,n3,varo,varn,tnd,dt,tndout,rk)
 
     use grid, only : iradtyp
 
     integer, intent(in) :: n1,n2,n3
     real, intent(in)    :: varo(n1,n2,n3),varn(n1,n2,n3),dt
     real, intent(inout) :: tnd(n1,n2,n3)
-    real, optional, intent(inout) :: tndout(n1,n2,n3)
- 
+    real, optional, intent(inout) :: tndout(n1,n2,n3)  !RV
+    real, optional, intent(in)    :: rk  !rv
+
     real :: dti
     integer :: i,j,k
 
@@ -115,7 +121,7 @@ contains
           do k=2,n1-1
              tnd(k,i,j)=tnd(k,i,j)+(varn(k,i,j)-varo(k,i,j))*dti
 	     if(iradtyp == 3) then   !RV: t&r tendencies stored
-		tndout(k,i,j)=tndout(k,i,j)+(varn(k,i,j)-varo(k,i,j))*dti
+		tndout(k,i,j)=tndout(k,i,j)+(varn(k,i,j)-varo(k,i,j))*dti*rk
              end if !rv
           end do
           tnd(n1,i,j) = 0.

@@ -68,7 +68,7 @@ contains
          , a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7, nscl, nxp, nyp    &
          , nzp, nxyp, nxyzp, zm, dxi, dyi, dzi_t, dzi_m, dt, th00, dn0, pi0, pi1     &
          ,level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,liquid, a_cvrxp, trac_sfc    & 
-	 , sgtendt, sgtendr, iradtyp
+	 , sgtendt, sgtendr, iradtyp, rkalpha, rkbeta
 
     use util, only         : atob, azero, get_avg3
     use mpi_interface, only: cyclics, cyclicc
@@ -76,6 +76,7 @@ contains
 
     real, intent(in)       :: timein 
     integer :: n
+    real :: rk
 
     ! Hack BvS: slowly increase smago constant...
     !csx = min(timein*0.23/3600.,0.23)    
@@ -144,6 +145,11 @@ contains
     if(iradtyp==3 .and. nstep==1) then !RV
        sgtendt = 0.
        sgtendr = 0.
+       rk = rkalpha(1)+rkalpha(2)
+    elseif (nstep==2) then
+       rk = rkbeta(2)+rkbeta(3)
+    else
+       rk = rkalpha(3)
     end if    !rv
 
     do n=4,nscl
@@ -158,9 +164,9 @@ contains
 
        if(iradtyp==3 .and. n<=5) then
           if(n==4) call diffsclr(nzp,nxp,nyp,dt,dxi,dyi,dzi_m,dzi_t,dn0,sxy1,sxy2   & !RV
-                     ,a_sp,a_scr2,a_st,a_scr1,sgtendt,nstep)
+                     ,a_sp,a_scr2,a_st,a_scr1,sgtendt,rk)
           if(n==5) call diffsclr(nzp,nxp,nyp,dt,dxi,dyi,dzi_m,dzi_t,dn0,sxy1,sxy2   & !RV
-                     ,a_sp,a_scr2,a_st,a_scr1,sgtendr,nstep)
+                     ,a_sp,a_scr2,a_st,a_scr1,sgtendr,rk)
        else
           call diffsclr(nzp,nxp,nyp,dt,dxi,dyi,dzi_m,dzi_t,dn0,sxy1,sxy2   &
                ,a_sp,a_scr2,a_st,a_scr1)
@@ -684,7 +690,7 @@ contains
   ! a tri-diagnonal solver in the vertical
   !
   subroutine diffsclr(n1,n2,n3,dt,dxi,dyi,dzi_m,dzi_t,dn0,sflx,tflx,scp,xkh,sct &
-       ,flx,flxtend,nstep)
+       ,flx,flxtend,rk)
 
     use grid, only : iradtyp
 
@@ -694,7 +700,7 @@ contains
     real, intent(in)    :: dxi,dyi,dzi_m(n1),dzi_t(n1),dt
 
     real, optional, intent(inout)   :: flxtend(n1,n2,n3) !RV
-    integer, optional, intent(in)   :: nstep !rv
+    real, optional, intent(in)   :: rk !rv
 
     real, intent(inout) :: flx(n1,n2,n3),sct(n1,n2,n3)
     !
@@ -754,8 +760,8 @@ contains
              if (k<n1-1) flx(k,i,j)=-xkh(k,i,j)*(sxz5(indh,k+1)-sxz5(indh,k)) &
                   *dzi_m(k)
              if(iradtyp == 3) then   !RV: t&r tendencies stored
-                flxtend(k,i,j)= flxtend(k,i,j) + dti*(sxz5(indh,k)-scp(k,i,j))   &
-                     -((szx1(k,i)-szx1(k,i-1))*dxi                               &
+                flxtend(k,i,j)= flxtend(k,i,j) + dti*rk*(sxz5(indh,k)-scp(k,i,j))   &
+                     -rk*((szx1(k,i)-szx1(k,i-1))*dxi                               &
                      + (-(scp(k,i,j+1)-scp(k,i,j))*dyi*0.25*(xkh(k,i,j)          &
                      +xkh(k,i,j+1)+xkh(k-1,i,j)+xkh(k-1,i,j+1))+(scp(k,i,j)      &
                      -scp(k,i,j-1))*dyi*0.25*(xkh(k,i,j-1)+xkh(k,i,j)            &

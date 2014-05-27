@@ -386,7 +386,7 @@ contains
   !
   subroutine bellon(n1,n2,n3,flx,sflx,zt,dzi_t,dzi_m,tt,tl,rtt,rt, ut,u,vt,v)
 
-    use grid, only : wtendt, wtendr, nstep !RV
+    use grid, only : wtendt, wtendr, nstep,rkalpha,rkbeta !RV
     use util, only : get_avg3
     use stat, only : sflg, updtst  !rv
 
@@ -400,10 +400,16 @@ contains
     integer :: i,j,k,kp1
     real    :: grad,wk
     real,dimension(n1) :: res,res1
+    real   :: rk !rv
 
     if(nstep==1) then !RV
        wtendt = 0.
        wtendr = 0.
+       rk = rkalpha(1)+rkalpha(2)
+    elseif (nstep==2) then
+       rk = rkbeta(2)+rkbeta(3)
+    else
+       rk = rkalpha(3)
     end if    !rv
 
     do j=3,n3-2
@@ -417,16 +423,14 @@ contains
              kp1 = k+1
              wk = w0*(1.-exp(-zt(k)/H))
              grad = Qrate/wk
-	     wtendt(k,i,j)  = wk*((tl(kp1,i,j)-tl(k,i,j))*dzi_t(k))  !RV
-             flx(k,i,j)  = wtendt(k,i,j)-(wk*grad)   !RV
+	     flx(k,i,j)  = wk*((tl(kp1,i,j)-tl(k,i,j))*dzi_t(k)-grad)
+	     wtendt(k,i,j)  = wk*dzi_t(k)*rk*(tl(kp1,i,j)-tl(k,i,j))  !RV
              sflx(k,i,j) = wk*((rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)-grad)
              tt(k,i,j) = tt(k,i,j) + flx(k,i,j)
-             wtendr(k,i,j) = wk*(rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)  !RV
-	     rtt(k,i,j)=rtt(k,i,j) + wtendr(k,i,j)
-             ut(k,i,j) =  ut(k,i,j) + &
-                  wk*(u(kp1,i,j)-u(k,i,j))*dzi_m(k)
-             vt(k,i,j) =  vt(k,i,j) + &
-                  wk*(v(kp1,i,j)-v(k,i,j))*dzi_m(k)
+	     rtt(k,i,j)= rtt(k,i,j) + wk*(rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)
+             wtendr(k,i,j) = wk*dzi_t(k)*rk*(rt(kp1,i,j)-rt(k,i,j))  !RV
+             ut(k,i,j) =  ut(k,i,j) + wk*(u(kp1,i,j)-u(k,i,j))*dzi_m(k)
+             vt(k,i,j) =  vt(k,i,j) + wk*(v(kp1,i,j)-v(k,i,j))*dzi_m(k)
           end do
           flx(n1,  i,j)  = 0.
           flx(n1-1,i,j)  = 0.
