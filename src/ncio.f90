@@ -1540,15 +1540,23 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('wtendr')    
        if (itype==0) ncinfo = 'ls tendencies of rt due to subsidence'
-       if (itype==1) ncinfo = 'g/kg/s'
+       if (itype==1) ncinfo = 'kg/kg/s'
        if (itype==2) ncinfo = 'tttt'
     case('sgtendt')    
        if (itype==0) ncinfo = 'sgs comp of turbulent flux divergence of theta_l'
-       if (itype==1) ncinfo = 'g/kg/s'
+       if (itype==1) ncinfo = 'K/s'
        if (itype==2) ncinfo = 'tttt'
     case('sgtendr')    
        if (itype==0) ncinfo = 'sgs comp of turbulent flux divergence of rt'
-       if (itype==1) ncinfo = 'g/kg/s'
+       if (itype==1) ncinfo = 'kg/kg/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('adtendt')    
+       if (itype==0) ncinfo = 'adv comp of turbulent flux divergence of theta_l'
+       if (itype==1) ncinfo = 'K/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('adtendr')    
+       if (itype==0) ncinfo = 'adv comp of turbulent flux divergence of rt'
+       if (itype==1) ncinfo = 'kg/kg/s'
        if (itype==2) ncinfo = 'tttt'
      case default
        if (myid==0) print *, 'ABORTING: variable not found in ncinfo, ',trim(short_name)
