@@ -386,7 +386,7 @@ contains
   !
   subroutine bellon(n1,n2,n3,flx,sflx,zt,dzi_t,dzi_m,tt,tl,rtt,rt, ut,u,vt,v)
 
-    use grid, only : wtendt, wtendr		!RV
+    use grid, only : wtendt, wtendr, nstep !RV
     use util, only : get_avg3
     use stat, only : sflg, updtst  !rv
 
@@ -401,6 +401,10 @@ contains
     real    :: grad,wk
     real,dimension(n1) :: res,res1
 
+    if(nstep==1) then !RV
+       wtendt = 0.
+       wtendr = 0.
+    end if    !rv
 
     do j=3,n3-2
        do i=3,n2-2
