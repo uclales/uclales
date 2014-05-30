@@ -1,0 +1,35 @@
+ &model
+  nzp =   528
+  nxp =   260 
+  nyp =   260
+  nxpart = .True.
+  deltax = 35.
+  deltay = 35.
+  deltaz = 5.
+  dzrat = 1.1
+  dzmax = 2500.
+  dtlong = 2.
+  distim = 100.
+  timmax = 259200.
+  runtype = "HISTORY"
+  igrdtyp = 1
+  level = 3
+  CCN = 100.e6
+  filprf = 'trref'
+  hfilin = 'trref.rst'
+  savg_intvl = 1800.
+  ssam_intvl = 60.
+  corflg = .true.
+  prndtl = -0.3333333
+  iradtyp = 4
+  strtim= 166.41 
+  th00 = 289.  
+  umean = -2.
+  vmean = -4.
+  cntlat=25.
+  isfctyp=2  
+  zrough =-0.01
+  case_name='trans'
+  lsvarflg=.true.
+  div=0.00000186
+ /

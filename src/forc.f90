@@ -67,7 +67,7 @@ contains
 
 !irina
     real :: alpha, beta, gamma, delta, uinf !linda
-
+print *, "FORC", a_tp(:,3,3)
     select case(iradtyp)
     case (1)
         call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt)
