@@ -1212,12 +1212,15 @@ contains
             svctr(k,49) = 0.
          end if
 	 if(iradtyp==3) then !RV: add adv and sgs component of rt and tl tendencies -> total turb. flux div.
+	    !print*, '----------------------INSIDE write_ps where turbtent computed------------------------' 
 	    svctr(k,125) = svctr(k,121)+svctr(k,123)
 	    svctr(k,126) = svctr(k,122)+svctr(k,124)
 	 end if !rv
          svctr(k,10:nv2) = svctr(k,10:nv2)/nsmp
       end do
 
+      print*, '----------------------INSIDE write_ps where turbtent computed---------------------' !RV
+      
       iret = nf90_inq_VarID(ncid2, s2(1), VarID)
       iret = nf90_put_var(ncid2, VarID, time, start=(/nrec2/))
       if (nrec2 == 1) then
@@ -1511,7 +1514,8 @@ contains
        case default
           nn = 0
        end select
-    case("tend")
+    case("tnd")
+      ! print*, '----------------------INSIDE UPDTST case TND ------------------------'!RV: Added new print statment for bug fix
        select case (nfld)
        case(1)
 	  nn=119   !wtendt
@@ -1537,6 +1541,9 @@ contains
        do k=1,n1
           svctr(k,nn)=svctr(k,nn)+values(k)
        enddo
+       !if (nn==119 .or. nn==120 .or. nn==121) then !RV: Added new print statment for bug fix
+	!  print*, 'svctr(30:40) for nn= ',nn,'is: ',svctr(30:40,nn)
+     !  end if  !rv
     end if
 
   end subroutine updtst

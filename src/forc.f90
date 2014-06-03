@@ -402,15 +402,11 @@ contains
     real,dimension(n1) :: res,res1
     real   :: rk !rv
 
-    if(nstep==1) then !RV
-       wtendt = 0.
-       wtendr = 0.
-       rk = rkalpha(1)+rkalpha(2)
-    elseif (nstep==2) then
-       rk = rkbeta(2)+rkbeta(3)
-    else
-       rk = rkalpha(3)
-    end if    !rv
+    if(nstep==1) rk = rkalpha(1)+rkalpha(2)  !RV
+       !wtendt = 0.!new at if (sflg)
+       !wtendr = 0.
+    if(nstep==2) rk = rkbeta(2)+rkbeta(3)
+    if(nstep==3) rk = rkalpha(3) !rv
 
     do j=3,n3-2
        do i=3,n2-2
@@ -424,11 +420,11 @@ contains
              wk = w0*(1.-exp(-zt(k)/H))
              grad = Qrate/wk
 	     flx(k,i,j)  = wk*((tl(kp1,i,j)-tl(k,i,j))*dzi_t(k)-grad)
-	     wtendt(k,i,j)  = wk*dzi_t(k)*rk*(tl(kp1,i,j)-tl(k,i,j))  !RV
-             sflx(k,i,j) = wk*((rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)-grad)
+	     wtendt(k,i,j)  = wtendt(k,i,j) + wk*dzi_t(k)*rk*(tl(kp1,i,j)-tl(k,i,j))  !RV
+	     sflx(k,i,j) = wk*((rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)-grad)
              tt(k,i,j) = tt(k,i,j) + flx(k,i,j)
 	     rtt(k,i,j)= rtt(k,i,j) + wk*(rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)
-             wtendr(k,i,j) = wk*dzi_t(k)*rk*(rt(kp1,i,j)-rt(k,i,j))  !RV
+             wtendr(k,i,j) = wtendr(k,i,j) + wk*dzi_t(k)*rk*(rt(kp1,i,j)-rt(k,i,j))  !RV
              ut(k,i,j) =  ut(k,i,j) + wk*(u(kp1,i,j)-u(k,i,j))*dzi_m(k)
              vt(k,i,j) =  vt(k,i,j) + wk*(v(kp1,i,j)-v(k,i,j))*dzi_m(k)
           end do
@@ -439,11 +435,19 @@ contains
        enddo
     enddo
 
+    !print *, 'wtendt(30:40,30,30) of nstep ',nstep,' is ',wtendt(30:40,30,30), '.' !RV: Added new print statment for bug fix
+    !print *, 'wtendr(30:40,30,30) of nstep ',nstep,' is ',wtendr(30:40,30,30), '.' !RV: Added new print statment for bug fix      
+
     if (sflg) then !RV
+       !print *, '------------------------------- sflg==true, updtst written -----------------------------------'
        call get_avg3(n1,n2,n3,wtendt,res)
-       call updtst(n1,'tend',1,res,1)
+       !print *, 'updtst of wtendt with average (res(30:40)) of ' ,res(30:40), '.'  !RV: Added new print statment for bug fix
+       call updtst(n1,'tnd',1,res,1)
        call get_avg3(n1,n2,n3,wtendr,res1)
-       call updtst(n1,'tend',2,res1,1)
+       !print *, 'updtst of wtendr with average (res1(30:40)) of ' ,res1(30:40), '.'  !RV: Added new print statment for bug fix
+       call updtst(n1,'tnd',2,res1,1)
+       wtendt = 0.
+       wtendr = 0.
     end if !rv
 
   end subroutine bellon

@@ -57,15 +57,13 @@ contains
     ! scale subsidence.  Don't advect TKE here since it resides at a
     ! w-point
     !
-    if(iradtyp==3 .and. nstep==1) then !RV
-       adtendt = 0.
-       adtendr = 0.
-       rk = rkalpha(1)+rkalpha(2)
-    elseif (nstep==2) then
-       rk = rkbeta(2)+rkbeta(3)
-    else
-       rk = rkalpha(3)
-    end if    !rv
+    if(iradtyp==3) then !RV
+       if(nstep==1) rk = rkalpha(1)+rkalpha(2)
+	  !adtendt = 0. !new at if (sflg)
+	  !adtendr = 0.
+       if(nstep==2) rk = rkbeta(2)+rkbeta(3)
+       if(nstep==3) rk = rkalpha(3)
+    end if   !rv
 
     do n=4,nscl
        call newvar(n,istep=nstep)
@@ -89,9 +87,14 @@ contains
        endif
        
        if (sflg .and. iradtyp==3 .and. n<=5) then !RV
-          if(n==4) call get_avg3(nzp,nxp,nyp,adtendt,v1da)
-          if(n==5) call get_avg3(nzp,nxp,nyp,adtendr,v1da)
-          call updtst(nzp,'tend',n+1,v1da,1)
+          if(n==4) then
+	     call get_avg3(nzp,nxp,nyp,adtendt,v1da)
+	     adtendt = 0.
+          else if(n==5) then
+	     call get_avg3(nzp,nxp,nyp,adtendr,v1da)
+	     adtendr = 0.
+	  end if
+          call updtst(nzp,'tnd',n+1,v1da,1)
        endif !rv
     end do
 

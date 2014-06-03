@@ -142,14 +142,12 @@ contains
     ! Diffuse scalars
     !
     
-    if(iradtyp==3 .and. nstep==1) then !RV
-       sgtendt = 0.
-       sgtendr = 0.
-       rk = rkalpha(1)+rkalpha(2)
-    elseif (nstep==2) then
-       rk = rkbeta(2)+rkbeta(3)
-    else
-       rk = rkalpha(3)
+    if(iradtyp==3) then !RV
+       !sgtendt = 0.!new at if (sflg)
+       !sgtendr = 0.
+       if(nstep==1) rk = rkalpha(1)+rkalpha(2)
+       if(nstep==2) rk = rkbeta(2)+rkbeta(3)
+       if(nstep==3) rk = rkalpha(3)
     end if    !rv
 
     do n=4,nscl
@@ -172,6 +170,8 @@ contains
                ,a_sp,a_scr2,a_st,a_scr1)
        endif
 
+  !     if(iradtyp==3 .and. n==4) print *, 'sgtendt(30:40,30,30) of nstep ',nstep,' is ',sgtendt(30:40,30,30), '.' !RV: Added new print statment for bug fix
+    
        if (sflg) then
 
           call get_avg3(nzp,nxp,nyp,a_scr1,sz1)
@@ -183,9 +183,15 @@ contains
              call sgsflxs(nzp,nxp,nyp,level,liquid,vapor,a_theta,a_scr1,'rt')
 
           if (iradtyp==3 .and. n<=5) then !RV
-             if(n==4) call get_avg3(nzp,nxp,nyp,sgtendt,sz1)
-             if(n==5) call get_avg3(nzp,nxp,nyp,sgtendr,sz1)
-             call updtst(nzp,'tend',n-1,sz1,1)
+             if(n==4) then
+		 call get_avg3(nzp,nxp,nyp,sgtendt,sz1)
+		 sgtendt = 0.
+!		 print *, 'updtst of sgtendt with average (sz1(30:40)) of ' ,sz1(30:40), '.'  !RV: Added new print
+             else if(n==5) then
+		 call get_avg3(nzp,nxp,nyp,sgtendr,sz1)
+		 sgtendr = 0.
+	     end if
+             call updtst(nzp,'tnd',n-1,sz1,1)
           endif !rv
 
        endif
