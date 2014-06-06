@@ -808,7 +808,6 @@ contains
             lowdthldtls = highdthldtls
             read (1,*) highheight,highwfls,highdqtdtls,highdthldtls
           end if
-          print *, highheight, lowheight, zt(k)
           fac = (highheight-zt(k))/(highheight - lowheight)
           wfls(k) = fac*lowwfls + (1-fac)*highwfls
           dqtdtls(k) = fac*lowdqtdtls + (1-fac)*highdqtdtls
