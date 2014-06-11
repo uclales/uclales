@@ -571,27 +571,27 @@ contains
 
     v1 = llimit
     do while (v1 > rlimit+epsilon(rlimit))
-       v2 = max(v1 - xk, rlimit)
-       vmid = ( v1 + v2 ) * 0.5
-       fq1 = 1.19107e-8 * vmid * vmid * vmid
-       fq2 = 1.43884 * vmid
-       do k = 2, nv
-          tk = (pt(k)+pt(k-1))*0.5
-          if ((tk.gt.0.0)) then
+      v2 = max(v1 - xk, rlimit)
+      vmid = ( v1 + v2 ) * 0.5
+      fq1 = 1.19107e-8 * vmid * vmid * vmid
+      fq2 = 1.43884 * vmid
+      do k = 2, nv
+        tk = (pt(k)+pt(k-1))*0.5
+        if ((tk.gt.0.0)) then
           bf(k) = bf(k) + (fq1/(exp(fq2/tk) - 1.0))*(v1-v2)
-          else
-             print*,'tk wrong',tk,v1,v2,rlimit,llimit
-             stop
-          endif
-       end do
-          if ((pt(1).gt.0.0)) then
-       bf(1) = bf(1) + (fq1/(exp(fq2/pt(1)) - 1.0))*(v1-v2)
-       bf(nv1) = bf(nv1) + (fq1/(exp(fq2/tskin) - 1.0))*(v1-v2)
-          else
-             print*,'pt wrong',pt(1),v1,v2,rlimit,llimit
-             stop
-          endif
-       v1 = v2
+        else
+          print*,'tk wrong',tk,v1,v2,rlimit,llimit
+          stop
+        endif
+      end do
+      if ((pt(1).gt.0.0)) then
+        bf(1) = bf(1) + (fq1/(exp(fq2/pt(1)) - 1.0))*(v1-v2)
+        bf(nv1) = bf(nv1) + (fq1/(exp(fq2/tskin) - 1.0))*(v1-v2)
+      else
+        print*,'pt wrong',pt(1),v1,v2,rlimit,llimit
+        stop
+      endif
+      v1 = v2
     end do
 
   end subroutine planck

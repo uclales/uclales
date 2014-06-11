@@ -57,7 +57,6 @@ contains
     use mpi_interface, only : myid, appl_abort
     use util, only : get_avg
 
-!irina
     real, optional, intent (in) :: time_in, cntlat, sst, div, time_in_2
     real, dimension (nzp):: um,vm
 
@@ -65,12 +64,11 @@ contains
     integer :: i, j, k, kp1
     real, dimension(nzp,nxp,nyp) :: dum0, dum1, dum2, dum3, dum4
 
-!irina
     real :: alpha, beta, gamma, delta, uinf !linda
 
     select case(iradtyp)
     case (1)
-        call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt)
+       call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt)
     case (2)
        select case(level)
        case(1)
@@ -83,7 +81,7 @@ contains
               a_rflx, a_sflx, zt, zm, dzi_t, a_tt, a_tp, a_rt, a_rp)
        end select
     case (3)
-       call bellon(nzp, nxp, nyp, a_rflx, a_sflx, zt, dzi_t, dzi_m, a_tt, a_tp&
+       call bellon(nzp, nxp, nyp, a_rflx, a_sflx, zt, dzi_t, dzi_m, a_tt, a_tp &
             ,a_rt, a_rp, a_ut, a_up, a_vt, a_vp)
     case (4)
        if (present(time_in) .and. present(cntlat) .and. present(sst)) then

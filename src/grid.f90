@@ -25,53 +25,53 @@ module grid
 !  use step, only : case_name
   implicit none
   !
-  integer           :: nxp = 132           ! number of x points
-  integer           :: nyp = 132           ! number of y points
-  integer           :: nzp = 105           ! number of z points
-  integer           :: nzs = 4             ! number of soil levels
+  integer            :: nxp = 132           ! number of x points
+  integer            :: nyp = 132           ! number of y points
+  integer            :: nzp = 105           ! number of z points
+  integer            :: nzs = 4             ! number of soil levels
 
-  logical           :: nxpart = .true.     ! number of processors in x
+  logical            :: nxpart = .true.     ! number of processors in x
 
-  real              :: deltax = 35.        ! dx for basic grid
-  real              :: deltay = 35.        ! dy for basic grid
-  real              :: deltaz = 17.5       ! dz for basic grid
-  real              :: dzrat  = 1.0        ! grid stretching ratio
-  real              :: dzmax  = 1200.      ! height to start grid-stretching
-  real              :: dtlong = 10.0       ! long timestep
-  real              :: th00   = 288.       ! basic state temperature
+  real               :: deltax = 35.        ! dx for basic grid
+  real               :: deltay = 35.        ! dy for basic grid
+  real               :: deltaz = 17.5       ! dz for basic grid
+  real               :: dzrat  = 1.0        ! grid stretching ratio
+  real               :: dzmax  = 1200.      ! height to start grid-stretching
+  real               :: dtlong = 10.0       ! long timestep
+  real               :: th00   = 288.       ! basic state temperature
 
-  real              :: CCN = 150.e6        ! Number of CCN per kg
-  real              :: umean = 0.          ! Galilean transformation
-  real              :: vmean = 0.          ! Galilean transformation
-  real              :: sfc_albedo = 0.05   ! surface albedo
+  real               :: CCN = 150.e6        ! Number of CCN per kg
+  real               :: umean = 0.          ! Galilean transformation
+  real               :: vmean = 0.          ! Galilean transformation
+  real               :: sfc_albedo = 0.05   ! surface albedo
 
-  integer           :: isfctyp = 0         ! surface flux parameterization type
-  integer           :: igrdtyp = 1         ! vertical grid type
-  integer           :: iradtyp = 0         ! radiation model type
-  integer           :: level   = 0         ! thermodynamic level
-  integer           :: naddsc  = 0         ! number of additional scalars
+  integer            :: isfctyp = 0         ! surface flux parameterization type
+  integer            :: igrdtyp = 1         ! vertical grid type
+  integer            :: iradtyp = 0         ! radiation model type
+  integer            :: level   = 0         ! thermodynamic level
+  integer            :: naddsc  = 0         ! number of additional scalars
 
-  logical           :: lmptend = .false.   ! Write out microphysical 3D fields.
-  logical           :: lrad_ca = .false.   ! Perform clear air radiation calculations
-  logical           :: lcouvreux = .false.  ! switch for 'radioactive' scalar
-  logical           :: lwaterbudget = .false.  ! switch for liquid water budget diagnostics
-  integer           :: ncvrx               ! Number of Couvreux scalar
-  integer           :: ncld               ! Number of Couvreux scalar
+  logical            :: lmptend = .false.   ! Write out microphysical 3D fields.
+  logical            :: lrad_ca = .false.   ! Perform clear air radiation calculations
+  logical            :: lcouvreux = .false.  ! switch for 'radioactive' scalar
+  logical            :: lwaterbudget = .false.  ! switch for liquid water budget diagnostics
+  integer            :: ncvrx               ! Number of Couvreux scalar
+  integer            :: ncld               ! Number of Couvreux scalar
 
-  integer           :: nfpt = 10           ! number of rayleigh friction points
-  real              :: distim = 300.0      ! dissipation timescale
-  logical           :: lspongeinit = .true. ! Sponge layer acts on initial profiles
+  integer            :: nfpt = 10           ! number of rayleigh friction points
+  real               :: distim = 300.0      ! dissipation timescale
+  logical            :: lspongeinit = .true. ! Sponge layer acts on initial profiles
 
   character (len=7), allocatable, save :: sanal(:)
-  character (len=80):: expnme = 'Default' ! Experiment name
-  character (len=80):: filprf = 'x'       ! File Prefix
-  character (len=7) :: runtype = 'INITIAL'! Run Type Selection
+  character (len=80) :: expnme = 'Default' ! Experiment name
+  character (len=80) :: filprf = 'x'       ! File Prefix
+  character (len=7)  :: runtype = 'INITIAL'! Run Type Selection
 
-  real, parameter   ::  rkalpha(3) = (/ 8./15., -17./60.,  3./4. /), &
+  real, parameter    :: rkalpha(3) = (/ 8./15., -17./60.,  3./4. /), &
                         rkbeta(3)  = (/    0.0,   5./12., -5./12./)
 
-  integer           :: nz, nxyzp, nxyp, nstep
-  real              :: dxi, dyi, dt, psrf
+  integer            :: nz, nxyzp, nxyp, nstep
+  real               :: dxi, dyi, dt, psrf
   real, dimension(:), allocatable :: xt, xm, yt, ym, zt, zm, dzi_t, dzi_m,        &
        u0, v0, pi0, pi1, th0, dn0, rt0, spngt, spngm, wsavex, wsavey,         &
        wfls, dthldtls,dqtdtls                                       !cgils

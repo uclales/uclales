@@ -131,15 +131,15 @@ contains
 
     integer, intent (in) ::  n1,n2,n3,level
 
-    real, intent (in), dimension (n1,n2,n3)    :: pp, tl, rt
-    real, intent (in), dimension (n1)          :: pi0, pi1
-    real, intent (in)                          :: th00
-    real, intent (out), dimension (n1,n2,n3)   :: rv,rs,th,tk,p
-    real, intent (out), dimension (n1,n2,n3) :: rc
-    real, intent (out), optional, dimension (n1,n2,n3) :: rsi
+    real, intent (in), dimension (n1,n2,n3)     :: pp, tl, rt
+    real, intent (in), dimension (n1)           :: pi0, pi1
+    real, intent (in)                           :: th00
+    real, intent (out), dimension (n1,n2,n3)    :: rv,rs,th,tk,p
+    real, intent (out), dimension (n1,n2,n3)    :: rc
+    real, intent (out), optional, dimension (n1,n2,n3)   :: rsi
     real, intent (inout), optional, dimension (n1,n2,n3) :: cloud
     real, intent (inout), optional, dimension (n2,n3)    :: tcond,tevap
-    real, intent (in), optional, dimension (n1)  :: zm,rho
+    real, intent (in), optional, dimension (n1) :: zm,rho
     integer, intent (in), optional :: nstep
 
     integer :: k, i, j, iterate
@@ -149,15 +149,15 @@ contains
     do j=3,n3-2
        do i=3,n2-2
           do k=1,n1
-             dtx = 2*epsln
+             dtx = 2 * epsln
              iterate = 1
              exner = (pi0(k)+pi1(k)+pp(k,i,j))/cp
              p(k,i,j) = p00 * (exner)**cpr
-             tli=(tl(k,i,j)+th00)*exner
-             tx=tli
-             rsx=rslf(p(k,i,j),tx)
+             tli = (tl(k,i,j) + th00)*exner
+             tx = tli
+             rsx = rslf(p(k,i,j),tx)
              if (level>3) rix=rsif(p(k,i,j),tx)
-             rcx=max(rt(k,i,j)-rsx,0.)
+             rcx = max(rt(k,i,j)-rsx,0.)
              ravail = rt(k,i,j)
              part = 1.
              if (rcx > 0.) then
@@ -331,6 +331,17 @@ contains
 
     integer :: i, j, k
     real    :: exner
+
+    do j=3,n3-2
+      do i=3,n2-2
+        do k=1,n1
+          exner=(pi0(k)+pi1(k)+pp(k,i,j))/cp
+          tk(k,i,j)=th(k,i,j)*exner
+          if (present(rs)) rs(k,i,j)=rslf(p00*(exner)**cpr,tk(k,i,j))
+        end do
+      end do
+    end do
+
 
     do j=3,n3-2
       do i=3,n2-2

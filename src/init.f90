@@ -309,6 +309,8 @@ contains
           spngm(kk)=max(0.,(zm(nzp)-zm(k))/((zm(nzp)-zm(nzp-nfpt))*distim))
           spngt(kk) = max(0.,(1./distim - spngt(kk)))
           spngm(kk) = max(0.,(1./distim - spngm(kk)))
+
+          print*,spngt(kk),spngm(kk)
        end do
 
        if(myid == 0) then

@@ -22,20 +22,17 @@ module radiation
   use defs, only       : cp, rcp, cpr, rowt, roice, p00, pi, nv1, nv, SolarConstant
   use fuliou, only     : rad, minSolarZenithCosForVis
   implicit none
- character (len=10), parameter :: background = 'backrad_in'
- ! character (len=19), parameter :: background = 'datafiles/s11.lay'
- ! character (len=19), parameter :: background = 'datafiles/astx.lay'
- !  character (len=19), parameter :: background = 'datafiles/dsrt.lay'
+  character (len=10), parameter :: background = 'backrad_in'
 
-  logical, save     :: first_time = .True.
-  real, allocatable, save ::  pp(:), pt(:), ph(:), po(:), pre(:), pde(:), &
-       plwc(:), piwc(:), prwc(:), pgwc(:), fds(:), fus(:), fdir(:), fuir(:)
+  logical, save :: first_time = .True.
+  real, allocatable, save :: &
+                   pp(:),   pt(:),   ph(:),   po(:),   pre(:), pde(:), &
+                   plwc(:), piwc(:), prwc(:), pgwc(:), fds(:), fus(:), fdir(:), fuir(:)
 
-  integer :: k,i,j, npts
+  integer :: k, i, j, npts
   real    :: ee, u0, day, time, alat, zz
   logical :: fixed_sun = .false.
   logical :: radMcICA = .true.
-!   real    :: radius = 1.03
   real    :: rad_eff_radius = 1.
 
   ! BvS: for simple surface radiation
@@ -43,10 +40,10 @@ module radiation
   real    :: flwin      = 300.
 
   contains
-
-    subroutine d4stream(n1, n2, n3, alat, time, sknt, sfc_albedo, CCN, dn0, &
-         pi0, pi1, dzi_m, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,sflxd, albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa, rr,ice,nice,grp)
-
+    subroutine d4stream(n1,n2,n3,alat,time,sknt,sfc_albedo,CCN,dn0, &
+                        pi0,pi1,dzi_m,pip,th,rv,rc,tt,rflx,sflx,lflxu,&
+                        lflxd,sflxu,sflxd,albedo,lflxu_toa,lflxd_toa,&
+                        sflxu_toa,sflxd_toa,rr,ice,nice,grp)
 
       integer, intent (in) :: n1, n2, n3
       real, intent (in)    :: alat, time, sknt, sfc_albedo, CCN
@@ -82,7 +79,6 @@ module radiation
       if (.not. fixed_sun) then
         u0 = zenith(alat,time)
       end if
-    !cgils
 
       !
       ! call the radiation
@@ -140,6 +136,11 @@ module radiation
             !print *, "plwc",plwc(:)
             !print *, "pre",pre(:)
             !print *, "u0",u0
+
+            !do k=1,250
+            !  print*,k,pp(k),pt(k),ph(k),po(k)
+            !end do
+            !stop
 
             if (present(ice).and.present(grp)) then
                call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&

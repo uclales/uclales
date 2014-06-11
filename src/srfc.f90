@@ -30,6 +30,10 @@ use lsmdata
   real    :: rh_srf  = 1.
   real    :: drag    = -1.
 
+  ! BvS: use local surface temp in radiation calculation
+  ! instead of global average (SST)
+  logical :: lrad_ts_loc = .false.  
+
   ! --------------------------
   ! some real-time statistics
   real    :: Hg,LEg,Gg,oblg,ustarg
@@ -245,78 +249,131 @@ contains
     ! ----------------------------------------------------------------------
     ! Malte: Get surface fluxes using a land surface model (van Heerwaarden, DALES)
     !
+    !case(5)
+    !   !Initialize Land Surface -> BvS called from init.f90 
+    !   if (init_lsm) then
+    !     call initlsm(sst,time_in)
+    !     init_lsm = .false.
+    !   end if
+
+    !   !Local or filtered variables for flux calculation
+    !   if (local) then
+    !     !Here we are assuming that MO theory is also valid locally
+    !     u0bar(:,:,:) = a_up(:,:,:)
+    !     v0bar(:,:,:) = a_vp(:,:,:)
+    !     thetaav(:,:) = a_theta(2,:,:)
+    !     vaporav(:,:) = vapor(2,:,:)
+    !     tskinav(:,:) = a_tskin(:,:)
+    !     qskinav(:,:) = a_qskin(:,:)
+    !   else
+    !     stop('filtering not supported in LSM')
+    !   end if
+
+    !   !Calculate surface wind for flux calculation
+    !   call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,u0bar,v0bar,umean,vmean)
+
+    !   ! a) Calculate Monin Obuhkov Length from surface scalars
+    !   do j=3,nyp-2
+    !     do i=3,nxp-2
+    !       dtdz(i,j) = thetaav(i,j) - tskinav(i,j)
+    !       drdz(i,j) = vaporav(i,j) - qskinav(i,j)
+    !     end do
+    !   end do
+
+    !   tskinavg = sum(a_tskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    !   sst      = tskinavg*(psrf/p00)**(rcp)
+    !   call srfcscls(nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,a_ustar,a_tstar,obl,drt=drdz,rstar=a_rstar)
+
+    !   !Calculate the drag coefficients and aerodynamic resistance
+    !   do j=3,nyp-2
+    !     do i=3,nxp-2
+    !       cm(i,j) =  vonk**2. / (log(zt(2)/z0m(i,j)) - psim(zt(2) / &
+    !                  obl(i,j)) + psim(z0m(i,j) / obl(i,j))) ** 2.
+    !       cs(i,j) =  vonk**2. / (log(zt(2)/z0m(i,j)) - psim(zt(2) / &
+    !                  obl(i,j)) + psim(z0m(i,j) / obl(i,j))) / (log(zt(2) / &
+    !                  z0h(i,j)) - psih(zt(2) / obl(i,j)) + psih(z0h(i,j) / &
+    !                  obl(i,j)))
+    !       ra(i,j) =  1. / (cs(i,j)* wspd(i,j))
+    !     end do
+    !   end do
+
+    !   !Get skin temperature and humidity from land surface model (van Heerwaarden)
+    !   call lsm
+
+    !   !Update tskin and qskin (local or filtered) for flux calculation
+    !   if (local) then
+    !     tskinav(:,:) = a_tskin(:,:)
+    !     qskinav(:,:) = a_qskin(:,:)
+    !   else
+    !     !Insert filter method here
+    !   end if
+
+    !   !Calculate the surface fluxes with bulk law (Fairall, 2003)
+    !   !Fluxes in kinematic form with units [K m/s] and [kg/kg m/s]
+    !   do j=3, nyp-2
+    !     do i=3, nxp-2
+    !       wt_sfc(i,j)  = - (thetaav(i,j) - tskinav(i,j)) / ra(i,j) 
+    !       wq_sfc(i,j)  = - (vaporav(i,j) - qskinav(i,j)) / ra(i,j)
+    !       uw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j)                  &
+    !                        *(a_up(2,i,j)+umean)/wspd(i,j)
+    !       vw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j)                  &
+    !                        *(a_vp(2,i,j)+vmean)/wspd(i,j)
+
+    !       a_rstar(i,j) = - wq_sfc(i,j)/a_ustar(i,j)
+    !       a_tstar(i,j) = - wt_sfc(i,j)/a_ustar(i,j)
+    !     end do
+    !   end do
+
+    !
+    ! ----------------------------------------------------------------------
+    ! BvS; Malte's LSM, with some changes. getobl() works better than the sfcscls() 
+    !      method for stable conditions and the transition from NBL-CBL-NBL
+    !
     case(5)
-       !Initialize Land Surface -> BvS called from init.f90 
        if (init_lsm) then
          call initlsm(sst,time_in)
          init_lsm = .false.
        end if
 
-       !Local or filtered variables for flux calculation
-       if (local) then
-         !Here we are assuming that MO theory is also valid locally
-         u0bar(:,:,:) = a_up(:,:,:)
-         v0bar(:,:,:) = a_vp(:,:,:)
-         thetaav(:,:) = a_theta(2,:,:)
-         vaporav(:,:) = vapor(2,:,:)
-         tskinav(:,:) = a_tskin(:,:)
-         qskinav(:,:) = a_qskin(:,:)
-       else
-         stop('filtering not supported in LSM')
-       end if
+       ! Temp, for getobl(). To-do: fix :)
+       u0bar(:,:,:) = a_up(:,:,:)
+       v0bar(:,:,:) = a_vp(:,:,:)
+       thetaav(:,:) = a_theta(2,:,:)
+       vaporav(:,:) = vapor(2,:,:)
+       tskinav(:,:) = a_tskin(:,:)
+       qskinav(:,:) = a_qskin(:,:)
 
-       !Calculate surface wind for flux calculation
-       call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,u0bar,v0bar,umean,vmean)
+       call get_swnds(nzp,nxp,nyp,usfc,vsfc,wspd,a_up,a_vp,umean,vmean)
+       call getobl(wspd)
 
-       ! a) Calculate Monin Obuhkov Length from surface scalars
-       do j=3,nyp-2
-         do i=3,nxp-2
-           dtdz(i,j) = thetaav(i,j) - tskinav(i,j)
-           drdz(i,j) = vaporav(i,j) - qskinav(i,j)
-         end do
-       end do
-
-       tskinavg = sum(a_tskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
-       sst      = tskinavg*(psrf/p00)**(rcp)
-       call srfcscls(nxp,nyp,zt(2),zrough,tskinavg,wspd,dtdz,a_ustar,a_tstar,obl,drt=drdz,rstar=a_rstar)
-
-       !Calculate the drag coefficients and aerodynamic resistance
+       ! Get drag coefficients and aerodynamic resistance
        do j=3,nyp-2
          do i=3,nxp-2
            cm(i,j) =  vonk**2. / (log(zt(2)/z0m(i,j)) - psim(zt(2) / &
                       obl(i,j)) + psim(z0m(i,j) / obl(i,j))) ** 2.
            cs(i,j) =  vonk**2. / (log(zt(2)/z0m(i,j)) - psim(zt(2) / &
                       obl(i,j)) + psim(z0m(i,j) / obl(i,j))) / (log(zt(2) / &
-                      z0h(i,j)) - psih(zt(2) / obl(i,j)) + psih(z0h(i,j) / &
-                      obl(i,j)))
+                      z0h(i,j)) - psih(zt(2) / obl(i,j)) + psih(z0h(i,j) / obl(i,j)))
            ra(i,j) =  1. / (cs(i,j)* wspd(i,j))
          end do
        end do
 
-       !Get skin temperature and humidity from land surface model (van Heerwaarden)
+       tskinavg = sum(a_tskin(3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+       sst      = tskinavg*(psrf/p00)**(rcp)
+
+       ! Call the LSM
        call lsm
 
-       !Update tskin and qskin (local or filtered) for flux calculation
-       if (local) then
-         tskinav(:,:) = a_tskin(:,:)
-         qskinav(:,:) = a_qskin(:,:)
-       else
-         !Insert filter method here
-       end if
-
-       !Calculate the surface fluxes with bulk law (Fairall, 2003)
-       !Fluxes in kinematic form with units [K m/s] and [kg/kg m/s]
+       ! Calculate surface fluxes
        do j=3, nyp-2
          do i=3, nxp-2
-           wt_sfc(i,j)  = - (thetaav(i,j) - tskinav(i,j)) / ra(i,j) 
-           wq_sfc(i,j)  = - (vaporav(i,j) - qskinav(i,j)) / ra(i,j)
-           uw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j)                  &
-                            *(a_up(2,i,j)+umean)/wspd(i,j)
-           vw_sfc(i,j)  = - a_ustar(i,j)*a_ustar(i,j)                  &
-                            *(a_vp(2,i,j)+vmean)/wspd(i,j)
-
-           a_rstar(i,j) = - wq_sfc(i,j)/a_ustar(i,j)
+           a_ustar(i,j) = vonk * wspd(i,j)  / (log(zt(2) / z0m(i,j)) - psim(zt(2) / obl(i,j)) + psim(z0m(i,j) / obl(i,j)))
+           wt_sfc(i,j)  = - (a_theta(2,i,j) - a_tskin(i,j)) / ra(i,j)
+           wq_sfc(i,j)  = - (vaporav(i,j) - qskinav(i,j))   / ra(i,j)
+           uw_sfc(i,j)  = - a_ustar(i,j) * a_ustar(i,j) * (a_up(2,i,j)+umean)/wspd(i,j)
+           vw_sfc(i,j)  = - a_ustar(i,j) * a_ustar(i,j) * (a_vp(2,i,j)+vmean)/wspd(i,j)
            a_tstar(i,j) = - wt_sfc(i,j)/a_ustar(i,j)
+           a_rstar(i,j) = - wq_sfc(i,j)/a_ustar(i,j)
          end do
        end do
 
@@ -854,6 +911,8 @@ contains
           thetavbar   = a_theta(2,i,j)
           tvskinbar   = a_tskin(i,j)
         else
+          !thetavbar   = thetaav(i,j) * (1. + ep2 * vaporav(i,j))
+          !tvskinbar   = tskinav(i,j) * (1. + ep2 * qskinav(i,j))
           thetavbar   = thetaav(i,j) * (1. + ep2 * vaporav(i,j))
           tvskinbar   = tskinav(i,j) * (1. + ep2 * qskinav(i,j))
         end if
@@ -1003,7 +1062,7 @@ contains
     integer  :: i, j, k
     real     :: f1, f2, f3, f4, fsoil !Correction functions for Jarvis-Stewart
     real     :: lflxu_av, lflxd_av, sflxu_av, sflxd_av
-    real     :: tsurfm, Tatm, qskinn, exnerair, exner, pair, thetaavg
+    real     :: tsurfm, Tatm, qskinn, exnerair, exner, pair, thetaavg, rhosurf
     real     :: e, esat, qsat, desatdT, dqsatdT, Acoef, Bcoef
     real     :: fH, fLE, fLEveg, fLEsoil, fLEliq, LEveg, LEsoil, LEliq
     real     :: Wlmx, rk3coef=0
@@ -1012,6 +1071,7 @@ contains
     pair      = psrf*exp(-1.*g*(zt(2)-zt(1))/2/R/thetaavg)
     exner     = (psrf/p00)**rcp
     exnerair  = (pair/p00)**rcp   
+    rhosurf   = (dn0(1)+dn0(2)) / 2.
 
     !"1.0 - Compute water content per layer
     do j = 3,nyp-2
@@ -1075,32 +1135,32 @@ contains
         !" 2.1 - Calculate the surface resistance with vegetation
         !" a) Stomatal opening as a function of incoming short wave radiation
         if ((iradtyp .eq. 4) .or. (iradtyp .eq. 5)) then
-          f1  = 1. /min(1., (0.004 * max(0.,sflxd_av) + 0.05) &
+          f1 = 1. /min(1., (0.004 * max(0.,sflxd_av) + 0.05) &
                   / (0.81 * (0.004 * max(0.,sflxd_av) + 1.)) )
         else
-          f1  = 1.
+          f1 = 1.
         end if
 
         !" b) Soil moisture availability
-        f2  = (phifc - phiwp) / (phitot(i,j) - phiwp)
+        f2   = (phifc - phiwp) / (phitot(i,j) - phiwp)
         !" Put upper bound f2 in case of very dry soils and prevent less than 1
-        f2  = max(f2, 1.)
-        f2  = min(1.e8, f2)
+        f2   = max(f2, 1.)
+        f2   = min(1.e8, f2)
 
         !" c) Response of stomata to vapor deficit of atmosphere
-        Tatm    = a_theta(2,i,j)*exnerair
+        Tatm = a_theta(2,i,j)*exnerair
         esat = 0.611e3 * exp(17.2694 * (Tatm - 273.16) / (Tatm - 35.86))
         e    = vapor(2,i,j) * psrf / (0.622 + vapor(2,i,j))
         f3   = 1. / exp(-gD(i,j) * (esat - e) / 100.)
 
         !" d) Response to temperature
-        f4      = 1./ (1. - 0.0016 * (298.0 - Tatm) ** 2.)
-        rsveg(i,j)  = rsmin(i,j) / LAI(i,j) * f1 * f2 * f3 * f4
+        f4   = 1./ (1. - 0.0016 * (298.0 - Tatm) ** 2.)
+        rsveg(i,j) = rsmin(i,j) / LAI(i,j) * f1 * f2 * f3 * f4
 
         !" 2.2 - Calculate soil resistance based on ECMWF method
-        fsoil  = (phifc - phiwp) / (a_phiw(1,i,j) - phiwp)
-        fsoil  = max(fsoil, 1.)
-        fsoil  = min(1.e8, fsoil)
+        fsoil = (phifc - phiwp) / (a_phiw(1,i,j) - phiwp)
+        fsoil = max(fsoil, 1.)
+        fsoil = min(1.e8, fsoil)
         rssoil(i,j) = rssoilmin(i,j) * fsoil
 
         !" 2.3 - Calculate the heat transport properties of the soil.
@@ -1127,7 +1187,6 @@ contains
         if(qsat - vapor(2,i,j) < 0.) then
           rsveg(i,j)  = 0.
           rssoil(i,j) = 0.
-          !print*,"Dew fall!!!!!!!!!!!!!!!!!!!!"
         end if
 
         Wlmx      = LAI(i,j) * Wmax
@@ -1135,13 +1194,10 @@ contains
         cliq(i,j) = a_Wl(i,j) / Wlmx
 
         !" Calculate coefficients for surface fluxes
-        fH      = 0.5*(dn0(1)+dn0(2)) * cp / ra(i,j) 
-        fLEveg  = (1. - cliq(i,j)) *cveg(i,j) * (0.5* (dn0(1)+dn0(2))) * alvl &
-                  /(ra(i,j) + rsveg(i,j))
-        fLEsoil = (1. - cveg(i,j))            * (0.5* (dn0(1)+dn0(2))) * alvl &
-                  /(ra(i,j) + rssoil(i,j))
-        fLEliq  = (cliq(i,j) * cveg(i,j))     * (0.5* (dn0(1)+dn0(2))) * alvl &
-                  /(ra(i,j))
+        fH      = rhosurf * cp / ra(i,j) 
+        fLEveg  = (1. - cliq(i,j)) * cveg(i,j)  * rhosurf * alvl / (ra(i,j) + rsveg(i,j))
+        fLEsoil = (1. - cveg(i,j))              * rhosurf * alvl / (ra(i,j) + rssoil(i,j))
+        fLEliq  = (cliq(i,j)       * cveg(i,j)) * rhosurf * alvl / (ra(i,j))
         fLE     = fLEveg + fLEsoil + fLEliq
 
         !" Weighted timestep in runge-kutta scheme
@@ -1174,11 +1230,12 @@ contains
         LEsoil    = - fLEsoil * ( vapor(2,i,j) - qskinn)
         LEliq     = - fLEliq  * ( vapor(2,i,j) - qskinn)
 
+        !if(i==5 .and. j==5) print*,LE(i,j),LEveg,LEsoil,LEliq
+
         if(LE(i,j) == 0.) then
           rsurf(i,j) = 1.e8           ! "WHY???
         else
-          rsurf(i,j) = -0.5*(dn0(1)+dn0(2)) * alvl * (vapor(2,i,j) - qskinn) &
-                    / LE(i,j) - ra(i,j) 
+          rsurf(i,j) = -rhosurf * alvl * (vapor(2,i,j) - qskinn) / LE(i,j) - ra(i,j) 
         end if
 
         H(i,j)    = - fH  * ( a_theta(2,i,j)*exner - a_tskin(i,j)*exner )
@@ -1186,10 +1243,12 @@ contains
 
         !" In case of dew formation, allow all water to enter skin reservoir a_Wl
         if(qsat - vapor(2,i,j) < 0.) then
-          a_Wl(i,j) =  Wlm(i,j) - rk3coef*((LEliq + LEsoil + LEveg)/(rowt * alvl))
+          a_Wl(i,j) =  Wlm(i,j) - rk3coef * ((LEliq + LEveg) / (rowt * alvl))
         else
-          a_Wl(i,j) =  Wlm(i,j) - rk3coef*(LEliq / (rowt * alvl))
+          a_Wl(i,j) =  Wlm(i,j) - rk3coef * ( LEliq          / (rowt * alvl))
         end if
+
+        !if(i==5 .and. j==5) print*,nstep,a_Wl(i,j)
 
         !" Save temperature and liquid water from previous timestep 
         if(nstep == 1) then

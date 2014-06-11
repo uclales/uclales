@@ -107,7 +107,7 @@ module lsmdata
   real, allocatable :: lambdaskin (:,:) !<  Heat conductivity skin layer [W/m/K]
   real              :: lambdaskinav = 5.
   real              :: Wlav     = 0.                          
-  real, parameter   :: Wmax     = 0.0002 !<  Maximum layer of liquid water on surface [m]
+  real              :: Wmax     = 0.0002 !<  Maximum layer of liquid water on surface [m]
   real, allocatable :: Wlm        (:,:) !<  Liquid water reservoir previous timestep [m]
   real, allocatable :: cliq       (:,:) !<  Fraction of vegetated surface covered with liquid water 
   real, allocatable :: tskinm     (:,:) !<  Skin temperature previous timestep [K]
@@ -184,7 +184,8 @@ module lsmdata
     !< Jarvis-Steward related variables
     rsminav, rssoilminav, LAIav, gDav, &
     !< Heterogeneity related variables
-    hetper, LAImin, LAImax
+    hetper, LAImin, LAImax, &
+    Wmax
 
     open(17,file='SURFNAMELIST',status='old',iostat=ierr)
     read (17,SURFNAMELIST,iostat=ierr)
@@ -289,16 +290,16 @@ module lsmdata
     z0h(:,:)       = z0hav
     
     !COSMO config from Linda
-    dzsoil(1) = 0.07    !z = 0.07 m 
-    dzsoil(2) = 0.27    !z = 0.34 m
-    dzsoil(3) = 1.13    !z = 1.47 m
-    dzsoil(4) = 1.39    !z = 2.86 m 
+    !dzsoil(1) = 0.07    !z = 0.07 m 
+    !dzsoil(2) = 0.27    !z = 0.34 m
+    !dzsoil(3) = 1.13    !z = 1.47 m
+    !dzsoil(4) = 1.39    !z = 2.86 m 
 
     !ECMWF config from Chiel
-    !dzsoil(1) = 0.07  
-    !dzsoil(2) = 0.21
-    !dzsoil(3) = 0.72
-    !dzsoil(4) = 1.89
+    dzsoil(1) = 0.07  
+    dzsoil(2) = 0.21
+    dzsoil(3) = 0.72
+    dzsoil(4) = 1.89
  
     ! Calculate vertical layer properties
     zsoil(1)  = dzsoil(1)
