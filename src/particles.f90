@@ -78,7 +78,7 @@ module modparticles
     real             :: x, xstart, ures, ures_prev, usgs, usgs_prev, udrop, udrop_rk, udrop_rkprev
     real             :: y, ystart, vres, vres_prev, vsgs, vsgs_prev, vdrop, vdrop_rk, vdrop_rkprev
     real             :: z, zstart, wres, wres_prev, wsgs, wsgs_prev, wdrop, wdrop_rk, wdrop_rkprev, zprev
-    real             :: sigma2_sgs, mass, tau, tau_res
+    real             :: sigma2_sgs, mass, tau
     type (particle_record), pointer :: next,prev
   end type
 
@@ -94,7 +94,7 @@ module modparticles
 
   integer            :: ipunique, ipx, ipy, ipz, ipzprev, ipxstart, ipystart, ipzstart, iptsart
   integer            :: ipures, ipvres, ipwres, ipures_prev, ipvres_prev, ipwres_prev, ipartstep, ipnd, nrpartvar
-  integer            :: ipusgs, ipvsgs, ipwsgs, ipusgs_prev, ipvsgs_prev, ipwsgs_prev, ipsigma2_sgs, ipm, ipt, iptres
+  integer            :: ipusgs, ipvsgs, ipwsgs, ipusgs_prev, ipvsgs_prev, ipwsgs_prev, ipsigma2_sgs, ipm, ipt
   integer            :: ipudrop, ipudrop_rkprev, ipvdrop, ipvdrop_rkprev, ipwdrop, ipwdrop_rkprev
   integer            :: ipudrop_rk, ipvdrop_rk, ipwdrop_rk, ipmtpl
 
@@ -885,48 +885,8 @@ contains
       end if
       particle%tau = 0.5 * (particle%tau + &
                      8.* r0**3. *rowt / (3. * C_d *i1d(particle%z,dn0) * rmax**2.) / v_rel)
-      
-      
-      if (lpartdumptau) then  ! calculate tau_res for balanced_particledump only
-        v_rel = sqrt((particle%udrop/dxi - particle%ures/dxi)**2. + &
-                     (particle%vdrop/dyi - particle%vres/dyi)**2. + &
-                     (particle%wdrop/dzi - particle%wres/dzi)**2. )
-        if (v_rel==0) then
-          v_rel = 1.e-20
-          print*,'v_rel ist null!'
-        end if
-        if (stokes) then
-          !use Stokes drag
-          C_d = 24./ (2.*rmax*v_rel/nu)
-        else
-          !use drag coefficient from Abraham (1970)        
-          C_d = C0 *(1+ delta0/ sqrt(2.*rmax*v_rel/nu) )**2.
-
-        end if
-        particle%tau_res = 8.* r0**3. *rowt / (3. * C_d *i1d(particle%z,dn0) * rmax**2.) / v_rel
-        vt = particle%tau_res *(1-i1d(particle%z,dn0)/rowt)*g
-        !predictor step
-        upred = (particle%udrop/dxi - particle%ures/dxi     ) * exp(-dt/particle%tau_res) &
-                          + particle%ures/dxi
-        vpred = (particle%vdrop/dyi - particle%vres/dyi     ) * exp(-dt/particle%tau_res) &
-                          + particle%vres/dyi
-        wpred = (particle%wdrop/dzi - particle%wres/dzi + vt) * exp(-dt/particle%tau_res) &
-                          + particle%wres/dzi - vt
-        !corrector step for tau_res
-        v_rel = sqrt((upred - particle%ures/dxi)**2. + &
-                     (vpred - particle%vres/dyi)**2. + &
-                     (wpred - particle%wres/dzi)**2. )
-        if (stokes) then
-          C_d = 24./ (2.*rmax*v_rel/nu)
-        else
-          C_d = C0 *(1+ delta0/ sqrt(2.*rmax*v_rel/nu) )**2.
-        end if
-        particle%tau_res = 0.5 * (particle%tau_res + &
-                           8.* r0**3. *rowt / (3. * C_d *i1d(particle%z,dn0) * rmax**2.) / v_rel)
-      end if
-      
-      
     end if 
+
     if (kc05) then
       call drag_coeff(particle, C_d, vt, tau)
       particle%tau = tau
@@ -1813,7 +1773,6 @@ contains
       buffer(n+ipwdrop_rkprev)  = particle%wdrop_rkprev
       buffer(n+ipt)             = particle%tau
       buffer(n+ipmtpl)          = particle%mtpl
-      buffer(n+iptres)          = particle%tau_res      
     else
       particle%unique           = buffer(n+ipunique)
       particle%x                = buffer(n+ipx)
@@ -1851,7 +1810,6 @@ contains
       particle%wdrop_rkprev     = buffer(n+ipwdrop_rkprev)
       particle%tau              = buffer(n+ipt)
       particle%mtpl             = int(buffer(n+ipmtpl))
-      particle%tau_res          = buffer(n+iptres)
     end if
 
   end subroutine partbuffer
@@ -2265,7 +2223,7 @@ contains
       if(lpartdrop.and.lpartmass.and.var_mtpl) &
                                      nvar = nvar + 1     ! mtpl
       if(lpartdumpp)                 nvar = nvar + 1     ! pressure
-      if(lpartdrop.and.lpartdumptau) nvar = nvar + 3     ! tau, tau_res, dissp
+      if(lpartdrop.and.lpartdumptau) nvar = nvar + 2     ! tau, dissp
 
       nprocs = nxprocs * nyprocs
       allocate(tosend(0:nprocs-1),toreceive(0:nprocs-1),base(0:nprocs-1),sendbase(0:nprocs-1),receivebase(0:nprocs-1))
@@ -2383,8 +2341,7 @@ contains
           end if
           if(lpartdrop.and.lpartdumptau) then
             sendbuff(base(p)+nvl+1)   = particle%tau
-            sendbuff(base(p)+nvl+2)   = particle%tau_res
-            sendbuff(base(p)+nvl+3)   = dissp
+            sendbuff(base(p)+nvl+2)   = dissp
           end if
   
           base(p)             = base(p) + nvar
@@ -2499,7 +2456,6 @@ contains
         if(lpartdrop.and.lpartdumptau) then
           sb_sorted(loc,nvl+1) = recvbuff(ii+nvl+1)
           sb_sorted(loc,nvl+2) = recvbuff(ii+nvl+2)
-          sb_sorted(loc,nvl+3) = recvbuff(ii+nvl+3)
         end if
 
         ii = ii + nvar
@@ -2577,8 +2533,7 @@ contains
       end if
       if(lpartdrop.and.lpartdumptau) then
         call writevar_nc(ncpartid,'tau',sb_sorted(:,nvl+1),ncpartrec)
-        call writevar_nc(ncpartid,'tau_res',sb_sorted(:,nvl+2),ncpartrec)
-        call writevar_nc(ncpartid,'diss',sb_sorted(:,nvl+3),ncpartrec)
+        call writevar_nc(ncpartid,'diss',sb_sorted(:,nvl+2),ncpartrec)
       end if
       
       stat  = nf90_sync(ncpartid)
@@ -2764,7 +2719,6 @@ contains
         particle%wdrop_rkprev   = fillvalue_double
         particle%tau            = fillvalue_double
         particle%mtpl           = fillvalue_double
-        particle%tau_res        = fillvalue_double
       end if
       i = i + 2
     end do
@@ -2878,7 +2832,6 @@ contains
                   particle%wdrop_rkprev   = 0.
                   particle%tau            = 0.
                   particle%mtpl           = nint(1./nppd)
-                  particle%tau_res        = 0.
                   newp = newp + 1
                 end if
                 particle => particle%next
@@ -3478,7 +3431,7 @@ contains
     real     :: tstart, xstart, ystart, zstart, ysizelocal, xsizelocal, firststartl, firststart
     real     :: pu,pts,px,py,pz,pzp,pxs,pys,pzs,pur,pvr,pwr,purp,pvrp,pwrp
     real     :: pus,pvs,pws,pusp,pvsp,pwsp,psg2,pm,pud,pvd,pwd,pudr,pvdr,pwdr
-    real     :: pudrp,pvdrp,pwdrp,pt,ptres
+    real     :: pudrp,pvdrp,pwdrp,pt
     integer  :: pstp,pnd,idot,pmtpl
     type (particle_record), pointer:: particle
     character (len=80) :: hname,prefix,suffix
@@ -3530,7 +3483,7 @@ contains
       do
         read (666,iostat=io) pu,pts,pstp,pnd,px,pxs,pur,purp,py,pys,pvr,pvrp,pz,pzs, &
                              pzp,pwr,pwrp,pus,pvs,pws,pusp,pvsp,pwsp,psg2,pm,pud,pvd,pwd, &
-                             pudr,pvdr,pwdr,pudrp,pvdrp,pwdrp,pt,pmtpl !,ptres
+                             pudr,pvdr,pwdr,pudrp,pvdrp,pwdrp,pt,pmtpl
         if(io .ne. 0) exit
         call add_particle_end(particle)
         particle%unique         = pu
@@ -3569,7 +3522,6 @@ contains
         particle%wdrop_rkprev   = pwdrp
         particle%tau            = pt
         particle%mtpl           = pmtpl  !nint(1./nppd)   ! 
-        particle%tau_res        = 0.  !ptres
         if(pts < firststartl) firststartl = pts
         
       end do
@@ -3633,7 +3585,6 @@ contains
         particle%wdrop_rkprev   = fillvalue_double
         particle%tau            = fillvalue_double
         particle%mtpl           = fillvalue_double
-        particle%tau_res        = fillvalue_double
       end do
       ! Set first dump times
       tnextdump = frqpartdump
@@ -3707,7 +3658,6 @@ contains
               particle%wdrop_rkprev   = 0.
               particle%tau            = 0.
               particle%mtpl           = 1
-              particle%tau_res        = 0.
               if(tstart < firststartl) firststartl = tstart
             end if
           end if
@@ -3761,8 +3711,7 @@ contains
     ipwdrop_rkprev  = 34
     ipt             = 35
     ipmtpl          = 36
-    iptres          = 37
-    nrpartvar       = iptres
+    nrpartvar       = ipmtpl
     
     ! 1D arrays for online statistics
     if(lpartstat) then
@@ -3902,7 +3851,7 @@ contains
         particle%udrop, particle%vdrop, particle%wdrop, &
         particle%udrop_rk, particle%vdrop_rk, particle%wdrop_rk, &
         particle%udrop_rkprev, particle%vdrop_rkprev, particle%wdrop_rkprev, &
-        particle%tau, particle%mtpl, particle%tau_res
+        particle%tau, particle%mtpl
       particle => particle%next
     end do
     close(666)
@@ -3997,7 +3946,6 @@ contains
     end if
     if(lpartdrop.and.lpartdumptau) then
       call addvar_nc(ncpartid,'tau','drop relaxation timescale','s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-      call addvar_nc(ncpartid,'tau_res','resolved drop relaxation timescale','s',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
       call addvar_nc(ncpartid,'diss','dissipation rate','m2/s3',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
     end if
 
