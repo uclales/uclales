@@ -121,6 +121,19 @@ contains
                rr=dum4,sflxu_toa=sflxu_toa_ca,sflxd_toa=sflxd_toa_ca,&
                lflxu_toa=lflxu_toa_ca,lflxd_toa=lflxd_toa_ca)
           end if
+          do j=3,nyp-2
+              do i=3,nxp-2
+              if (div /= 0.) then
+                do k=2,nzp-2
+                    kp1 = k+1
+                    a_tt(k,i,j) = a_tt(k,i,j) + &
+                            div*zt(k)*(a_tp(kp1,i,j)-a_tp(k,i,j))*dzi_t(k)
+                    a_rt(k,i,j)=a_rt(k,i,j) + &
+                            div*zt(k)*(a_rp(kp1,i,j)-a_rp(k,i,j))*dzi_t(k)
+                end do
+              end if
+              enddo
+          enddo
         else
           if (myid == 0) print *, '  ABORTING: inproper call to radiation'
           call appl_abort(0)
