@@ -68,7 +68,7 @@ contains
          , a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7, nscl, nxp, nyp    &
          , nzp, nxyp, nxyzp, zm, dxi, dyi, dzi_t, dzi_m, dt, th00, dn0, pi0, pi1     &
          ,level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,liquid, a_cvrxp, trac_sfc    & 
-	 , sgtendt, sgtendr, iradtyp, rkalpha, rkbeta
+	 , sgtendt, sgtendr, outtend, rkalpha, rkbeta
 
     use util, only         : atob, azero, get_avg3
     use mpi_interface, only: cyclics, cyclicc
@@ -142,7 +142,7 @@ contains
     ! Diffuse scalars
     !
     
-    if(iradtyp==3) then !RV
+    if(outtend) then !RV
        !sgtendt = 0.!new at if (sflg)
        !sgtendr = 0.
        if(nstep==1) rk = rkalpha(1)+rkalpha(2)
@@ -160,7 +160,7 @@ contains
 
        if (sflg) call azero(nxyzp,a_scr1)
 
-       if(iradtyp==3 .and. n<=5) then
+       if(outtend .and. n<=5) then
           if(n==4) call diffsclr(nzp,nxp,nyp,dt,dxi,dyi,dzi_m,dzi_t,dn0,sxy1,sxy2   & !RV
                      ,a_sp,a_scr2,a_st,a_scr1,sgtendt,rk)
           if(n==5) call diffsclr(nzp,nxp,nyp,dt,dxi,dyi,dzi_m,dzi_t,dn0,sxy1,sxy2   & !RV
@@ -170,7 +170,7 @@ contains
                ,a_sp,a_scr2,a_st,a_scr1)
        endif
 
-  !     if(iradtyp==3 .and. n==4) print *, 'sgtendt(30:40,30,30) of nstep ',nstep,' is ',sgtendt(30:40,30,30), '.' !RV: Added new print statment for bug fix
+  !     if(outtend .and. n==4) print *, 'sgtendt(30:40,30,30) of nstep ',nstep,' is ',sgtendt(30:40,30,30), '.' !RV: Added new print statment for bug fix
     
        if (sflg) then
 
@@ -182,7 +182,7 @@ contains
           if (associated(a_sp,a_rp))                                          &
              call sgsflxs(nzp,nxp,nyp,level,liquid,vapor,a_theta,a_scr1,'rt')
 
-          if (iradtyp==3 .and. n<=5) then !RV
+          if (outtend .and. n<=5) then !RV
              if(n==4) then
 		 call get_avg3(nzp,nxp,nyp,sgtendt,sz1)
 		 sgtendt = 0.
@@ -698,7 +698,7 @@ contains
   subroutine diffsclr(n1,n2,n3,dt,dxi,dyi,dzi_m,dzi_t,dn0,sflx,tflx,scp,xkh,sct &
        ,flx,flxtend,rk)
 
-    use grid, only : iradtyp
+    use grid, only : outtend
 
     integer, intent(in) :: n1,n2,n3
     real, intent(in)    :: xkh(n1,n2,n3),scp(n1,n2,n3)
@@ -765,7 +765,7 @@ contains
                   +xkh(k-1,i,j-1)+xkh(k-1,i,j)))*dyi) /dn0(k)
              if (k<n1-1) flx(k,i,j)=-xkh(k,i,j)*(sxz5(indh,k+1)-sxz5(indh,k)) &
                   *dzi_m(k)
-             if(iradtyp == 3) then   !RV: t&r tendencies stored
+             if(outtend) then   !RV: t&r tendencies stored
                 flxtend(k,i,j)= flxtend(k,i,j) + dti*rk*(sxz5(indh,k)-scp(k,i,j))   &
                      -rk*((szx1(k,i)-szx1(k,i-1))*dxi                               &
                      + (-(scp(k,i,j+1)-scp(k,i,j))*dyi*0.25*(xkh(k,i,j)          &

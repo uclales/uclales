@@ -602,7 +602,7 @@ contains
 
     iret  = nf90_sync(ncid0)
     nrec0 = nrec0+1
-
+	print*, 'I leave the write_anal subroutine' !RV
   end subroutine write_anal
 
   !

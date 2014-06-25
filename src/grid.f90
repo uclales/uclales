@@ -50,6 +50,7 @@ module grid
   integer           :: level   = 0         ! thermodynamic level
   integer           :: naddsc  = 0         ! number of additional scalars
 
+  logical           :: outtend = .true.    ! Heat and moisture tendencies added to .ps.
   logical           :: lmptend = .false.   ! Write out microphysical 3D fields.
   logical           :: lrad_ca = .false.   ! Perform clear air radiation calculations
   logical           :: lcouvreux = .false.  ! switch for 'radioactive' scalar
@@ -438,7 +439,7 @@ contains
 !linda,e
 
 !RV:allocate tendency arrays
-    if (iradtyp == 3) then
+    if (outtend) then
        allocate(wtendt(nzp,nxp,nyp))
        allocate(wtendr(nzp,nxp,nyp))
        allocate(sgtendt(nzp,nxp,nyp))

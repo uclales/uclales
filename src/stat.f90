@@ -184,6 +184,7 @@ contains
     ! profile statistics
     !
 
+	print*, 'I am in the statistics subroutine' !RV
     if (debug) WRITE (0,*) 'statistics: start,      myid=',myid
 
     call accum_stat(nzp, nxp, nyp, zm, a_up, a_vp, a_wp, a_tp, press, umean    &
@@ -1181,7 +1182,7 @@ contains
     use mpi_interface, only : myid
     use netcdf
     use defs, only : alvl, cp
-    use grid, only : iradtyp
+    use grid, only : outtend !RV
 
     integer, intent (in) :: n1
     real, intent (in)    :: time
@@ -1211,7 +1212,7 @@ contains
          else
             svctr(k,49) = 0.
          end if
-	 if(iradtyp==3) then !RV: add adv and sgs component of rt and tl tendencies -> total turb. flux div.
+	 if(outtend) then !RV: add adv and sgs component of rt and tl tendencies -> total turb. flux div.
 	    !print*, '----------------------INSIDE write_ps where turbtent computed------------------------' 
 	    svctr(k,125) = svctr(k,121)+svctr(k,123)
 	    svctr(k,126) = svctr(k,122)+svctr(k,124)
@@ -1219,7 +1220,7 @@ contains
          svctr(k,10:nv2) = svctr(k,10:nv2)/nsmp
       end do
 
-      print*, '----------------------INSIDE write_ps where turbtent computed---------------------' !RV
+      !print*, '----------------------INSIDE write_ps where turbtent computed---------------------' !RV
       
       iret = nf90_inq_VarID(ncid2, s2(1), VarID)
       iret = nf90_put_var(ncid2, VarID, time, start=(/nrec2/))

@@ -34,7 +34,7 @@ contains
 
     use grid, only : a_up, a_vp, a_wp, a_sp, a_st, liquid, a_scr1, a_scr2,    &
          dn0 , nxp, nyp, nzp, nxyzp, dt, dzi_t, dzi_m, zt, dxi, dyi, level, nscl, &
-         newvar, nstep, iradtyp, adtendt, adtendr, rkalpha, rkbeta
+         newvar, nstep, outtend, adtendt, adtendr, rkalpha, rkbeta
 
     use stat, only      : sflg, updtst
     use util, only      : atob, get_avg3
@@ -57,7 +57,7 @@ contains
     ! scale subsidence.  Don't advect TKE here since it resides at a
     ! w-point
     !
-    if(iradtyp==3) then !RV
+    if(outtend) then !RV
        if(nstep==1) rk = rkalpha(1)+rkalpha(2)
 	  !adtendt = 0. !new at if (sflg)
 	  !adtendr = 0.
@@ -79,14 +79,14 @@ contains
           call updtst(nzp,'adv',n-3,v1da,1)
        end if
 
-       if(iradtyp==3 .and. n<=5) then
+       if(outtend .and. n<=5) then
           if(n==4) call advtnd(nzp,nxp,nyp,a_sp,a_scr1,a_st,dt,adtendt,rk)
           if(n==5) call advtnd(nzp,nxp,nyp,a_sp,a_scr1,a_st,dt,adtendr,rk)
        else
           call advtnd(nzp,nxp,nyp,a_sp,a_scr1,a_st,dt)
        endif
        
-       if (sflg .and. iradtyp==3 .and. n<=5) then !RV
+       if (sflg .and. outtend .and. n<=5) then !RV
           if(n==4) then
 	     call get_avg3(nzp,nxp,nyp,adtendt,v1da)
 	     adtendt = 0.
@@ -105,7 +105,7 @@ contains
   !
   subroutine advtnd(n1,n2,n3,varo,varn,tnd,dt,tndout,rk)
 
-    use grid, only : iradtyp
+    use grid, only : outtend
 
     integer, intent(in) :: n1,n2,n3
     real, intent(in)    :: varo(n1,n2,n3),varn(n1,n2,n3),dt
@@ -123,7 +123,7 @@ contains
           tnd(1,i,j)  = 0.
           do k=2,n1-1
              tnd(k,i,j)=tnd(k,i,j)+(varn(k,i,j)-varo(k,i,j))*dti
-	     if(iradtyp == 3) then   !RV: t&r tendencies stored
+	     if(outtend) then   !RV: t&r tendencies stored
 		tndout(k,i,j)=tndout(k,i,j)+(varn(k,i,j)-varo(k,i,j))*dti*rk
              end if !rv
           end do
