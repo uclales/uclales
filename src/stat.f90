@@ -1766,17 +1766,16 @@ contains
   ! subroutine for creating output of edmf scheme
   !
 
-  subroutine stat_edmf(a1, a2, pcog, pnog, pextr2, pextra, kfldx2, kfldx, klevx)
-! 
+  subroutine stat_edmf(pcog, pnog, pextr2, pextra, kfldx2, kfldx, klevx)
+
   use parkind1 , only : jpim ,jprb
   use yos_cst , only : rcpd
   use grid,  only : nzp, nxp, nyp, pextrac
-!   use vdf, only : flip
-! 
+!  use vdf, only : flip
+
    integer(kind=jpim),intent(in) :: kfldx2, kfldx, klevx
-   real(kind=jprb)   ,intent(in) :: pextr2(pnog ,kfldx2), pextra(pnog,klevx,kfldx)
-  real(kind=jprb)  :: pextratest(pnog,klevx)
    integer(kind=jpim),intent(in) :: pcog, pnog
+   real(kind=jprb)   ,intent(in) :: pextr2(pnog ,kfldx2), pextra(pnog,klevx,kfldx)
    real, dimension((nxp-4)*(nyp-4),nzp) :: a1, avg_cond
    real, dimension((nxp-4)*(nyp-4)) :: a2
    real, dimension(nzp) :: a3
@@ -1874,19 +1873,14 @@ contains
     call updtst(nzp,'u3p',6,a3(:),1) 
 
 !assign output for crosssections
-!pextratest=0.
+
   do i=1,pnog
     qt_av(:) = qt_av(:) +  pextra (i,:,42)
     th_av(:) = th_av(:) +  pextra (i,:,43)
   enddo
   qt_av = qt_av / pnog
   th_av = th_av / pnog
-!print*, 'rcpd', qt_av
-!  do i=1,pnog
-!    pextratest(i,:) = pextra (i,:,42) -qt_av(:)
-!  enddo
-!  pextratest = 1000. * pextratest
-!print*, 'pextra (1,:,42)', pextratest (1,:)
+
   n = 0
   pextrac = 0.
   do j=3,nyp-2
@@ -1930,7 +1924,6 @@ contains
     enddo
   enddo
 
-!print*, 'pextrac (i,j,13): ', maxval(pextrac (:,:,14))
 
   end subroutine stat_edmf
 
@@ -1941,8 +1934,8 @@ contains
   subroutine avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
    use parkind1 , only : jpim
    use grid,  only : nzp, nxp, nyp
-!    use vdf, only : flip
-! 
+!   use vdf, only : flip
+
    integer(kind=jpim),intent(in) :: pcog
    real, dimension((nxp-4)*(nyp-4),nzp),intent(in) :: a1, avg_cond
    real, dimension((nxp-4)*(nyp-4)),intent(in) :: a2
@@ -1975,16 +1968,15 @@ contains
    a4 = a2aux/real(n)
 
   end subroutine avg_edmf
-  function flip(a)
-    real, dimension(:), intent(in) :: a
-    real, dimension(size(a)) :: flip
-    integer :: k
-    do k=1,size(a)
-      flip(k) = a(1+size(a)-k)
-    end do
-
-  end function flip
-
+function flip(a)
+  real, dimension(:), intent(in) :: a
+  real, dimension(size(a)) :: flip
+  integer :: k
+  do k=1,size(a)
+    flip(k) = a(1+size(a)-k)
+  end do
+  
+end function flip
 end module stat
 
 

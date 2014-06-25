@@ -56,7 +56,7 @@ integer(kind=jpim),parameter :: kfldx=100, kfldx2=100
 real(kind=jprb)   :: pextr2((nxp-4)*(nyp-4),kfldx2), pextra((nxp-4)*(nyp-4),nzp-1,kfldx)
 integer(kind=jpim) :: i,j,pcog, pnog, klevx
 
-!allocate (pextrac(nxp,nyp,10))
+
 
   pextr2 = 0.
   pextra = 0.
@@ -209,11 +209,11 @@ integer(kind=jpim) :: i,j,pcog, pnog, klevx
   )
     end do
     end do
-!print*, pextra(1,:,54) 
+
 !output of edmf variables
 klevx = nzp-1
   if (sflg) then
-    call stat_edmf(a1, a2, pcog, pnog, pextr2, pextra, kfldx2, kfldx, klevx)
+    call stat_edmf(pcog, pnog, pextr2, pextra, kfldx2, kfldx, klevx)
   end if
 
 end subroutine vdfouter
