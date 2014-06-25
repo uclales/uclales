@@ -229,13 +229,14 @@ contains
                  a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r,zp=a_zpp,zpt=a_zpt)
           end if
           do n =1,count(prc_lev>0)
-            prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(n,:,:)+prc_r(n,:,:)) * dt / 3.
+	    ! Christopher: implemented Axel's bug fix (also at the corresponding lines)
+            prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(prc_lev(n),:,:)+prc_r(prc_lev(n),:,:)) * dt / 3.
           end do
        else
           call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
                a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r,rct=a_rct)
             do n =1,count(prc_lev>0)
-              prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(n,:,:)+prc_r(n,:,:)) * dt / 3.
+              prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(prc_lev(n),:,:)+prc_r(prc_lev(n),:,:)) * dt / 3.
             end do
 
           if (debug.and.lwaterbudget.and. .false.) then
@@ -283,7 +284,8 @@ contains
             a_ricep,a_nicep,a_rsnowp,a_rgrp, &
             prc_i, prc_s, prc_g)
       do n =1,count(prc_lev>0)
-        prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(n,:,:)+prc_r(n,:,:)+prc_i(n,:,:)+prc_s(n,:,:)+prc_g(n,:,:)) * dt / 3.
+        prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(prc_lev(n),:,:)+prc_r(prc_lev(n),:,:)+prc_i(prc_lev(n),:,:)  &
+	                                + prc_s(prc_lev(n),:,:)+prc_g(prc_lev(n),:,:)) * dt / 3.
       end do
     case(5)
        call mcrph_sb(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,a_wp,vapor,liquid, &
@@ -300,9 +302,9 @@ contains
             a_rhailt, a_nhailt,  & ! hail
             prc_c, prc_r, prc_i, prc_s, prc_g, prc_h)
       do n =1,count(prc_lev>0)
-        prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(n,:,:)+prc_r(n,:,:)+prc_i(n,:,:)          &
-                           +prc_s(n,:,:)+prc_g(n,:,:)+prc_h(n,:,:)) * dt / 3.
-       end do
+        prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(prc_lev(n),:,:)+prc_r(prc_lev(n),:,:)+prc_i(prc_lev(n),:,:)          &
+                           +prc_s(prc_lev(n),:,:)+prc_g(prc_lev(n),:,:)+prc_h(prc_lev(n),:,:)) * dt / 3.
+      end do
    end select
 
   end subroutine micro
