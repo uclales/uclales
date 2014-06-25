@@ -1547,6 +1547,14 @@ contains
        if (itype==0) ncinfo = 'EDMF moist updraft qt excess'
        if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
+    case('edmf_ws')
+       if (itype==0) ncinfo = 'EDMF vertical velocity variance'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('edmf_mf')    
+       if (itype==0) ncinfo = 'EDMF Mass flux'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'tttt'
     case('Qnet')    
        if (itype==0) ncinfo = 'Qnet'
        if (itype==1) ncinfo = 'w/m^2'

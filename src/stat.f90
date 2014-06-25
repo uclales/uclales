@@ -1767,15 +1767,15 @@ contains
   !
 
   subroutine stat_edmf(a1, a2, pcog, pnog, pextr2, pextra, kfldx2, kfldx, klevx)
-
+! 
   use parkind1 , only : jpim ,jprb
   use yos_cst , only : rcpd
   use grid,  only : nzp, nxp, nyp, pextrac
-  use vdf, only : flip
-
+!   use vdf, only : flip
+! 
    integer(kind=jpim),intent(in) :: kfldx2, kfldx, klevx
    real(kind=jprb)   ,intent(in) :: pextr2(pnog ,kfldx2), pextra(pnog,klevx,kfldx)
-!   real(kind=jprb)  :: pextratest(pnog,klevx)
+  real(kind=jprb)  :: pextratest(pnog,klevx)
    integer(kind=jpim),intent(in) :: pcog, pnog
    real, dimension((nxp-4)*(nyp-4),nzp) :: a1, avg_cond
    real, dimension((nxp-4)*(nyp-4)) :: a2
@@ -1941,8 +1941,8 @@ contains
   subroutine avg_edmf(a1, a2, a3, a4, pcog, avg_cond, tsps)
    use parkind1 , only : jpim
    use grid,  only : nzp, nxp, nyp
-   use vdf, only : flip
-
+!    use vdf, only : flip
+! 
    integer(kind=jpim),intent(in) :: pcog
    real, dimension((nxp-4)*(nyp-4),nzp),intent(in) :: a1, avg_cond
    real, dimension((nxp-4)*(nyp-4)),intent(in) :: a2
@@ -1975,6 +1975,15 @@ contains
    a4 = a2aux/real(n)
 
   end subroutine avg_edmf
+  function flip(a)
+    real, dimension(:), intent(in) :: a
+    real, dimension(size(a)) :: flip
+    integer :: k
+    do k=1,size(a)
+      flip(k) = a(1+size(a)-k)
+    end do
+
+  end function flip
 
 end module stat
 
