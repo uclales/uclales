@@ -29,7 +29,7 @@ implicit none
   character(len=7),  dimension(10) :: hname
   character(len=80), dimension(10) :: hlname
   character(len=7) :: hname_prc
-  integer, parameter :: nvar_all = 56
+  integer, parameter :: nvar_all = 65
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
          'l      ','rp     ','np     ','tv     ','ricep  ', & !6-10
@@ -42,7 +42,8 @@ implicit none
          't_cld  ','qdev_cl','qdev_sc','q_cld  ','tv_cl  ', & !41-45
          'tv_sc  ','tv_cld ','core   ','th_e   ','w_int  ', & !46-50
          'a_moist','zt_mst ','e_mup  ','q_ex   ','buoy   ', & !51-55
-         'zt_dry '/) !56
+         'zt_dry ','zb_mst ','zt_test','lwptest','buoytst', & !56-60
+         'e_tup  ','q_extst','q_exenv','thexenv','thl_ex '/)  !61-65
   integer :: nccrossxzid,nccrossyzid,nccrossxyid, nccrossrec, nvar
 
   interface writecross
@@ -380,7 +381,7 @@ contains
       case ('e_mup')
         if (level < 2) return
         longname = 'edmf normalized energy of moist updraft'
-        unit = 'm'
+        unit = 'm/s2'
       case ('q_ex')
         if (level < 2) return
         longname = 'edmf normalized integrated qt excess of moist updraft'
@@ -388,11 +389,47 @@ contains
       case ('buoy')
         if (level < 2) return
         longname = 'edmf normalized buoyancy of moist updraft'
-        unit = 'm2/s'
+        unit = 'm/s'
       case ('zt_dry')
         if (level < 2) return
         longname = 'edmf dry updraft termination height'
         unit = 'm'
+      case ('zb_mst')
+        if (level < 2) return
+        longname = 'edmf moist updraft LCL'
+        unit = 'm'
+      case ('zt_test')
+        if (level < 2) return
+        longname = 'edmf test updraft termination height'
+        unit = 'm'
+      case ('lwptest')
+        if (level < 2) return
+        longname = 'edmf test updraft integrated liquid water'
+        unit = 'g/kg'
+      case ('buoytst')
+        if (level < 2) return
+        longname = 'edmf normalized buoyancy of test updraft'
+        unit = 'm/s'
+      case ('e_tup')
+        if (level < 2) return
+        longname = 'edmf normalized energy of test updraft'
+        unit = 'm/s2'
+      case ('q_extst')
+        if (level < 2) return
+        longname = 'edmf normalized integrated qt excess of test updraft'
+        unit = 'g/kg'
+      case ('q_exenv')
+        if (level < 2) return
+        longname = 'integrated qt excess of environment over average'
+        unit = 'g/kg'
+      case ('thexenv')
+        if (level < 2) return
+        longname = 'integrated thl excess of environment over average'
+        unit = 'K'
+      case ('thl_ex')
+        if (level < 2) return
+        longname = 'edmf normalized integrated thl excess of moist updraft'
+        unit = 'K'
       case default
         return
       end select
@@ -506,7 +543,7 @@ contains
     use thrm,      only: rslf
     real, intent(in) :: rtimee
     real             :: tstar, exner, tk
-    real, dimension(3:nxp-2,3:nyp-2) :: tmp, z_top, z_top_mst
+    real, dimension(3:nxp-2,3:nyp-2) :: tmp, z_top, z_top_mst, z_top_test
     real, dimension(nzp,nxp,nyp) :: tracer, tv, interp, th_e,p
     real, dimension(nzp)         :: c1, thvar, tvbar, tvenv, tvcld
     integer :: n, nn, i, j, k, ct, cb, zi, lcl
@@ -833,6 +870,66 @@ z_top = tmp
         call writecross(crossname(n), tmp)
       case ('zt_dry')
         tmp = pextrac(:,:,6)
+        call writecross(crossname(n), tmp)
+      case ('zb_mst')
+        tmp = pextrac(:,:,7)
+        call writecross(crossname(n), tmp)
+      case ('zt_test')
+        tmp = pextrac(:,:,8)
+        call writecross(crossname(n), tmp)
+        z_top_test = tmp
+      case ('lwptest')
+        tmp = pextrac(:,:,9)
+        call writecross(crossname(n), tmp)
+      case ('buoytst')
+        do j=3,nyp-2
+          do i=3,nxp-2
+            if (z_top_mst(i,j) .ne. 0) then
+              tmp(i,j) = pextrac(i,j,10)/z_top_test(i,j)
+            else
+              tmp(i,j) = 0.
+            endif
+          end do
+        end do
+        call writecross(crossname(n), tmp)
+      case ('e_tup')
+        do j=3,nyp-2
+          do i=3,nxp-2
+            if (z_top_test(i,j) .ne. 0) then
+              tmp(i,j) = pextrac(i,j,11)/z_top_test(i,j)
+            else
+              tmp(i,j) = 0.
+            endif
+          end do
+        end do
+        call writecross(crossname(n), tmp)
+      case ('q_extst')
+        do j=3,nyp-2
+          do i=3,nxp-2
+            if (z_top_test(i,j) .ne. 0) then
+              tmp(i,j) = pextrac(i,j,12)/z_top_test(i,j)
+            else
+              tmp(i,j) = 0.
+            endif
+          end do
+        end do
+        call writecross(crossname(n), tmp)
+      case ('q_exenv')
+        tmp = pextrac(:,:,13)
+        call writecross(crossname(n), tmp)
+      case ('thexenv')
+        tmp = pextrac(:,:,14)
+        call writecross(crossname(n), tmp)
+      case ('thl_ex')
+        do j=3,nyp-2
+          do i=3,nxp-2
+            if (z_top_mst(i,j) .ne. 0) then
+              tmp(i,j) = pextrac(i,j,15)/z_top_mst(i,j)
+            else
+              tmp(i,j) = 0.
+            endif
+          end do
+        end do
         call writecross(crossname(n), tmp)
       end select
     end do

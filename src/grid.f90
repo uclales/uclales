@@ -443,7 +443,7 @@ contains
     end if
 
   !output of edmf cross sections
-  allocate (pextrac(nxp,nyp,10))
+  allocate (pextrac(nxp,nyp,15))
   pextrac = 0.
 
   end subroutine define_vars

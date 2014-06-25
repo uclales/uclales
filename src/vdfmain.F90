@@ -59,6 +59,7 @@ integer(kind=jpim) :: i,j,pcog, pnog, klevx
 !allocate (pextrac(nxp,nyp,10))
 
   pextr2 = 0.
+  pextra = 0.
   pnog = (nxp-4)*(nyp-4)
   !fill arrays
     ! do loop to give vdfmain one profile for every column
@@ -208,7 +209,7 @@ integer(kind=jpim) :: i,j,pcog, pnog, klevx
   )
     end do
     end do
-!print*, pextra(:,75,15) 
+!print*, pextra(1,:,54) 
 !output of edmf variables
 klevx = nzp-1
   if (sflg) then

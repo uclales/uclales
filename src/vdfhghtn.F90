@@ -257,7 +257,7 @@ logical ::            llcape, llcapetest
 
 real(kind=jprb) ::    zrhs(klon), zmasscape(klon), ztaubm, &
                     & zfracbcong(klon), zmscale(klon)
-		    
+
 ! real(kind=jprb) :: zhook_handle
 ! 
 ! 
@@ -1710,11 +1710,16 @@ endif
     pextra(pcog,1:klev,52) =  ( pmflx(jl,0:klev-1,3) * (pslguh(jl,0:klev-1,3) - zslgenh(jl,0:klev-1)) ) / (zcfnc1(jl,0:klev-1) * zmgeom(jl,0:klev-1) * zrg )
     pextra(pcog,1:klev,53) =  ( pmflx(jl,0:klev-1,2) * (pslguh(jl,0:klev-1,2) - zslgenh(jl,0:klev-1)) + &
                     &    pmflx(jl,0:klev-1,3) * (pslguh(jl,0:klev-1,3) - zslgenh(jl,0:klev-1)) ) / (zcfnc1(jl,0:klev-1) * zmgeom(jl,0:klev-1) * zrg )
-    
+
+    !  qt and th(environment)
+    pextra(pcog,:,42) = zqtenh(jl,:)
+    pextra(pcog,:,43) = zslgenh(jl,:)
+
   enddo !jl
   
   endif !lldiag
-
+!print*, 'pextra (2,:,54)',pextra (1,:,43)
+!print*, 'zqtenh(1,:)',maxval(zslgenh(:,:))
 
 ! if (lhook) call dr_hook('vdfhghtn',1,zhook_handle)
 

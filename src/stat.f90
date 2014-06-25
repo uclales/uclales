@@ -1769,15 +1769,18 @@ contains
   subroutine stat_edmf(a1, a2, pcog, pnog, pextr2, pextra, kfldx2, kfldx, klevx)
 
   use parkind1 , only : jpim ,jprb
+  use yos_cst , only : rcpd
   use grid,  only : nzp, nxp, nyp, pextrac
   use vdf, only : flip
 
    integer(kind=jpim),intent(in) :: kfldx2, kfldx, klevx
    real(kind=jprb)   ,intent(in) :: pextr2(pnog ,kfldx2), pextra(pnog,klevx,kfldx)
+!   real(kind=jprb)  :: pextratest(pnog,klevx)
    integer(kind=jpim),intent(in) :: pcog, pnog
    real, dimension((nxp-4)*(nyp-4),nzp) :: a1, avg_cond
    real, dimension((nxp-4)*(nyp-4)) :: a2
    real, dimension(nzp) :: a3
+   real, dimension(klevx) :: qt_av, th_av
    real :: a4
    integer :: tsps,i,j,k,n
 
@@ -1785,6 +1788,8 @@ contains
     a1 = 0.
     a2 = 0.
     tsps = 1
+    qt_av = 0.
+    th_av = 0.
 
     !--- timeseries ---
 
@@ -1869,13 +1874,25 @@ contains
     call updtst(nzp,'u3p',6,a3(:),1) 
 
 !assign output for crosssections
+!pextratest=0.
+  do i=1,pnog
+    qt_av(:) = qt_av(:) +  pextra (i,:,42)
+    th_av(:) = th_av(:) +  pextra (i,:,43)
+  enddo
+  qt_av = qt_av / pnog
+  th_av = th_av / pnog
+!print*, 'rcpd', qt_av
+!  do i=1,pnog
+!    pextratest(i,:) = pextra (i,:,42) -qt_av(:)
+!  enddo
+!  pextratest = 1000. * pextratest
+!print*, 'pextra (1,:,42)', pextratest (1,:)
   n = 0
   pextrac = 0.
   do j=3,nyp-2
     do i=3,nxp-2
       n = n+1
       pextrac (i-2,j-2,1) = pextr2(n,33)                 !Moist updraft termination height
-!print*, 'pextr2(n,33),n: ',pextr2(n,33),n
       pextrac (i-2,j-2,2) = pextra(n,nzp-5,39)           !Moist updraft area Fraction
       do k=2,nzp
         pextrac (i,j,3) = pextrac (i,j,3) + (pextra(n,k,27))**2   !Moist updraft w² integrated
@@ -1887,10 +1904,33 @@ contains
         pextrac (i,j,5) = pextrac (i,j,5) + pextra(n,k,29)   !Moist updraft B integrated
       enddo
       pextrac (i-2,j-2,6) = pextr2(n,32)                 !Dry updraft termination height
+      pextrac (i-2,j-2,7) = pextr2(n,36)                 !Moist updraft LCL
+      pextrac (i-2,j-2,8) = pextr2(n,31)                 !Test updraft termination height
+      do k=2,nzp-2
+        pextrac (i-2,j-2,9) = pextrac (i-2,j-2,9) + pextra(n,k,19)   !Test updraft liquid water integrated
+      enddo
+      do k=2,nzp-2
+        pextrac (i,j,10) = pextrac (i,j,10) + pextra(n,k,20)   !Test updraft B integrated
+      enddo
+      do k=2,nzp
+        pextrac (i,j,11) = pextrac (i,j,11) + (pextra(n,k,17))**2   !Test updraft w² integrated
+      enddo
+      do k=2,nzp-2
+        pextrac (i,j,12) = pextrac (i,j,12) + pextra(n,k,15)   !Test updraft qt excess integrated
+      enddo
+      do k=2,nzp-2                                              !qt excess environment - average integrated
+        pextrac (i-2,j-2,13) = pextrac (i-2,j-2,13) + (1000. * ( pextra(n,k,42) - qt_av(k)) )
+      enddo
+      do k=2,nzp-2                                              !thl excess environment - average integrated
+        pextrac (i-2,j-2,14) = pextrac (i-2,j-2,14) + ( ( pextra (n,k,43) - th_av(k)) / rcpd )
+      enddo
+      do k=2,nzp-2
+        pextrac (i,j,15) = pextrac (i,j,15) + pextra(n,k,35)   !Moist updraft thl excess integrated
+      enddo
     enddo
   enddo
 
-!print*, 'pextrac (i,j,1): ', pextrac (:,:,4)
+!print*, 'pextrac (i,j,13): ', maxval(pextrac (:,:,14))
 
   end subroutine stat_edmf
 
