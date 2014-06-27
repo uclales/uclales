@@ -41,6 +41,8 @@ contains
 
     real    :: v1da(nzp),rk
     integer :: n
+    real, allocatable :: acumtime     !RV
+
     !
     ! diagnose liquid water flux
     !
@@ -58,9 +60,14 @@ contains
     ! w-point
     !
     if(outtend) then !RV
-       if(nstep==1) rk = rkalpha(1)+rkalpha(2)
-	  !adtendt = 0. !new at if (sflg)
-	  !adtendr = 0.
+       if(nstep==1) then 
+	  rk = rkalpha(1)+rkalpha(2)
+          if(allocated(acumtime)) then
+	     acumtime=acumtime+dt  !accumulate time to get correct mean tendency
+          else
+	     acumtime = 0.
+	  end if
+       end if
        if(nstep==2) rk = rkbeta(2)+rkbeta(3)
        if(nstep==3) rk = rkalpha(3)
     end if   !rv
@@ -94,7 +101,8 @@ contains
 	     call get_avg3(nzp,nxp,nyp,adtendr,v1da)
 	     adtendr = 0.
 	  end if
-          call updtst(nzp,'tnd',n+1,v1da,1)
+          call updtst(nzp,'tnd',n+1,v1da/acumtime,1)
+	  acumtime=0.
        endif !rv
     end do
 
@@ -124,7 +132,7 @@ contains
           do k=2,n1-1
              tnd(k,i,j)=tnd(k,i,j)+(varn(k,i,j)-varo(k,i,j))*dti
 	     if(present(tndout)) then   !RV: t&r tendencies stored
-		tndout(k,i,j)=tndout(k,i,j)+(varn(k,i,j)-varo(k,i,j))*dti*rk
+		tndout(k,i,j)=tndout(k,i,j)+(varn(k,i,j)-varo(k,i,j))*rk  !*dti canceled -> *dti*dt=1
              end if !rv
           end do
           tnd(n1,i,j) = 0.

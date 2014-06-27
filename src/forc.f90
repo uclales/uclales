@@ -389,7 +389,7 @@ contains
   !
   subroutine bellon(n1,n2,n3,flx,sflx,zt,dzi_t,dzi_m,tt,tl,rtt,rt, ut,u,vt,v)
 
-    use grid, only : outtend, wtendt, wtendr, nstep,rkalpha,rkbeta !RV
+    use grid, only : outtend, wtendt, wtendr, nstep,rkalpha,rkbeta, dt !RV
     use util, only : get_avg3
     use stat, only : sflg, updtst  !rv
 
@@ -404,12 +404,18 @@ contains
     integer :: i,j,k,kp1
     real    :: grad,wk
     real,dimension(n1) :: res,res1
-    real   :: rk !rv
+    real   :: rk !RV
+    real, allocatable :: acumtime     !rv
 
     if(outtend) then !RV
-	if(nstep==1) rk = rkalpha(1)+rkalpha(2)
-      	   !wtendt = 0.!new at if (sflg)
-           !wtendr = 0.
+       if(nstep==1) then 
+	  rk = rkalpha(1)+rkalpha(2)
+          if(allocated(acumtime)) then
+	     acumtime=acumtime+dt  !accumulate time to get correct mean tendency
+          else
+	     acumtime = 0.
+	  end if
+       end if
     	if(nstep==2) rk = rkbeta(2)+rkbeta(3)
     	if(nstep==3) rk = rkalpha(3)
     end if   !rv
@@ -431,8 +437,8 @@ contains
 	     rtt(k,i,j)= rtt(k,i,j) + wk*(rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)
 
 	     if(outtend) then !RV
-	     	wtendt(k,i,j)  = wtendt(k,i,j) + wk*dzi_t(k)*rk*(tl(kp1,i,j)-tl(k,i,j))  
-             	wtendr(k,i,j) = wtendr(k,i,j) + wk*dzi_t(k)*rk*(rt(kp1,i,j)-rt(k,i,j)) 
+	     	wtendt(k,i,j)  = wtendt(k,i,j) + wk*dzi_t(k)*rk*dt*(tl(kp1,i,j)-tl(k,i,j))  
+             	wtendr(k,i,j) = wtendr(k,i,j) + wk*dzi_t(k)*rk*dt*(rt(kp1,i,j)-rt(k,i,j)) 
 	     end if   !rv
 
              ut(k,i,j) =  ut(k,i,j) + wk*(u(kp1,i,j)-u(k,i,j))*dzi_m(k)
@@ -447,11 +453,12 @@ contains
 
     if (sflg .and. outtend) then !RV
        call get_avg3(n1,n2,n3,wtendt,res)
-       call updtst(n1,'tnd',1,res,1)
+       call updtst(n1,'tnd',1,res/acumtime,1)
        call get_avg3(n1,n2,n3,wtendr,res1)
-       call updtst(n1,'tnd',2,res1,1)
+       call updtst(n1,'tnd',2,res1/acumtime,1)
        wtendt = 0.
        wtendr = 0.
+       acumtime = 0.
     end if !rv
 
   end subroutine bellon
