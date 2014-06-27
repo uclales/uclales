@@ -41,8 +41,8 @@ module forc
   real, dimension(nls)  :: vgeo_ls=0.
   !cgils
   logical :: lstendflg=.false.
- ! real, parameter      :: w0 = 7.5e-3 !RV
-!  real, parameter      :: Qrate = 2.5/86400. !rv
+  real  :: w0 = 7.5e-3 !RV
+  real :: Qrate = 2.5/86400. !rv
 
 contains
   !
@@ -398,8 +398,8 @@ contains
     real, dimension (n1), intent (in)            :: zt, dzi_t, dzi_m
     real, dimension (n1, n2, n3), intent (inout) :: tt, tl, rtt, rt, ut,u,vt,v
     real,  dimension (n1, n2, n3), intent (out)  :: flx, sflx
-    real, parameter      :: w0= 7.5e-3, H=1000., Qrate = 2.5/86400.
-   ! real, parameter  :: H=1000.
+   !real, parameter      :: w0= 7.5e-3, H=1000., Qrate = 2.5/86400.
+    real, parameter  :: H=1000.
 
     integer :: i,j,k,kp1
     real    :: grad,wk

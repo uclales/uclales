@@ -203,10 +203,10 @@ contains
                 iret=nf90_put_att(ncID,VarID,'x_min',hail%x_min)
                 iret=nf90_put_att(ncID,VarID,'x_max',hail%x_max)
              end if
-             !if (outtend .and. sx(n) .eq. "wtendt") then !RV
-              !  iret=nf90_put_att(ncID,VarID,'w0',w0)
-               ! iret=nf90_put_att(ncID,VarID,'Qrate',QRate)
-             !end if!rv
+!             if (outtend .and. sx(n) .eq. "wtendt") then !RV
+!                iret=nf90_put_att(ncID,VarID,'w0',w0)
+!                iret=nf90_put_att(ncID,VarID,'Qrate',QRate)
+!             end if!rv
           case ('mttt')
              if (present(n2) .and. present(n3)) then
                 iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_mttt,VarID)
