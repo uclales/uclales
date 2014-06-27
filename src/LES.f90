@@ -149,7 +149,8 @@ contains
          clouddiff, &
          lpartic,lpartsgs,lrandsurf,lpartstat,lpartdump, &           ! Particles
          lpartdumpui,lpartdumpth,lpartdumpmr,frqpartdump,&           ! Particles
-         lpartdrop, ldropstart                                       ! Particles
+         lpartdrop, ldropstart!, &                                    ! Particles
+	! w0, QRate                                         !RV: parameters for large-scale forcings
 
 
     deflev = deflate_level

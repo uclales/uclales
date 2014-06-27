@@ -184,7 +184,6 @@ contains
     ! profile statistics
     !
 
-	print*, 'I am in the statistics subroutine' !RV
     if (debug) WRITE (0,*) 'statistics: start,      myid=',myid
 
     call accum_stat(nzp, nxp, nyp, zm, a_up, a_vp, a_wp, a_tp, press, umean    &

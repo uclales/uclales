@@ -123,7 +123,7 @@ contains
           tnd(1,i,j)  = 0.
           do k=2,n1-1
              tnd(k,i,j)=tnd(k,i,j)+(varn(k,i,j)-varo(k,i,j))*dti
-	     if(outtend) then   !RV: t&r tendencies stored
+	     if(present(tndout)) then   !RV: t&r tendencies stored
 		tndout(k,i,j)=tndout(k,i,j)+(varn(k,i,j)-varo(k,i,j))*dti*rk
              end if !rv
           end do

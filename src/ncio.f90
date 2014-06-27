@@ -4,6 +4,7 @@
   use grid
   use mpi_interface, only : appl_abort, myid, pecount, wrxid, wryid
   use mcrp, only : cldw,rain,ice,snow,graupel,hail
+ ! use forc, only : w0, QRate  !RV
 
   implicit none
   private
@@ -202,6 +203,10 @@ contains
                 iret=nf90_put_att(ncID,VarID,'x_min',hail%x_min)
                 iret=nf90_put_att(ncID,VarID,'x_max',hail%x_max)
              end if
+             !if (outtend .and. sx(n) .eq. "wtendt") then !RV
+              !  iret=nf90_put_att(ncID,VarID,'w0',w0)
+               ! iret=nf90_put_att(ncID,VarID,'Qrate',QRate)
+             !end if!rv
           case ('mttt')
              if (present(n2) .and. present(n3)) then
                 iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_mttt,VarID)
@@ -270,7 +275,6 @@ contains
          'shf    ','lhf    ','ustars ','a_tskin','a_qskin','tsoil  '   ,& !31
          'phiw   ','a_Qnet ','a_G0   ','mp_tlt ','mp_qt  ','mp_qr  '   ,& !37
          'mp_qi  ','mp_qs  ','mp_qg  ','mp_qh  '/)  !43-46
-
 
 
     real, intent (in) :: time
@@ -602,7 +606,6 @@ contains
 
     iret  = nf90_sync(ncid0)
     nrec0 = nrec0+1
-	print*, 'I leave the write_anal subroutine' !RV
   end subroutine write_anal
 
   !

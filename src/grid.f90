@@ -50,7 +50,7 @@ module grid
   integer           :: level   = 0         ! thermodynamic level
   integer           :: naddsc  = 0         ! number of additional scalars
 
-  logical           :: outtend = .true.    ! Heat and moisture tendencies added to .ps.
+  logical           :: outtend = .true.    ! rv, Heat and moisture tendencies added to .ps.
   logical           :: lmptend = .false.   ! Write out microphysical 3D fields.
   logical           :: lrad_ca = .false.   ! Perform clear air radiation calculations
   logical           :: lcouvreux = .false.  ! switch for 'radioactive' scalar
@@ -455,6 +455,8 @@ contains
        sgtendr(:,:,:) = 0.
        adtendt(:,:,:) = 0.            
        adtendr(:,:,:) = 0.
+
+     !  acumtime = 0.
     end if !rv
    
 

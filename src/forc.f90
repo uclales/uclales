@@ -27,6 +27,7 @@ module forc
   use grid, only      : wfls, dthldtls, dqtdtls, sfc_albedo, lrad_ca
   use modnudge, only  : nudge, nudge_bound, lnudge_bound !LINDA 
   use stat, only : sflg
+
   implicit none
 
   !character (len=5), parameter :: case_name = 'xxxx'
@@ -40,6 +41,8 @@ module forc
   real, dimension(nls)  :: vgeo_ls=0.
   !cgils
   logical :: lstendflg=.false.
+ ! real, parameter      :: w0 = 7.5e-3 !RV
+!  real, parameter      :: Qrate = 2.5/86400. !rv
 
 contains
   !
@@ -396,6 +399,7 @@ contains
     real, dimension (n1, n2, n3), intent (inout) :: tt, tl, rtt, rt, ut,u,vt,v
     real,  dimension (n1, n2, n3), intent (out)  :: flx, sflx
     real, parameter      :: w0= 7.5e-3, H=1000., Qrate = 2.5/86400.
+   ! real, parameter  :: H=1000.
 
     integer :: i,j,k,kp1
     real    :: grad,wk
@@ -441,16 +445,10 @@ contains
        enddo
     enddo
 
-    !print *, 'wtendt(30:40,30,30) of nstep ',nstep,' is ',wtendt(30:40,30,30), '.' !RV: Added new print statment for bug fix
-    !print *, 'wtendr(30:40,30,30) of nstep ',nstep,' is ',wtendr(30:40,30,30), '.' !RV: Added new print statment for bug fix      
-
     if (sflg .and. outtend) then !RV
-       !print *, '------------------------------- sflg==true, updtst written -----------------------------------'
        call get_avg3(n1,n2,n3,wtendt,res)
-       !print *, 'updtst of wtendt with average (res(30:40)) of ' ,res(30:40), '.'  !RV: Added new print statment for bug fix
        call updtst(n1,'tnd',1,res,1)
        call get_avg3(n1,n2,n3,wtendr,res1)
-       !print *, 'updtst of wtendr with average (res1(30:40)) of ' ,res1(30:40), '.'  !RV: Added new print statment for bug fix
        call updtst(n1,'tnd',2,res1,1)
        wtendt = 0.
        wtendr = 0.

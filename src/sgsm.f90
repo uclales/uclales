@@ -76,7 +76,7 @@ contains
 
     real, intent(in)       :: timein 
     integer :: n
-    real :: rk
+    real :: rk!, acumtime     !RV
 
     ! Hack BvS: slowly increase smago constant...
     !csx = min(timein*0.23/3600.,0.23)    
@@ -148,6 +148,7 @@ contains
        if(nstep==1) rk = rkalpha(1)+rkalpha(2)
        if(nstep==2) rk = rkbeta(2)+rkbeta(3)
        if(nstep==3) rk = rkalpha(3)
+      ! acumtime=acumtime+dt  !accumulate time to get correct mean tendency
     end if    !rv
 
     do n=4,nscl
@@ -169,8 +170,6 @@ contains
           call diffsclr(nzp,nxp,nyp,dt,dxi,dyi,dzi_m,dzi_t,dn0,sxy1,sxy2   &
                ,a_sp,a_scr2,a_st,a_scr1)
        endif
-
-  !     if(outtend .and. n==4) print *, 'sgtendt(30:40,30,30) of nstep ',nstep,' is ',sgtendt(30:40,30,30), '.' !RV: Added new print statment for bug fix
     
        if (sflg) then
 
@@ -186,12 +185,13 @@ contains
              if(n==4) then
 		 call get_avg3(nzp,nxp,nyp,sgtendt,sz1)
 		 sgtendt = 0.
-!		 print *, 'updtst of sgtendt with average (sz1(30:40)) of ' ,sz1(30:40), '.'  !RV: Added new print
              else if(n==5) then
 		 call get_avg3(nzp,nxp,nyp,sgtendr,sz1)
 		 sgtendr = 0.
 	     end if
+	    ! sz1=sz1/acumtime   !divide by accumulated time -> mean tendency in X/s.
              call updtst(nzp,'tnd',n-1,sz1,1)
+	     !acumtime=0.
           endif !rv
 
        endif
@@ -696,16 +696,14 @@ contains
   ! a tri-diagnonal solver in the vertical
   !
   subroutine diffsclr(n1,n2,n3,dt,dxi,dyi,dzi_m,dzi_t,dn0,sflx,tflx,scp,xkh,sct &
-       ,flx,flxtend,rk)
-
-    use grid, only : outtend
+       ,flx,sgs,rk)
 
     integer, intent(in) :: n1,n2,n3
     real, intent(in)    :: xkh(n1,n2,n3),scp(n1,n2,n3)
     real, intent(in)    :: sflx(n2,n3),tflx(n2,n3),dn0(n1)
     real, intent(in)    :: dxi,dyi,dzi_m(n1),dzi_t(n1),dt
 
-    real, optional, intent(inout)   :: flxtend(n1,n2,n3) !RV
+    real, optional, intent(inout)   :: sgs(n1,n2,n3) !RV
     real, optional, intent(in)   :: rk !rv
 
     real, intent(inout) :: flx(n1,n2,n3),sct(n1,n2,n3)
@@ -765,9 +763,9 @@ contains
                   +xkh(k-1,i,j-1)+xkh(k-1,i,j)))*dyi) /dn0(k)
              if (k<n1-1) flx(k,i,j)=-xkh(k,i,j)*(sxz5(indh,k+1)-sxz5(indh,k)) &
                   *dzi_m(k)
-             if(outtend) then   !RV: t&r tendencies stored
-                flxtend(k,i,j)= flxtend(k,i,j) + dti*rk*(sxz5(indh,k)-scp(k,i,j))   &
-                     -rk*((szx1(k,i)-szx1(k,i-1))*dxi                               &
+             if(present(sgs)) then   !RV: t&r tendencies stored
+                sgs(k,i,j)= sgs(k,i,j) + dt*rk*dti*(sxz5(indh,k)-scp(k,i,j))   &
+                     -dt*rk*((szx1(k,i)-szx1(k,i-1))*dxi                               &
                      + (-(scp(k,i,j+1)-scp(k,i,j))*dyi*0.25*(xkh(k,i,j)          &
                      +xkh(k,i,j+1)+xkh(k-1,i,j)+xkh(k-1,i,j+1))+(scp(k,i,j)      &
                      -scp(k,i,j-1))*dyi*0.25*(xkh(k,i,j-1)+xkh(k,i,j)            &
