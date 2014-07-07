@@ -394,7 +394,7 @@ do jd=1,kdraft
     zfacexc(jl,jd) = 0._jprb 
     zfacexc(jl,jd) = 0._jprb 
     zmflxb(jl,jd)  = 0._jprb 
-    izi(jl,jd)     = 0._jprb        
+    izi(jl,jd)     = 0        
   enddo
 enddo
 

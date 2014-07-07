@@ -1958,7 +1958,7 @@ contains
      if (tsps .eq. 1) then
       a2aux = a2aux + a2(i)
      else if (tsps .eq. 2) then
-      a1aux2(2:nzp) = flip(a1(i,2:nzp))
+      a1aux2(2:nzp) = flip1(a1(i,2:nzp))
       a1aux(2:nzp) = a1aux(2:nzp) + a1aux2(2:nzp)
      endif
       n=n+1
@@ -1968,15 +1968,15 @@ contains
    a4 = a2aux/real(n)
 
   end subroutine avg_edmf
-function flip(a)
+function flip1(a)
   real, dimension(:), intent(in) :: a
-  real, dimension(size(a)) :: flip
+  real, dimension(size(a)) :: flip1
   integer :: k
   do k=1,size(a)
-    flip(k) = a(1+size(a)-k)
+    flip1(k) = a(1+size(a)-k)
   end do
   
-end function flip
+end function flip1
 end module stat
 
 

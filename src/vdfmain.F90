@@ -98,7 +98,7 @@ real(kind=jprb)   :: zkmfl(1)
      papm1(1,:) = flip(a1(pcog,2:nzp-1))
      a1h = 0.
      a1h = interpolate(a1(pcog,:))
-     a1h(nzp) = a1h(nzp-1)+a1h(nzp-1)-a1h(nzp-2) !extrapolate interpolated array so that length is same as before
+!     a1h(nzp) = a1h(nzp-1)+a1h(nzp-1)-a1h(nzp-2) !extrapolate interpolated array so that length is same as before
      paphm1(1,:) = flip(a1h(2:nzp))
      zkmfl = a_ustar(i,j) !get ustar
      psst = sst
@@ -508,7 +508,7 @@ subroutine vdfmain    ( cdconf, &
 !     for details about the mathematics of this routine.
 
 !     ------------------------------------------------------------------
-! use garbage, only : foealfa, foeewm, foeldcpm
+ use garbage, only : foealfa!, foeewm, foeldcpm
 use parkind1  ,only : jpim     ,jprb
 ! use yomhook   ,only : lhook    ,dr_hook
 
@@ -544,6 +544,7 @@ integer(kind=jpim),intent(in)    :: kdhvtts
 integer(kind=jpim),intent(in)    :: kdhftts 
 integer(kind=jpim),intent(in)    :: kdhvtis 
 integer(kind=jpim),intent(in)    :: kdhftis 
+real(kind=jprb)   ,intent(in)    :: zkmfl(klon) 
 character(len=1)  ,intent(in)    ,optional:: cdconf 
 integer(kind=jpim),intent(in)    ,optional:: kidia
 integer(kind=jpim),intent(in)    ,optional:: kfdia
@@ -633,8 +634,7 @@ real(kind=jprb)   ,intent(inout) ,optional:: ptofdv(klon)
 real(kind=jprb)   ,intent(out)   ,optional:: pstrsou(klon,0:klev) 
 real(kind=jprb)   ,intent(out)   ,optional:: pstrsov(klon,0:klev) 
 real(kind=jprb)   ,intent(out)   ,optional:: pkh(klon,klev) 
-real(kind=jprb)   ,intent(in)    ,optional:: pvervel(klon,klev) 
-real(kind=jprb)   ,intent(in)    ,optional:: zkmfl(klon) 
+real(kind=jprb)   ,intent(in)    ,optional:: pvervel(klon,klev)
 !          diagnostic output
 integer(kind=jpim),intent(in)     :: kfldx2, klevx, kfldx
 real(kind=jprb)   ,intent(inout)  ,optional:: pextr2(pnog,kfldx2), pextra(pnog,klevx,kfldx)
@@ -1580,7 +1580,7 @@ call vdfincr (kidia  , kfdia  , klon   , klev   , itop   , ztmst  , &
         zaupd(jl,jk) = zcldfrac(jl,jk)
         
         !-- decomposition of total condensate into ice and liquid ---
-        !zalfaw(jl,jk) = foealfa(ptm1(jl,jk))   !new alpha?
+        zalfaw(jl,jk) = foealfa(ptm1(jl,jk))   !new alpha?
         zlupd(jl,jk) = zqlav(jl,jk) * zalfaw(jl,jk) 
         ziupd(jl,jk) = zqlav(jl,jk) * ( 1.0_jprb - zalfaw(jl,jk))
         
@@ -1599,7 +1599,6 @@ call vdfincr (kidia  , kfdia  , klon   , klev   , itop   , ztmst  , &
       ztupd(jl,jk)  = ( zslgupd(jl,jk) - pgeom1(jl,jk) &
         &     + rlvtt * zlupd(jl,jk) + rlstt * ziupd(jl,jk) &
         &   ) / ( rcpd * ( 1.0_jprb + rvtmp2 * zqupd(jl,jk) ) )   !compare to t->slg conversion in section 2.2
-
 
 
       !--- calculate the final tendencies between state at t-1 and state after rad + dyn + pbl ---
