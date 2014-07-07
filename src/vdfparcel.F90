@@ -268,6 +268,7 @@ zlcrit = 0.001_jprb     !cy32r3
         
         zwuh(jl,jk+1) = sqrt( max( pwu2h(jl,jk+1,kd), 0.01_jprb) ) ! w,up > 0.1 m/s (safety)
         peps(jl,jk+1,kd) = 1.0_jprb / ( zwuh(jl,jk+1) * ztaueps(jl) ) !& ! eps=1/(w,up*tau)
+
         
         !rn numerical entrainment limiter: maximally c_e/dz
         zdz           = (pgeoh(jl,jk) - pgeoh(jl,jk+1))*zrg

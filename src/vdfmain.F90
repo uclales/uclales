@@ -23,14 +23,14 @@ function interpolate(a)
   real, dimension(size(a)-1) :: interpolate
   integer :: k
   do k=1,size(a) - 1
-    interpolate(k) = 0.5*(a(k) + a(k) + 1)
+    interpolate(k) = 0.5*(a(k) + a(k+ 1) )
   end do
   
 end function interpolate
   
 subroutine vdfouter(sst)
 use parkind1, only : jprb, jpim
-use grid,  only : nzp, nxp, nyp, liquid, a_up, a_vp, a_theta, a_pexnr, pi0, pi1, a_rp, dt, press,zm, zt, wt_sfc, wq_sfc, dn0, th00, a_tp
+use grid,  only : nzp, nxp, nyp, liquid, a_up, a_vp, a_theta, a_pexnr, pi0, pi1, a_rp, dt, press,zm, zt, wt_sfc, wq_sfc, dn0, th00, a_tp, a_ustar
 use defs, only : g,alvl, cp, cpr,p00
 use srfc, only : zrough
 use util, only : get_avg3, get_avg
@@ -55,7 +55,7 @@ integer(kind=jpim), dimension(1)    :: kpbltype, khpbln, kvartop
 integer(kind=jpim),parameter :: kfldx=100, kfldx2=100
 real(kind=jprb)   :: pextr2((nxp-4)*(nyp-4),kfldx2), pextra((nxp-4)*(nyp-4),nzp-1,kfldx)
 integer(kind=jpim) :: i,j,pcog, pnog, klevx
-
+real(kind=jprb)   :: zkmfl(1)
 
 
   pextr2 = 0.
@@ -94,12 +94,13 @@ integer(kind=jpim) :: i,j,pcog, pnog, klevx
      !call get_avg3(nzp,nxp,nyp, a_scr1,a1)
      pam1(1,:) = 0.!flip(a1(2:nzp-1))
              a1(pcog,:)=p00*((pi0+pi1)/cp)**cpr
-
 !      call get_avg3(nzp,nxp,nyp, a,a1)
      papm1(1,:) = flip(a1(pcog,2:nzp-1))
      a1h = 0.
      a1h = interpolate(a1(pcog,:))
+     a1h(nzp) = a1h(nzp-1)+a1h(nzp-1)-a1h(nzp-2) !extrapolate interpolated array so that length is same as before
      paphm1(1,:) = flip(a1h(2:nzp))
+     zkmfl = a_ustar(i,j) !get ustar
      psst = sst
      ptskti = sst
      z0   = zrough
@@ -205,7 +206,7 @@ integer(kind=jpim) :: i,j,pcog, pnog, klevx
   pextr2 = pextr2, &
   pextra = pextra, &
  pvdis = pvdis , pvdisg = pvdisg, pstrtu = pstrtu, pstrtv = pstrtv, pstrsou = pstrsou, pstrsov =pstrsov, ptofdu = ptofdu , ptofdv = ptofdv, &
- pdiftq = pdiftq, pdiftl = pdiftl, pdifti = pdifti, pdifts = pdifts , pcog = pcog, pnog = pnog &
+ pdiftq = pdiftq, pdiftl = pdiftl, pdifti = pdifti, pdifts = pdifts , pcog = pcog, pnog = pnog, zkmfl = zkmfl &
   )
     end do
     end do
@@ -239,7 +240,7 @@ subroutine vdfmain    ( cdconf, &
  & ptenc  , ptske1 , &
  & pustrti, pvstrti, pahfsti, pevapti, ptskti , &
  & pdifts , pdiftq , pdiftl , pdifti , pstrtu , pstrtv , ptofdu , ptofdv, &
- & pstrsou, pstrsov,   pkh  , pcog   , pnog  &
+ & pstrsou, pstrsov,   pkh  , pcog   , pnog   , zkmfl  &
  & )
 
 !***
@@ -633,6 +634,7 @@ real(kind=jprb)   ,intent(out)   ,optional:: pstrsou(klon,0:klev)
 real(kind=jprb)   ,intent(out)   ,optional:: pstrsov(klon,0:klev) 
 real(kind=jprb)   ,intent(out)   ,optional:: pkh(klon,klev) 
 real(kind=jprb)   ,intent(in)    ,optional:: pvervel(klon,klev) 
+real(kind=jprb)   ,intent(in)    ,optional:: zkmfl(klon) 
 !          diagnostic output
 integer(kind=jpim),intent(in)     :: kfldx2, klevx, kfldx
 real(kind=jprb)   ,intent(inout)  ,optional:: pextr2(pnog,kfldx2), pextra(pnog,klevx,kfldx)
@@ -646,7 +648,7 @@ real(kind=jprb) ::    zcptgz(klon,klev) , zcfm(klon,klev)   , zcfh(klon,klev)   
                     & zqtdif(klon,klev) , zslgdif(klon,klev),&
                     & zslgm1(klon,klev) , zqtm1(klon,klev)  , zqte(klon,klev)   ,&
                     & zslge(klon,klev)  , ztofdc(klon,klev) , zsoc(klon,klev)
-real(kind=jprb) ::    zkhfl(klon)       , zkqfl(klon)       , zkmfl(klon)  
+real(kind=jprb) ::    zkhfl(klon)       , zkqfl(klon)       !, zkmfl(klon)  
 real(kind=jprb) ::    zqea(klon,klev)   , zlea(klon,klev)   , ziea(klon,klev)   ,&
                     & zqtea(klon,klev)  , zslgea(klon,klev) , zaea(klon,klev)   ,&
                     & ztea(klon,klev)   , zuea(klon,klev)   , zvea(klon,klev)   ,&
@@ -1093,8 +1095,8 @@ enddo
 !  & pum1,pvm1,pgeom1,psigflt,&
 !  & ztofdc)  
 ! 
-! 
-
+! set turbulent orographic drag coefficient (subroutine vdftofdc not active)
+ztofdc = 0._jprb
 !     ------------------------------------------------------------------
 
 !*         5.     solve advection-diffusion equation
@@ -1122,6 +1124,7 @@ call vdfdifm (kidia, kfdia, klon , klev  , idraft , itop  , &
 
 !*         5.2  generalized liquid water static energy and total water
 zcfh(1,1) = 0
+
 call vdfdifh (kidia  , kfdia  , klon   , klev   , idraft , itop   , ktiles, &
             & ztmst  , zextshf, zextlhf, llsfcflx, &
             & pfrti  , pssrflti,pslrfl , pemis  , pevapsnw, &
@@ -1198,7 +1201,7 @@ call vdfincr (kidia  , kfdia  , klon   , klev   , itop   , ztmst  , &
       !integrate in time
       zqtupd(jl,jk)  = zqtm1(jl,jk)  + zqte(jl,jk)  * ztmst
       zslgupd(jl,jk) = zslgm1(jl,jk) + zslge(jl,jk) * ztmst
-      
+     
       !total specific humidity limiter
       zqtupd(jl,jk) = max( 0._jprb, zqtupd(jl,jk))
       zqte(jl,jk)   = (zqtupd(jl,jk) - zqtm1(jl,jk) ) * zrtmst
@@ -1312,7 +1315,7 @@ call vdfincr (kidia  , kfdia  , klon   , klev   , itop   , ztmst  , &
       ztupd(jl,jk)  = ptm1(jl,jk) + pte(jl,jk) * ztmst
 !          total condensate (water + ice)
       zliupd(jl,jk) = zlupd(jl,jk) + ziupd(jl,jk)
-      
+   
     enddo
   enddo
 ! 
@@ -1590,12 +1593,13 @@ call vdfincr (kidia  , kfdia  , klon   , klev   , itop   , ztmst  , &
         
       endif  
       
-      
+     
       !--- derive non-conserved properties qv and t ---
       zqupd(jl,jk)  = zqtupd(jl,jk) - zlupd(jl,jk) - ziupd(jl,jk)
       ztupd(jl,jk)  = ( zslgupd(jl,jk) - pgeom1(jl,jk) &
         &     + rlvtt * zlupd(jl,jk) + rlstt * ziupd(jl,jk) &
         &   ) / ( rcpd * ( 1.0_jprb + rvtmp2 * zqupd(jl,jk) ) )   !compare to t->slg conversion in section 2.2
+
 
 
       !--- calculate the final tendencies between state at t-1 and state after rad + dyn + pbl ---

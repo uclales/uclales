@@ -265,7 +265,6 @@ enddo
     zbb(jl,ktop) =1.0_jprb+( pcfh(jl,ktop)+0.5_jprb*zmflx(jl,ktop))*z1dp(jl,ktop)
   enddo
 
-
 !*         1.1    setting of right hand sides.
 
 do jk=ktop+1,klev-1
