@@ -24,7 +24,7 @@ module forc
   !irina
   use rad_gcss, only  : gcss_rad
   !cgils
-  use grid, only      : wfls, dthldtls, dqtdtls, sfc_albedo, lrad_ca
+  use grid, only      : wfls, dthldtls, dqtdtls, sfc_albedo, lrad_ca !, Qrate, w0
   use modnudge, only  : nudge, nudge_bound, lnudge_bound !LINDA 
   use stat, only : sflg
 
@@ -41,8 +41,10 @@ module forc
   real, dimension(nls)  :: vgeo_ls=0.
   !cgils
   logical :: lstendflg=.false.
-  real  :: w0 = 7.5e-3 !RV
-  real :: Qrate = 2.5/86400. !rv
+  !real  :: w0 = 7.5e-3 !RV
+  !real  :: Qrate = 2.5/86400. !rv
+ 
+  !public ::  Qrate 
 
 contains
   !
@@ -389,7 +391,7 @@ contains
   !
   subroutine bellon(n1,n2,n3,flx,sflx,zt,dzi_t,dzi_m,tt,tl,rtt,rt, ut,u,vt,v)
 
-    use grid, only : outtend, wtendt, wtendr, nstep,rkalpha,rkbeta, dt !RV
+    use grid, only : outtend, wtendt, wtendr, nstep,rkalpha,rkbeta, dt, Qrate, w0 !RV
     use util, only : get_avg3
     use stat, only : sflg, updtst  !rv
 
@@ -404,18 +406,14 @@ contains
     integer :: i,j,k,kp1
     real    :: grad,wk
     real,dimension(n1) :: res,res1
-    real   :: rk !RV
-    real, allocatable :: acumtime     !rv
+    real    :: rk !RV
+    real    :: acumtime = 0.     !rv
 
     if(outtend) then !RV
        if(nstep==1) then 
 	  rk = rkalpha(1)+rkalpha(2)
-          if(allocated(acumtime)) then
-	     acumtime=acumtime+dt  !accumulate time to get correct mean tendency
-          else
-	     acumtime = 0.
-	  end if
-       end if
+          acumtime=acumtime+dt  !accumulate time to get correct mean tendency
+        end if
     	if(nstep==2) rk = rkbeta(2)+rkbeta(3)
     	if(nstep==3) rk = rkalpha(3)
     end if   !rv

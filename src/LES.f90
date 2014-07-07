@@ -85,11 +85,11 @@ contains
     use modnetcdf, only : lsync, deflate_level
     use ncio, only : deflev => deflate_level
     use modcross, only : lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars
-    use forc, only : lstendflg, sfc_albedo, w0, Qrate
+    use forc, only : lstendflg, sfc_albedo !, w0, Qrate
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
          filprf, expnme, iradtyp, igrdtyp, nfpt, distim, lspongeinit, runtype,             &
-         CCN, lwaterbudget, lcouvreux, prc_lev, isfctyp, sfc_albedo, lrad_ca
+         CCN, lwaterbudget, lcouvreux, prc_lev, isfctyp, sfc_albedo, lrad_ca, w0, Qrate
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,irsflg, iseed, hfilin,   &
          zrand,lhomrestart,mag_pert_q,mag_pert_t
     use stat, only : ssam_intvl, savg_intvl
@@ -150,7 +150,7 @@ contains
          lpartic,lpartsgs,lrandsurf,lpartstat,lpartdump, &           ! Particles
          lpartdumpui,lpartdumpth,lpartdumpmr,frqpartdump,&           ! Particles
          lpartdrop, ldropstart, &                                    ! Particles
-	 w0, Qrate                                              !RV: parameters for large-scale forcings in bellon_rad
+	 w0, Qrate                                    !RV: parameters for large-scale forcings in bellon_rad
 
 
     deflev = deflate_level

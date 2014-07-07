@@ -73,11 +73,12 @@ contains
     use util, only         : atob, azero, get_avg3
     use mpi_interface, only: cyclics, cyclicc
     use thrm, only         : bruvais, fll_tkrs
+    !use step, only         : istp
 
     real, intent(in)       :: timein 
     integer :: n
-    real :: rk
-    real, allocatable :: acumtime     !RV
+    real :: rk        !RV
+    real :: acumtime = 0. !rv	
 
     ! Hack BvS: slowly increase smago constant...
     !csx = min(timein*0.23/3600.,0.23)    
@@ -148,11 +149,7 @@ contains
        !sgtendr = 0.
        if(nstep==1) then 
 	  rk = rkalpha(1)+rkalpha(2)
-          if(allocated(acumtime)) then
-	     acumtime=acumtime+dt  !accumulate time to get correct mean tendency
-          else
-	     acumtime = 0.
-	  end if
+	  acumtime=acumtime+dt  !accumulate time to get correct mean tendency
        end if
        if(nstep==2) rk = rkbeta(2)+rkbeta(3)
        if(nstep==3) rk = rkalpha(3)	
@@ -198,7 +195,7 @@ contains
 	     end if
 	     sz1=sz1/acumtime   !divide by accumulated time -> mean tendency in X/s.
              call updtst(nzp,'tnd',n-1,sz1,1)
-	     acumtime=0.
+	     if(n==5) acumtime = 0.
           endif !rv
 
        endif

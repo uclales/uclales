@@ -41,7 +41,7 @@ contains
 
     real    :: v1da(nzp),rk
     integer :: n
-    real, allocatable :: acumtime     !RV
+    real    :: acumtime = 0.    !RV
 
     !
     ! diagnose liquid water flux
@@ -62,11 +62,8 @@ contains
     if(outtend) then !RV
        if(nstep==1) then 
 	  rk = rkalpha(1)+rkalpha(2)
-          if(allocated(acumtime)) then
-	     acumtime=acumtime+dt  !accumulate time to get correct mean tendency
-          else
-	     acumtime = 0.
-	  end if
+          acumtime=acumtime+dt  !accumulate time to get correct mean tendency
+	  print*, 'acumtime =',acumtime, 'and dt=',dt
        end if
        if(nstep==2) rk = rkbeta(2)+rkbeta(3)
        if(nstep==3) rk = rkalpha(3)
@@ -101,8 +98,9 @@ contains
 	     call get_avg3(nzp,nxp,nyp,adtendr,v1da)
 	     adtendr = 0.
 	  end if
+	  print*, '------------------------- acumtime at sflg =', acumtime
           call updtst(nzp,'tnd',n+1,v1da/acumtime,1)
-	  acumtime=0.
+	  if(n==5) acumtime=0.
        endif !rv
     end do
 

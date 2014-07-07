@@ -126,6 +126,8 @@ module grid
 
  !RV: ls tendencies due to subsidence, sgs diff & advection
   real, dimension (:,:,:), allocatable  :: wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr
+  real  :: w0 = 7.5e-3
+  real  :: Qrate = 2.5/86400. !rv
 
   character(40)      :: zname      = 'zt'
   character(40)      :: zhname     = 'zm'

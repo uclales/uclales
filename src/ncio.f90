@@ -4,7 +4,6 @@
   use grid
   use mpi_interface, only : appl_abort, myid, pecount, wrxid, wryid
   use mcrp, only : cldw,rain,ice,snow,graupel,hail
- ! use forc, only : w0, QRate  !RV
 
   implicit none
   private
@@ -203,10 +202,11 @@ contains
                 iret=nf90_put_att(ncID,VarID,'x_min',hail%x_min)
                 iret=nf90_put_att(ncID,VarID,'x_max',hail%x_max)
              end if
-!             if (outtend .and. sx(n) .eq. "wtendt") then !RV
-!                iret=nf90_put_att(ncID,VarID,'w0',w0)
-!                iret=nf90_put_att(ncID,VarID,'Qrate',QRate)
-!             end if!rv
+            ! if (outtend .and. sx(n) .eq. "wtendt") then !RV
+             if (sx(n) .eq. "wtendt") then !RV
+                iret=nf90_put_att(ncID,VarID,'w0',w0)
+                iret=nf90_put_att(ncID,VarID,'Qrate',QRate)
+             end if!rv
           case ('mttt')
              if (present(n2) .and. present(n3)) then
                 iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_mttt,VarID)
@@ -1569,7 +1569,15 @@ contains
        if (itype==0) ncinfo = 'total turbulent flux divergence of rt'
        if (itype==1) ncinfo = 'kg/kg/s'
        if (itype==2) ncinfo = 'tttt'
-     case default
+    case('Q1')    
+       if (itype==0) ncinfo = 'Heat source for theta_l (conserved)'
+       if (itype==1) ncinfo = 'K/day'
+       if (itype==2) ncinfo = 'tttt'
+    case('Q2')    
+       if (itype==0) ncinfo = 'Moisture sink for rt (conserved)'
+       if (itype==1) ncinfo = 'K/day'
+       if (itype==2) ncinfo = 'tttt'
+    case default
        if (myid==0) print *, 'ABORTING: variable not found in ncinfo, ',trim(short_name)
        call appl_abort(0)
     end select
