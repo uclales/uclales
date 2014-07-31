@@ -1601,14 +1601,6 @@ contains
        if (itype==0) ncinfo = 'total turbulent flux divergence of rt'
        if (itype==1) ncinfo = 'kg/kg/s'
        if (itype==2) ncinfo = 'tttt'
-    case('Q1')    
-       if (itype==0) ncinfo = 'Heat source for theta_l (conserved)'
-       if (itype==1) ncinfo = 'K/day'
-       if (itype==2) ncinfo = 'tttt'
-    case('Q2')    
-       if (itype==0) ncinfo = 'Moisture sink for rt (conserved)'
-       if (itype==1) ncinfo = 'K/day'
-       if (itype==2) ncinfo = 'tttt'
     case('dtdt')    
        if (itype==0) ncinfo = 'dtdt'
        if (itype==1) ncinfo = 'K'

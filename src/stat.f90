@@ -32,7 +32,7 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 68, nvar2 = 130 ! number of time series and profiles
+  integer, parameter :: nvar1 = 68, nvar2 = 128 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2
   real, save         :: fsttm, lsttm
 
@@ -77,7 +77,7 @@ module stat
        'hail   ','qt_th  ','s_1    ','s_2    ','s_3    ','RH     ', & !109
        'lwuca  ','lwdca  ','swuca  ','swdca  ','wtendt ','wtendr ', & !115
        'sgtendt','sgtendr','adtendt','adtendr','turtent','turtenr', & !121
-       'Q1     ','Q2     ','dtdt   ','dqdt   '/)		      !127
+       'dtdt   ','dqdt   '/)		     			      !127
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:)
@@ -1215,11 +1215,9 @@ contains
          else
             svctr(k,49) = 0.
          end if
-	 if(outtend) then !RV: add adv and sgs component of rt and tl tend. Compute Q1 and Q2.
+	 if(outtend) then !RV: add adv and sgs component of rt and tl tend. 
 	    svctr(k,125) = svctr(k,121)+svctr(k,123)
 	    svctr(k,126) = svctr(k,122)+svctr(k,124)
-	    svctr(k,127) = svctr(k,125)*86400.+Qrate
-	    svctr(k,128) = -svctr(k,126)*86400.*alvl/cp
 	 end if !rv
          svctr(k,10:nv2) = svctr(k,10:nv2)/nsmp
       end do
