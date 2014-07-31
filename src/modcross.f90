@@ -22,6 +22,8 @@ implicit none
   logical            :: lcross = .false., ldocross, lxy = .false., lxz = .false., lyz = .false.
   real               :: dtcross = 60, xcross = 0., ycross = 0., zcross(10) = 0.
   integer            :: icross,jcross,kcross(10) = 0, nkcross
+  integer            :: lev_500, lev_1000
+  real               :: dn0_int, dn0_i
   real               :: threstracer = 2
   real               :: thres_rw    = 1.e-8
   integer :: ncross = 0
@@ -29,7 +31,7 @@ implicit none
   character(len=7),  dimension(10) :: hname
   character(len=80), dimension(10) :: hlname
   character(len=7) :: hname_prc
-  integer, parameter :: nvar_all = 49
+  integer, parameter :: nvar_all = 58
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
          'l      ','rp     ','np     ','tv     ','ricep  ', & !6-10
@@ -40,7 +42,9 @@ implicit none
          'rwptop ','tracer ','trcpath','trcbase','trctop ', & !31-35
          'wdev_cl','wdev_sc','w_cld  ','tdev_cl','tdev_sc', & !36-40
          't_cld  ','qdev_cl','qdev_sc','q_cld  ','tv_cl  ', & !41-45
-         'tv_sc  ','tv_cld ','core   ','th_e   '/)            !46-49
+         'tv_sc  ','tv_cld ','core   ','th_e   ','cmfbase', & !46-50
+	 'wtndtsc','wtndrsc','ttndtsc','ttndrsc','wtndtcl', & !51-55
+         'wtndrcl','ttndtcl','ttndrcl'/)                      !56-58
   integer :: nccrossxzid,nccrossyzid,nccrossxyid, nccrossrec, nvar
 
   interface writecross
@@ -57,8 +61,8 @@ contains
   subroutine initcross(rtimee, expname)
     use mpi_interface,   only : wrxid, wryid
     use modnetcdf,       only : open_nc, addvar_nc
-    use grid,            only : nzp, nxp, nyp, zt, xt, yt, xm, ym, &
-                                tname, tlongname, tunit
+    use grid,            only : nzp, nxp, nyp, zt, xt, yt, zm, xm, ym, &
+                                tname, tlongname, tunit, dn0, dzi_t, outtend
 
     real, intent(in) :: rtimee
     integer :: n
@@ -133,8 +137,23 @@ contains
     do n=1,nvar_all
       call addcross(crossvars(n))
     end do
-  end subroutine initcross
 
+    ! RV, from LS: determine first level >500m / >1000m & calculate integrated density
+    lev_500 = 1
+    do while (zm(lev_500).le.500.)
+       lev_500 = lev_500 +1
+    end do
+    lev_1000 = 1
+    do while (zm(lev_1000).le.1000.)
+       lev_1000 = lev_1000 +1
+    end do
+    dn0_i = 0.0d0
+    do k=2,nzp-1
+       dn0_i = dn0_i + dn0(k)/dzi_t(k)
+    end do
+    dn0_int = 1./dn0_i!rv
+  end subroutine initcross
+  
   subroutine addcross(name)
     use modnetcdf,     only : addvar_nc
     use mpi_interface, only : appl_abort
@@ -143,7 +162,7 @@ contains
                             xname, xlongname, xunit, &
                             yname, ylongname, yunit, &
                             tname, tlongname, tunit, &
-                            lwaterbudget, lcouvreux, prc_lev
+                            lwaterbudget, lcouvreux, prc_lev,outtend
 
     character (*), intent(in)     :: name
     character (40), dimension(3) :: dimname, dimlongname, dimunit
@@ -362,7 +381,42 @@ contains
         if (level < 2) return
         longname = 'equivalent potential temperature'
         unit = 'K'
-        iscross = .true.
+      case ('cmfbase') !RV von Linda ------------------------------------------------------------------
+	If (level < 2.or.outtend.eq..false.) return
+	longname = 'cloud base convective mass flux'
+	unit = 'kg/m^2/s' 
+      case ('wtndtsc') 
+	If (level < 2.or.outtend.eq..false.) return
+	longname = 'wtendt integrated over sub-cloud layer'
+	unit = 'K/s' 
+      case ('wtndrsc') 
+	If (level < 2.or.outtend.eq..false.) return
+	longname = 'wtendr integrated over sub-cloud layer'
+	unit = 'kg/kg/s' 
+      case ('ttndtsc') 
+	If (level < 2.or.outtend.eq..false.) return
+	longname = 'sgtendt+adtendt integrated over sub-cloud layer'
+	unit = 'K/s' 
+      case ('ttndrsc') 
+	If (level < 2.or.outtend.eq..false.) return
+	longname = 'sgtendr+adtendr integrated over sub-cloud layer'
+	unit = 'kg/kg/s' 
+      case ('wtndtcl') 
+	If (level < 2.or.outtend.eq..false.) return
+	longname = 'wtendt integrated from cb to inversion'
+	unit = 'K/s' 
+      case ('wtndrcl') 
+	If (level < 2.or.outtend.eq..false.) return
+	longname = 'wtendr integrated from cb to inversion'
+	unit = 'kg/kg/s' 
+      case ('ttndtcl') 
+	If (level < 2.or.outtend.eq..false.) return
+	longname = 'sgtendt+adtendt integrated from cb to inversion'
+	unit = 'K/s' 
+      case ('ttndrcl') 
+	If (level < 2.or.outtend.eq..false.) return
+	longname = 'sgtendr+adtendr integrated from cb to inversion'
+	unit = 'kg/kg/s' !rv -----------------------------------------------------------------------
       case default
         return
       end select
@@ -469,16 +523,18 @@ contains
   subroutine triggercross(rtimee)
     use grid,      only : level,nxp, nyp, nzp, tname, zt, zm, dzi_m, dzi_t, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
        a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
-       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta, pi0, pi1, a_pexnr, prc_lev, umean, vmean, th00
+       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta, pi0, pi1,&
+       a_pexnr, prc_lev, umean, vmean, th00, outtend, dn0, wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr
     use modnetcdf, only : writevar_nc, fillvalue_double
     use util,      only : get_avg3, get_var3, calclevel
-    use defs,      only : ep2,cp,cpr, p00
+    use defs,      only : ep2,cp,cpr, p00, R
     use thrm,      only: rslf
     real, intent(in) :: rtimee
-    real             :: tstar, exner, tk
-    real, dimension(3:nxp-2,3:nyp-2) :: tmp
-    real, dimension(nzp,nxp,nyp) :: tracer, tv, interp, th_e,p
-    real, dimension(nzp)         :: c1, thvar, tvbar, tvenv, tvcld
+    real             :: tstar, exner, tk, zi1, zi2
+    real, dimension(3:nxp-2,3:nyp-2) :: tmp, tmpw
+    real, dimension(nzp,nxp,nyp) :: tracer, tv, interp, th_e, p, tvo 
+    real, dimension(3:nxp-2,3:nyp-2) :: cmf, wtsc_int, wrsc_int,ttsc_int, trsc_int, wtcl_int, wrcl_int,ttcl_int, trcl_int
+    real, dimension(nzp)         :: c1, thvar, tvbar, tvenv, tvcld, dz
     integer :: n, nn, i, j, k, ct, cb, zi, lcl
 
     if (.not. lcross) return
@@ -494,71 +550,170 @@ contains
     end if
 
     if (level == 0) then
-      do j=3,nyp-2
-        do i=3,nxp-2
-            do k=1,nzp
-              tv(k,i,j) = a_theta(k,i,j)
-            end do
-        end do
-      end do
-    else if (level == 1) then
-      do j=3,nyp-2
-        do i=3,nxp-2
-            do k=1,nzp
-              tv(k,i,j) = a_theta(k,i,j)*(1.+ep2*a_rp(k,i,j))
-            end do
-        end do
-      end do
-    else
-      do j=3,nyp-2
-        do i=3,nxp-2
-            do k=1,nzp
-              tv(k,i,j) = a_theta(k,i,j)*(1.+ep2*a_rp(k,i,j) - liquid(k,i,j))
-            end do
-        end do
-      end do
-     do j=3,nyp-2
-       do i=3,nxp-2
-          do k=1,nzp
-             exner = (pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp
-             p(k,i,j) = p00 * (exner)**cpr
-             tk=a_theta(k,i,j)*exner
-             tstar = 1./(1./(tk-55.)-log(a_rp(k,i,j)/rslf(p(k,i,j),tk))/2840.)+55.
-             th_e(k,i,j) = tk*(p00/p(k,i,j))**(0.2854*(1.-0.28*a_rp(k,i,j)))*exp(a_rp(k,i,j)*(1.+0.81*a_rp(k,i,j))*(3376./tstar-2.54))
+       do j=3,nyp-2
+          do i=3,nxp-2
+             do k=1,nzp
+                tv(k,i,j) = a_theta(k,i,j)
+             end do
           end do
        end do
-      end do
-
+    else if (level == 1) then
+       do j=3,nyp-2
+          do i=3,nxp-2
+             do k=1,nzp
+                tv(k,i,j) = a_theta(k,i,j)*(1.+ep2*a_rp(k,i,j))
+             end do
+          end do
+       end do
+    else
+       do j=3,nyp-2
+          do i=3,nxp-2
+             do k=1,nzp
+                tv(k,i,j) = a_theta(k,i,j)*(1.+ep2*a_rp(k,i,j) - liquid(k,i,j))
+             end do
+          end do
+       end do
+       do j=3,nyp-2
+          do i=3,nxp-2
+             do k=1,nzp
+                exner = (pi0(k)+pi1(k)+a_pexnr(k,i,j))/cp
+                p(k,i,j) = p00 * (exner)**cpr
+                tk=a_theta(k,i,j)*exner
+                tstar = 1./(1./(tk-55.)-log(a_rp(k,i,j)/rslf(p(k,i,j),tk))/2840.)+55.
+                th_e(k,i,j) = tk*(p00/p(k,i,j))**(0.2854*(1.-0.28*a_rp(k,i,j)))*exp(a_rp(k,i,j)*(1.+0.81*a_rp(k,i,j))*(3376./tstar-2.54))
+             end do
+          end do
+       end do
     end if
-
-
+    
     call get_avg3(nzp,nxp,nyp,tv,tvbar)
     do j=3,nyp-2
        do i=3,nxp-2
           do k=1,nzp
+ 	     ! save the tv field for later usage in density calculation
+	     tvo(k,i,j) = tv(k,i,j)            
              tv(k,i,j) = tv(k,i,j) - tvbar(k)
           end do
        end do
     end do
 
-
     call get_avg3(nzp,nxp,nyp, tv, c1)
     call get_var3(nzp,nxp,nyp, tv, c1, thvar)
     zi = maxloc(thvar,1)
+
     if (level > 1) then
-      call calclevel(liquid, cb, 'base')
+      call calclevel(liquid, cb, 'base', 1.e-6)
       call calclevel(liquid, ct, 'top')
 
       if (cb >= nzp-1) then
         cb = zi
-      end if
-
+    end if
+    
+    !---- RV ----------------------------------------------------------------
+    if (outtend) then 
+       do k=1,nzp 
+          dz(k) = 1./dzi_t(k)
+       end do
+       !integrate from surface up to cloud base 
+       zi1=max(cb,lev_500)
+       wtsc_int(:,:)=0.
+       do j=3,nyp-2
+          do i=3,nxp-2
+             do k=2,zi1
+                wtsc_int(i,j) = wtsc_int(i,j) + wtendt(k,i,j)*dz(k)*dn0(k)
+             end do
+             wtsc_int(i,j)=wtsc_int(i,j)*dn0_int
+          end do
+       end do
+       wrsc_int(:,:)=0.
+       do j=3,nyp-2
+          do i=3,nxp-2
+            do k=2,zi1
+                wrsc_int(i,j) = wrsc_int(i,j)+wtendr(k,i,j)*dz(k)*dn0(k)
+             end do
+             wrsc_int(i,j)=wrsc_int(i,j)*dn0_int
+          end do
+       end do
+       ttsc_int(:,:)=0.
+       do j=3,nyp-2
+          do i=3,nxp-2
+             do k=2,zi1
+                ttsc_int(i,j) = ttsc_int(i,j)+ (sgtendt(k,i,j)+adtendt(k,i,j))*dz(k)*dn0(k)
+             end do
+             ttsc_int(i,j)=ttsc_int(i,j)*dn0_int
+          end do
+       end do
+       trsc_int(:,:)=0.
+       do j=3,nyp-2
+          do i=3,nxp-2
+             do k=2,zi1
+                trsc_int(i,j) = trsc_int(i,j)+(sgtendr(k,i,j)+adtendr(k,i,j))*dz(k)*dn0(k)
+             end do
+             trsc_int(i,j)=trsc_int(i,j)*dn0_int
+          end do
+       end do
+       
+       !Integrate from cloud base up to inversion
+       zi2=max(zi,lev_1000)
+       wtcl_int(:,:)=0.
+       do j=3,nyp-2
+          do i=3,nxp-2
+             do k=(zi1+1),zi2
+                wtcl_int(i,j) = wtcl_int(i,j)+wtendt(k,i,j)*dz(k)*dn0(k)
+             end do
+             wtcl_int(i,j)=wtcl_int(i,j)*dn0_int
+          end do
+       end do
+       wrcl_int(:,:)=0.
+       do j=3,nyp-2
+          do i=3,nxp-2
+             do k=(zi1+1),zi2
+                wrcl_int(i,j) = wrcl_int(i,j)+wtendr(k,i,j)*dz(k)*dn0(k)
+             end do
+             wrcl_int(i,j)=wrcl_int(i,j)*dn0_int
+          end do
+       end do
+       ttcl_int(:,:)=0.
+       do j=3,nyp-2
+          do i=3,nxp-2
+             do k=(zi1+1),zi2
+                ttcl_int(i,j) = ttcl_int(i,j)+(sgtendt(k,i,j)+adtendt(k,i,j))*dz(k)*dn0(k)
+             end do
+             ttcl_int(i,j)=ttcl_int(i,j)*dn0_int
+          end do
+       end do
+       trcl_int(:,:)=0.
+       do j=3,nyp-2
+          do i=3,nxp-2
+             do k=(zi1+1),zi2
+                trcl_int(i,j) = trcl_int(i,j)+(sgtendr(k,i,j)+adtendr(k,i,j))*dz(k)*dn0(k)
+             end do
+             trcl_int(i,j)=trcl_int(i,j)*dn0_int
+          end do
+       end do
+    end if
+    !---- rv ----------------------------------------------------------------
+    
   !-------- calc lcl -------------------
       lcl=cb+nint(200.*dzi_m(cb))
   !-------------------------------------
       if (lcl >= nzp-1) then
         lcl = 0
       end if
+
+ !-------- calc cloud base convective mass flux -------------------
+ ! mask * density * w
+ 	
+      call calcbase_mask(liquid, tmp, 1.e-6)
+	call calcw_mask(a_wp, tmpw, cb, 1.0)
+	
+	do j=3,nyp-2
+	   do i=3,nxp-2
+	      exner = (pi0(cb)+pi1(cb)+a_pexnr(cb,i,j))/cp
+	      p(cb,i,j) = p00 * (exner)**cpr
+	      cmf(i,j) = tmp(i,j) * tmpw(i,j) * p(cb,i,j)/(R*tvo(cb,i,j)) * 0.5*(a_wp(cb,i,j)+a_wp(cb-1,i,j))
+	   end do
+	end do
     end if
 
     do n = 1, nkcross
@@ -609,51 +764,69 @@ contains
           end do
         end do
         call writecross(crossname(n), interp)
-      case('t')
+     case('t')
         call writecross(crossname(n), a_tp+th00)
-      case('r')
+     case('r')
         call writecross(crossname(n), a_rp)
-      case('l')
+     case('l')
         call writecross(crossname(n), liquid)
-      case('tv')
+     case('tv')
         call writecross(crossname(n), tv)
-      case('rp')
+     case('rp')
         call writecross(crossname(n), a_rpp)
-      case('np')
+     case('np')
         call writecross(crossname(n), a_npp)
-      case('ricep')
+     case('ricep')
         call writecross(crossname(n), a_ricep)
-      case('nicep')
+     case('nicep')
         call writecross(crossname(n), a_nicep)
-      case('rsnowp')
+     case('rsnowp')
         call writecross(crossname(n), a_rsnowp)
-      case('nsnowp')
+     case('nsnowp')
         call writecross(crossname(n), a_nsnowp)
-      case('rgrpp')
+     case('rgrpp')
         call writecross(crossname(n), a_rgrp)
-      case('ngrpp')
+     case('ngrpp')
         call writecross(crossname(n), a_ngrp)
-      case('rhailp')
+     case('rhailp')
         call writecross(crossname(n), a_rhailp)
-      case('nhailp')
+     case('nhailp')
         call writecross(crossname(n), a_nhailp)
-      case ('th_e')
+     case ('th_e')
         call writecross(crossname(n), th_e)
-      case('tracer')
+     case('wtndtsc')    !RV -----------------------------------------------------------------------------
+        call writecross(crossname(n), wtsc_int)
+     case('wtndrsc')
+        call writecross(crossname(n), wrsc_int)
+     case('ttndtsc')
+        call writecross(crossname(n), ttsc_int)
+     case('ttndrsc')
+        call writecross(crossname(n), trsc_int)
+     case('wtndtcl')    
+        call writecross(crossname(n), wtcl_int)
+     case('wtndrcl')
+        call writecross(crossname(n), wrcl_int)
+     case('ttndtcl')
+        call writecross(crossname(n), ttcl_int)
+     case('ttndrcl')
+        call writecross(crossname(n), trcl_int)
+     case ('cmfbase')
+ 	call writecross(crossname(n), cmf)  !rv ---------------------------------------------------------
+     case('tracer')
         call writecross(crossname(n), tracer)
-      case('lwp')
+     case('lwp')
         call calcintpath(liquid, tmp)
         call writecross(crossname(n), tmp)
-      case('rwp')
+     case('rwp')
         call calcintpath(a_rpp, tmp, thres_rw)
         call writecross(crossname(n), tmp)
-      case('iwp')
+     case('iwp')
         call calcintpath(a_ricep, tmp)
         call writecross(crossname(n), tmp)
-      case('swp')
+     case('swp')
         call calcintpath(a_rsnowp, tmp)
         call writecross(crossname(n), tmp)
-      case('gwp')
+     case('gwp')
         call calcintpath(a_rgrp, tmp)
         call writecross(crossname(n), tmp)
       case('hwp')
@@ -962,6 +1135,56 @@ contains
     end do
   end subroutine calcbase
 
+  subroutine calcbase_mask(varin, varout, threshold)
+    use grid, only : nzp, nxp, nyp, zt
+    use modnetcdf, only : fillvalue_double
+    real, intent(in), dimension(:,:,:) :: varin
+    real, intent(out), dimension(3:,3:) :: varout
+    real, intent(in), optional :: threshold
+    integer :: i, j, k, km1
+    real :: thres
+    varout = 0.0
+    if (present(threshold)) then
+       thres = threshold
+    else
+       thres = 0.0
+    end if
+    do j = 3, nyp - 2
+       do i = 3, nxp - 2
+          base:do k = 2, nzp - 1
+             if (varin(k,i,j) > thres) then
+                varout(i,j) = 1.
+                exit base
+             end if
+          end do base
+       end do
+    end do
+  end subroutine calcbase_mask
+
+  subroutine calcw_mask(varin, varout, level,threshold)
+    use grid, only : nxp, nyp
+    real, intent(in), dimension(:,:,:) :: varin
+    real, intent(out), dimension(3:,3:) :: varout
+    real, intent(in), optional :: threshold
+    integer, intent(in) :: level
+    integer :: i, j, level_m1
+    real :: thres
+    varout = 0.0
+    level_m1 = max(level - 1,1)
+    if (present(threshold)) then
+      thres = threshold
+    else
+      thres = 1.0
+    end if
+    do j = 3, nyp - 2
+      do i = 3, nxp - 2
+        if (0.5*(varin(level,i,j)+varin(level_m1,i,j)) > thres) then
+          varout(i,j) = 1.
+        end if
+      end do
+    end do
+  end subroutine calcw_mask
+
   subroutine calctop(varin, varout, threshold)
     use grid, only : nzp, nxp, nyp, zt
     use modnetcdf, only : fillvalue_double
@@ -1097,7 +1320,6 @@ contains
       end do
     end do
   end subroutine scalexcess
-
-
+  
 end module modcross
 

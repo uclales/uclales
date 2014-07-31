@@ -474,14 +474,36 @@ contains
 !irina
     use grid, only : a_xp, a_xt1, a_xt2, a_up, a_vp, a_wp, a_sp, dzi_t, dt,  &
          nscl, nxp, nyp, nzp, newvar,level, a_rpp,a_ricep,a_nicep,a_rsnowp,a_rgrp,a_npp,rkalpha,rkbeta, &
-         a_nsnowp,a_ngrp,a_rhailp,a_nhailp,a_rp,liquid
-    use util, only : sclrset,velset
+         a_nsnowp,a_ngrp,a_rhailp,a_nhailp,a_rp,liquid, dtdt, dqdt, a_st, outtend
+    use util, only : sclrset,velset, get_avg3
+    use stat, only : sflg, updtst
 
     integer, intent (in) :: nstep
 
+    real    :: v1da(nzp)
     integer :: n
 
     a_xp = a_xp + dt *(rkalpha(nstep)*a_xt1 + rkbeta(nstep)*a_xt2)
+
+    if (outtend) then !RV, output dx/dt. from linda_particles
+	call newvar(4,istep=nstep)
+	if (nstep==1) dtdt(:,:,:)=dtdt(:,:,:)+dt*(rkalpha(1)+rkalpha(2))*a_st(:,:,:)
+	if (nstep==2) dtdt(:,:,:)=dtdt(:,:,:)+dt*(rkbeta(2)+rkbeta(3))*a_st(:,:,:)
+	if (nstep==3) dtdt(:,:,:)=dtdt(:,:,:)+dt*rkalpha(3)*a_st(:,:,:)
+
+	call newvar(5,istep=nstep)
+	if (nstep==1) dqdt(:,:,:)=dqdt(:,:,:)+dt*(rkalpha(1)+rkalpha(2))*a_st(:,:,:)
+	if (nstep==2) dqdt(:,:,:)=dqdt(:,:,:)+dt*(rkbeta(2)+rkbeta(3))*a_st(:,:,:)
+	if (nstep==3) then
+           dqdt(:,:,:)=dqdt(:,:,:)+dt*rkalpha(3)*a_st(:,:,:)
+	   if (sflg) then !update statistics for both dtdt and dqdt
+              call get_avg3(nzp,nxp,nyp,dtdt,v1da)
+              call updtst(nzp,'tnd',7,v1da,1)
+              call get_avg3(nzp,nxp,nyp,dqdt,v1da)
+              call updtst(nzp,'tnd',8,v1da,1)
+	   end if
+        end if
+    end if !rv
 
     call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
 

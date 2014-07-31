@@ -125,7 +125,7 @@ module grid
 ! linda, e 
 
  !RV: ls tendencies due to subsidence, sgs diff & advection
-  real, dimension (:,:,:), allocatable  :: wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr
+  real, dimension (:,:,:), allocatable  :: wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt
   real  :: w0 = 7.5e-3
   real  :: Qrate = 2.5/86400. !rv
 
@@ -448,8 +448,10 @@ contains
        allocate(sgtendr(nzp,nxp,nyp))
        allocate(adtendt(nzp,nxp,nyp))
        allocate(adtendr(nzp,nxp,nyp))
+       allocate(dtdt(nzp,nxp,nyp))
+       allocate(dqdt(nzp,nxp,nyp))
 
-       memsize = memsize + 6*nxyzp
+       memsize = memsize + 8*nxyzp
 
        wtendt(:,:,:) = 0.            
        wtendr(:,:,:) = 0.
@@ -457,8 +459,8 @@ contains
        sgtendr(:,:,:) = 0.
        adtendt(:,:,:) = 0.            
        adtendr(:,:,:) = 0.
-
-     !  acumtime = 0.
+       dtdt(:,:,:) = 0.            
+       dqdt(:,:,:) = 0.
     end if !rv
    
 
@@ -737,6 +739,11 @@ contains
     end if
     write(10) nv2, nsmp
     write(10) svctr
+
+    !RV: write accumulated tendencies
+    if (outtend) then
+       write(10) wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt
+    end if !rv
     close(10)
 
     if (myid == 0 .and. htype < 0) then
@@ -823,6 +830,11 @@ contains
       read(10) nv2, nsmp
       allocate (svctr(nzp,nv2))
       read(10) svctr
+
+       !RV: write accumulated tendencies
+       if (outtend) then
+          read(10) wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt
+       end if !rv
 
        close(10)
        !

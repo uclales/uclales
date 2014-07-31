@@ -407,13 +407,12 @@ contains
     real    :: grad,wk
     real,dimension(n1) :: res,res1
     real    :: rk !RV
-    real    :: acumtime = 0.     !rv
+    !real    :: acumtime = 0.     !rv
 
     if(outtend) then !RV
-       if(nstep==1) then 
-	  rk = rkalpha(1)+rkalpha(2)
-          acumtime=acumtime+dt  !accumulate time to get correct mean tendency
-        end if
+       if(nstep==1) rk = rkalpha(1)+rkalpha(2)!then 
+          !acumtime=acumtime+dt  !accumulate time to get correct mean tendency
+        !end if
     	if(nstep==2) rk = rkbeta(2)+rkbeta(3)
     	if(nstep==3) rk = rkalpha(3)
     end if   !rv
@@ -451,12 +450,12 @@ contains
 
     if (sflg .and. outtend) then !RV
        call get_avg3(n1,n2,n3,wtendt,res)
-       call updtst(n1,'tnd',1,res/acumtime,1)
+       call updtst(n1,'tnd',1,res,1) !call updtst(n1,'tnd',1,res/acumtime,1)
        call get_avg3(n1,n2,n3,wtendr,res1)
-       call updtst(n1,'tnd',2,res1/acumtime,1)
-       wtendt = 0.
-       wtendr = 0.
-       acumtime = 0.
+       call updtst(n1,'tnd',2,res1,1)!rm /acumtime
+       !wtendt = 0.
+       !wtendr = 0.
+       !acumtime = 0.
     end if !rv
 
   end subroutine bellon

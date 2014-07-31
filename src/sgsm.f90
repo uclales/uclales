@@ -78,7 +78,7 @@ contains
     real, intent(in)       :: timein 
     integer :: n
     real :: rk        !RV
-    real :: acumtime = 0. !rv	
+    !real :: acumtime = 0. !rv	
 
     ! Hack BvS: slowly increase smago constant...
     !csx = min(timein*0.23/3600.,0.23)    
@@ -145,12 +145,8 @@ contains
     !
     
     if(outtend) then !RV
-       !sgtendt = 0.!new at if (sflg)
-       !sgtendr = 0.
-       if(nstep==1) then 
-	  rk = rkalpha(1)+rkalpha(2)
-	  acumtime=acumtime+dt  !accumulate time to get correct mean tendency
-       end if
+       if(nstep==1) rk = rkalpha(1)+rkalpha(2)
+	  !acumtime=acumtime+dt  !accumulate time to get correct mean tendency
        if(nstep==2) rk = rkbeta(2)+rkbeta(3)
        if(nstep==3) rk = rkalpha(3)	
     end if    !rv
@@ -188,14 +184,14 @@ contains
           if (outtend .and. n<=5) then !RV
              if(n==4) then
 		 call get_avg3(nzp,nxp,nyp,sgtendt,sz1)
-		 sgtendt = 0.
+		 !sgtendt = 0.
              else if(n==5) then
 		 call get_avg3(nzp,nxp,nyp,sgtendr,sz1)
-		 sgtendr = 0.
+		 !sgtendr = 0.
 	     end if
-	     sz1=sz1/acumtime   !divide by accumulated time -> mean tendency in X/s.
+	     !sz1=sz1/acumtime
              call updtst(nzp,'tnd',n-1,sz1,1)
-	     if(n==5) acumtime = 0.
+	     !if(n==5) acumtime = 0.
           endif !rv
 
        endif

@@ -329,6 +329,7 @@ contains
     use defs, only          : p00,p00i,cp,cpr,rcp,r,g,ep2,alvl,Rm,ep
     use thrm, only          : rslf,rsif
     use mpi_interface, only : appl_abort, myid
+    use grid, only          : outtend
 
     implicit none
 
@@ -428,6 +429,7 @@ contains
              enddo
           endif
           tks(ns)=xx
+	  if (outtend) tks(ns)=ts(ns) !RV: do nothing resp. revert changes
        case (2)
           tks(ns) = ts(ns) ! a long way of saying do nothing
        case default
@@ -463,6 +465,7 @@ contains
                enddo
             endif
             tks(ns)=xx
+	    if (outtend) tks(ns)=ts(ns) !RV: do nothing resp. revert changes
          case (2)
             ts(ns)=tks(ns)*(p00/ps(ns))**rcp     ! update ts for fldinit
          case default
@@ -470,7 +473,7 @@ contains
          
        end do
        if (itsflg==1) then
-          ts(ns)=tks(ns)*(p00/ps(ns))**rcp     ! update ts for fldinit
+          if(.not. outtend) ts(ns)=tks(ns)*(p00/ps(ns))**rcp     ! update ts for fldinit RV: leave it!!!
        end if
        ns = ns+1
 
@@ -495,7 +498,11 @@ contains
     end if
 
     do k=1,ns
-       thds(k)=tks(k)*(p00/ps(k))**rcp ! thds goes into the basic state
+       if (outtend) then
+	  thds(k)=tks(k)  !RV: do nothing 
+       else
+          thds(k)=tks(k)*(p00/ps(k))**rcp ! thds goes into the basic state
+       end if
     end do
 
     do k=1,ns
