@@ -94,6 +94,8 @@ contains
     call mpi_get_time(t0)
     call broadcast_dbl(t0, 0)
 
+    if(myid==0)  print "(' ',49('-')/,' Start time integration',/,' ',49('-'))"
+
     do while (time < timmax .and. (t2-t0) < wctime)
        call mpi_get_time(t1)
        istp = istp + 1
@@ -209,8 +211,9 @@ contains
 
     iret = close_stat()
 
-    if ((t2-t0) .ge. wctime .and. myid == 0) write(*,*) '  Wall clock limit wctime reached, stopped simulation for restart'
-    if (time.ge.timmax .and. myid == 0) write(*,*) '  Max simulation time timmax reached. Finished simulation successfully'
+    if(myid==0) print "(' ',49('-'))"
+    if ((t2-t0) .ge. wctime .and. myid == 0) print*,'Wall clock limit wctime reached, stopped simulation for restart'
+    if (time.ge.timmax .and. myid == 0)      print*,'Max simulation time timmax reached. Finished simulation successfully'
 
   end subroutine stepper
 

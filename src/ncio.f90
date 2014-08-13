@@ -367,10 +367,10 @@ contains
     nvar0=nend
     fname =  trim(filprf)
     if(myid == 0) print                                                  &
-            "(//' ',49('-')/,' ',/,'   Initializing: ',A20)",trim(fname)
+            "(' ',49('-')/,' Initializing: ',A20)",trim(fname)
     call open_nc( fname, expnme, time, (nxp-4)*(nyp-4), ncid0, nrec0)
     call define_nc( ncid0, nrec0, nvar0, sanal, n1=nzp, n2=nxp-4, n3=nyp-4)
-    if (myid == 0) print *,'   ...starting record: ', nrec0
+    if (myid == 0) print *,'...starting record: ', nrec0
 
   end subroutine init_anal
   !
@@ -545,7 +545,7 @@ contains
 !        call appl_abort(0)
 !     end if
 
-    if (myid==0) print "(//' ',12('-'),'   Record ',I3,' to: ',A60)",    &
+    if (myid==0) print "(' Analysis record ',I3,' to: ',A60)",    &
          nrec0,fname
 
     iret  = nf90_sync(ncid0)

@@ -63,6 +63,7 @@ contains
   subroutine init_mpi
 
     character (len=8) date
+    character (len=30) ghash
 
     call mpi_init(ierror)
     call mpi_comm_size(MPI_COMM_WORLD, pecount, ierror)
@@ -91,9 +92,11 @@ contains
     end select
     !
     call date_and_time(date)
-    if (myid == 0) print "(/1x,75('-'),/2x,A13,A8,/2x,A15,I2,A15,I2,A14)", &
-         'UCLA LES 2.0 ',date, 'Computing using',nbytes,' byte reals and', &
+    ghash = adjustl(GITHASH)
+    if (myid == 0) print "(' ',49('-')/A23,A8,/,A11,A30,/,A16,I2,A15,I2,A14)", &
+         'UCLA LES experiment @ ',date, 'GIT-hash: ',ghash, 'Computing using',nbytes,' byte reals and', &
          intsize," byte integers"
+    !print*,GITHASH
 
   end subroutine init_mpi
   !
@@ -303,15 +306,16 @@ contains
     endif
 
     if (myid == 0) then
-       print 61, 'Processor count', pecount,'nxpl =', nxp,' nypl = ',nyp
-       do i=0,min(nxprocs,nyprocs)-1
-          print "(2x,A13,2I5)", 'x/y offset = ', xoffset(i), yoffset(i)
-       end do
+       print 61, 'Processor count =', pecount,' nxpl =', nxp,' nypl =',nyp
+       !BvS disable for now; annoying with very large jobs 
+       !do i=0,min(nxprocs,nyprocs)-1
+       !   print "(1x,A13,2I5)", 'x/y offset = ', xoffset(i), yoffset(i)
+       !end do
        if (nxprocs>nyprocs) print "(15x,I5)", xoffset(nyprocs:nxprocs-1)
        if (nxprocs<nyprocs) print "(15x,I5)", yoffset(nxprocs:nyprocs-1)
     end if
 
-61 format (/1x,49('-')/2x,A15,I5,2(A6,I5))
+61 format (1x,49('-')/1x,A17,I5,2(A7,I5))
 
   end subroutine define_decomp
   !

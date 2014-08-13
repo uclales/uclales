@@ -34,7 +34,7 @@ program ucla_les
   call cpu_time(t2)
 
   if(myid == 0) then
-    print "(/,' ',49('-')/,' ',A16,F10.1,' s')", '  Execution time: ', t2-t1
+    print "(A16,F10.1,' s')",' Execution time: ', t2-t1
     stop ' ..... Normal termination'
   end if  
 
@@ -221,14 +221,14 @@ contains
 
     end if
 
-600 format(//' ',49('-')/,' ',/,'  Initial Experiment: ',A50 &
-         /,'  Final Time:         ',F7.1,' s'              )
-601 format(//' ',49('-')/,' ',/,'  Restart Experiment: ',A50 &
-         /,'  Restart File: ',A30,                           &
-         /,'  Final Time: ',F10.1,' s'              )
-602 format('  Output File Stem:   ',A50                      &
-         /,'  History Frequency:  ',F7.1,                    &
-         /,'  Analysis Frequency: ',F7.1)
+600 format(' ',49('-')/,' Initial Experiment: ',A50 &
+         /,' Final Time:         ',F7.1,' s')
+601 format(' ',49('-')/,' Restart Experiment: ',A50 &
+         /,' Restart File: ',A30,                           &
+         /,' Final Time: ',F10.1,' s')
+602 format(' Output File Stem:   ',A50                      &
+         /,' History Frequency:  ',F7.1,' s'                &
+         /,' Analysis Frequency: ',F7.1,' s')
 
     return
   end subroutine define_parm

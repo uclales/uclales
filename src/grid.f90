@@ -454,8 +454,8 @@ contains
     end if
 !linda,e
     if(myid == 0) then
-       print "(//' ',49('-')/,' ',/3x,i3.3,' prognostic scalars')", nscl
-       print "('   memory to be allocated  -  ',f8.3,' mbytes')", &
+       print "(' ',49('-')/,' ',i3.3,' prognostic scalars')", nscl
+       print "(' memory to be allocated  -  ',f8.3,' mbytes')", &
             memsize*1.e-6*kind(0.0)
     end if
 
@@ -472,11 +472,11 @@ contains
     real    :: dzrfm,dz,zb,dzmin
     real    :: zmnvc(-1:nzp+1)
     character (len=51) :: &
-         fm1 = '(//" ",49("-")/,"   grid dimensions:"/)            ',      &
-         fm2 = '("   nxp-4 = ",i4,", dx, dx = ",f8.1,",",f9.1," m")',      &
-         fm3 = '("   nyp-4 = ",i4,", dy, dy = ",f8.1,",",f9.1," m")',      &
-         fm4 = '("   nzp   = ",i4,", dz, dz = ",f8.1,",",f9.1," m")',      &
-         fm5 = '("   thermo level: ",i3)                        '
+         fm1 = '(" ",49("-")/," grid dimensions:")               ',      &
+         fm2 = '(" nxp-4 = ",i4,", dx, dx = ",f8.1,",",f9.1," m")',      &
+         fm3 = '(" nyp-4 = ",i4,", dy, dy = ",f8.1,",",f9.1," m")',      &
+         fm4 = '(" nzp   = ",i4,", dz, dz = ",f8.1,",",f9.1," m")',      &
+         fm5 = '(" thermo level: ",i1)                        '
 
     nxyzp  = nxp*nyp*nzp
     nxyp   = nxp*nyp
@@ -687,7 +687,7 @@ contains
     !
     ! Write fields
     !
-    if (myid == 0) print "(//' ',49('-')/,' ',/,'   History write to: ',A30)" &
+    if (myid == 0) print "(' History write to: ',A30)" &
          ,hname
     open(10,file=trim(hname), form='unformatted')
 

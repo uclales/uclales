@@ -125,31 +125,29 @@ contains
     if(mpistat) then
       if(myid == 0) then
         fname =  trim(filprf)//'.ts'
-        print "(//' ',49('-')/,' ',/,'  Initializing: ',A20)",trim(fname)
+        print "(' ',49('-')/,' Initializing: ',A20)",trim(fname)
         call open_nc( fname, expnme, time, (nxp-4)*(nyp-4), ncid1, nrec1, .true.)
         call define_nc( ncid1, nrec1, nv1, s1)
-        print *, '   ...starting record: ', nrec1
+        print *, '...starting record: ', nrec1
 
         fname =  trim(filprf)//'.ps'
-        print "(//' ',49('-')/,' ',/,'  Initializing: ',A20)",trim(fname)
+        print "(' ',49('-')/,' Initializing: ',A20)",trim(fname)
         call open_nc( fname, expnme, time,(nxp-4)*(nyp-4), ncid2, nrec2, .true.)
         call define_nc( ncid2, nrec2, nv2, s2, n1=nzp)
-        print *, '   ...starting record: ', nrec2
+        print *, '...starting record: ', nrec2
       end if
     else
       fname =  trim(filprf)//'.ts'
-      if(myid == 0) print                                                  &
-           "(//' ',49('-')/,' ',/,'  Initializing: ',A20)",trim(fname)
+      if(myid == 0) print "(' ',49('-')/,' Initializing: ',A20)",trim(fname)
       call open_nc( fname, expnme, time, (nxp-4)*(nyp-4), ncid1, nrec1)
       call define_nc( ncid1, nrec1, nv1, s1)
-      if (myid == 0) print *, '   ...starting record: ', nrec1
+      if (myid == 0) print *, '...starting record: ', nrec1
  
       fname =  trim(filprf)//'.ps'
-      if(myid == 0) print                                                  &
-           "(//' ',49('-')/,' ',/,'  Initializing: ',A20)",trim(fname)
+      if(myid == 0) print "(' ',49('-')/,' Initializing: ',A20)",trim(fname)
       call open_nc( fname, expnme, time,(nxp-4)*(nyp-4), ncid2, nrec2)
       call define_nc( ncid2, nrec2, nv2, s2, n1=nzp)
-      if (myid == 0) print *, '   ...starting record: ', nrec2
+      if (myid == 0) print *, '...starting record: ', nrec2
     end if
 
   end subroutine init_stat
