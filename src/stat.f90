@@ -1166,29 +1166,23 @@ contains
   ! Subroutine write_ts: writes the statistics file
   !
   subroutine write_ts
-    use mpi_interface, only : myid, pecount, double_array_par_sum, double_array_par_sum_root 
+    use mpi_interface, only : myid, pecount, double_array_par_sum_root 
     use netcdf
 
     integer :: iret, n, VarID
-    real :: tmp
 
     !
-    ! reduce data from all processes
-    ! to-do: only necessary to root process (id==0) (reduce vs allreduce)
+    ! sum data from all processes to root (myid=0) process
     !
-    call double_array_par_sum(ssclr,ssclrg,nv1)
-    !call double_array_par_sum_root(ssclr,ssclrg,nv1)
+    call double_array_par_sum_root(ssclr,ssclrg,nv1)
     !
     ! write to netcdf file and reset ssclr array
     !
     if(myid==0) then
       do n=1,nv1
          iret = nf90_inq_varid(ncid1, s1(n), VarID)
-         if(iret == 0) then
-           tmp = ssclrg(n) / float(pecount) 
-           iret = nf90_put_var(ncid1, VarID, tmp, start=(/nrec1/))
-           ssclr(n) = 0.
-         end if
+         if(iret == 0) iret = nf90_put_var(ncid1, VarID, (ssclrg(n)/float(pecount)), start=(/nrec1/))
+         ssclr(n) = 0.
       end do
       iret = nf90_sync(ncid1)
       nrec1 = nrec1 + 1
