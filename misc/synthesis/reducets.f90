@@ -5,6 +5,9 @@
 ! This program glues together the ts files from UCLA
 ! Compile with ifort -o reducets reducets.f90 -L/sw/sles9-x64/netcdf-3.6.2-intel/lib -lnetcdf
 ! -I/sw/sles9-x64/netcdf-3.6.2-intel/include on tornado
+! Compile with ifort -o reducets reducets.f90 -L/sw/sles9-x64/netcdf-3.6.2-intel/lib -lnetcdf
+! -I/sw/sles9-x64/netcdf-3.6.2-intel/include on tornado
+
 ! Assume number of time steps nt smaller than 10000 and number of variables nv smaller than 35 ! otherwise need to be changes
 
         integer, parameter :: nv=100,nma=7,nmi=2,nsu=28

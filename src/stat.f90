@@ -139,6 +139,7 @@ contains
     end if
     ssclr(:)   = 0.                 ! changed from = -999. to = 0.
 
+    ! Only create nc file on root process -> single statistic output file
     if(myid == 0) then
       fname =  trim(filprf)//'.ts'
       print "(//' ',49('-')/,' ',/,'  Initializing: ',A20)",trim(fname)
@@ -1165,7 +1166,7 @@ contains
   ! Subroutine write_ts: writes the statistics file
   !
   subroutine write_ts
-    use mpi_interface, only : myid, pecount, double_array_par_sum 
+    use mpi_interface, only : myid, pecount, double_array_par_sum, double_array_par_sum_root 
     use netcdf
 
     integer :: iret, n, VarID
@@ -1173,12 +1174,12 @@ contains
 
     !
     ! reduce data from all processes
-    ! to-do: only necessary to root process (id==0)
+    ! to-do: only necessary to root process (id==0) (reduce vs allreduce)
     !
     call double_array_par_sum(ssclr,ssclrg,nv1)
-
+    !call double_array_par_sum_root(ssclr,ssclrg,nv1)
     !
-    ! define different dimensions
+    ! write to netcdf file and reset ssclr array
     !
     if(myid==0) then
       do n=1,nv1

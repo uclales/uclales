@@ -607,6 +607,7 @@ contains
     endif
 
   end subroutine yshuffle
+
   !
   !---------------------------------------------------------------------------
   ! get maximum across processors
@@ -619,7 +620,6 @@ contains
     integer:: mpiop,ierror
 
     xxl = rxl
-
     call mpi_allreduce(xxl,xxg,1,MPI_DOUBLE_PRECISION, MPI_MAX, &
          MPI_COMM_WORLD, ierror)
 
@@ -630,7 +630,6 @@ contains
     real(kind=8), intent(out) :: xxg
     real(kind=8), intent(in) :: xxl
     integer:: mpiop,ierror
-
 
     call mpi_allreduce(xxl,xxg,1,MPI_DOUBLE_PRECISION, MPI_MAX, &
          MPI_COMM_WORLD, ierror)
@@ -643,7 +642,6 @@ contains
     real(kind=8), intent(in) :: xxl
     integer:: mpiop,ierror
 
-
     call mpi_allreduce(xxl,xxg,1,MPI_DOUBLE_PRECISION, MPI_MIN, &
          MPI_COMM_WORLD, ierror)
 
@@ -655,12 +653,14 @@ contains
     real(kind=8), intent(in) :: xxl
     integer:: mpiop,ierror
 
-
     call mpi_allreduce(xxl,xxg,1,MPI_DOUBLE_PRECISION, MPI_SUM, &
          MPI_COMM_WORLD, ierror)
 
   end subroutine double_scalar_par_sum
 
+  !
+  ! Sum arrays -> send to all processes
+  ! 
   subroutine double_array_par_sum(xxl,xxg,n)
 
     integer, intent(in)::n
@@ -668,26 +668,49 @@ contains
     real(kind=8), intent(in) :: xxl(n)
     integer:: mpiop,ierror
 
-
     call mpi_allreduce(xxl,xxg,n,MPI_DOUBLE_PRECISION, MPI_SUM, &
          MPI_COMM_WORLD, ierror)
 
   end subroutine double_array_par_sum
+
+  !
+  ! Sum arrays -> send to root process
+  ! 
+  subroutine double_array_par_sum_root(xxl,xxg,n)
+
+    integer, intent(in)::n
+    real(kind=8), intent(out) :: xxg(n)
+    real(kind=8), intent(in) :: xxl(n)
+    integer:: mpiop,ierror
+
+    call mpi_reduce(xxl,xxg,n,MPI_DOUBLE_PRECISION, MPI_SUM, &
+         0, MPI_COMM_WORLD, ierror)
+
+  end subroutine double_array_par_sum_root
+
   subroutine broadcast(val, procsend)
-   integer, intent(in) :: procsend
-   real(kind=8), intent(inout) :: val
-   integer :: ierror
-   call mpi_bcast(val, 1, mpi_double_precision, procsend, mpi_comm_world, ierror)
+
+    integer, intent(in) :: procsend
+    real(kind=8), intent(inout) :: val
+    integer :: ierror
+    call mpi_bcast(val, 1, mpi_double_precision, procsend, mpi_comm_world, ierror)
+
   end subroutine broadcast
+
   subroutine broadcast_dbl(val, procsend)
-   integer, intent(in) :: procsend
-   double precision, intent(inout) :: val
-   integer :: ierror
-   call mpi_bcast(val, 1, mpi_double_precision, procsend, mpi_comm_world, ierror)
+
+    integer, intent(in) :: procsend
+    double precision, intent(inout) :: val
+    integer :: ierror
+    call mpi_bcast(val, 1, mpi_double_precision, procsend, mpi_comm_world, ierror)
+
   end subroutine broadcast_dbl
+
   subroutine mpi_get_time(val)
-   double precision, intent(out) :: val
-          val = MPI_Wtime()
+
+    double precision, intent(out) :: val
+    val = MPI_Wtime()
+
   end subroutine mpi_get_time
 
 
