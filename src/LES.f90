@@ -24,7 +24,7 @@
 ! \todo reduce nr of warnings when compiling with gfortran/NAG
 ! \todo Nicer version of accumelated precip
 program ucla_les
-
+  use mpi_interface, only : myid
   implicit none
 
   real :: t1, t2
@@ -33,8 +33,10 @@ program ucla_les
   call driver
   call cpu_time(t2)
 
-  print "(/,' ',49('-')/,' ',A16,F10.1,' s')", '  Execution time: ', t2-t1
-  stop ' ..... Normal termination'
+  if(myid == 0) then
+    print "(/,' ',49('-')/,' ',A16,F10.1,' s')", '  Execution time: ', t2-t1
+    stop ' ..... Normal termination'
+  end if  
 
 contains
 

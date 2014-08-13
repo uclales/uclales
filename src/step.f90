@@ -361,37 +361,28 @@ contains
        xtime = xtime + strtim
 
        call diffuse(time,istp)
-
-       !if (adv=='monotone') then
-       !elseif ((adv=='second').or.(adv=='third').or.(adv=='fourth')) then
-       !   call advection_scalars(adv)
-       !else 
-       !   print *, 'wrong specification for advection scheme'
-       !   call appl_abort(0)
-       !endif
-
        call fadvect
        call ladvect
 
        if (level >= 1) then
-          if (lwaterbudget) then
-             call thermo(level,1)
-          else
-             call thermo(level)
-          end if
+         if (lwaterbudget) then
+           call thermo(level,1)
+         else
+           call thermo(level)
+         end if
        end if
 
        call forcings(xtime,cntlat,sst,div,case_name,time)
 
        if (level >= 1) then
-          call micro(level,istp)
+         call micro(level,istp)
        end if
 
        call corlos
        call buoyancy
        call sponge
        call decay
-       call update (nstep)
+       call update(nstep)
        call poisson
        call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
 
