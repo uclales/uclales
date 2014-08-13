@@ -1,0 +1,53 @@
+&model
+! GRID --------------------
+  nxp          = 260
+  nyp          = 260
+  nzp          = 256
+  deltax       = 10
+  deltay       = 10
+  deltaz       = 10
+  igrdtyp      = 1
+
+! TIME --------------------
+  runtype      = "INITIAL"
+  timmax       = 600.
+  dtlong       = 15
+  istpfl       = 20
+
+! PHYSICS -----------------
+  iradtyp      = 0
+  isfctyp      = 0
+  level        = 0
+  nfpt         = 8
+  distim       = 300.
+  th00         = 296.
+  dthcon       = 100.
+
+  iadv_mom     = 44
+  iadv_scal    = 44    
+  gcfl         = 1.0 
+  cfllim       = 1.2  
+
+! INIT --------------------
+  zrand        = 500
+  itsflg       = 0
+  ipsflg       = 1
+  irsflg       = 1
+  ps           = 1000.0,  5000.,
+  ts           =  290.0,  317,
+  rts          =    0.,   0.,
+  us           =    0.,   0.,
+  vs           =    0.,   0.,
+  umean        = 0.
+  vmean        = 0.
+
+! STAT --------------------
+  hfilin       = 'diu.0014400s'
+  filprf       = 'dry'
+  frqhis       = 9999999. 
+  frqanl       = 9999999.
+  savg_intvl   = 60.
+  ssam_intvl   = 60.
+  mpistat      = .true.
+/
+
