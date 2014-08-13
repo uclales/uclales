@@ -309,15 +309,13 @@ contains
           spngm(kk)=max(0.,(zm(nzp)-zm(k))/((zm(nzp)-zm(nzp-nfpt))*distim))
           spngt(kk) = max(0.,(1./distim - spngt(kk)))
           spngm(kk) = max(0.,(1./distim - spngm(kk)))
-
-          print*,spngt(kk),spngm(kk)
        end do
 
        if(myid == 0) then
-          print "(//' ',49('-')/)"
-          print '(2X,A17)', 'Sponge Layer Init '
-          print '(3X,A12,F9.1,A1)', 'Starting at ', zt(nzp-nfpt), 'm'
-          print '(3X,A18,F9.1,A1)', 'Minimum timescale ', 1/spngm(nfpt),'s'
+          print "(' ',49('-'))"
+          print '(1X,A17)', 'Sponge Layer Init '
+          print '(1X,A18,F9.1,A1)', 'Starting at:      ', zt(nzp-nfpt),'m'
+          print '(1X,A18,F9.1,A1)', 'Minimum timescale:', 1/spngm(nfpt),'s'
        end if
     end if
 
@@ -340,10 +338,10 @@ contains
     integer :: k, iterate, iterate1
     real    :: tavg, zold2, zold1, x1, xx, yy, zz, til
     character (len=260) :: fm0 = &
-         "(/,' -------------------------------------------------',/,"       //&
-         "'  Sounding Input: ',//,7x,'ps',9x,'hs',7x,'ts',6x ,'thds',6x," // &
-         "'us',7x,'vs',7x,'rts',5x,'rel hum',5x,'rhi'/,6x,'(Pa)',7X,'(m)',6X,'(K)'"// &
-         ",6X,'(K)',6X,'(m/s)',4X,'(m/s)',3X,'(kg/kg)',5X,'(%)',5X,'(%)'/,1x/)"
+         "(' ',49('-')/,"         //&
+         "' Sounding Input: ',/,7x,'ps',9x,'hs',7x,'ts',6x ,'thds',6x,"      // &
+         "'us',7x,'vs',7x,'rts',5x,'rel hum',3x,'rhi'/,6x,'(Pa)',7X,'(m)',6X,'(K)'"// &
+         ",6X,'(K)',6X,'(m/s)',4X,'(m/s)',3X,'(kg/kg)',5X,'(%)',5X,'(%)'/)"
     character (len=37) :: fm1 = "(f11.2,f10.2,2f9.2,2f9.2,f10.5,2f9.1)"
     !
     ! arrange the input sounding
@@ -551,13 +549,11 @@ contains
     real :: v1da(nzp), v1db(nzp), v1dc(nzp),x0(nzp), exner
 
     character (len=305) :: fmt =  &
-         "(/,' -------------------------------------------------',/,"     //&
-         "'  Basic State: ',//,4X,'Z',6X,'U0',6X,'V0',6X,'DN0',6X,' P0'"   //&
+         "(' ',49('-')/,"     //&
+         "' Basic State: ',/,4X,'Z',6X,'U0',6X,'V0',6X,'DN0',6X,' P0'"   //&
          ",6X,'PRESS',4X,'TH0',6X,'THV',5X,'RT0',/,3X,'(m)',5X,'(m/s)'"     //&
          ",3X,'(m/s)',2X,'(kg/m3)',2X,'(J/kgK)',4X,'(Pa)',5X,'(K)',5X"      //&
          ",'(K)',4X,'(g/kg)',//,(1X,F7.1,2F8.2,F8.3,2F10.2,2F8.2,F7.2))"
-
-    !
 
     call htint(ns,thds,hs,nzp,th0,zt)
     call htint(ns,us,hs,nzp,u0,zt)
@@ -726,20 +722,18 @@ contains
     end do
 
     if(myid == 0) then
-       print *
        print *,'-------------------------------------------------'
        print 600,zt(kmx),rand(3,3),xx
-       print *,'-------------------------------------------------'
     endif
 
     call sclrset('cnst',n1,n2,n3,fld)
 
     return
 
-600 format(2x,'Inserting random temperature perturbations',    &
-         /3x,'Below: ',F7.2,' meters;',                        &
-         /3x,'with test value of: ',E12.5,                     &
-         /3x,'and a magnitude of: ',E12.5)
+600 format(1x,'Inserting random temperature perturbations',    &
+         /1x,'Below: ',F7.2,' meters;',                        &
+         /1x,'with test value of: ',E12.5,                     &
+         /1x,'and a magnitude of: ',E12.5)
   end subroutine random_pert
 
   subroutine random_init

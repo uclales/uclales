@@ -22,13 +22,14 @@ contains
   ! ----------------------------------------------------------------------
   ! Subroutine Open_NC: Opens a NetCDF File and identifies starting record
   !
-  subroutine open_nc (fname, ename, time, npts, ncid, nrec)
+  subroutine open_nc (fname, ename, time, npts, ncid, nrec, singleio)
 
     integer, intent(in)             :: npts
     integer, intent(out)            :: ncid
     integer, intent(out)            :: nrec
     real, intent (in)               :: time
     character (len=80), intent (in) :: fname, ename
+    logical, intent(in), optional   :: singleio
 
     real, allocatable :: xtimes(:)
 
@@ -36,11 +37,11 @@ contains
     character (len=88) :: lfname
     integer :: iret, ncall, VarID, RecordDimID
     logical :: exans
-
-    if (pecount > 1) then
-       write(lfname,'(a,a1,i4.4,i4.4,a3)') trim(fname),'.',wrxid,wryid,'.nc'
-    else
+ 
+    if((present(singleio) .and. singleio .eqv. .true.) .or. pecount == 1) then
        write(lfname,'(a,a3)') trim(fname),'.nc'
+    else
+       write(lfname,'(a,a1,i4.4,i4.4,a3)') trim(fname),'.',wrxid,wryid,'.nc'
     end if
 
     inquire(file=trim(lfname),exist=exans)
@@ -366,10 +367,10 @@ contains
     nvar0=nend
     fname =  trim(filprf)
     if(myid == 0) print                                                  &
-            "(//' ',49('-')/,' ',/,'   Initializing: ',A20)",trim(fname)
+            "(' ',49('-')/,' Initializing: ',A20)",trim(fname)
     call open_nc( fname, expnme, time, (nxp-4)*(nyp-4), ncid0, nrec0)
     call define_nc( ncid0, nrec0, nvar0, sanal, n1=nzp, n2=nxp-4, n3=nyp-4)
-    if (myid == 0) print *,'   ...starting record: ', nrec0
+    if (myid == 0) print *,'...starting record: ', nrec0
 
   end subroutine init_anal
   !
@@ -544,7 +545,7 @@ contains
 !        call appl_abort(0)
 !     end if
 
-    if (myid==0) print "(//' ',12('-'),'   Record ',I3,' to: ',A60)",    &
+    if (myid==0) print "(' Analysis record ',I3,' to: ',A60)",    &
          nrec0,fname
 
     iret  = nf90_sync(ncid0)

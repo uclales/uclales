@@ -24,7 +24,7 @@
 ! \todo reduce nr of warnings when compiling with gfortran/NAG
 ! \todo Nicer version of accumelated precip
 program ucla_les
-
+  use mpi_interface, only : myid
   implicit none
 
   real :: t1, t2
@@ -33,8 +33,10 @@ program ucla_les
   call driver
   call cpu_time(t2)
 
-  print "(/,' ',49('-')/,' ',A16,F10.1,' s')", '  Execution time: ', t2-t1
-  stop ' ..... Normal termination'
+  if(myid == 0) then
+    print "(A16,F10.1,' s')",' Execution time: ', t2-t1
+    stop ' ..... Normal termination'
+  end if  
 
 contains
 
@@ -75,8 +77,6 @@ contains
     use util, only : fftinix,fftiniy
     use defs, only : SolarConstant
     use sgsm, only : csx, prndtl, clouddiff, idynsgs, waldamp 
-    !use advf, only : lmtr !,advs
-    !use advl, only : advm
     ! BvS
     use advf, only : iadv_scal, lmtr, gcfl, cfllim
     use advl, only : iadv_mom
@@ -95,7 +95,7 @@ contains
          CCN, lwaterbudget, lcouvreux, prc_lev, isfctyp, sfc_albedo, lrad_ca
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,irsflg, iseed, hfilin,   &
          zrand,mag_pert_t,mag_pert_q,lhomrestart
-    use stat, only : ssam_intvl, savg_intvl
+    use stat, only : ssam_intvl, savg_intvl, mpistat
     use mpi_interface, only : myid, appl_abort
     use radiation, only : u0, fixed_sun, rad_eff_radius, fixed_lwin, flwin, radMcICA
     use modnudge, only : lnudge,tnudgefac, qfloor, zfloor, znudgemin, znudgeplus, &
@@ -113,6 +113,7 @@ contains
          naddsc    ,       & ! Number of additional scalars
          savg_intvl,       & ! output statistics frequency
          ssam_intvl,       & ! integral accumulate/ts print frequency
+         mpistat,          & ! Option to write single NetCDF statistics
          corflg , cntlat , & ! coriolis flag
          nfpt   , distim , & ! rayleigh friction points, dissipation time
          lspongeinit     , & ! Sponge back to initial profile or bulk values
@@ -220,14 +221,14 @@ contains
 
     end if
 
-600 format(//' ',49('-')/,' ',/,'  Initial Experiment: ',A50 &
-         /,'  Final Time:         ',F7.1,' s'              )
-601 format(//' ',49('-')/,' ',/,'  Restart Experiment: ',A50 &
-         /,'  Restart File: ',A30,                           &
-         /,'  Final Time: ',F10.1,' s'              )
-602 format('  Output File Stem:   ',A50                      &
-         /,'  History Frequency:  ',F7.1,                    &
-         /,'  Analysis Frequency: ',F7.1)
+600 format(' ',49('-')/,' Initial Experiment: ',A50 &
+         /,' Final Time:         ',F7.1,' s')
+601 format(' ',49('-')/,' Restart Experiment: ',A50 &
+         /,' Restart File: ',A30,                           &
+         /,' Final Time: ',F10.1,' s')
+602 format(' Output File Stem:   ',A50                      &
+         /,' History Frequency:  ',F7.1,' s'                &
+         /,' Analysis Frequency: ',F7.1,' s')
 
     return
   end subroutine define_parm

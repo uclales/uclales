@@ -63,6 +63,7 @@ contains
   subroutine init_mpi
 
     character (len=8) date
+    character (len=30) ghash
 
     call mpi_init(ierror)
     call mpi_comm_size(MPI_COMM_WORLD, pecount, ierror)
@@ -91,9 +92,11 @@ contains
     end select
     !
     call date_and_time(date)
-    if (myid == 0) print "(/1x,75('-'),/2x,A13,A8,/2x,A15,I2,A15,I2,A14)", &
-         'UCLA LES 2.0 ',date, 'Computing using',nbytes,' byte reals and', &
+    ghash = adjustl(GITHASH)
+    if (myid == 0) print "(' ',49('-')/A23,A8,/,A11,A30,/,A16,I2,A15,I2,A14)", &
+         'UCLA LES experiment @ ',date, 'GIT-hash: ',ghash, 'Computing using',nbytes,' byte reals and', &
          intsize," byte integers"
+    !print*,GITHASH
 
   end subroutine init_mpi
   !
@@ -303,15 +306,16 @@ contains
     endif
 
     if (myid == 0) then
-       print 61, 'Processor count', pecount,'nxpl =', nxp,' nypl = ',nyp
-       do i=0,min(nxprocs,nyprocs)-1
-          print "(2x,A13,2I5)", 'x/y offset = ', xoffset(i), yoffset(i)
-       end do
+       print 61, 'Processor count =', pecount,' nxpl =', nxp,' nypl =',nyp
+       !BvS disable for now; annoying with very large jobs 
+       !do i=0,min(nxprocs,nyprocs)-1
+       !   print "(1x,A13,2I5)", 'x/y offset = ', xoffset(i), yoffset(i)
+       !end do
        if (nxprocs>nyprocs) print "(15x,I5)", xoffset(nyprocs:nxprocs-1)
        if (nxprocs<nyprocs) print "(15x,I5)", yoffset(nxprocs:nyprocs-1)
     end if
 
-61 format (/1x,49('-')/2x,A15,I5,2(A6,I5))
+61 format (1x,49('-')/1x,A17,I5,2(A7,I5))
 
   end subroutine define_decomp
   !
@@ -607,6 +611,7 @@ contains
     endif
 
   end subroutine yshuffle
+
   !
   !---------------------------------------------------------------------------
   ! get maximum across processors
@@ -619,7 +624,6 @@ contains
     integer:: mpiop,ierror
 
     xxl = rxl
-
     call mpi_allreduce(xxl,xxg,1,MPI_DOUBLE_PRECISION, MPI_MAX, &
          MPI_COMM_WORLD, ierror)
 
@@ -630,7 +634,6 @@ contains
     real(kind=8), intent(out) :: xxg
     real(kind=8), intent(in) :: xxl
     integer:: mpiop,ierror
-
 
     call mpi_allreduce(xxl,xxg,1,MPI_DOUBLE_PRECISION, MPI_MAX, &
          MPI_COMM_WORLD, ierror)
@@ -643,7 +646,6 @@ contains
     real(kind=8), intent(in) :: xxl
     integer:: mpiop,ierror
 
-
     call mpi_allreduce(xxl,xxg,1,MPI_DOUBLE_PRECISION, MPI_MIN, &
          MPI_COMM_WORLD, ierror)
 
@@ -655,12 +657,14 @@ contains
     real(kind=8), intent(in) :: xxl
     integer:: mpiop,ierror
 
-
     call mpi_allreduce(xxl,xxg,1,MPI_DOUBLE_PRECISION, MPI_SUM, &
          MPI_COMM_WORLD, ierror)
 
   end subroutine double_scalar_par_sum
 
+  !
+  ! Sum arrays -> send to all processes
+  ! 
   subroutine double_array_par_sum(xxl,xxg,n)
 
     integer, intent(in)::n
@@ -668,26 +672,49 @@ contains
     real(kind=8), intent(in) :: xxl(n)
     integer:: mpiop,ierror
 
-
     call mpi_allreduce(xxl,xxg,n,MPI_DOUBLE_PRECISION, MPI_SUM, &
          MPI_COMM_WORLD, ierror)
 
   end subroutine double_array_par_sum
+
+  !
+  ! Sum arrays -> send to root process
+  ! 
+  subroutine double_array_par_sum_root(xxl,xxg,n)
+
+    integer, intent(in)::n
+    real(kind=8), intent(out) :: xxg(n)
+    real(kind=8), intent(in) :: xxl(n)
+    integer:: mpiop,ierror
+
+    call mpi_reduce(xxl,xxg,n,MPI_DOUBLE_PRECISION, MPI_SUM, &
+         0, MPI_COMM_WORLD, ierror)
+
+  end subroutine double_array_par_sum_root
+
   subroutine broadcast(val, procsend)
-   integer, intent(in) :: procsend
-   real(kind=8), intent(inout) :: val
-   integer :: ierror
-   call mpi_bcast(val, 1, mpi_double_precision, procsend, mpi_comm_world, ierror)
+
+    integer, intent(in) :: procsend
+    real(kind=8), intent(inout) :: val
+    integer :: ierror
+    call mpi_bcast(val, 1, mpi_double_precision, procsend, mpi_comm_world, ierror)
+
   end subroutine broadcast
+
   subroutine broadcast_dbl(val, procsend)
-   integer, intent(in) :: procsend
-   double precision, intent(inout) :: val
-   integer :: ierror
-   call mpi_bcast(val, 1, mpi_double_precision, procsend, mpi_comm_world, ierror)
+
+    integer, intent(in) :: procsend
+    double precision, intent(inout) :: val
+    integer :: ierror
+    call mpi_bcast(val, 1, mpi_double_precision, procsend, mpi_comm_world, ierror)
+
   end subroutine broadcast_dbl
+
   subroutine mpi_get_time(val)
-   double precision, intent(out) :: val
-          val = MPI_Wtime()
+
+    double precision, intent(out) :: val
+    val = MPI_Wtime()
+
   end subroutine mpi_get_time
 
 

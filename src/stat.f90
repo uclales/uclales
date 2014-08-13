@@ -21,25 +21,21 @@ module stat
 
   use mpi_interface, only : myid
   use ncio, only : open_nc, define_nc
-  use grid, only : level, isfctyp, svctr, ssclr, nv1, nv2, nsmp
+  use grid, only : level, isfctyp, svctr, svctrg, ssclr, ssclrg, nv1, nv2, nsmp
   use util, only : get_avg, get_cor, get_avg3, get_cor3, get_var3, get_csum
-!irina
-!  use step, only: case_name
+
   implicit none
   private
 
-!irina
-  ! axel, me too!
   integer, parameter :: nvar1 = 72, nvar2 = 121 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2
   real, save         :: fsttm, lsttm
+  logical, parameter :: debug      = .false.
+  logical            :: sflg       = .false.
+  real               :: ssam_intvl = 30.     ! statistical sampling interval
+  real               :: savg_intvl = 1800.   ! statistical averaging interval
+  logical            :: mpistat    = .false. ! write single output NetCDF for statistics 
 
-  logical, parameter :: debug = .false.
-  logical            :: sflg = .false.
-  real               :: ssam_intvl = 30.   ! statistical sampling interval
-  real               :: savg_intvl = 1800. ! statistical averaging interval
-
-!irina
   character (len=7), save :: s1(nvar1)=(/                           &
        'time   ','cfl    ','maxdiv ','zi1_bar','zi2_bar','zi3_bar', & ! 1
        'vtke   ','sfcbflx','wmax   ','tsrf   ','ustar  ','shf_bar', & ! 7
@@ -76,12 +72,12 @@ module stat
        'lwuca  ','lwdca  ','swuca  ','swdca  ','tot_tvw','sgs_tvw', & !115
        'csmago '/)                                          !121
 
-  real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
-       wtv_res(:), wrl_sgs(:), thvar(:)
+  real, save, allocatable :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
+                             wtv_res(:), wrl_sgs(:), thvar(:)
 
   public :: sflg, ssam_intvl, savg_intvl, statistics, init_stat, write_ps,   &
        acc_tend, updtst, sfc_stat, close_stat, fill_scalar, tke_sgs, sgsflxs,&
-       sgs_vel, comp_tke, get_zi
+       sgs_vel, comp_tke, get_zi, mpistat
 
 contains
   !
@@ -93,38 +89,20 @@ contains
   !
   subroutine init_stat(time, filprf, expnme, nzp)
 
-    use grid, only : nxp, nyp, iradtyp
+    use grid, only          : nxp, nyp, iradtyp
     use mpi_interface, only : myid
 
     character (len=80), intent (in) :: filprf, expnme
     integer, intent (in)            :: nzp
     real, intent (in)               :: time
+    character (len=80)              :: fname
 
-    character (len=80) :: fname
-
-!     select case(level)
-!     case (0)
-!        nv1 = 13
-!        nv2 = 58
-!     case (1)
-!        nv1 = 14
-!        nv2 = 58
-!     case (2)
-!        nv1 = 20
-!        nv2 = 83
-!        !irina
-!        if (iradtyp == 4) nv1=21
-!     case (3:4)
-!        nv1 = 43
-!        nv2 = 107
-!     case default
-       nv1 = nvar1
-       nv2 = nvar2
-!     end select
+    nv1 = nvar1
+    nv2 = nvar2
 
     allocate (wtv_sgs(nzp),wtv_res(nzp),wrl_sgs(nzp))
     allocate (tke_res(nzp),tke_sgs(nzp),tke0(nzp),thvar(nzp))
-    allocate (ssclr(nv1))
+    allocate (ssclr(nv1),ssclrg(nv1))
 
     wtv_sgs(:) = 0.
     wtv_res(:) = 0.
@@ -134,24 +112,43 @@ contains
     tke0(:)    = 0.
 
     if (.not. allocated(svctr)) then
-      allocate(svctr(nzp, nv2))
+      allocate(svctr(nzp, nv2),svctrg(nzp, nv2))
       svctr(:,:) = 0.
     end if
     ssclr(:)   = 0.                 ! changed from = -999. to = 0.
 
-    fname =  trim(filprf)//'.ts'
-    if(myid == 0) print                                                  &
-         "(//' ',49('-')/,' ',/,'  Initializing: ',A20)",trim(fname)
-    call open_nc( fname, expnme, time, (nxp-4)*(nyp-4), ncid1, nrec1)
-    call define_nc( ncid1, nrec1, nv1, s1)
-    if (myid == 0) print *, '   ...starting record: ', nrec1
+    ! 
+    ! if(mpistat) the statistics are communicated to the root process
+    ! and a single statistic file (ts,ps) is created. Else statistics are
+    ! written for each process
+    !
+    if(mpistat) then
+      if(myid == 0) then
+        fname =  trim(filprf)//'.ts'
+        print "(' ',49('-')/,' Initializing: ',A20)",trim(fname)
+        call open_nc( fname, expnme, time, (nxp-4)*(nyp-4), ncid1, nrec1, .true.)
+        call define_nc( ncid1, nrec1, nv1, s1)
+        print *, '...starting record: ', nrec1
 
-    fname =  trim(filprf)//'.ps'
-    if(myid == 0) print                                                  &
-         "(//' ',49('-')/,' ',/,'  Initializing: ',A20)",trim(fname)
-    call open_nc( fname, expnme, time,(nxp-4)*(nyp-4), ncid2, nrec2)
-    call define_nc( ncid2, nrec2, nv2, s2, n1=nzp)
-    if (myid == 0) print *, '   ...starting record: ', nrec2
+        fname =  trim(filprf)//'.ps'
+        print "(' ',49('-')/,' Initializing: ',A20)",trim(fname)
+        call open_nc( fname, expnme, time,(nxp-4)*(nyp-4), ncid2, nrec2, .true.)
+        call define_nc( ncid2, nrec2, nv2, s2, n1=nzp)
+        print *, '...starting record: ', nrec2
+      end if
+    else
+      fname =  trim(filprf)//'.ts'
+      if(myid == 0) print "(' ',49('-')/,' Initializing: ',A20)",trim(fname)
+      call open_nc( fname, expnme, time, (nxp-4)*(nyp-4), ncid1, nrec1)
+      call define_nc( ncid1, nrec1, nv1, s1)
+      if (myid == 0) print *, '...starting record: ', nrec1
+ 
+      fname =  trim(filprf)//'.ps'
+      if(myid == 0) print "(' ',49('-')/,' Initializing: ',A20)",trim(fname)
+      call open_nc( fname, expnme, time,(nxp-4)*(nyp-4), ncid2, nrec2)
+      call define_nc( ncid2, nrec2, nv2, s2, n1=nzp)
+      if (myid == 0) print *, '...starting record: ', nrec2
+    end if
 
   end subroutine init_stat
   !
@@ -1165,20 +1162,44 @@ contains
   ! Subroutine write_ts: writes the statistics file
   !
   subroutine write_ts
-
+    use mpi_interface, only : myid, pecount, double_array_par_sum_root 
     use netcdf
 
     integer :: iret, n, VarID
+
+    if(mpistat) then
+      !
+      ! sum data from all processes to root (myid=0) process
+      !
+      call double_array_par_sum_root(ssclr,ssclrg,nv1)
+      ssclrg(:) = ssclrg(:) / float(pecount)
+      !
+      ! write to single netcdf file on myid=0 process
+      !
+      if(myid==0) then
+        do n=1,nv1
+          iret = nf90_inq_varid(ncid1, s1(n), VarID)
+          if(iret == 0) iret = nf90_put_var(ncid1, VarID, ssclrg(n), start=(/nrec1/))
+        end do
+        iret = nf90_sync(ncid1)
+        nrec1 = nrec1 + 1
+      end if
+    else
+      ! 
+      ! Write statistics per process to netcdf
+      !
+      do n=1,nv1
+        iret = nf90_inq_varid(ncid1, s1(n), VarID)
+        if(iret == 0) iret = nf90_put_var(ncid1, VarID, ssclr(n), start=(/nrec1/))
+        ssclr(n) = 0.
+      end do
+      iret = nf90_sync(ncid1)
+      nrec1 = nrec1 + 1
+    end if
+    ! 
+    ! Reset array at all processes
     !
-    ! define different dimensions
-    !
-    do n=1,nv1
-       iret = nf90_inq_varid(ncid1, s1(n), VarID)
-       if(iret == 0) iret = nf90_put_var(ncid1, VarID, ssclr(n), start=(/nrec1/))
-       ssclr(n) = 0.
-    end do
-    iret = nf90_sync(ncid1)
-    nrec1 = nrec1 + 1
+    ssclr(:) = 0.
 
   end subroutine write_ts
   !
@@ -1188,18 +1209,21 @@ contains
   !
   subroutine  write_ps(n1,dn0,u0,v0,zm,zt,time)
 
-    use mpi_interface, only : myid
+    use mpi_interface, only : myid, pecount, double_array_par_sum_root
     use netcdf
     use defs, only : alvl, cp
 
     integer, intent (in) :: n1
     real, intent (in)    :: time
     real, intent (in)    :: dn0(n1), u0(n1), v0(n1), zm(n1), zt(n1)
-
-    integer :: iret, VarID, k, n, kp1
-
-    ! BvS: check if nsmp != 0, causes div/0
+    integer              :: iret, VarID, k, n, kp1
+    !
+    ! Check if nsmp != 0, causes div/0
+    !
     if(nsmp .ne. 0) then
+      !
+      ! Local pre-processing before writing to netcdf
+      !
       lsttm = time
       do k=1,n1
          kp1 = min(n1,k+1)
@@ -1223,43 +1247,77 @@ contains
          svctr(k,10:nv2) = svctr(k,10:nv2)/nsmp
       end do
 
-      iret = nf90_inq_VarID(ncid2, s2(1), VarID)
-      iret = nf90_put_var(ncid2, VarID, time, start=(/nrec2/))
-      if (nrec2 == 1) then
-         iret = nf90_inq_varid(ncid2, s2(2), VarID)
-         iret = nf90_put_var(ncid2, VarID, zt, start = (/nrec2/))
-         iret = nf90_inq_varid(ncid2, s2(3), VarID)
-         iret = nf90_put_var(ncid2, VarID, zm, start = (/nrec2/))
-         iret = nf90_inq_varid(ncid2, s2(4), VarID)
-         iret = nf90_put_var(ncid2, VarID, dn0, start = (/nrec2/))
-         iret = nf90_inq_varid(ncid2, s2(5), VarID)
-         iret = nf90_put_var(ncid2, VarID, u0, start = (/nrec2/))
-         iret = nf90_inq_varid(ncid2, s2(6), VarID)
-         iret = nf90_put_var(ncid2, VarID, v0, start = (/nrec2/))
+      if(mpistat) then
+        !
+        ! sum data from all processes to root (myid=0) process
+        !
+        call double_array_par_sum_root(svctr,svctrg,n1*nv2)
+        svctrg(:,:) = svctrg(:,:) / float(pecount)
+        !
+        ! write to single netcdf file on myid=0 process
+        !
+        if(myid == 0) then
+          iret = nf90_inq_VarID(ncid2, s2(1), VarID)
+          iret = nf90_put_var(ncid2, VarID, time, start = (/nrec2/))
+          if (nrec2 == 1) then
+             iret = nf90_inq_varid(ncid2, s2(2), VarID)
+             iret = nf90_put_var(ncid2, VarID, zt, start = (/nrec2/))
+             iret = nf90_inq_varid(ncid2, s2(3), VarID)
+             iret = nf90_put_var(ncid2, VarID, zm, start = (/nrec2/))
+             iret = nf90_inq_varid(ncid2, s2(4), VarID)
+             iret = nf90_put_var(ncid2, VarID, dn0, start = (/nrec2/))
+             iret = nf90_inq_varid(ncid2, s2(5), VarID)
+             iret = nf90_put_var(ncid2, VarID, u0, start = (/nrec2/))
+             iret = nf90_inq_varid(ncid2, s2(6), VarID)
+             iret = nf90_put_var(ncid2, VarID, v0, start = (/nrec2/))
+          end if
+          iret = nf90_inq_VarID(ncid2, s2(7), VarID)
+          iret = nf90_put_var(ncid2, VarID, fsttm, start=(/nrec2/))
+          iret = nf90_inq_VarID(ncid2, s2(8), VarID)
+          iret = nf90_put_var(ncid2, VarID, lsttm, start=(/nrec2/))
+          iret = nf90_inq_VarID(ncid2, s2(9), VarID)
+          iret = nf90_put_var(ncid2, VarID, nsmp,  start=(/nrec2/))
+          do n=10,nv2
+            iret = nf90_inq_varid(ncid2, s2(n), VarID)
+            iret = nf90_put_var(ncid2,VarID,svctrg(:,n), start=(/1,nrec2/),count=(/n1,1/))
+          end do
+          iret  = nf90_sync(ncid2)
+          nrec2 = nrec2+1
+        end if
+      else
+        iret = nf90_inq_VarID(ncid2, s2(1), VarID)
+        iret = nf90_put_var(ncid2, VarID, time, start = (/nrec2/))
+        if (nrec2 == 1) then
+           iret = nf90_inq_varid(ncid2, s2(2), VarID)
+           iret = nf90_put_var(ncid2, VarID, zt, start = (/nrec2/))
+           iret = nf90_inq_varid(ncid2, s2(3), VarID)
+           iret = nf90_put_var(ncid2, VarID, zm, start = (/nrec2/))
+           iret = nf90_inq_varid(ncid2, s2(4), VarID)
+           iret = nf90_put_var(ncid2, VarID, dn0, start = (/nrec2/))
+           iret = nf90_inq_varid(ncid2, s2(5), VarID)
+           iret = nf90_put_var(ncid2, VarID, u0, start = (/nrec2/))
+           iret = nf90_inq_varid(ncid2, s2(6), VarID)
+           iret = nf90_put_var(ncid2, VarID, v0, start = (/nrec2/))
+        end if
+        iret = nf90_inq_VarID(ncid2, s2(7), VarID)
+        iret = nf90_put_var(ncid2, VarID, fsttm, start=(/nrec2/))
+        iret = nf90_inq_VarID(ncid2, s2(8), VarID)
+        iret = nf90_put_var(ncid2, VarID, lsttm, start=(/nrec2/))
+        iret = nf90_inq_VarID(ncid2, s2(9), VarID)
+        iret = nf90_put_var(ncid2, VarID, nsmp,  start=(/nrec2/))
+        do n=10,nv2
+          iret = nf90_inq_varid(ncid2, s2(n), VarID)
+          iret = nf90_put_var(ncid2,VarID,svctr(:,n), start=(/1,nrec2/),count=(/n1,1/))
+        end do
+        iret  = nf90_sync(ncid2)
+        nrec2 = nrec2+1
       end if
-
-      iret = nf90_inq_VarID(ncid2, s2(7), VarID)
-      iret = nf90_put_var(ncid2, VarID, fsttm, start=(/nrec2/))
-      iret = nf90_inq_VarID(ncid2, s2(8), VarID)
-      iret = nf90_put_var(ncid2, VarID, lsttm, start=(/nrec2/))
-      iret = nf90_inq_VarID(ncid2, s2(9), VarID)
-      iret = nf90_put_var(ncid2, VarID, nsmp,  start=(/nrec2/))
-      do n=10,nv2
-         iret = nf90_inq_varid(ncid2, s2(n), VarID)
-         iret = nf90_put_var(ncid2,VarID,svctr(:,n), start=(/1,nrec2/),    &
-              count=(/n1,1/))
-      end do
-
-      iret  = nf90_sync(ncid2)
-      nrec2 = nrec2+1
-      nsmp  = 0
-
-      do k=1,n1
-         svctr(k,:) = 0.
-      end do
-    else
-      if(myid==0) print*,'Attempt to write_ps with zero samples, skipping..'
     end if
+    ! 
+    ! Reset number of samples and data array at all processes
+    !
+    nsmp = 0
+    svctr(:,:) = 0.
 
   end subroutine write_ps
   !
