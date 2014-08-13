@@ -21,7 +21,7 @@ module stat
 
   use mpi_interface, only : myid
   use ncio, only : open_nc, define_nc
-  use grid, only : level, isfctyp, svctr, ssclr, ssclrg, nv1, nv2, nsmp
+  use grid, only : level, isfctyp, svctr, svctrg, ssclr, ssclrg, nv1, nv2, nsmp
   use util, only : get_avg, get_cor, get_avg3, get_cor3, get_var3, get_csum
 !irina
 !  use step, only: case_name
@@ -134,7 +134,7 @@ contains
     tke0(:)    = 0.
 
     if (.not. allocated(svctr)) then
-      allocate(svctr(nzp, nv2))
+      allocate(svctr(nzp, nv2),svctrg(nzp, nv2))
       svctr(:,:) = 0.
     end if
     ssclr(:)   = 0.                 ! changed from = -999. to = 0.
@@ -148,11 +148,13 @@ contains
       print *, '   ...starting record: ', nrec1
     end if
 
-    fname =  trim(filprf)//'.ps'
-    if(myid==0) print "(//' ',49('-')/,' ',/,'  Initializing: ',A20)",trim(fname)
-    call open_nc( fname, expnme, time,(nxp-4)*(nyp-4), ncid2, nrec2)
-    call define_nc( ncid2, nrec2, nv2, s2, n1=nzp)
-    if(myid==0) print *, '   ...starting record: ', nrec2
+    if(myid == 0) then
+      fname =  trim(filprf)//'.ps'
+      print "(//' ',49('-')/,' ',/,'  Initializing: ',A20)",trim(fname)
+      call open_nc( fname, expnme, time,(nxp-4)*(nyp-4), ncid2, nrec2)
+      call define_nc( ncid2, nrec2, nv2, s2, n1=nzp)
+      print *, '   ...starting record: ', nrec2
+    end if
 
   end subroutine init_stat
   !
@@ -1176,17 +1178,20 @@ contains
     !
     call double_array_par_sum_root(ssclr,ssclrg,nv1)
     !
-    ! write to netcdf file and reset ssclr array
+    ! write to netcdf file
     !
     if(myid==0) then
       do n=1,nv1
-         iret = nf90_inq_varid(ncid1, s1(n), VarID)
-         if(iret == 0) iret = nf90_put_var(ncid1, VarID, (ssclrg(n)/float(pecount)), start=(/nrec1/))
-         ssclr(n) = 0.
+        iret = nf90_inq_varid(ncid1, s1(n), VarID)
+        if(iret == 0) iret = nf90_put_var(ncid1, VarID, (ssclrg(n)/float(pecount)), start=(/nrec1/))
       end do
       iret = nf90_sync(ncid1)
       nrec1 = nrec1 + 1
     end if
+    ! 
+    ! Reset array at all processes
+    !
+    ssclr(:) = 0.
 
   end subroutine write_ts
   !
@@ -1196,18 +1201,22 @@ contains
   !
   subroutine  write_ps(n1,dn0,u0,v0,zm,zt,time)
 
-    use mpi_interface, only : myid
+    use mpi_interface, only : myid, pecount, double_array_par_sum_root
     use netcdf
     use defs, only : alvl, cp
 
     integer, intent (in) :: n1
     real, intent (in)    :: time
     real, intent (in)    :: dn0(n1), u0(n1), v0(n1), zm(n1), zt(n1)
+    integer              :: iret, VarID, k, n, kp1
 
-    integer :: iret, VarID, k, n, kp1
-
-    ! BvS: check if nsmp != 0, causes div/0
+    !
+    ! Check if nsmp != 0, causes div/0
+    !
     if(nsmp .ne. 0) then
+      !
+      ! Local pre-processing before writing to netcdf
+      !
       lsttm = time
       do k=1,n1
          kp1 = min(n1,k+1)
@@ -1230,44 +1239,52 @@ contains
          end if
          svctr(k,10:nv2) = svctr(k,10:nv2)/nsmp
       end do
+      !
+      ! sum data from all processes to root (myid=0) process
+      !
+      call double_array_par_sum_root(svctr,svctrg,n1*nv2)
+      svctrg(:,:) = svctrg(:,:) / float(pecount)
+      !
+      ! Write to netcdf file
+      !
+      if(myid == 0) then
+        iret = nf90_inq_VarID(ncid2, s2(1), VarID)
+        iret = nf90_put_var(ncid2, VarID, time, start = (/nrec2/))
+        if (nrec2 == 1) then
+           iret = nf90_inq_varid(ncid2, s2(2), VarID)
+           iret = nf90_put_var(ncid2, VarID, zt, start = (/nrec2/))
+           iret = nf90_inq_varid(ncid2, s2(3), VarID)
+           iret = nf90_put_var(ncid2, VarID, zm, start = (/nrec2/))
+           iret = nf90_inq_varid(ncid2, s2(4), VarID)
+           iret = nf90_put_var(ncid2, VarID, dn0, start = (/nrec2/))
+           iret = nf90_inq_varid(ncid2, s2(5), VarID)
+           iret = nf90_put_var(ncid2, VarID, u0, start = (/nrec2/))
+           iret = nf90_inq_varid(ncid2, s2(6), VarID)
+           iret = nf90_put_var(ncid2, VarID, v0, start = (/nrec2/))
+        end if
 
-      iret = nf90_inq_VarID(ncid2, s2(1), VarID)
-      iret = nf90_put_var(ncid2, VarID, time, start = (/nrec2/))
-      if (nrec2 == 1) then
-         iret = nf90_inq_varid(ncid2, s2(2), VarID)
-         iret = nf90_put_var(ncid2, VarID, zt, start = (/nrec2/))
-         iret = nf90_inq_varid(ncid2, s2(3), VarID)
-         iret = nf90_put_var(ncid2, VarID, zm, start = (/nrec2/))
-         iret = nf90_inq_varid(ncid2, s2(4), VarID)
-         iret = nf90_put_var(ncid2, VarID, dn0, start = (/nrec2/))
-         iret = nf90_inq_varid(ncid2, s2(5), VarID)
-         iret = nf90_put_var(ncid2, VarID, u0, start = (/nrec2/))
-         iret = nf90_inq_varid(ncid2, s2(6), VarID)
-         iret = nf90_put_var(ncid2, VarID, v0, start = (/nrec2/))
+        iret = nf90_inq_VarID(ncid2, s2(7), VarID)
+        iret = nf90_put_var(ncid2, VarID, fsttm, start=(/nrec2/))
+        iret = nf90_inq_VarID(ncid2, s2(8), VarID)
+        iret = nf90_put_var(ncid2, VarID, lsttm, start=(/nrec2/))
+        iret = nf90_inq_VarID(ncid2, s2(9), VarID)
+        iret = nf90_put_var(ncid2, VarID, nsmp,  start=(/nrec2/))
+
+        do n=10,nv2
+          iret = nf90_inq_varid(ncid2, s2(n), VarID)
+          iret = nf90_put_var(ncid2,VarID,svctrg(:,n), start=(/1,nrec2/),count=(/n1,1/))
+        end do
+
+        iret  = nf90_sync(ncid2)
+        nrec2 = nrec2+1
+
       end if
-
-      iret = nf90_inq_VarID(ncid2, s2(7), VarID)
-      iret = nf90_put_var(ncid2, VarID, fsttm, start=(/nrec2/))
-      iret = nf90_inq_VarID(ncid2, s2(8), VarID)
-      iret = nf90_put_var(ncid2, VarID, lsttm, start=(/nrec2/))
-      iret = nf90_inq_VarID(ncid2, s2(9), VarID)
-      iret = nf90_put_var(ncid2, VarID, nsmp,  start=(/nrec2/))
-      do n=10,nv2
-         iret = nf90_inq_varid(ncid2, s2(n), VarID)
-         iret = nf90_put_var(ncid2,VarID,svctr(:,n), start=(/1,nrec2/),    &
-              count=(/n1,1/))
-      end do
-
-      iret  = nf90_sync(ncid2)
-      nrec2 = nrec2+1
-      nsmp  = 0
-
-      do k=1,n1
-         svctr(k,:) = 0.
-      end do
-    else
-      if(myid==0) print*,'Attempt to write_ps with zero samples, skipping..'
     end if
+    ! 
+    ! Reset number of samples and data array at all processes
+    !
+    nsmp = 0
+    svctr(:,:) = 0.
 
   end subroutine write_ps
   !
