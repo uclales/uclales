@@ -22,13 +22,14 @@ contains
   ! ----------------------------------------------------------------------
   ! Subroutine Open_NC: Opens a NetCDF File and identifies starting record
   !
-  subroutine open_nc (fname, ename, time, npts, ncid, nrec)
+  subroutine open_nc (fname, ename, time, npts, ncid, nrec, singleio)
 
     integer, intent(in)             :: npts
     integer, intent(out)            :: ncid
     integer, intent(out)            :: nrec
     real, intent (in)               :: time
     character (len=80), intent (in) :: fname, ename
+    logical, intent(in), optional   :: singleio
 
     real, allocatable :: xtimes(:)
 
@@ -36,11 +37,11 @@ contains
     character (len=88) :: lfname
     integer :: iret, ncall, VarID, RecordDimID
     logical :: exans
-  
-    if (pecount > 1) then
-       write(lfname,'(a,a1,i4.4,i4.4,a3)') trim(fname),'.',wrxid,wryid,'.nc'
-    else
+ 
+    if((present(singleio) .and. singleio .eqv. .true.) .or. pecount == 1) then
        write(lfname,'(a,a3)') trim(fname),'.nc'
+    else
+       write(lfname,'(a,a1,i4.4,i4.4,a3)') trim(fname),'.',wrxid,wryid,'.nc'
     end if
 
     inquire(file=trim(lfname),exist=exans)
