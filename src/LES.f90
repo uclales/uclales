@@ -75,8 +75,6 @@ contains
     use util, only : fftinix,fftiniy
     use defs, only : SolarConstant
     use sgsm, only : csx, prndtl, clouddiff, idynsgs, waldamp 
-    !use advf, only : lmtr !,advs
-    !use advl, only : advm
     ! BvS
     use advf, only : iadv_scal, lmtr, gcfl, cfllim
     use advl, only : iadv_mom
@@ -95,7 +93,7 @@ contains
          CCN, lwaterbudget, lcouvreux, prc_lev, isfctyp, sfc_albedo, lrad_ca
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,irsflg, iseed, hfilin,   &
          zrand,mag_pert_t,mag_pert_q,lhomrestart
-    use stat, only : ssam_intvl, savg_intvl
+    use stat, only : ssam_intvl, savg_intvl, mpistat
     use mpi_interface, only : myid, appl_abort
     use radiation, only : u0, fixed_sun, rad_eff_radius, fixed_lwin, flwin, radMcICA
     use modnudge, only : lnudge,tnudgefac, qfloor, zfloor, znudgemin, znudgeplus, &
@@ -113,6 +111,7 @@ contains
          naddsc    ,       & ! Number of additional scalars
          savg_intvl,       & ! output statistics frequency
          ssam_intvl,       & ! integral accumulate/ts print frequency
+         mpistat,          & ! Option to write single NetCDF statistics
          corflg , cntlat , & ! coriolis flag
          nfpt   , distim , & ! rayleigh friction points, dissipation time
          lspongeinit     , & ! Sponge back to initial profile or bulk values
