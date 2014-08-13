@@ -109,8 +109,9 @@ module grid
   real, dimension(:,:,:), allocatable :: Immm,Ilmm,Innm,Iqnm,betam,Immt,Ilmt,Innt, &
                                          Iqnt, betat, Immq, Ilmq, Innq, Iqnq, betaq
   !
-  real, dimension (:,:), allocatable :: svctr
-  real, dimension (:)  , allocatable :: ssclr
+  ! Arrays to accumulate / hold statistics
+  real, dimension (:,:), allocatable :: svctr, svctrg ! 1xlocal (per process) 1xglobal
+  real, dimension (:)  , allocatable :: ssclr, ssclrg ! 2xlocal (per process) 1xglobal
   !
   ! Named pointers (to 3D arrays)
   !

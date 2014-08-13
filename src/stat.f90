@@ -21,7 +21,7 @@ module stat
 
   use mpi_interface, only : myid
   use ncio, only : open_nc, define_nc
-  use grid, only : level, isfctyp, svctr, ssclr, nv1, nv2, nsmp
+  use grid, only : level, isfctyp, svctr, ssclr, ssclrg, nv1, nv2, nsmp
   use util, only : get_avg, get_cor, get_avg3, get_cor3, get_var3, get_csum
 !irina
 !  use step, only: case_name
@@ -124,7 +124,7 @@ contains
 
     allocate (wtv_sgs(nzp),wtv_res(nzp),wrl_sgs(nzp))
     allocate (tke_res(nzp),tke_sgs(nzp),tke0(nzp),thvar(nzp))
-    allocate (ssclr(nv1))
+    allocate (ssclr(nv1),ssclrg(nv1))
 
     wtv_sgs(:) = 0.
     wtv_res(:) = 0.
@@ -139,19 +139,19 @@ contains
     end if
     ssclr(:)   = 0.                 ! changed from = -999. to = 0.
 
-    fname =  trim(filprf)//'.ts'
-    if(myid == 0) print                                                  &
-         "(//' ',49('-')/,' ',/,'  Initializing: ',A20)",trim(fname)
-    call open_nc( fname, expnme, time, (nxp-4)*(nyp-4), ncid1, nrec1)
-    call define_nc( ncid1, nrec1, nv1, s1)
-    if (myid == 0) print *, '   ...starting record: ', nrec1
+    if(myid == 0) then
+      fname =  trim(filprf)//'.ts'
+      print "(//' ',49('-')/,' ',/,'  Initializing: ',A20)",trim(fname)
+      call open_nc( fname, expnme, time, (nxp-4)*(nyp-4), ncid1, nrec1)
+      call define_nc( ncid1, nrec1, nv1, s1)
+      print *, '   ...starting record: ', nrec1
+    end if
 
     fname =  trim(filprf)//'.ps'
-    if(myid == 0) print                                                  &
-         "(//' ',49('-')/,' ',/,'  Initializing: ',A20)",trim(fname)
+    if(myid==0) print "(//' ',49('-')/,' ',/,'  Initializing: ',A20)",trim(fname)
     call open_nc( fname, expnme, time,(nxp-4)*(nyp-4), ncid2, nrec2)
     call define_nc( ncid2, nrec2, nv2, s2, n1=nzp)
-    if (myid == 0) print *, '   ...starting record: ', nrec2
+    if(myid==0) print *, '   ...starting record: ', nrec2
 
   end subroutine init_stat
   !
@@ -1165,20 +1165,33 @@ contains
   ! Subroutine write_ts: writes the statistics file
   !
   subroutine write_ts
-
+    use mpi_interface, only : myid, pecount, double_array_par_sum 
     use netcdf
 
     integer :: iret, n, VarID
+    real :: tmp
+
+    !
+    ! reduce data from all processes
+    ! to-do: only necessary to root process (id==0)
+    !
+    call double_array_par_sum(ssclr,ssclrg,nv1)
+
     !
     ! define different dimensions
     !
-    do n=1,nv1
-       iret = nf90_inq_varid(ncid1, s1(n), VarID)
-       if(iret == 0) iret = nf90_put_var(ncid1, VarID, ssclr(n), start=(/nrec1/))
-       ssclr(n) = 0.
-    end do
-    iret = nf90_sync(ncid1)
-    nrec1 = nrec1 + 1
+    if(myid==0) then
+      do n=1,nv1
+         iret = nf90_inq_varid(ncid1, s1(n), VarID)
+         if(iret == 0) then
+           tmp = ssclrg(n) / float(pecount) 
+           iret = nf90_put_var(ncid1, VarID, tmp, start=(/nrec1/))
+           ssclr(n) = 0.
+         end if
+      end do
+      iret = nf90_sync(ncid1)
+      nrec1 = nrec1 + 1
+    end if
 
   end subroutine write_ts
   !
@@ -1224,7 +1237,7 @@ contains
       end do
 
       iret = nf90_inq_VarID(ncid2, s2(1), VarID)
-      iret = nf90_put_var(ncid2, VarID, time, start=(/nrec2/))
+      iret = nf90_put_var(ncid2, VarID, time, start = (/nrec2/))
       if (nrec2 == 1) then
          iret = nf90_inq_varid(ncid2, s2(2), VarID)
          iret = nf90_put_var(ncid2, VarID, zt, start = (/nrec2/))
