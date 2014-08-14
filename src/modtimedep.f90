@@ -149,15 +149,24 @@ contains
       read (ifinput,*)  highheight, highugt, highvgt, highwflst, dummy, dummy, highdqtdt, highdthldt
 
       do k=2,nzp
-        if (highheight<zt(k)) then
+	! Christopher: bug fix (analog in modnudge.f90)
+        !if (highheight<zt(k)) then
+        !  lowheight    = highheight
+        !  lowwflst     = highwflst
+        !  lowdthldt    = highdthldt
+        !  lowdqtdt     = highdqtdt
+        !  read (ifinput,*) highheight, highwflst, highdqtdt, highdthldt
+        !end if
+        do
+          if (highheight>=zt(k)) exit
           lowheight    = highheight
           lowugt       = highugt
           lowvgt       = highvgt
           lowwflst     = highwflst
           lowdthldt    = highdthldt
           lowdqtdt     = highdqtdt
-          read (ifinput,*) highheight, highugt, highvgt, highwflst, dummy, dummy, highdqtdt, highdthldt
-        end if
+          read (ifinput,*) highheight, highwflst, highdqtdt, highdthldt
+        end do
         fac            = (highheight-zt(k))/(highheight - lowheight)
         ugt(k,t)       = (fac*lowugt    + (1-fac)*highugt) - umean
         vgt(k,t)       = (fac*lowvgt    + (1-fac)*highvgt) - vmean
@@ -165,7 +174,7 @@ contains
         dthldtlst(k,t) = fac*lowdthldt + (1-fac)*highdthldt
         dqtdtlst(k,t)  = fac*lowdqtdt  + (1-fac)*highdqtdt
       end do
-    end do
+    end do !(timels<timeend)
 
     if (timels(1) > time_end) then
       if(myid==0) then
