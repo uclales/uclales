@@ -1,3 +1,21 @@
+!
+! compile with:
+! fort -o trackmapperd trackmapper.f90 `/sw/sles10-x64/netcdf-latest-static-intel12/bin/nc-config --fflags --flibs`
+!
+! command line call 
+! trackmapper rico_140.out.xy.track.nc rico_140.out.xy.w_cld.nc nrcloud w_cld smcloudlwp 2
+!
+! argument list is:
+!   1. file name of tracking file
+!   2. file name of file containing variable to be mapped
+!   3. name of cloud tracking variable
+!   4. name of variable to be mapped
+!   5. some variable contained in file 1 with the same target array structure as variable 6
+!   6. number of coarse graining grid points
+!
+!
+
+
 
 module modnetcdf
   use netcdf
@@ -283,23 +301,45 @@ program trackmapper
   read(ctmp,'(i4)') ncoarsegrain
 
   !Open files
+  write (*,*) ' ifile1 = ',trim(ifile1)
+  write (*,*) ' ifile2 = ',trim(ifile2)
 
   call check ( nf90_open(trim(adjustl(ifile1)), NF90_WRITE, ifid1))
   call check ( nf90_open(trim(adjustl(ifile2)), NF90_NOWRITE, ifid2))
 
   !Find dimensions/sizes
-print *, ncvar1%name
+  write (*,*) ' inquire ncvar1 = ',trim(ncvar1%name)
   call inquire_ncvar(ifid1, ncvar1)
-print *, ncvar3%name
+  write (*,*) '   nx = ',ncvar1%dim(1)
+  write (*,*) '   ny = ',ncvar1%dim(2)
+  write (*,*) '   nt = ',ncvar1%dim(3)
+
+  write (*,*) ' inquire ncvar3 = ',trim(ncvar3%name)
   call inquire_ncvar(ifid1, ncvar3)
-print *, ncvar2%name
+  write (*,*) '   tmax  = ',ncvar3%dim(1)
+  write (*,*) '   nrmax = ',ncvar3%dim(2)
+
+  write (*,*) ' inquire ncvar2 = ',trim(ncvar2%name)
   call inquire_ncvar(ifid2, ncvar2)
+  write (*,*) '   nx = ',ncvar2%dim(1)
+  write (*,*) '   ny = ',ncvar2%dim(2)
+  write (*,*) '   nt = ',ncvar2%dim(3)
+
+! size of cloud field variable
   nx = ncvar1%dim(1)
   ny = ncvar1%dim(2)
   nt = ncvar1%dim(3)
 
+! size of original data can be larger
+  nxr = ncvar2%dim(1)
+  nyr = ncvar2%dim(2)
+
+  nctime%name = "time"
+  write (*,*) ' inquire time coordinate'
   call inquire_ncvar(ifid1, nctime)
+  write (*,*) '   ntime = ',nctime%dim(1)
   allocate(time(nctime%dim(1)))
+  write (*,*) ' reading ',trim(nctime%name)
   call read_ncvar(ifid1, nctime, time)
   
   tmax  = ncvar3%dim(1)
@@ -313,12 +353,20 @@ print *, ncvar2%name
   npts = 0
   allocate(var1(nx,ny,nt))
   allocate(var2(nxr,nyr,nt))
-  call read_ncvar(ifid1, ncvar1, var1)
-  call read_ncvar(ifid2, ncvar2, var2,(/1,1,nint(time(1)/(time(2)-time(1)))/),(/nxr,nyr,nt/))
-!   !Time loop
 
+  write (*,*) ' reading ',trim(ncvar1%name)
+  call read_ncvar(ifid1, ncvar1, var1)
+  write (*,*) ' reading ',trim(ncvar2%name)
+  write (*,*) ' tstart ',nint(time(1)/(time(2)-time(1)))
+  write (*,*) ' time(1) ',time(1)
+  !call read_ncvar(ifid2, ncvar2, var2,(/1,1,nint(time(1)/(time(2)-time(1)))/),(/nxr,nyr,nt/))
+  call read_ncvar(ifid2, ncvar2, var2,(/1,1,1/),(/nxr,nyr,nt/))
+  !call read_ncvar(ifid2, ncvar2, var2)
+  write (*,*) ' Done.'  
+
+! Time loop
   do t = 1,nt
-    write (*,*) 'Time = ',t
+    if (mod(t,50).eq.0) write (*,'(a,i5)') '   Time = ',t
     do j=1,ny
       jj = (j-1) * ncoarsegrain + 1
       do i=1,nx
@@ -336,11 +384,29 @@ print *, ncvar2%name
     end do
     tt = tt + 1
   end do
-  where (npts > 0)
-    ovar = ovar/npts
-  elsewhere
-    ovar = fillvalue_r
-  end where
+  write (*,*) 'Finished Time Loop'
+
+  write (*,*) 'Deallocate var1, var2'
+  deallocate(var1)
+  deallocate(var2)
+  do t=1,tmax
+     do nr=1,nrmax
+        if (npts(t,nr).gt.0) then
+           ovar(t,nr) = ovar(t,nr)/npts(t,nr)
+        else
+           ovar(t,nr) = -1e9
+        end if
+     end do
+  end do
+  write (*,*) '  max ovar = ',maxval(ovar)
+  write (*,*) '  min ovar = ',minval(ovar)
+
+!  where (npts > 0)
+!    ovar = ovar/npts
+!  elsewhere
+!    ovar = fillvalue_r
+!  end where
+
   allocate(ncovar%dim(2))
   allocate(ncovar%dimids(2))
   ncovar = ncvar3
@@ -349,7 +415,22 @@ print *, ncvar2%name
   ncovar%name     = ncvar1%name(3:len_trim(ncvar1%name))//trim(ncvar2%name)
   ncovar%longname = ncvar1%longname(1:len_trim(ncvar1%longname)-6)//trim(ncvar2%longname)
   ncovar%units    = ncvar2%units
+!  ncovar%dim      = ncvar3%dim
+!  ncovar%dimids   = ncvar3%dimids
+
+  write (*,*) '    ncovar%name = ',trim(ncovar%name)
+  write (*,*) '    ncovar%longname = ',trim(ncovar%longname)
+  write (*,*) '    ncovar%dim(1) = ',ncovar%dim(1)
+  write (*,*) '    ncovar%dim(2) = ',ncovar%dim(2)
+  write (*,*) '    ncovar%dimids(1) = ',ncovar%dimids(1)
+  write (*,*) '    ncovar%dimids(2) = ',ncovar%dimids(2)
+  write (*,*) '    ncvar3%dimids(1) = ',ncvar3%dimids(1)
+  write (*,*) '    ncvar3%dimids(2) = ',ncvar3%dimids(2)
+
+  write (*,*) ' Define ncovar in netcdf file'
   call define_ncvar(ifid1, ncovar, nf90_float)
+
+  write (*,*) 'Write to netcdf file: '
   call write_ncvar(ifid1, ncovar, ovar)
 
 
