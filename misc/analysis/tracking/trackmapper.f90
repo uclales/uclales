@@ -357,12 +357,9 @@ program trackmapper
   write (*,*) ' reading ',trim(ncvar1%name)
   call read_ncvar(ifid1, ncvar1, var1)
   write (*,*) ' reading ',trim(ncvar2%name)
-  write (*,*) ' tstart ',nint(time(1)/(time(2)-time(1)))
-  write (*,*) ' time(1) ',time(1)
   !call read_ncvar(ifid2, ncvar2, var2,(/1,1,nint(time(1)/(time(2)-time(1)))/),(/nxr,nyr,nt/))
   call read_ncvar(ifid2, ncvar2, var2,(/1,1,1/),(/nxr,nyr,nt/))
   !call read_ncvar(ifid2, ncvar2, var2)
-  write (*,*) ' Done.'  
 
 ! Time loop
   do t = 1,nt

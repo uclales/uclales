@@ -92,75 +92,80 @@ program mergeparticles
     
       if(i .eq. 1 .and. j .eq. 1) then
         ! Put attributes
-	! dimensions
-	call check(nf90_inq_dimid(ncid_in, "time", tid_in))
-	call check(nf90_get_att(ncid_in,tid_in,'longname',lname))
-	call check(nf90_put_att(ncid_out,tid_out,'longname',trim(lname)))
-	call check(nf90_get_att(ncid_in,tid_in,'units',uname))
+        ! dimensions
+        call check(nf90_inq_dimid(ncid_in, "time", tid_in))
+        call check(nf90_get_att(ncid_in,tid_in,'longname',lname))
+        call check(nf90_put_att(ncid_out,tid_out,'longname',trim(lname)))
+        call check(nf90_get_att(ncid_in,tid_in,'units',uname))
         call check(nf90_put_att(ncid_out,tid_out,'units',trim(uname)))
-	call check(nf90_get_att(ncid_in,tid_in,'_FillValue',fvalr))
-	call check(nf90_put_att(ncid_out,tid_out,'_FillValue',fvalr))
-	!call check(nf90_inq_dimid(ncid_in, "particles", pid_in))
-	!call check(nf90_get_att(ncid_in,pid_in,'longname',lname))
-	!call check(nf90_put_att(ncid_out,pid_out,'longname',trim(lname)))
-	!call check(nf90_get_att(ncid_in,pid_in,'units',uname))
+        call check(nf90_get_att(ncid_in,tid_in,'_FillValue',fvalr))
+        call check(nf90_put_att(ncid_out,tid_out,'_FillValue',fvalr))
+        !call check(nf90_inq_dimid(ncid_in, "particles", pid_in))
+        !call check(nf90_get_att(ncid_in,pid_in,'longname',lname))
+        !call check(nf90_put_att(ncid_out,pid_out,'longname',trim(lname)))
+        !call check(nf90_get_att(ncid_in,pid_in,'units',uname))
         !call check(nf90_put_att(ncid_out,pid_out,'units',trim(uname)))
-	!call check(nf90_get_att(ncid_in,pid_in,'_FillValue',fvalr))
-	!call check(nf90_put_att(ncid_out,pid_out,'_FillValue',fvalr))
+        !call check(nf90_get_att(ncid_in,pid_in,'_FillValue',fvalr))
+        !call check(nf90_put_att(ncid_out,pid_out,'_FillValue',fvalr))
         ! variable
-	call check(nf90_get_att(ncid_in,varid_in,'longname',lname))
-	call check(nf90_put_att(ncid_out,varid_out,'longname',trim(lname)))
-	call check(nf90_get_att(ncid_in,varid_in,'units',uname))
+        call check(nf90_get_att(ncid_in,varid_in,'longname',lname))
+        call check(nf90_put_att(ncid_out,varid_out,'longname',trim(lname)))
+        call check(nf90_get_att(ncid_in,varid_in,'units',uname))
         call check(nf90_put_att(ncid_out,varid_out,'units',trim(uname)))
-	call check(nf90_get_att(ncid_in,varid_in,'_FillValue',fval))
-	call check(nf90_put_att(ncid_out,varid_out,'_FillValue',fval))
+        call check(nf90_get_att(ncid_in,varid_in,'_FillValue',fval))
+        call check(nf90_put_att(ncid_out,varid_out,'_FillValue',fval))
         ! Leave define mode
         call check(nf90_enddef(ncid_out))
       end if
       print*,'number of particles',npin
       
-      do p=1,npin/npp+1
-	!prepare to read data
+      do p=npin/npp+1,1,-1
+        !prepare to read data
         start_in  = (/(p-1)*npp+1,1/)
         if (p*npp<npin) then
           count_in  = (/npp,ntin/)
-	  allocate(var_read_in(npp,ntin))
-	  allocate(mask1d(npp))
-	  allocate(mask2d(npp,ntin))
- 	else
+          allocate(var_read_in(npp,ntin))
+          allocate(mask1d(npp))
+          allocate(mask2d(npp,ntin))
+        else
           count_in  = (/npin-((p-1)*npp),ntin/)
           allocate(var_read_in(npin-((p-1)*npp),ntin))
           allocate(mask1d(npin-((p-1)*npp)))
           allocate(mask2d(npin-((p-1)*npp),ntin))
-	end if
+        end if
         
-	!read data
-	call check(nf90_get_var(ncid_in,  varid_in,  var_read_in,  start=start_in,  count=count_in))
-	
-	!reduce dims of var_read_in by deleting the empty particles
+        !read data
+        call check(nf90_get_var(ncid_in,  varid_in,  var_read_in,  start=start_in,  count=count_in))
+        
+        !reduce dims of var_read_in by deleting the empty particles
         mask1d = .not.all(var_read_in.eq.fval,2)
-	npre = count(mask1d)
-	print*,'number of active particles',npre,'of',size(mask1d)
-	mask2d = spread(mask1d,2,ntin)
-	deallocate(mask1d)
-	allocate(var_red(npre,ntin))
-	allocate(var_read_out(ntin,npre))
-	var_red = reshape(pack(var_read_in,mask2d),(/npre,ntin/))
-	deallocate(mask2d)
-	deallocate(var_read_in)
-	var_read_out = transpose(var_red)
-	deallocate(var_red)
-	
-	
-	!prepare to write data
-        start_out = (/1,loc/) 	
+        npre = count(mask1d)
+        print*,'number of active particles',npre,'of',size(mask1d)
+        if (npre == 0) then
+          deallocate(var_read_in)
+          deallocate(mask1d)
+          deallocate(mask2d)
+          exit
+        end if
+        mask2d = spread(mask1d,2,ntin)
+        deallocate(mask1d)
+        allocate(var_red(npre,ntin))
+        allocate(var_read_out(ntin,npre))
+        var_red = reshape(pack(var_read_in,mask2d),(/npre,ntin/))
+        deallocate(mask2d)
+        deallocate(var_read_in)
+        var_read_out = transpose(var_red)
+        deallocate(var_red)
+
+       !prepare to write data
+        start_out = (/1,loc/) 
         count_out = (/ntin,npre/)
-	
+
         !write data
         call check(nf90_put_var(ncid_out, varid_out, var_read_out, start=start_out, count=count_out)) 
-	
-	deallocate(var_read_out)
-	loc = loc + npre
+
+        deallocate(var_read_out)
+        loc = loc + npre
       end do
   
 
