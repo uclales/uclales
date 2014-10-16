@@ -55,7 +55,7 @@ module mcrp
                         ice_multiplication = .TRUE., kessler = .false., khairoutdinov_au = .false.
   integer            :: nprocess,nprocwarm=5,nprocice=18
 
-  integer,parameter  :: iwtrdff = 3,iauto = 1,iaccr = 2,isedimrd = 4,isedimcd = 5, &
+  integer,parameter  :: iwtrdff = 3,iauto = 1,iaccr = 2,isedimrd = 4, isedimcd= 5, &
        iicenucnr = 6, iicenuc = 7, ifreez=8, idep=9, imelt_ice=10,imelt_snow=11,imelt_grp=12, ised_ice=13, &
        iself_ice=14, icoll_ice_snow=15, icoll_ice_grp=16, icoll_snow_grp=17, &
        iriming_ice_cloud=18, iriming_snow_cloud=19, iriming_grp_cloud=20, &
@@ -567,6 +567,10 @@ contains
              cerpt = 2. * pi * Dp * G * S * np(k) * dt
              cerpt = max (cerpt, -rp(k))
              cenpt = c_Nevap*cerpt * np(k) / rp(k)
+             if (cerpt > 0  .and. k<40) then
+               print *, "CERPT above 0", k,cerpt,Dp,G,S,np(k),dt
+               stop
+             end if
              np(k)=np(k) + cenpt
              rp(k)=rp(k) + cerpt
              rv(k)=rv(k) - cerpt
@@ -691,6 +695,10 @@ contains
 	  end if
           au    = au * dt
           au    = min(au,rc(k))
+             if (au > 0  .and. k<40) then
+               print *, "AU above 0", k,au, rc(k), rp(k)
+               stop
+             end if
           rp(k) = rp(k) + au
           rc(k) = rc(k) - au
           tl(k) = tl(k) + convliq(k)*au
@@ -759,6 +767,10 @@ contains
              !
              ac    = ac * dt
              ac    = min(ac, rc(k))
+             if (ac > 0  .and. k<40) then
+               print *,"AC above 0", k,ac
+               stop
+             end if
              rp(k) = rp(k) + ac
              rc(k) = rc(k) - ac
              tl(k) = tl(k) + convliq(k)*ac
