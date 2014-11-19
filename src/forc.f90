@@ -21,6 +21,7 @@ module forc
 
   use defs, only      : cp, pi
   use radiation, only : d4stream,surfacerad
+  use radiation_3d, only : rad_3d
   !irina
   use rad_gcss, only  : gcss_rad
   !cgils
@@ -141,6 +142,47 @@ contains
         stop
       end if
 
+
+       case (6:7)
+         if (present(time_in) .and. present(cntlat) .and. present(sst)) then
+           select case (level)
+           case(3)
+             call rad_3d(cntlat, time_in, sst, sfc_albedo, CCN,         &
+                 dn0, pi0, pi1, a_pexnr, a_theta, vapor, liquid, a_tt,          &
+                 a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo,      &
+                 rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,              &
+                 lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
+           case(4,5)
+             call rad_3d(cntlat, time_in, sst, sfc_albedo, CCN,         &
+                 dn0, pi0, pi1, a_pexnr, a_theta, vapor, liquid, a_tt,          &
+                 a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo,      &
+                 rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,              &
+                 lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa,                       &
+                 ice=a_ricep,nice=a_nicep,grp=a_rgrp )
+ 
+           case default
+             call rad_3d(cntlat, time_in, sst, sfc_albedo, CCN,         &
+                 dn0, pi0, pi1, a_pexnr, a_theta, vapor, liquid, a_tt,          &
+                 a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo,      &
+                 sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,                       &
+                 lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
+           end select
+           if (sflg .and. lrad_ca) then
+             dum0 = 0.
+             dum1 = 0.
+             dum2 = 0.
+             dum3 = 0.
+             dum4 = 0.
+             call rad_3d(cntlat, time_in, sst, 0.05, CCN,                  &
+                 dn0, pi0, pi1, a_pexnr, a_theta, vapor, dum0, dum1,               &
+                 dum2, dum3, a_lflxu_ca, a_lflxd_ca,a_sflxu_ca,a_sflxd_ca, albedo, &
+                 rr=dum4,sflxu_toa=sflxu_toa_ca,sflxd_toa=sflxd_toa_ca,            &
+                 lflxu_toa=lflxu_toa_ca,lflxd_toa=lflxd_toa_ca)
+           end if
+         else
+           if (myid == 0) print *, '  ABORTING: inproper call to tenstream radiation'
+           call appl_abort(0)
+         end if
 
     end select
 !irina
