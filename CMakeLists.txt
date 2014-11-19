@@ -85,6 +85,7 @@ if(WITH_TENSTREAM)
   FIND_PACKAGE (HDF5 NAMES hdf5 REQUIRED)
 
   # Petsc
+  enable_language(Fortran C)
   list (APPEND CMAKE_MODULE_PATH "${TENSTREAM_DIR}/cmake/petsc_cmake_modules/")
   find_package(PETSc REQUIRED)
   add_definitions (${PETSC_DEFINITIONS})
