@@ -873,7 +873,7 @@ contains
       do i = 3, nxp-2
 
         !" 1.1 - Calculate net radiation (average over nradtime)
-        if((iradtyp .eq. 4) .or. (iradtyp .eq. 5)) then
+        if((iradtyp .eq. 4) .or. (iradtyp .eq. 6) .or. (iradtyp .eq. 7) .or. (iradtyp .eq. 5)) then
           if(nstep == 1) then
 
             a_sflxd_avn(2:nradtime,i,j) = a_sflxd_avn(1:nradtime-1,i,j)
