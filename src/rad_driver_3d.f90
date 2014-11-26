@@ -276,7 +276,7 @@ contains
                 fdiv_th( nv1,:,:) = (fdir( nv1,:,:) - fuir(nv1,:,:))
 
               case (7) !tenstr
-                call tenstream_wrapper(.False., nxp,nyp,nv,deltax,deltay,dz, -one,-one, one-ee, tau, w0, phasefct,bf, fd3d,fu3d,fdiv3d, solution_uid=solution_id)
+                call tenstream_wrapper(.False., nxp,nyp,nv,deltax,deltay,dz, -one,-one, one-ee, tau, w0, phasefct,bf, fd3d,fu3d,fdiv3d, solution_uid=solution_id,solution_time=time)
                 solution_id=solution_id+1
 !                if(ib.eq.2 .and. myid.eq.0) then
 !                  do k=1,nv1
@@ -468,7 +468,7 @@ contains
 
               case (7) !tenstr
 
-                call tenstream_wrapper(.True., nxp,nyp,nv,deltax,deltay,dz, zero,u0, sfc_albedo, tau, w0, phasefct,bf, fd3d,fu3d,fdiv3d, solution_uid=solution_id)
+                call tenstream_wrapper(.True., nxp,nyp,nv,deltax,deltay,dz, zero,u0, sfc_albedo, tau, w0, phasefct,bf, fd3d,fu3d,fdiv3d, solution_uid=solution_id, solution_time=time)
                 solution_id=solution_id+1
 !if(ib.eq.5 .and. ig.eq.1 .and. myid.eq.0) then
 !  do k=1,nv1
@@ -788,12 +788,13 @@ contains
       endif
   end subroutine
 
-  subroutine tenstream_wrapper(lsolar, in_nxp,in_nyp,in_nv,in_dx,in_dy,dz, in_phi0,in_u0, in_albedo, tau, w0, pf, bf, fdn,fup,fdiv, solution_uid)
+  subroutine tenstream_wrapper(lsolar, in_nxp,in_nyp,in_nv,in_dx,in_dy,dz, in_phi0,in_u0, in_albedo, tau, w0, pf, bf, fdn,fup,fdiv, solution_uid,solution_time)
       use mpi_interface, only: nxpa,nypa
 #ifdef HAVE_TENSTREAM
       use mpi, only : MPI_COMM_WORLD
       use m_tenstream, only: init_tenstream,set_optical_properties,solve_tenstream, destroy_tenstream, tenstream_get_result
       use m_data_parameters, only : ireals,iintegers
+      use grid, only : dt,nstep
 #endif      
 
       logical                ,intent(in) :: lsolar
@@ -805,10 +806,11 @@ contains
       real,dimension(:,:,:),intent(out) :: fdn,fup,fdiv
 
       integer,optional :: solution_uid
+      real,optional :: solution_time
 
 #ifdef HAVE_TENSTREAM
       integer(iintegers) :: nxp,nyp,nv,uid
-      real(ireals) :: dx,dy,phi0,u0,albedo
+      real(ireals) :: dx,dy,phi0,u0,albedo,time
       real(ireals),dimension(3:in_nxp-2,3:in_nyp-2,in_nv)   :: kabs,ksca,g,deltaz
       real(ireals),dimension(:,:,:),allocatable :: planck
       real(ireals),dimension(:,:,:),allocatable :: edir,edn,eup
@@ -818,8 +820,11 @@ contains
       integer(iintegers) :: k
       real(ireals)       :: theta0,incSolar
 
-      nxp=in_nxp;nyp=in_nyp;nv=in_nv;uid=solution_uid
+      nxp=in_nxp;nyp=in_nyp;nv=in_nv
       dx=in_dx;dy=in_dy;phi0=in_phi0;u0=in_u0;albedo=in_albedo
+
+      if(present(solution_uid) ) uid=solution_uid
+      if(present(solution_time)) time=solution_time*3600*24 + dt*(nstep-1)/3 !time is given in days + approx. a third at each rungekutta step
 
       if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
         theta0=acos(u0)*180./3.141592653589793 !rad2deg
@@ -854,8 +859,8 @@ contains
         call set_optical_properties( kabs, ksca, g, planck)
       endif
 
-      if(present(solution_uid) ) then
-        call solve_tenstream(incSolar,uid)
+      if(present(solution_uid).and.present(solution_time) ) then
+        call solve_tenstream(incSolar,uid,time)
       else
         call solve_tenstream(incSolar)
       endif
