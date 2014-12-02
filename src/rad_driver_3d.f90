@@ -26,6 +26,14 @@ module radiation_3d
   use radiation, only  : zenith, setup, pp, pt, ph,po, plwc, pre, prwc, piwc, pde, pgwc, &
       u0, fixed_sun, radMcICA, rad_eff_radius !namelist parameters
 
+#ifdef HAVE_TENSTREAM
+      use mpi_interface, only: nxpa,nypa
+      use mpi, only : MPI_COMM_WORLD
+      use m_tenstream, only: init_tenstream,set_optical_properties,solve_tenstream, destroy_tenstream, tenstream_get_result, need_new_solution
+      use m_data_parameters, only : ireals,iintegers
+      use grid, only : dt,nstep
+#endif      
+
   implicit none
 
   private 
@@ -42,6 +50,12 @@ module radiation_3d
 
   logical,save :: linit=.False.
   logical,parameter :: ldebug=.False.
+
+#ifdef HAVE_TENSTREAM
+  integer(iintegers) :: solution_uid    ! is solution uid, each subband has one
+  real(ireals)       :: solution_time   ! is set to the approximate time of each solve
+#endif
+
 contains
 
   subroutine rad_3d(alat, time, sknt, sfc_albedo, CCN, dn0, &
@@ -167,8 +181,11 @@ contains
           integer :: ibandloop(3:nxp-2, 3:nyp-2), ibandg(3:nxp-2, 3:nyp-2) ! for McICA, save wavelength band information for each pixel
           real    :: exner(nzp), pres(nzp)
 
-          integer :: solution_id
-          solution_id = 500
+#ifdef HAVE_TENSTREAM
+          real(ireals),dimension(:,:,:),allocatable :: edn,eup
+          real(ireals),dimension(:,:,:),allocatable :: abso
+          solution_uid = 500
+#endif
 
           fdir    = 0 
           fuir    = 0 
@@ -201,8 +218,34 @@ contains
             if(.not.radMcICA) nrgpts = kg(ir_bands(iband))
             do igpt = 1, nrgpts
               if(myid.eq.0.and.ldebug) print *,myid,'DEBUG :: calculating thermal band',iband,igpt    !TODO
+
               ib = iband
               ig = igpt
+
+#ifdef HAVE_TENSTREAM
+              solution_uid=solution_uid+1
+              solution_time = time*3600._ireals*24._ireals + dt*(nstep-1._ireals)/3._ireals !time is given in days + approx. a third at each rungekutta step
+              if(.not.need_new_solution(solution_uid,solution_time)) then
+                allocate(edn (3:nxp-2,3:nyp-2,nv+1))
+                allocate(eup (3:nxp-2,3:nyp-2,nv+1))
+                allocate(abso(3:nxp-2,3:nyp-2,nv  ))
+                call tenstream_get_result(redn=edn,reup=eup,rabso=abso)
+                do k=1,nv
+                  fd3d  (k,:,:) = edn (:,:,k)
+                  fu3d  (k,:,:) = eup (:,:,k)
+                  fdiv3d(k,:,:) = abso(:,:,k) * dz(k,:,:)
+                enddo
+                deallocate(abso)
+
+                fd3d  (nv+1,:,:) = edn(:,:,nv+1)
+                fu3d  (nv+1,:,:) = eup(:,:,nv+1)
+                fdiv3d(nv+1,:,:) = edn(:,:,nv+1) - eup(:,:,nv+1)
+
+                deallocate(edn )
+                deallocate(eup )
+                cycle
+              endif
+#endif
 
               do j=js,je
                 do i=is,ie
@@ -276,14 +319,12 @@ contains
                 fdiv_th( nv1,:,:) = (fdir( nv1,:,:) - fuir(nv1,:,:))
 
               case (7) !tenstr
-                call tenstream_wrapper(.False., nxp,nyp,nv,deltax,deltay,dz, -one,-one, one-ee, tau, w0, phasefct,bf, fd3d,fu3d,fdiv3d, solution_uid=solution_id,solution_time=time)
-                solution_id=solution_id+1
-!                if(ib.eq.2 .and. myid.eq.0) then
-!                  do k=1,nv1
-!                    print *,'tenstr edn',fd3d(k,3,3),fu3d(k,3,3),bf(k,3,3),'::',fdir(k,3,3),fuir(k,3,3)
-!                  enddo
-!                  call exit(1)
-!                endif
+#ifdef HAVE_TENSTREAM
+                call tenstream_wrapper(.False., nxp,nyp,nv,deltax,deltay,dz, -one,-one, one-ee,zero, tau, w0, phasefct,bf, fd3d,fu3d,fdiv3d)
+#else
+                print *,'This build does not support the tenstream solver ... exiting!'
+                call exit(1)
+#endif
 
                 if (radMcICA) then
                   do j = js, je  
@@ -320,12 +361,6 @@ contains
             end do ! i
           end do ! j
 
-!          if(myid.eq.0) then
-!            do k=1,nv1
-!              print *,'edn',fdir(k,3,3),fuir(k,3,3),'::',fdiv_th(k,3,3)
-!            enddo
-!            call exit(1)
-!          endif
       end subroutine
       subroutine solar_rad()
           use grid, only   : iradtyp
@@ -351,8 +386,12 @@ contains
           integer :: iband, igpt,nrbands,nrgpts, ib, ig
           integer :: ibandloop(3:nxp-2, 3:nyp-2), ibandg(3:nxp-2, 3:nyp-2) ! for McICA, save wavelength band information for each pixel
           real    :: exner(nzp), pres(nzp)
-          integer :: solution_id
-          solution_id = 1
+
+#ifdef HAVE_TENSTREAM
+          real(ireals),dimension(:,:,:),allocatable :: edir,edn,eup
+          real(ireals),dimension(:,:,:),allocatable :: abso
+          solution_uid = 1
+#endif
 
           fus      = zero
           fds      = zero
@@ -392,6 +431,34 @@ contains
               ib = iband
               ig = igpt
 
+#ifdef HAVE_TENSTREAM
+              solution_uid=solution_uid+1
+              solution_time = time*3600._ireals*24._ireals + dt*(nstep-1._ireals)/3._ireals !time is given in days + approx. a third at each rungekutta step
+              if(.not.need_new_solution(solution_uid,solution_time)) then
+
+                allocate(edn (3:nxp-2,3:nyp-2,nv+1))
+                allocate(eup (3:nxp-2,3:nyp-2,nv+1))
+                allocate(abso(3:nxp-2,3:nyp-2,nv  ))
+                allocate(edir(3:nxp-2,3:nyp-2,nv+1))
+                call tenstream_get_result(redir=edir,redn=edn,reup=eup,rabso=abso)
+                do k=1,nv
+                  fd3d  (k,:,:) = edn (:,:,k) + edir(:,:,k)
+                  fu3d  (k,:,:) = eup (:,:,k)
+                  fdiv3d(k,:,:) = abso(:,:,k) * dz(k,:,:)
+                enddo
+                deallocate(abso)
+
+                fd3d  (nv+1,:,:) = edn(:,:,nv+1) + edir(:,:,nv+1)
+                fu3d  (nv+1,:,:) = eup(:,:,nv+1)
+                fdiv3d(nv+1,:,:) = edn(:,:,nv+1) - eup(:,:,nv+1)
+
+                deallocate(edir)
+                deallocate(edn )
+                deallocate(eup )
+                cycle
+              endif
+#endif
+
               do j=js,je
                 do i=is,ie
 
@@ -425,8 +492,6 @@ contains
                 end do ! j
               end do ! i
 
-!if(myid.eq.0) print *,ib,ig,'::',sum(tau(:,3,3)),sum(w0(:,3,3)),sum(phasefct(:,1,3,3)),sum(dz(:,3,3))
-
               select case(iradtyp)
 
               case (6) ! d4stream with 3d interface
@@ -442,17 +507,6 @@ contains
                         phasefct(:, 1, i,j), phasefct(:, 2, i,j),    &
                         phasefct(:, 3, i,j), phasefct(:, 4, i,j), fu1, fd1)
 
-!                    call delta_eddington_twostream(tau(:,i,j),w0(:,i,j),phasefct(:,1,i,j)/3,u0,one*u0,sfc_albedo,fd3d(:,i,j),fd1,fu1 )
-!                    fd1 = fd1 + fd3d(:,i,j)
-!if(ib.eq.5 .and. ig.eq.1 .and. myid.eq.0 .and. i.eq.3 .and. j.eq.3) then
-!  do k=1,nv1
-!    print *,'3d qft edn',k,fd1(k),fu1(k),bf(k,3,3),'::',fdir(k,i,j),fuir(k,i,j)
-!  enddo
-!!  call exit(1)
-!endif
-
-!if(myid.eq.0 .and. i.eq.3 .and. j.eq.3) print *,'band',ib,ig,'::',sum(fu1)/size(fu1),sum(fd1)/size(fd1)
-
                     if (radMcICA) then
                       xs_norm = power(solar_bands(ibandloop(i,j) ))/ bandweights(ibandloop(i,j))
                     else
@@ -467,31 +521,30 @@ contains
 
 
               case (7) !tenstr
+                xs_norm = gPointWeight(solar_bands(iband), igpt)*power(solar_bands(iband))
 
-                call tenstream_wrapper(.True., nxp,nyp,nv,deltax,deltay,dz, zero,u0, sfc_albedo, tau, w0, phasefct,bf, fd3d,fu3d,fdiv3d, solution_uid=solution_id, solution_time=time)
-                solution_id=solution_id+1
-!if(ib.eq.5 .and. ig.eq.1 .and. myid.eq.0) then
-!  do k=1,nv1
-!    print *,'tenstr edn',k,fd3d(k,3,3),fu3d(k,3,3),bf(k,3,3),'::',fdir(k,3,3),fuir(k,3,3)
-!  enddo
-!!  call exit(1)
-!endif
-!if(myid.eq.0) print *,'band',ib,ig,'::',sum(fu3d(:,3,3))/size(fu3d(:,3,3)),sum(fd3d(:,3,3))/size(fd3d(:,3,3))
+#ifdef HAVE_TENSTREAM
+                call tenstream_wrapper(.True., nxp,nyp,nv,deltax,deltay,dz, zero,u0, sfc_albedo,xs_norm, tau, w0, phasefct,bf, fd3d,fu3d,fdiv3d)
+#else
+                print *,'This build does not support the tenstream solver ... exiting!'
+                call exit(1)
+#endif
 
                 if (radMcICA) then
-                  do j = js, je  
-                    do i = is, ie  
-                      xs_norm = power(solar_bands(ibandloop(i,j) ))/ bandweights(ibandloop(i,j))
-                      fd3d  (:,i,j) = fd3d  (:,i,j)*xs_norm
-                      fu3d  (:,i,j) = fu3d  (:,i,j)*xs_norm
-                      fdiv3d(:,i,j) = fdiv3d(:,i,j)*xs_norm
-                    end do ! i
-                  end do ! j
-                else
-                  xs_norm = gPointWeight(solar_bands(iband), igpt)*power(solar_bands(iband))
-                  fd3d   = fd3d   *xs_norm
-                  fu3d   = fu3d   *xs_norm
-                  fdiv3d = fdiv3d *xs_norm
+                  print *,'ATTENTION :: this is probably not meaningful! You should not use radMcICA together with 3d solvers'
+                  call exit()
+                !  do j = js, je  
+                !    do i = is, ie  
+                !      xs_norm = power(solar_bands(ibandloop(i,j) ))/ bandweights(ibandloop(i,j))
+                !      fd3d  (:,i,j) = fd3d  (:,i,j)*xs_norm
+                !      fu3d  (:,i,j) = fu3d  (:,i,j)*xs_norm
+                !      fdiv3d(:,i,j) = fdiv3d(:,i,j)*xs_norm
+                !    end do ! i
+                !  end do ! j
+                !else
+                !  fd3d   = fd3d   *xs_norm
+                !  fu3d   = fu3d   *xs_norm
+                !  fdiv3d = fdiv3d *xs_norm
                 end if
                 fds     = fds      + fd3d  
                 fus     = fus      + fu3d  
@@ -788,29 +841,19 @@ contains
       endif
   end subroutine
 
-  subroutine tenstream_wrapper(lsolar, in_nxp,in_nyp,in_nv,in_dx,in_dy,dz, in_phi0,in_u0, in_albedo, tau, w0, pf, bf, fdn,fup,fdiv, solution_uid,solution_time)
-      use mpi_interface, only: nxpa,nypa
 #ifdef HAVE_TENSTREAM
-      use mpi, only : MPI_COMM_WORLD
-      use m_tenstream, only: init_tenstream,set_optical_properties,solve_tenstream, destroy_tenstream, tenstream_get_result
-      use m_data_parameters, only : ireals,iintegers
-      use grid, only : dt,nstep
-#endif      
+  subroutine tenstream_wrapper(lsolar, in_nxp,in_nyp,in_nv,in_dx,in_dy,dz, in_phi0,in_u0, in_albedo,in_incSolar, tau, w0, pf, bf, fdn,fup,fdiv)
 
       logical                ,intent(in) :: lsolar
       integer                ,intent(in) :: in_nxp,in_nyp,in_nv
-      real                   ,intent(in) :: in_dx,in_dy,in_phi0,in_u0,in_albedo
+      real                   ,intent(in) :: in_dx,in_dy,in_phi0,in_u0,in_albedo,in_incSolar
       real,dimension(:,:,:)  ,intent(in) :: tau,w0,dz,bf ! have dimensions (nv,nxp-4,nyp-4); bf with (nv1)
       real,dimension(:,:,:,:),intent(in) :: pf
 
       real,dimension(:,:,:),intent(out) :: fdn,fup,fdiv
 
-      integer,optional :: solution_uid
-      real,optional :: solution_time
-
-#ifdef HAVE_TENSTREAM
-      integer(iintegers) :: nxp,nyp,nv,uid
-      real(ireals) :: dx,dy,phi0,u0,albedo,time
+      integer(iintegers) :: nxp,nyp,nv
+      real(ireals) :: dx,dy,phi0,u0,albedo
       real(ireals),dimension(3:in_nxp-2,3:in_nyp-2,in_nv)   :: kabs,ksca,g,deltaz
       real(ireals),dimension(:,:,:),allocatable :: planck
       real(ireals),dimension(:,:,:),allocatable :: edir,edn,eup
@@ -823,12 +866,9 @@ contains
       nxp=in_nxp;nyp=in_nyp;nv=in_nv
       dx=in_dx;dy=in_dy;phi0=in_phi0;u0=in_u0;albedo=in_albedo
 
-      if(present(solution_uid) ) uid=solution_uid
-      if(present(solution_time)) time=solution_time*3600*24 + dt*(nstep-1)/3 !time is given in days + approx. a third at each rungekutta step
-
       if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
         theta0=acos(u0)*180./3.141592653589793 !rad2deg
-        incSolar = 1
+        incSolar = in_incSolar
       else
         theta0=0
         incSolar=0
@@ -859,11 +899,7 @@ contains
         call set_optical_properties( kabs, ksca, g, planck)
       endif
 
-      if(present(solution_uid).and.present(solution_time) ) then
-        call solve_tenstream(incSolar,uid,time)
-      else
-        call solve_tenstream(incSolar)
-      endif
+      call solve_tenstream(incSolar,solution_uid,solution_time)
 
       allocate(edn (3:nxp-2,3:nyp-2,nv+1))
       allocate(eup (3:nxp-2,3:nyp-2,nv+1))
@@ -903,9 +939,6 @@ contains
           call exit(-1)
         endif
       endif
-#else
-      print *,'This build does not support the tenstream solver ... exiting!'
-      call exit(1)
-#endif
   end subroutine
+#endif
 end module
