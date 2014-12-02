@@ -967,7 +967,7 @@ contains
         if(qsat - vapor(2,i,j) < 0.) then
           rsveg(i,j)  = 0.
           rssoil(i,j) = 0.
-          print*,"Dew fall!!!!!!!!!!!!!!!!!!!!"
+!          print*,"Dew fall!!!!!!!!!!!!!!!!!!!!"
         end if
 
         Wlmx      = LAI(i,j) * Wmax
