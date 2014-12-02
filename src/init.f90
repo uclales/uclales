@@ -213,8 +213,8 @@ contains
        end do
     end if
     if (case_name == 'bubble') then
-      xc = 1e4
-      zc = 1400
+      xc = .5e3
+      zc = 400
       do j=1,nyp
         do i=1,nxp
           do k=1,nzp
