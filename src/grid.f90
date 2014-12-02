@@ -158,8 +158,6 @@ contains
   subroutine define_vars
 
     use mpi_interface, only : myid
-    use radiation,     only : radMcICA
-    use lsmdata,       only : nradtime
     integer :: memsize
 
     allocate (u0(nzp),v0(nzp),pi0(nzp),pi1(nzp),th0(nzp),dn0(nzp),rt0(nzp))
@@ -345,7 +343,6 @@ contains
 
     !Malte: allocate Land surface variables for restart
     if (isfctyp == 5) then
-       if(.not.radMcICA) nradtime=1
        allocate (a_tsoil(4,nxp,nyp))
        allocate (a_phiw (4,nxp,nyp))
        allocate (a_tskin (nxp,nyp))
@@ -353,11 +350,11 @@ contains
        allocate (a_Wl    (nxp,nyp))
        allocate (a_Qnet  (nxp,nyp))
        allocate (a_G0    (nxp,nyp))
-       allocate (a_sflxd_avn(nradtime,nxp,nyp))
-       allocate (a_sflxu_avn(nradtime,nxp,nyp))
-       allocate (a_lflxd_avn(nradtime,nxp,nyp))
-       allocate (a_lflxu_avn(nradtime,nxp,nyp))
-       memsize = memsize + 2*nxp*nyp*4 + 5*nxp*nyp + 4*nxp*nyp*nradtime
+       allocate (a_sflxd_avn(100,nxp,nyp))
+       allocate (a_sflxu_avn(100,nxp,nyp))
+       allocate (a_lflxd_avn(100,nxp,nyp))
+       allocate (a_lflxu_avn(100,nxp,nyp))
+       memsize = memsize + 2*nxp*nyp*4 + 5*nxp*nyp + 4*nxp*nyp*100
     end if
 
     if (level >= 2) then

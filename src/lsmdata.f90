@@ -181,6 +181,7 @@ module lsmdata
                      a_tskin, a_qskin, a_phiw, a_tsoil, a_Wl, dt
 
     use mpi_interface, only: myid, xoffset, yoffset, wrxid, wryid, nxpg, nypg
+    use radiation,     only : radMcICA
 
     integer :: k,ierr
 
@@ -357,6 +358,8 @@ module lsmdata
     cveg       = cvegav
 
     deallocate(LAIG)
+
+    if(.not.radMcICA) nradtime = 1
 
   end subroutine initlsm
 
