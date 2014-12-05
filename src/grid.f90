@@ -831,7 +831,7 @@ contains
       allocate (svctr(nzp,nv2))
       read(10) svctr
 
-       !RV: write accumulated tendencies
+       !RV: read accumulated tendencies
        if (outtend) then
           read(10) wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt
        end if !rv
@@ -845,9 +845,9 @@ contains
           a_tp(:,:,:) = a_tp(:,:,:) + thx - th00
        end if
        if (umx /= umean) then
-          if (myid == 0) print "('  umean changed  -  ',2f8.2)",umean,umx
-          a_up = a_up + umx - umean
-          u0 = u0 + umx - umean
+          if (myid == 0) print "('  umean changed, a_up & u0 left unchanged  -  ',2f8.2)",umean,umx
+          !a_up = a_up + umx - umean !RV: allow adjustment of u-wind, for perturbations!
+          !u0 = u0 + umx - umean      !rv, don't do this, otherwise sets u back to initial in sponge layer
        end if
        if (vmx /= vmean) then
           if (myid == 0) print "('  vmean changed  -  ',2f8.2)",vmean,vmx

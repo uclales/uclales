@@ -1603,11 +1603,11 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('dtdt')    
        if (itype==0) ncinfo = 'dtdt'
-       if (itype==1) ncinfo = 'K'
+       if (itype==1) ncinfo = 'K/s'
        if (itype==2) ncinfo = 'tttt'
     case('dqdt')    
        if (itype==0) ncinfo = 'dqdt'
-       if (itype==1) ncinfo = 'kg/kg'
+       if (itype==1) ncinfo = 'kg/kg/s'
        if (itype==2) ncinfo = 'tttt'
    case default
        if (myid==0) print *, 'ABORTING: variable not found in ncinfo, ',trim(short_name)

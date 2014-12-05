@@ -1530,9 +1530,9 @@ contains
        case(6)
 	  nn=124   !adtendr
        case(7)
-	  nn=129   !dtdt
+	  nn=127   !dtdt
        case(8)
-	  nn=130   !dqdt
+	  nn=128   !dqdt
        case default
 	  nn = 0
        end select
