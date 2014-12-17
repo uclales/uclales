@@ -68,7 +68,7 @@ else()
   MESSAGE(STATUS "Compiler Flags " ${CMAKE_Fortran_FLAGS} ${CMAKE_Fortran_FLAGS_DEBUG})
 endif()
 
-
+MESSAGE(STATUS "NetCDF Includes  :  ${NETCDF_INCLUDE_DIR}")
 set(INCLUDE_DIRS ${NETCDF_INCLUDE_DIR})
 
 option(WITH_TENSTREAM "Include the tenstream solver for radiation" OFF)
@@ -77,27 +77,41 @@ if(WITH_TENSTREAM)
     message( FATAL_ERROR "You asked to include the TENSTREAM solver, yet you did not specify a path to the library -- please set: TENSTREAM_DIR(root dir of tenstream solver) and TENSTREAM_BUILD_DIR(directory where you issued cmake&&make)" )
   endif((NOT TENSTREAM_DIR) OR (NOT TENSTREAM_BUILD_DIR))
 
-  set (CMAKE_C_FLAGS "-cpp -W -Wall -Wuninitialized --std=c99" )
+  # Read config with which the tenstream was built
+  include( ${TENSTREAM_CMAKE} )
 
-  if(NOT HDF5_ROOT_DIR_HINT)
-    set( HDF5_ROOT_DIR_HINT "${TENSTREAM_DIR}/cmake/hdf5")
-  endif(NOT HDF5_ROOT_DIR_HINT)
-  FIND_PACKAGE (HDF5 NAMES hdf5 REQUIRED)
-
-  # Petsc
-  enable_language(Fortran C)
-  list (APPEND CMAKE_MODULE_PATH "${TENSTREAM_DIR}/cmake/petsc_cmake_modules/")
-  find_package(PETSc REQUIRED)
-  add_definitions (${PETSC_DEFINITIONS})
-
-  include_directories (${PETSC_INCLUDES} ${ITAPS_INCLUDES} ${HDF5_INCLUDE_DIRS})
-
-
+  # Add Tenstream
   FIND_LIBRARY(TENSTREAM_LIBRARY tenstream "${TENSTREAM_BUILD_DIR}/lib/")
-  #  LIST(APPEND LIBS "${TENSTREAM_LIBRARY}")
   set(INCLUDE_DIRS ${INCLUDE_DIRS} "${TENSTREAM_BUILD_DIR}/src/")
+  list (APPEND LIBS "${TENSTREAM_LIBRARY}")
 
-  list (APPEND LIBS "${HDF5_LIBRARIES}" "${PETSC_LIBRARIES}" "${TENSTREAM_LIBRARY}")
+  # Add Petsc
+  enable_language(C)
+  set (CMAKE_C_FLAGS "-cpp -W -Wall -Wuninitialized --std=c99" )
+  list(APPEND CMAKE_MODULE_PATH "${TENSTREAM_DIR}/cmake/petsc_cmake_modules/")
+  MESSAGE(STATUS "Using PETSC $ENV{PETSC_DIR} / $ENV{PETSC_ARCH} ")
+  find_package(PETSc REQUIRED)
+  message(STATUS "Found Petsc:    ${PETSC_FOUND}" )
+  message(STATUS "Petsc Includes: ${PETSC_INCLUDES}" )
+  message(STATUS "Petsc Library : ${PETSC_LIBRARIES}")
+  message(STATUS "Petsc compiler: ${PETSC_COMPILER}" )
+  message(STATUS "Petsc VERSION : ${PETSC_VERSION}" )
+  message(STATUS "Petsc definiti: ${PETSC_DEFINITIONS}")
+
+  include_directories (${PETSC_INCLUDES})
+  list (APPEND LIBS "${PETSC_LIBRARIES}")
+
+  # Add HDF5
+  list(APPEND CMAKE_MODULE_PATH "${TENSTREAM_DIR}/cmake/hdf5/")
+  set(HDF5_ROOT_DIR_HINT ${USER_HDF5_ROOT_DIR_HINT})
+  find_package(HDF5 REQUIRED)
+  message(STATUS "Found HDF5            :: ${HDF5_FOUND} ")
+  message(STATUS "HDF5 Includes         :: ${HDF5_INCLUDE_DIRS} ")
+  message(STATUS "HDF5 Libraries        :: ${HDF5_LIBRARIES} ")
+
+  include_directories (${ITAPS_INCLUDES} ${HDF5_INCLUDE_DIRS})
+  list (APPEND LIBS "${HDF5_LIBRARIES}")
+
 
   add_definitions(-DHAVE_TENSTREAM)
 endif(WITH_TENSTREAM)
