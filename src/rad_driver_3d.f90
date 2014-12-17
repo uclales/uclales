@@ -17,6 +17,17 @@
 ! Copyright 1999-2008, Bjorn B. Stevens, Dep't Atmos and Ocean Sci, UCLA
 !----------------------------------------------------------------------------
 !
+! This is an adaptation from the original Independent Pixel Code.
+! In the IPA Code the spatial dimensions are the outermost loops.
+! To allow for 3D approximations and solvers, we need to rearrange the loop structure,
+! so that the spectral integration is outermost.
+! The 1D routines are reused as much as possible to guarantee conformance to earlier results.
+! The 3D interface can be called with iradtype:
+! 6 -- 1D original delta 4 stream solver
+! 7 -- thermal and solar tenstream solver
+! The copying of the optical properties fields results in a performance penalty 
+! -- hence if you do not use a 3D solver, please use the 1D interface with iradtype=4
+
 module radiation_3d
 
   use grid, only       : nzp,nxp,nyp, deltax,deltay,zm
@@ -41,7 +52,7 @@ module radiation_3d
 
   character (len=10), parameter :: background = 'backrad_in'
 
-  !thos global vars are in radiation module...  ::  pp, pt, ph, po, pre, pde, plwc, piwc, prwc, pgwc
+  !those global vars are in radiation module...  ::  pp, pt, ph, po, pre, pde, plwc, piwc, prwc, pgwc
   real,parameter :: zero=0, one=1
 
   integer :: npts
