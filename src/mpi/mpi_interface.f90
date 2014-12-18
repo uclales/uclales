@@ -100,8 +100,8 @@ contains
     tmp = dble(myid)
     call broadcast_dbl(tmp,0)
     if(tmp.ne.dble(0)) then
-      print *,'Checking mpi_bcast/broadcast_dbl at
-      rank',myid,' ... failed! Should be 0 but is',tmp
+      print *,'Checking mpi_bcast/broadcast_dbl at rank',myid, &
+              ' ... failed! Should be 0 but is',tmp
       call appl_abort(1)
     endif
 
