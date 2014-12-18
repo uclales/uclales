@@ -63,6 +63,7 @@ contains
   subroutine init_mpi
 
     character (len=8) date
+    double precision :: tmp
 
     call mpi_init(ierror)
     call mpi_comm_size(MPI_COMM_WORLD, pecount, ierror)
@@ -94,6 +95,15 @@ contains
     if (myid == 0) print "(/1x,75('-'),/2x,A13,A8,/2x,A15,I2,A15,I2,A14)", &
          'UCLA LES 2.0 ',date, 'Computing using',nbytes,' byte reals and', &
          intsize," byte integers"
+
+    !check mpi_bcast
+    tmp = dble(myid)
+    call broadcast_dbl(tmp,0)
+    if(tmp.ne.dble(0)) then
+      print *,'Checking mpi_bcast/broadcast_dbl at
+      rank',myid,' ... failed! Should be 0 but is',tmp
+      call appl_abort(1)
+    endif
 
   end subroutine init_mpi
   !
