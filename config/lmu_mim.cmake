@@ -2,7 +2,7 @@
 set(CMAKE_Fortran_COMPILER "/home/opt/cosmo_tica_lib/ompi1.8.1/openmpi-1.8.1/install/bin/mpif90")
 set(Fortran_COMPILER_WRAPPER "/home/opt/cosmo_tica_lib/ompi1.8.1/openmpi-1.8.1/install/bin/mpif90")
 
-set(USER_Fortran_FLAGS "-fdefault-real-8 -ffree-line-length-none") #
+set(USER_Fortran_FLAGS "-fdefault-real-8 -fdefault-double-8 -ffree-line-length-none") #
 set(USER_Fortran_FLAGS_RELEASE "-O3 ") #-march=native -mtune=native")
 set(USER_Fortran_FLAGS_DEBUG "-fbacktrace -finit-real=nan -W -Wall -Wuninitialized -g -pg -fcheck=all -fbounds-check -ffpe-trap=invalid,zero,overflow") #")
 

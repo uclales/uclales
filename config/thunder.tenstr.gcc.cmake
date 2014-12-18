@@ -2,7 +2,7 @@
 set(CMAKE_Fortran_COMPILER "gfortran")
 set(Fortran_COMPILER_WRAPPER mpif90)
 
-set(USER_Fortran_FLAGS "-fbacktrace -finit-real=nan -fdefault-real-8  -fno-f2c -ffree-line-length-none")
+set(USER_Fortran_FLAGS "-fbacktrace -finit-real=nan -fdefault-real-8 -fdefault-double-8 -fno-f2c -ffree-line-length-none")
 set(USER_Fortran_FLAGS_RELEASE "-funroll-all-loops -O3 -march=native -mtune=native")
 set(USER_Fortran_FLAGS_DEBUG "-W -Wall -Wuninitialized -fcheck=all -fbacktrace -O0 -g -ffpe-trap=invalid,zero,overflow")
 
