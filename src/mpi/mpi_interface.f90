@@ -685,6 +685,12 @@ contains
    integer :: ierror
    call mpi_bcast(val, 1, mpi_double_precision, procsend, mpi_comm_world, ierror)
   end subroutine broadcast_dbl
+  subroutine broadcast_logical(val, procsend)
+   integer, intent(in) :: procsend
+   logical, intent(inout) :: val
+   integer :: ierror
+   call mpi_bcast(val, 1, mpi_logical, procsend, mpi_comm_world, ierror)
+  end subroutine broadcast_logical
   subroutine mpi_get_time(val)
    double precision, intent(out) :: val
           val = MPI_Wtime()
