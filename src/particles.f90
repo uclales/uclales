@@ -24,6 +24,11 @@
 !! \author Bart van Stratum
 !! \todo Merge interpolation functions!
 !! \todo Extend Lagrange interpolation to non-equidistant grids
+!
+!
+!> Lagrangian Drop Module (LD)  !Ann Kristin Naumann
+!! Lagrangian Drop model to study warm rain microphysics incl. raindrop evaporation,
+!! accretion of bulk cloud water, selfcollection among LDs and sedimentation
 
 
 module modparticles
@@ -46,24 +51,23 @@ module modparticles
   logical            :: lpartdumpui    = .false.        !< Switch for writing velocities to dump
   logical            :: lpartdumpth    = .false.        !< Switch for writing temperatures (liquid water / virtual potential T) to dump
   logical            :: lpartdumpmr    = .false.        !< Switch for writing moisture (total / liquid (+rain if level==3) water mixing ratio) to dump
-  logical            :: lpartdumpp     = .false.        !< Switch for particle dump: pressure)
+  logical            :: lpartdumpp     = .false.        !< Switch for particle dump: pressure
   logical            :: lpartdumptau   = .false.        !< Switch for LD dump: tau and dissipation
   real               :: frqpartdump    =  3600          !< Time interval for particle dump
   integer            :: int_part       =  1             !< Interpolation scheme, 1=linear, 3=3rd order Lagrange
   real               :: ldropstart     = 0.             !< Earliest time to start drops
 
-  real               :: nppd = 1./(5.e8)               ! number of Lagrangian particles per real drops
+  real               :: nppd = 1./(5.e8)                ! number of Lagrangian particles per real drops
   character(30)      :: startfile
   integer            :: ifinput        = 1
   integer(kind=long) :: np
   real               :: tnextdump
   real               :: randint   = 20.
   real               :: tnextrand = 6e6 
-  logical            :: lpartmass = .true.              ! hard code switch to turn on/off drop mass 
+  logical            :: lpartmass = .true.              ! switch to turn on/off drop mass 
                                                         ! used only in combination with lpartdrop = .true. (namelist)
   logical            :: selfcollection = .true.         ! switch for enabling self-collection of LD
   logical            :: var_mtpl       = .true.         ! switch to use a variable multiplicity in self-collection
-                                                        ! used only in combination with lpartmass = .true.
   logical            :: cal_ecoal      = .true.         ! switch for coalescence efficiency as in Seifert et al. 2005
   logical            :: sc_zsort       = .true.         ! switch to use a selfcollection that depends on the LD's
                                                         ! vertical position 
@@ -241,24 +245,6 @@ contains
     ! Communicate particles to other procs
     call partcomm
 
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    ! Temporary hack, sync particle dump with statistics
-    ! see also step.f90
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-    ! Statistics
-    !if (nstep==3) then
-    !  ! Particle dump
-    !  if((time + (0.5*dt) >= tnextdump .or. time + dt >= timmax) .and. lpartdump) then
-    !    !call particledump(time)
-    !    call balanced_particledump(time)
-    !    !call rawparticledump(time)
-    !    tnextdump = tnextdump + frqpartdump
-    !  end if
-    !  !call checkdiv
-    !end if
-
-
   end subroutine particles
 
   !
@@ -276,15 +262,16 @@ contains
 
     ! Let drops grow
     if (lpartdrop.and.lpartmass) then
-      ! Accretion, condensation and evaporation
+      ! Accretion and evaporation
       particle => head
       do while( associated(particle))
         if (particle%x.ne.fillvalue_double) then
+          ! accretion and evaporation of Lagrangian drops
           call drop_growth(particle)
         end if
         particle => particle%next
       end do
-      ! Self-collection of Lagrangian drops
+      ! selfcollection of Lagrangian drops
       if (selfcollection) call self_coll
     end if
       
@@ -806,8 +793,8 @@ contains
     
     ! tubulence correction
     if(lturbulence) then
-      psi   = (1.0 + zk)/(1.0 + cturb*zk)               ! Eq (3.2)-
-      C_d = C_d / psi                     ! Eq (3.1)
+      psi   = (1.0 + zk)/(1.0 + cturb*zk)      ! Eq (3.2)
+      C_d = C_d / psi                          ! Eq (3.1)
     end if
     
     if(present(tau)) tau = 8.* (D0/2.)**3. *rowt / (3. * C_d *i1d(particle%z,dn0) * (Dmax/2.)**2.) / vt 
@@ -817,8 +804,6 @@ contains
 !-----------------------------------------------------
 ! subroutine drop_vel
 ! > Calculates the drop velocity according to momentum equation
-! > 
-! > not working with SGS yet ?
 !---------------------------------------------------
   subroutine drop_vel(particle)
     use grid, only : dxi, dyi, dzi_t, dt, dn0, nstep
@@ -2270,9 +2255,9 @@ contains
       particle => head
       do while( associated(particle) )
         if (particle%x.ne.fillvalue_double) then
-          !p = floor((particle%unique-1) / nlocal)       ! Which proc to send to
-          p = (particle%unique - floor(particle%unique)) * nprocs
-          !if(p .gt. nprocs-1) p = nprocs-1              ! Last proc gets remaining particles
+          !p = floor((particle%unique-1) / nlocal)                 ! Which proc to send to 
+          !if(p .gt. nprocs-1) p = nprocs-1                        ! Last proc gets remaining particles
+          p = (particle%unique - floor(particle%unique)) * nprocs  ! Which proc to send to (LD)
    
           if((lpartdumpth .or. lpartdumpmr)) then
             if(level==0) then
@@ -2638,7 +2623,7 @@ contains
     particle => head
     do while(associated(particle))
       if(particle%x.ne.fillvalue_double.and. &
-      !(particle%mass.lt.(0.13*rain%x_min).or.particle%z<=(1+zmax))) then
+      !(particle%mass.lt.(0.13*rain%x_min).or.particle%z<=(1+zmax))) then    ! only for MN20
       (particle%mass.lt.(rain%x_min).or.particle%z<=(1+zmax))) then
         ndel = ndel + 2
       end if
@@ -2650,7 +2635,7 @@ contains
     particle => head
     do while(associated(particle))
       if(particle%x.ne.fillvalue_double.and. &
-      !(particle%mass.lt.(0.13*rain%x_min).or.particle%z<=(1+zmax))) then
+      !(particle%mass.lt.(0.13*rain%x_min).or.particle%z<=(1+zmax))) then    ! only for MN20
       (particle%mass.lt.(rain%x_min).or.particle%z<=(1+zmax))) then
         ndel_n(ndel+1) = particle%unique
         ndel_n(ndel+2) = particle%nd
@@ -2729,7 +2714,7 @@ contains
   !
   !--------------------------------------------------------------------------
   ! subroutine activate_drops : activates drops proportional to the autoconversion rate
-  !   - puts a new drops on a deactivated particle if available
+  !   - puts a new drop on a deactivated particle if available
   !   - puts remaining new drops on new particles
   !! \todo activate_drops: extend to non-equidistant grids ?!
   !--------------------------------------------------------------------------
@@ -2778,7 +2763,7 @@ contains
               a_npauto(k,i,j) = a_npauto(k,i,j)/(rain%x_min*4./3.)*nppd/dxi/dyi/dzi_t(k)
             end select
 
-            call random_number(randnr)          ! Random seed has been called from init_particles...
+            call random_number(randnr)   
 
             if(randnr(1)<(a_npauto(k,i,j)-floor(a_npauto(k,i,j)))) then
               a_npauto(k,i,j) = a_npauto(k,i,j) + 1.
@@ -2788,7 +2773,7 @@ contains
               newp = 0
               do while(associated(particle).and.(newp.lt.floor(a_npauto(k,i,j))))
                 if(particle%x.eq.fillvalue_double) then
-                  call random_number(randnr)          ! Random seed has been called from init_particles...
+                  call random_number(randnr)
                   particle%x              = real(i) + randnr(2)
                   particle%y              = real(j) + randnr(3)
                   particle%z              = real(k) + randnr(4)
@@ -2905,10 +2890,8 @@ contains
     
     ! drop evaporation
     
-    !ev = (rt-rl)*prs/(ep+rt-rl)
     es = esl(tk)
     rs = rslf(prs,tk)
-    !S  = ev/es
     S = (rt-rl)/rs
     
     if (S.lt.1) then
@@ -2924,9 +2907,7 @@ contains
    
       particle%mass = particle%mass + f_v* 4.*pi*r0* rowt*(S-1) / (Fk+Fd) * dt
     end if
-    
-    !add drop breakup at 3mm to 6mm?! 
-        
+     
   end subroutine drop_growth
 
   !
@@ -3441,7 +3422,7 @@ contains
     kmax = size(zm)
 
     firststartl = 1e9
-!     call init_random_seed()
+!    call init_random_seed()
 
     ! clear pointers to head and tail
     nullify(head)
@@ -4149,7 +4130,7 @@ contains
     end if
 
   end subroutine delete_particle
-!
+
 !   subroutine init_random_seed()
 !     integer :: i, n, clock
 !     integer, dimension(:), allocatable :: seed
@@ -4422,57 +4403,5 @@ contains
   !  deallocate(nremote, sendbuff)
 
   !end subroutine particledump
-
-  !
-  !--------------------------------------------------------------------------
-  ! Subroutine randomize
-  !
-  !> !!!! DEPRECATED !!!!!
-  !
-  !> Randomizes the X,Y,Z positions of all particles in
-  !> the lowest grid level every RK3 cycle. Called from: particles()
-  !--------------------------------------------------------------------------
-  !
-  !subroutine randomize(once)
-  !  use mpi_interface, only : nxg, nyg, nyprocs, nxprocs
-  !  implicit none
-
-  !  logical, intent(in) :: once            !> flag: randomize all particles (false) or only the onces which sink into the surface layer (true)?
-  !  real                :: zmax = 1.       ! Max height in grid coordinates
-  !  integer             :: nyloc, nxloc
-  !  type (particle_record), pointer:: particle
-  !  real                :: randnr(3)
-
-  !  nyloc   = nyg / nyprocs
-  !  nxloc   = nxg / nxprocs
-
-  !  if(once) then
-  !    particle => head
-  !    do while(associated(particle) )
-  !      if( particle%z <= (1. + zmax) .and. particle%zprev > (1. + zmax) ) then
-  !        call random_number(randnr)
-  !        particle%x = (randnr(1) * nyloc) + 3
-  !        particle%y = (randnr(2) * nxloc) + 3
-  !        !particle%z = zmax * randnr(3)    + 1
-  !        particle%ures_prev = 0.
-  !        particle%vres_prev = 0.
-  !        particle%wres_prev = 0.
-  !      end if
-  !      particle => particle%next
-  !    end do
-  !  else
-  !    particle => head
-  !    do while(associated(particle) )
-  !      if( particle%z <= (1. + zmax) ) then
-  !        call random_number(randnr)
-  !        particle%x = (randnr(1) * nyloc) + 3
-  !        particle%y = (randnr(2) * nxloc) + 3
-  !        !particle%z = zmax * randnr(3)    + 1
-  !      end if
-  !      particle => particle%next
-  !    end do
-  !  end if
-
-  !end subroutine randomize
 
 end module modparticles
