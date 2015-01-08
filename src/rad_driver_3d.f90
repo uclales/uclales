@@ -61,6 +61,7 @@ module radiation_3d
 
   logical,save :: linit=.False.
   logical,parameter :: ldebug=.False.
+!  logical,parameter :: ldebug=.True.
 
 #ifdef HAVE_TENSTREAM
   integer(iintegers) :: solution_uid    ! is solution uid, each subband has one
@@ -874,8 +875,10 @@ contains
       integer(iintegers) :: k
       real(ireals)       :: theta0,incSolar
 
+
       nxp=in_nxp;nyp=in_nyp;nv=in_nv
       dx=in_dx;dy=in_dy;phi0=in_phi0;u0=in_u0;albedo=in_albedo
+      if(ldebug.and.myid.eq.0) print *,'Calling tenstream wrapper with lsolar',lsolar,'nx/ny',nxp,nyp
 
       if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
         theta0=acos(u0)*180./3.141592653589793 !rad2deg
@@ -903,7 +906,7 @@ contains
         enddo
       endif
 
-      call init_tenstream(MPI_COMM_WORLD, nxp-4,nyp-4,nv, dx,dy,phi0, theta0, albedo, nxproc=nxpa, nyproc=nypa, dz3d=deltaz)
+      call init_tenstream(MPI_COMM_WORLD, nxp-4,nyp-4,nv, dx,dy,phi0, theta0, albedo, nxproc=nxpa, nyproc=nypa,  dz3d=deltaz)
       if(lsolar) then
         call set_optical_properties( kabs, ksca, g )
       else

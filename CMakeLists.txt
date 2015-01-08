@@ -83,16 +83,23 @@ if(WITH_TENSTREAM)
   endif((NOT TENSTREAM_DIR) OR (NOT TENSTREAM_BUILD_DIR) OR (NOT TENSTREAM_CMAKE) )
 
   # Read config with which the tenstream was built
-  include( ${TENSTREAM_CMAKE} )
+  #  include( ${TENSTREAM_CMAKE} )
+  # set(CMAKE_C_COMPILER       mpicc)
+
+  set(CMAKE_C_FLAGS               ${USER_C_FLAGS} )
+  set(CMAKE_Fortran_FLAGS         ${USER_Fortran_FLAGS} )
+  set(CMAKE_Fortran_FLAGS_RELEASE ${USER_Fortran_FLAGS_RELEASE} )
+  set(CMAKE_Fortran_FLAGS_DEBUG   ${USER_Fortran_FLAGS_DEBUG})
+
 
   # Add Tenstream
-  FIND_LIBRARY(TENSTREAM_LIBRARY tenstream "${TENSTREAM_BUILD_DIR}/lib/")
-  set(INCLUDE_DIRS ${INCLUDE_DIRS} "${TENSTREAM_BUILD_DIR}/src/")
-  list (APPEND LIBS "${TENSTREAM_LIBRARY}")
+    FIND_LIBRARY(TENSTREAM_LIBRARY tenstream "${TENSTREAM_BUILD_DIR}/lib/")
+    set(INCLUDE_DIRS ${INCLUDE_DIRS} "${TENSTREAM_BUILD_DIR}/src/")
+    list (APPEND LIBS "${TENSTREAM_LIBRARY}")
 
   # Add Petsc
   enable_language(C)
-  set (CMAKE_C_FLAGS "-cpp -W -Wall -Wuninitialized --std=c99" )
+  #  set (CMAKE_C_FLAGS "-cpp -W -Wall -Wuninitialized --std=c99" )
   list(APPEND CMAKE_MODULE_PATH "${TENSTREAM_DIR}/cmake/petsc_cmake_modules/")
   MESSAGE(STATUS "Using PETSC $ENV{PETSC_DIR} / $ENV{PETSC_ARCH} ")
   find_package(PETSc REQUIRED)
@@ -107,21 +114,23 @@ if(WITH_TENSTREAM)
   list (APPEND LIBS "${PETSC_LIBRARIES}")
 
   # Add HDF5
-  list(APPEND CMAKE_MODULE_PATH "${TENSTREAM_DIR}/cmake/hdf5/")
-  set(HDF5_ROOT_DIR_HINT ${USER_HDF5_ROOT_DIR_HINT})
-  find_package(HDF5 REQUIRED)
-  message(STATUS "Found HDF5            :: ${HDF5_FOUND} ")
-  message(STATUS "HDF5 Includes         :: ${HDF5_INCLUDE_DIRS} ")
-  message(STATUS "HDF5 Libraries        :: ${HDF5_LIBRARIES} ")
-
-  include_directories (${ITAPS_INCLUDES} ${HDF5_INCLUDE_DIRS})
-  list (APPEND LIBS "${HDF5_LIBRARIES}")
+  #  list(APPEND CMAKE_MODULE_PATH "${TENSTREAM_DIR}/cmake/hdf5/")
+  #  set(HDF5_ROOT_DIR_HINT ${USER_HDF5_ROOT_DIR_HINT})
+  #  find_package(HDF5 REQUIRED)
+  #  message(STATUS "Found HDF5            :: ${HDF5_FOUND} ")
+  #  message(STATUS "HDF5 Includes         :: ${HDF5_INCLUDE_DIRS} ")
+  #  message(STATUS "HDF5 Libraries        :: ${HDF5_LIBRARIES} ")
+  #
+  #  include_directories (${ITAPS_INCLUDES} ${HDF5_INCLUDE_DIRS})
+  #  list (APPEND LIBS "${HDF5_LIBRARIES}")
 
 
   add_definitions(-DHAVE_TENSTREAM)
 endif(WITH_TENSTREAM)
 
-add_subdirectory(src)
+#include_directories (${CMAKE_CURRENT_SOURCE_DIR})
+#add_subdirectory(tenstr_src)
+add_subdirectory(src)# tenstream)
 
 
 #####################
