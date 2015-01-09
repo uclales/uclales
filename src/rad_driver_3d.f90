@@ -480,11 +480,7 @@ contains
 
                   fd3d  (nv+1,:,:) = edn(:,:,nv+1) + edir(:,:,nv+1)
                   fu3d  (nv+1,:,:) = eup(:,:,nv+1)
-<<<<<<< HEAD
                   fdiv3d(nv+1,:,:) = edir(:,:,nv+1) + edn(:,:,nv+1) - eup(:,:,nv+1)
-=======
-                  fdiv3d(nv+1,:,:) = edn(:,:,nv+1) - eup(:,:,nv+1)
->>>>>>> 19fd5ac56c28ddc8abe4dc8b1d793f4776c9b2d3
 
                   deallocate(edir)
                   deallocate(edn )
