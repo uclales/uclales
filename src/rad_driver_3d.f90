@@ -60,8 +60,8 @@ module radiation_3d
   integer :: is,ie,js,je
 
   logical,save :: linit=.False.
-!  logical,parameter :: ldebug=.False.
-  logical,parameter :: ldebug=.True.
+  logical,parameter :: ldebug=.False.
+!  logical,parameter :: ldebug=.True.
 
 #ifdef HAVE_TENSTREAM
   integer(iintegers) :: solution_uid    ! is solution uid, each subband has one
@@ -101,11 +101,7 @@ contains
 
       if(ldebug.and.myid.le.0) then
         do k=1,ubound(fds,1)
-<<<<<<< HEAD
           print *,k,'solar',fds(k,3,3),fus(k,3,3),fdiv_sol(k,3,3),':: thermal',fdir(k,3,3),fuir(k,3,3),fdiv_th(k,3,3)
-=======
-          print *,k,'solar',fds(k,3,3),fus(k,3,3),':: thermal',fdir(k,3,3),fuir(k,3,3)
->>>>>>> 19fd5ac56c28ddc8abe4dc8b1d793f4776c9b2d3
         enddo
       endif
       !copy from radiation grid, to dynamics grid
