@@ -40,7 +40,7 @@ module radiation_3d
 #ifdef HAVE_TENSTREAM
       use mpi_interface, only: nxpa,nypa
       use mpi, only : MPI_COMM_WORLD
-      use m_tenstream, only: init_tenstream,set_optical_properties,solve_tenstream, destroy_tenstream, tenstream_get_result, need_new_solution
+      use m_tenstream, only: init_tenstream,set_optical_properties,solve_tenstream, destroy_tenstream, tenstream_get_result, need_new_solution, load_solution
       use m_data_parameters, only : ireals,iintegers
       use grid, only : dt,nstep
 #endif      
@@ -60,8 +60,8 @@ module radiation_3d
   integer :: is,ie,js,je
 
   logical,save :: linit=.False.
-  logical,parameter :: ldebug=.False.
-!  logical,parameter :: ldebug=.True.
+!  logical,parameter :: ldebug=.False.
+  logical,parameter :: ldebug=.True.
 
 #ifdef HAVE_TENSTREAM
   integer(iintegers) :: solution_uid    ! is solution uid, each subband has one
@@ -99,9 +99,11 @@ contains
       call solar_rad()
       call thermal_rad()
 
-!      do k=1,nv1
-!        if(myid.le.0) print *,k,'solar',fds(k,3,3),fus(k,3,3),':: thermal',fdir(k,3,3),fuir(k,3,3)
-!      enddo
+      if(ldebug.and.myid.le.0) then
+        do k=1,ubound(fds,1)
+          print *,k,'solar',fds(k,3,3),fus(k,3,3),fdiv_sol(k,3,3),':: thermal',fdir(k,3,3),fuir(k,3,3),fdiv_th(k,3,3)
+        enddo
+      endif
       !copy from radiation grid, to dynamics grid
       do k=1,nzp
         kk = ubound(fus,1) - (k-1)
@@ -229,7 +231,7 @@ contains
           do iband = 1, nrbands
             if(.not.radMcICA) nrgpts = kg(ir_bands(iband))
             do igpt = 1, nrgpts
-              if(myid.eq.0.and.ldebug) print *,myid,'DEBUG :: calculating thermal band',iband,igpt    !TODO
+              if(myid.eq.0.and.ldebug) print *,myid,'DEBUG :: calculating thermal band',iband,igpt
 
               ib = iband
               ig = igpt
@@ -238,25 +240,36 @@ contains
               solution_uid=solution_uid+1
               solution_time = time*3600._ireals*24._ireals + dt*(nstep-1._ireals)/3._ireals !time is given in days + approx. a third at each rungekutta step
               if(.not.need_new_solution(solution_uid,solution_time)) then
-                allocate(edn (3:nxp-2,3:nyp-2,nv+1))
-                allocate(eup (3:nxp-2,3:nyp-2,nv+1))
-                allocate(abso(3:nxp-2,3:nyp-2,nv  ))
-                call tenstream_get_result(redn=edn,reup=eup,rabso=abso)
-                do k=1,nv
-                  fd3d  (k,:,:) = edn (:,:,k)
-                  fu3d  (k,:,:) = eup (:,:,k)
-                  fdiv3d(k,:,:) = abso(:,:,k) * dz(k,:,:)
-                enddo
-                deallocate(abso)
+                if(load_solution(solution_uid)) then
+                  allocate(edn (3:nxp-2,3:nyp-2,nv+1))
+                  allocate(eup (3:nxp-2,3:nyp-2,nv+1))
+                  allocate(abso(3:nxp-2,3:nyp-2,nv  ))
+                  call tenstream_get_result(redn=edn,reup=eup,rabso=abso)
+                  do k=1,nv
+                    fd3d  (k,:,:) = edn (:,:,k)
+                    fu3d  (k,:,:) = eup (:,:,k)
+                    fdiv3d(k,:,:) = abso(:,:,k) * dz(k,:,:)
+                  enddo
+                  deallocate(abso)
 
-                fd3d  (nv+1,:,:) = edn(:,:,nv+1)
-                fu3d  (nv+1,:,:) = eup(:,:,nv+1)
-                fdiv3d(nv+1,:,:) = edn(:,:,nv+1) - eup(:,:,nv+1)
+                  fd3d  (nv+1,:,:) = edn(:,:,nv+1)
+                  fu3d  (nv+1,:,:) = eup(:,:,nv+1)
+                  fdiv3d(nv+1,:,:) = edn(:,:,nv+1) - eup(:,:,nv+1)
 
-                deallocate(edn )
-                deallocate(eup )
-                cycle
-              endif
+                  deallocate(edn )
+                  deallocate(eup )
+
+                  xir_norm = gPointWeight(ir_bands(ib), ig)
+                  fd3d  = fd3d  *xir_norm
+                  fu3d  = fu3d  *xir_norm
+                  fdiv3d= fdiv3d*xir_norm
+
+                  fdir = fdir       + fd3d  
+                  fuir = fuir       + fu3d  
+                  fdiv_th = fdiv_th + fdiv3d
+                  cycle
+                endif ! could load a solution
+              endif ! dont need to calc new solution
 #endif
 
               do j=js,je
@@ -364,8 +377,8 @@ contains
 
           !
           ! fuq2 is the surface emitted flux in the band 0 - 280 cm**-1 with a
-          ! hk of 0.03. !TODO Fabian: what exactly does this mean?
-          !
+          ! hk of 0.03.
+          ! TODO Fabian: what exactly does this mean? Is this a leftover of some refactoring? The Planck function is certainly not well defined here?! Definitely not if MCICA is used!!!
           do j = js, je  
             do i = is, ie  
               fuq2 = bf(nv1,i,j) * 0.03 * pi * ee
@@ -439,7 +452,7 @@ contains
           do iband = 1, nrbands
             if(.not.radMcICA) nrgpts = kg(solar_bands(iband))
             do igpt = 1, nrgpts
-              if(myid.eq.0.and.ldebug) print *,myid,'DEBUG :: calculating solar band',iband,igpt    !TODO
+              if(myid.eq.0.and.ldebug) print *,myid,'DEBUG :: calculating solar band',iband,igpt
               ib = iband
               ig = igpt
 
@@ -448,27 +461,33 @@ contains
               solution_time = time*3600._ireals*24._ireals + dt*(nstep-1._ireals)/3._ireals !time is given in days + approx. a third at each rungekutta step
               if(.not.need_new_solution(solution_uid,solution_time)) then
 
-                allocate(edn (3:nxp-2,3:nyp-2,nv+1))
-                allocate(eup (3:nxp-2,3:nyp-2,nv+1))
-                allocate(abso(3:nxp-2,3:nyp-2,nv  ))
-                allocate(edir(3:nxp-2,3:nyp-2,nv+1))
-                call tenstream_get_result(redir=edir,redn=edn,reup=eup,rabso=abso)
-                do k=1,nv
-                  fd3d  (k,:,:) = edn (:,:,k) + edir(:,:,k)
-                  fu3d  (k,:,:) = eup (:,:,k)
-                  fdiv3d(k,:,:) = abso(:,:,k) * dz(k,:,:)
-                enddo
-                deallocate(abso)
+                if(load_solution(solution_uid)) then
+                  allocate(edn (3:nxp-2,3:nyp-2,nv+1))
+                  allocate(eup (3:nxp-2,3:nyp-2,nv+1))
+                  allocate(abso(3:nxp-2,3:nyp-2,nv  ))
+                  allocate(edir(3:nxp-2,3:nyp-2,nv+1))
+                  call tenstream_get_result(redir=edir,redn=edn,reup=eup,rabso=abso)
+                  do k=1,nv
+                    fd3d  (k,:,:) = edn (:,:,k) + edir(:,:,k)
+                    fu3d  (k,:,:) = eup (:,:,k)
+                    fdiv3d(k,:,:) = abso(:,:,k) * dz(k,:,:)
+                  enddo
+                  deallocate(abso)
 
-                fd3d  (nv+1,:,:) = edn(:,:,nv+1) + edir(:,:,nv+1)
-                fu3d  (nv+1,:,:) = eup(:,:,nv+1)
-                fdiv3d(nv+1,:,:) = edn(:,:,nv+1) - eup(:,:,nv+1)
+                  fd3d  (nv+1,:,:) = edn(:,:,nv+1) + edir(:,:,nv+1)
+                  fu3d  (nv+1,:,:) = eup(:,:,nv+1)
+                  fdiv3d(nv+1,:,:) = edir(:,:,nv+1) + edn(:,:,nv+1) - eup(:,:,nv+1)
 
-                deallocate(edir)
-                deallocate(edn )
-                deallocate(eup )
-                cycle
-              endif
+                  deallocate(edir)
+                  deallocate(edn )
+                  deallocate(eup )
+
+                  fds     = fds      + fd3d  
+                  fus     = fus      + fu3d  
+                  fdiv_sol= fdiv_sol + fdiv3d
+                  cycle
+                endif ! could load a solution
+              endif ! dont need to calc new solution
 #endif
 
               do j=js,je
