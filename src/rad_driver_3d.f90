@@ -60,8 +60,8 @@ module radiation_3d
   integer :: is,ie,js,je
 
   logical,save :: linit=.False.
-!  logical,parameter :: ldebug=.False.
-  logical,parameter :: ldebug=.True.
+  logical,parameter :: ldebug=.False.
+!  logical,parameter :: ldebug=.True.
 
 #ifdef HAVE_TENSTREAM
   integer(iintegers) :: solution_uid    ! is solution uid, each subband has one
