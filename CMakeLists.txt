@@ -73,14 +73,13 @@ set(INCLUDE_DIRS ${NETCDF_INCLUDE_DIR})
 
 option(WITH_TENSTREAM "Include the tenstream solver for radiation" OFF)
 if(WITH_TENSTREAM)
-  set(TENSTREAM_DIR        "" CACHE STRING "Tenstream base dir"            )
-  set(TENSTREAM__BUILD_DIR "" CACHE STRING "Tenstream build or install dir")
   if(  (NOT TENSTREAM_DIR) 
     OR (NOT TENSTREAM_BUILD_DIR) )
     message( FATAL_ERROR "You asked to include the TENSTREAM solver, yet you did not specify a path to the library -- please set:")
     message( FATAL_ERROR " TENSTREAM_DIR         (root dir of tenstream solver) ")
     message( FATAL_ERROR " TENSTREAM_BUILD_DIR   (directory where you issued cmake&&make)" )
-    message( FATAL_ERROR " TENSTREAM_CMAKE       (cmake include file -- usually TENSTREAM_DIR/config/default.cmake)")
+    set(TENSTREAM_DIR        "" CACHE STRING "Tenstream base dir"            )
+    set(TENSTREAM__BUILD_DIR "" CACHE STRING "Tenstream build or install dir")
   endif((NOT TENSTREAM_DIR) OR (NOT TENSTREAM_BUILD_DIR) )
 
   # Read config with which the tenstream was built
@@ -92,10 +91,9 @@ if(WITH_TENSTREAM)
   set(CMAKE_Fortran_FLAGS_RELEASE ${USER_Fortran_FLAGS_RELEASE} )
   set(CMAKE_Fortran_FLAGS_DEBUG   ${USER_Fortran_FLAGS_DEBUG})
 
-
   # Add Tenstream
     FIND_LIBRARY(TENSTREAM_LIBRARY tenstream "${TENSTREAM_BUILD_DIR}/lib/")
-    set(INCLUDE_DIRS ${INCLUDE_DIRS} "${TENSTREAM_BUILD_DIR}/src/")
+    set(INCLUDE_DIRS ${INCLUDE_DIRS} "${TENSTREAM_BUILD_DIR}/include/")
     list (APPEND LIBS "${TENSTREAM_LIBRARY}")
 
   # Add Petsc
