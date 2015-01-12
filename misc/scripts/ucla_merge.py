@@ -22,7 +22,9 @@ def write_nc(basename, data, dims):
         D.createDimension(dim[0], len(dim[1]) )
         D.createVariable(dim[0] ,'f4',(dim[0],) )
         D.variables[dim[0]][:] = dim[1]
+        print 'write_netcdf: write dim:',dim,'shape',np.shape(dim[1])
 
+    print 'write_netcdf: var: ',varname,' shape', np.shape(data)
     D.createVariable(varname, 'f4', [ d[0] for d in dims ] , zlib=True,least_significant_digit=6, complevel=7)
     D.variables[varname][:] = data
 
@@ -118,26 +120,29 @@ def append_var(basename,varname):
         if l2d: coord_files[zd] = np.arange( np.shape( D.variables[varname] )[1] )
 
       if 'yd' in locals():
-        if '%s.%s' % (yd,j) not in coord_files.keys(): 
-          coord_files['%s.%s' % (yd,j)] = D.variables[ yd ][:maxtime] #save y-dimension
+        if '{0:}.{1:}'.format(yd,j) not in coord_files.keys(): 
+          coord_files['{0:}.{1:}'.format(yd,j)] = D.variables[ yd ][:maxtime] #save y-dimension
 
       if 'xd' in locals():
-        if '%s.%s' % (xd,i) not in coord_files.keys():
-          coord_files['%s.%s' % (xd,i)] = D.variables[ xd ][:maxtime] #save x-dimension
+        if '{0:}.{1:}'.format(xd,i) not in coord_files.keys():
+          coord_files['{0:}.{1:}'.format(xd,i)] = D.variables[ xd ][:maxtime] #save x-dimension
 
       D.close()
 
     # append individual arrays in y dimension
-    if l3d or l4d: coord_files['concat_%s'%i] = np.concatenate( [ coord_files[(i,j)].pop(varname) for j in np.arange(nr_y) ], axis=1 )
-    if l2d or l1d: coord_files['concat_%s'%i] = np.mean       ( [ coord_files[(i,j)].pop(varname) for j in np.arange(nr_y) ], axis=0 )
+    if l3d or l4d: coord_files['concat_{0:}'.format(i)] = np.concatenate( [ coord_files[(i,j)].pop(varname) for j in np.arange(nr_y) ], axis=1 )
+    if l2d or l1d: coord_files['concat_{0:}'.format(i)] = np.mean       ( [ coord_files[(i,j)].pop(varname) for j in np.arange(nr_y) ], axis=0 )
 
   # append individual arrays in x dimension
-  if l3d or l4d: var = np.concatenate( [ coord_files.pop('concat_%s'%i) for i in np.arange(nr_x) ], axis=2)
-  if l2d or l1d: var = np.mean       ( [ coord_files.pop('concat_%s'%i) for i in np.arange(nr_x) ], axis=0)
+  if l3d or l4d: var = np.concatenate( [ coord_files.pop('concat_{0:}'.format(i)) for i in np.arange(nr_x) ], axis=2)
+  if l2d or l1d: var = np.mean       ( [ coord_files.pop('concat_{0:}'.format(i)) for i in np.arange(nr_x) ], axis=0)
 
   # append coordinate arrays for x and y axis
-  if 'yd' in locals(): coord_files[yd] = np.concatenate( [ coord_files.pop('%s.%s'%(yd,j)) for j in np.arange(nr_y) ], axis=1 ) 
-  if 'xd' in locals(): coord_files[xd] = np.concatenate( [ coord_files.pop('%s.%s'%(xd,i)) for i in np.arange(nr_x) ], axis=2 ) 
+  if 'yd' in locals(): 
+#    import ipdb;ipdb.set_trace()
+    coord_files[yd] = np.concatenate( [ coord_files.pop('{0:}.{1:}'.format(yd,j)) for j in np.arange(nr_y) ], axis=1 ) 
+  if 'xd' in locals(): 
+    coord_files[xd] = np.concatenate( [ coord_files.pop('{0:}.{1:}'.format(xd,i)) for i in np.arange(nr_x) ], axis=2 ) 
 
   if l4d:
     data = var.swapaxes(2,3).swapaxes(1,2) # from [time,y,x,z] to [time,z,y,x]
