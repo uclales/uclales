@@ -61,7 +61,7 @@ module radiation_3d
 
   logical,save :: linit=.False.
   logical,parameter :: ldebug=.False.
-!  logical,parameter :: ldebug=.True.
+! logical,parameter :: ldebug=.True.
 
 #ifdef HAVE_TENSTREAM
   integer(iintegers) :: solution_uid    ! is solution uid, each subband has one
@@ -85,7 +85,7 @@ contains
       real,allocatable,dimension(:,:,:) :: fus,fds,fdiv_sol,flxdiv
       real,allocatable,dimension(:,:,:) :: fuir,fdir,fdiv_th
 
-      real,allocatable,dimension(:,:,:) :: hr_factor ! convert from flux divergence to heating rate
+      real,allocatable,dimension(:,:,:) :: hr_factor, dz ! convert from flux divergence to heating rate
 
       real :: p0(nzp)
 
@@ -156,17 +156,21 @@ contains
           if(any(isnan(hr_factor(k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency hrf',k,hr_factor(k,:,:)
           if(any(isnan(flxdiv   (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency div',k,flxdiv   (k,:,:)
           if(any(isnan(tt       (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency tt',k,tt(k,:,:)
-          call mpi_barrier(mpi_comm_world,ierr)
           if(any(isnan([hr_factor(k,:,:),flxdiv(k,:,:),tt(k,:,:),fdiv_sol (k,:,:),fdiv_th  (k,:,:),rflx     (k,:,:)]))) call exit(1)
+
+          !                if(myid.le.0) print *,'heating rate ::',k,flxdiv(k,i,j),  hr_factor(k,i,j), - (rflx(k,i,j) - rflx(k-1,i,j))
+          !        if(myid.le.0) print *,k,'solar',sflxd(k,3,3),sflxu(k,3,3),':: thermal',lflxd(k,3,3),lflxu(k,3,3)
         endif
-        !        i=3
-        !        j=3
-        !        if(myid.le.0) print *,'flx ::',k,' edn',lflxd(k,i,j),' eup',lflxu(k,i,j)
-        !        if(myid.le.0) print *,'div ::',k,' sol',fdiv_sol(kk,i,j),' th',fdiv_th(kk,i,j)
-        !        if(myid.le.0) print *,'flx ::',k,' flxdiv',flxdiv(k,i,j),'tt',tt(k,i,j)
-        !        if(myid.le.0) print *,'heating rate ::',k,flxdiv(k,i,j),  hr_factor(k,i,j), - (rflx(k,i,j) - rflx(k-1,i,j))
-!        if(myid.le.0) print *,k,'solar',sflxd(k,3,3),sflxu(k,3,3),':: thermal',lflxd(k,3,3),lflxu(k,3,3)
       end do
+
+      !i=is
+      !j=js
+      !if(myid.le.0) print *,'flx ::','tedn',lflxd(:,i,j),' eup',lflxu(:,i,j)
+      !if(myid.le.0) print *,'flx ::','sedn',sflxd(:,i,j),' eup',sflxu(:,i,j)
+      !if(myid.le.0) print *,'div ::',' sol',fdiv_sol(:,i,j),' th',fdiv_th(:,i,j)
+      !if(myid.le.0) print *,'flx ::',' flxdiv',flxdiv(:,i,j),'tt',tt(:,i,j)
+      !call mpi_barrier(mpi_comm_world,ierr)
+      !call exit(1)
 
       deallocate( fus )
       deallocate( fds )
@@ -177,20 +181,21 @@ contains
       deallocate( fdiv_th )
 
       deallocate(hr_factor)
+      deallocate(dz)
 
       if(myid.eq.0.and.ldebug) print *,'calculate radiation ... done'
     contains
       subroutine thermal_rad()
           use grid, only       : iradtyp
           use ckd   , only: llimit, rlimit
-          use fuliou, only: computeIRBandWeights, planck, select_bandg,thicks
+          use fuliou, only: computeIRBandWeights, planck, select_bandg
           use defs, only: nv,nv1,pi
           use solver, only : qft
           use ckd, only: ir_bands,gPointWeight,kg
 
           real,dimension(nv1)  :: fu1,fd1
           real,dimension(nv1,  is:ie,js:je) :: fd3d,fu3d,fdiv3d
-          real,dimension(nv ,  is:ie,js:je) :: tau,w0,dz
+          real,dimension(nv ,  is:ie,js:je) :: tau,w0
           real,dimension(nv ,4,is:ie,js:je) :: phasefct
 
           real,dimension(nv1,  is:ie,js:je) :: bf
@@ -204,7 +209,6 @@ contains
 
           integer :: iband, igpt,nrbands,nrgpts, ib, ig
           integer :: ibandloop(3:nxp-2, 3:nyp-2), ibandg(3:nxp-2, 3:nyp-2) ! for McICA, save wavelength band information for each pixel
-          real    :: exner(nzp), pres(nzp)
 
 #ifdef HAVE_TENSTREAM
           real(ireals),dimension(:,:,:),allocatable :: edn,eup
@@ -248,14 +252,14 @@ contains
                   ! tenstream -- only use one random band.... due to
                   ! horizontal correlations, it does not make sense to have
                   !different spectral intervals horizontally
-                  call mpi_bcast(ibandloop(3,3),1,mpi_integer,0,mpi_comm_world,ierr)
-                  call mpi_bcast(ibandg   (3,3),1,mpi_integer,0,mpi_comm_world,ierr)
-                  ib = ibandloop(3,3)
-                  ig = ibandg   (3,3)
+                  call mpi_bcast(ibandloop(is,js),1,mpi_integer,0,mpi_comm_world,ierr)
+                  call mpi_bcast(ibandg   (is,js),1,mpi_integer,0,mpi_comm_world,ierr)
+                  ib = ibandloop(is,js)
+                  ig = ibandg   (is,js)
                 else
                   ! will be set below, dont need them for solution_uid...
-                  ib=-1
-                  ig=-1
+                  ib = -1
+                  ig = -1
                 endif
               else
                 ib = iband
@@ -263,50 +267,46 @@ contains
               endif
 
 #ifdef HAVE_TENSTREAM
-              solution_uid=get_band_uid(.False., ib,ig)
-              solution_time = time*3600._ireals*24._ireals + dt*(nstep-1._ireals)/3._ireals !time is given in days + approx. a third at each rungekutta step
-              if(.not.need_new_solution(solution_uid,solution_time)) then
-                if(load_solution(solution_uid)) then
-                  allocate(edn (3:nxp-2,3:nyp-2,nv+1))
-                  allocate(eup (3:nxp-2,3:nyp-2,nv+1))
-                  allocate(abso(3:nxp-2,3:nyp-2,nv  ))
-                  call tenstream_get_result(redn=edn,reup=eup,rabso=abso)
+              if(iradtyp.eq.7) then
+                solution_uid=get_band_uid(.False., ib,ig)
+                solution_time = time*3600._ireals*24._ireals + dt*(nstep-1._ireals)/3._ireals !time is given in days + approx. a third at each rungekutta step
+                if(.not.need_new_solution(solution_uid,solution_time)) then
+                  if(load_solution(solution_uid)) then
+                    allocate(edn (3:nxp-2,3:nyp-2,nv+1))
+                    allocate(eup (3:nxp-2,3:nyp-2,nv+1))
+                    allocate(abso(3:nxp-2,3:nyp-2,nv  ))
+                    call tenstream_get_result(redn=edn,reup=eup,rabso=abso)
 
-                  do i=3,nxp-2
-                    do j=3,nyp-2
-                      call thicks(pp, pt, ph, dz(:,i,j)) 
+                    do k=1,nv
+                      fd3d  (k,:,:) = edn (:,:,k)
+                      fu3d  (k,:,:) = eup (:,:,k)
+                      fdiv3d(k,:,:) = abso(:,:,k) * dz(k,:,:)
                     enddo
-                  enddo
+                    deallocate(abso)
 
-                  do k=1,nv
-                    fd3d  (k,:,:) = edn (:,:,k)
-                    fu3d  (k,:,:) = eup (:,:,k)
-                    fdiv3d(k,:,:) = abso(:,:,k) * dz(k,:,:)
-                  enddo
-                  deallocate(abso)
+                    fd3d  (nv+1,:,:) = edn(:,:,nv+1)
+                    fu3d  (nv+1,:,:) = eup(:,:,nv+1)
+                    fdiv3d(nv+1,:,:) = edn(:,:,nv+1) - eup(:,:,nv+1)
 
-                  fd3d  (nv+1,:,:) = edn(:,:,nv+1)
-                  fu3d  (nv+1,:,:) = eup(:,:,nv+1)
-                  fdiv3d(nv+1,:,:) = edn(:,:,nv+1) - eup(:,:,nv+1)
+                    deallocate(edn )
+                    deallocate(eup )
 
-                  deallocate(edn )
-                  deallocate(eup )
+                    if (radMcICA) then
+                      xir_norm = 1./bandweights(ibandloop(is,js))
+                    else
+                      xir_norm = gPointWeight(ir_bands(ib), ig)
+                    end if
+                    fd3d  = fd3d  *xir_norm
+                    fu3d  = fu3d  *xir_norm
+                    fdiv3d= fdiv3d*xir_norm
 
-                  if (radMcICA) then
-                    xir_norm = 1./bandweights(ibandloop(3,3))
-                  else
-                    xir_norm = gPointWeight(ir_bands(ib), ig)
-                  end if
-                  fd3d  = fd3d  *xir_norm
-                  fu3d  = fu3d  *xir_norm
-                  fdiv3d= fdiv3d*xir_norm
-
-                  fdir = fdir       + fd3d  
-                  fuir = fuir       + fu3d  
-                  fdiv_th = fdiv_th + fdiv3d
-                  cycle ! if we successfully loaded a solution, just cycle this spectral band
-                endif ! could load a solution
-              endif ! dont need to calc new solution
+                    fdir = fdir       + fd3d  
+                    fuir = fuir       + fu3d  
+                    fdiv_th = fdiv_th + fdiv3d
+                    cycle ! if we successfully loaded a solution, just cycle this spectral band
+                  endif ! could load a solution
+                endif ! dont need to calc new solution
+              endif
 #endif
 
               do j=js,je
@@ -320,29 +320,18 @@ contains
                     case (7) ! tenstream -- only use one random band.... due to
                              ! horizontal correlations, it does not make sense to have
                              !different spectral intervals horizontally
-                      ib = ibandloop(3,3)
-                      ig = ibandg   (3,3)
+                      ib = ibandloop(is,js)
+                      ig = ibandg   (is,js)
                     end select
                   endif
 
                   if (present(ice).and.present(grp)) then
-                    call setup_rad_atmosphere(CCN, dn0, pi0, pi1,    &
-                        pip(:,i,j), th(:,i,j), rv(:,i,j), rc(:,i,j), &
-                        exner,pres,  hr_factor(:,i,j),               &
-                        rr=rr(:,i,j),ice=ice(:,i,j),nice=nice(:,i,j),grp=grp(:,i,j))
-
                     call optprop_rad_ir( ib, ig, pp, pt, ph, po, &
-                        tau (:,i,j), w0  (:,i,j), phasefct(:,:,i,j), dz(:,i,j), & 
+                        tau (:,i,j), w0  (:,i,j), phasefct(:,:,i,j),dz(:,i,j),  & 
                         plwc=plwc, pre=pre, piwc=piwc, pde=pde, pgwc=pgwc)
                   else
-
-                    call setup_rad_atmosphere(CCN, dn0, pi0, pi1,    &
-                        pip(:,i,j), th(:,i,j), rv(:,i,j), rc(:,i,j), &
-                        exner,pres, hr_factor(:,i,j)                 )
-
-
                     call optprop_rad_ir( ib, ig, pp, pt, ph, po,&
-                        tau (:,i,j), w0  (:,i,j), phasefct(:,:,i,j), dz(:,i,j), & 
+                        tau (:,i,j), w0  (:,i,j), phasefct(:,:,i,j),dz(:,i,j), & 
                         plwc=plwc, pre=pre)
                   end if
 
@@ -373,12 +362,13 @@ contains
 !                      call exit(1)
 !                    endif
 
-                    xir_norm = gPointWeight(ir_bands(ib), ig)
 
                     if (radMcICA) then
                       ib = ibandloop(i,j)
                       ig = ibandg   (i,j)
                       xir_norm = 1./bandweights(ib)
+                    else
+                      xir_norm = gPointWeight(ir_bands(ib), ig)
                     end if
 
                     fdir(:,i,j) = fdir(:,i,j) + fd1(:) * xir_norm 
@@ -397,7 +387,7 @@ contains
 #endif
 
                 if (radMcICA) then
-                  xir_norm = 1./bandweights(ibandloop(3,3))
+                  xir_norm = 1./bandweights(ibandloop(is,js))
                 else
                   xir_norm = gPointWeight(ir_bands(ib), ig)
                 end if
@@ -426,7 +416,7 @@ contains
           use grid, only   : iradtyp
           use defs, only   : nv,nv1,SolarConstant,totalpower
           use solver, only : qft
-          use fuliou, only : computesolarbandweights, select_bandg,thicks
+          use fuliou, only : computesolarbandweights, select_bandg
           use ckd, only    : solar_bands,kg,power,gPointWeight
           use mpi, only    : mpi_comm_world,mpi_barrier !TODO
 
@@ -435,7 +425,7 @@ contains
           real :: fuq1,xs_norm
           real,dimension(nv1)  :: fu1,fd1
           real,dimension(nv1,  is:ie,js:je) :: fu3d,fd3d,fdiv3d
-          real,dimension(nv ,  is:ie,js:je) :: tau,w0,dz
+          real,dimension(nv ,  is:ie,js:je) :: tau,w0
           real,dimension(nv1,  is:ie,js:je) :: bf
           real,dimension(nv ,4,is:ie,js:je) :: phasefct
           real, dimension(:), allocatable, save :: bandWeights
@@ -445,7 +435,6 @@ contains
 
           integer :: iband, igpt,nrbands,nrgpts, ib, ig
           integer :: ibandloop(3:nxp-2, 3:nyp-2), ibandg(3:nxp-2, 3:nyp-2) ! for McICA, save wavelength band information for each pixel
-          real    :: exner(nzp), pres(nzp)
 
 #ifdef HAVE_TENSTREAM
           real(ireals),dimension(:,:,:),allocatable :: edir,edn,eup
@@ -477,10 +466,10 @@ contains
                 call select_bandg(solar_bands, bandweights, randomNumber, ib, ig)
                 ibandloop(i,j) = ib
                 ibandg   (i,j) = ig
-                nrbands = 1
-                nrgpts  = 1
               enddo 
             enddo
+            nrbands = 1
+            nrgpts  = 1
           else
             nrbands = size(solar_bands)
           end if
@@ -488,20 +477,19 @@ contains
             if(.not.radMcICA) nrgpts = kg(solar_bands(iband))
             do igpt = 1, nrgpts
 
-
               if(radMcICA) then
                 if(iradtyp.eq.7) then
                   ! tenstream -- only use one random band.... due to
                   ! horizontal correlations, it does not make sense to have
                   !different spectral intervals horizontally
-                  call mpi_bcast(ibandloop(3,3),1,mpi_integer,0,mpi_comm_world,ierr)
-                  call mpi_bcast(ibandg   (3,3),1,mpi_integer,0,mpi_comm_world,ierr)
-                  ib = ibandloop(3,3)
-                  ig = ibandg   (3,3)
+                  call mpi_bcast(ibandloop(is,js),1,mpi_integer,0,mpi_comm_world,ierr)
+                  call mpi_bcast(ibandg   (is,js),1,mpi_integer,0,mpi_comm_world,ierr)
+                  ib = ibandloop(is,js)
+                  ig = ibandg   (is,js)
                 else
                   ! will be set below, dont need them for solution_uid...
-                  ib=-1
-                  ig=-1
+                  ib = -1
+                  ig = -1
                 endif
               else
                 ib = iband
@@ -509,44 +497,40 @@ contains
               endif
 
 #ifdef HAVE_TENSTREAM
-              solution_uid = get_band_uid( .True., ib, ig )
-              solution_time = time*3600._ireals*24._ireals + dt*(nstep-1._ireals)/3._ireals !time is given in days + approx. a third at each rungekutta step
-              if(.not.need_new_solution(solution_uid,solution_time)) then
+              if(iradtyp.eq.7) then
+                solution_uid = get_band_uid( .True., ib, ig )
+                solution_time = time*3600._ireals*24._ireals + dt*(nstep-1._ireals)/3._ireals !time is given in days + approx. a third at each rungekutta step
+                if(.not.need_new_solution(solution_uid,solution_time)) then
 
-                if(load_solution(solution_uid)) then
-                  allocate(edn (3:nxp-2,3:nyp-2,nv+1))
-                  allocate(eup (3:nxp-2,3:nyp-2,nv+1))
-                  allocate(abso(3:nxp-2,3:nyp-2,nv  ))
-                  allocate(edir(3:nxp-2,3:nyp-2,nv+1))
-                  call tenstream_get_result(redir=edir,redn=edn,reup=eup,rabso=abso)
+                  if(load_solution(solution_uid)) then
+                    allocate(edn (3:nxp-2,3:nyp-2,nv+1))
+                    allocate(eup (3:nxp-2,3:nyp-2,nv+1))
+                    allocate(abso(3:nxp-2,3:nyp-2,nv  ))
+                    allocate(edir(3:nxp-2,3:nyp-2,nv+1))
+                    call tenstream_get_result(redir=edir,redn=edn,reup=eup,rabso=abso)
 
-                  do i=3,nxp-2
-                    do j=3,nyp-2
-                      call thicks(pp, pt, ph, dz(:,i,j)) 
+                    do k=1,nv
+                      fd3d  (k,:,:) = edn (:,:,k) + edir(:,:,k)
+                      fu3d  (k,:,:) = eup (:,:,k)
+                      fdiv3d(k,:,:) = abso(:,:,k) * dz(k,:,:)
                     enddo
-                  enddo
+                    deallocate(abso)
 
-                  do k=1,nv
-                    fd3d  (k,:,:) = edn (:,:,k) + edir(:,:,k)
-                    fu3d  (k,:,:) = eup (:,:,k)
-                    fdiv3d(k,:,:) = abso(:,:,k) * dz(k,:,:)
-                  enddo
-                  deallocate(abso)
+                    fd3d  (nv+1,:,:) = edn(:,:,nv+1) + edir(:,:,nv+1)
+                    fu3d  (nv+1,:,:) = eup(:,:,nv+1)
+                    fdiv3d(nv+1,:,:) = edir(:,:,nv+1) + edn(:,:,nv+1) - eup(:,:,nv+1)
 
-                  fd3d  (nv+1,:,:) = edn(:,:,nv+1) + edir(:,:,nv+1)
-                  fu3d  (nv+1,:,:) = eup(:,:,nv+1)
-                  fdiv3d(nv+1,:,:) = edir(:,:,nv+1) + edn(:,:,nv+1) - eup(:,:,nv+1)
+                    deallocate(edir)
+                    deallocate(edn )
+                    deallocate(eup )
 
-                  deallocate(edir)
-                  deallocate(edn )
-                  deallocate(eup )
-
-                  fds     = fds      + fd3d  
-                  fus     = fus      + fu3d  
-                  fdiv_sol= fdiv_sol + fdiv3d
-                  cycle ! cycle this spectral band
-                endif ! could load a solution
-              endif ! dont need to calc new solution
+                    fds     = fds      + fd3d  
+                    fus     = fus      + fu3d  
+                    fdiv_sol= fdiv_sol + fdiv3d
+                    cycle ! cycle this spectral band
+                  endif ! could load a solution
+                endif ! dont need to calc new solution
+              endif
 #endif
 
               do j=js,je
@@ -560,29 +544,18 @@ contains
                     case (7) ! tenstream -- only use one random band.... due to
                              ! horizontal correlations, it does not make sense to have
                              !different spectral intervals horizontally
-                      ib = ibandloop(3,3)
-                      ig = ibandg   (3,3)
+                      ib = ibandloop(is,js)
+                      ig = ibandg   (is,js)
                     end select
                   endif
 
                   if (present(ice).and.present(grp)) then
-                    call setup_rad_atmosphere(CCN, dn0, pi0, pi1,    &
-                        pip(:,i,j), th(:,i,j), rv(:,i,j), rc(:,i,j), &
-                        exner,pres, hr_factor(:,i,j),                &
-                        rr=rr(:,i,j),ice=ice(:,i,j),nice=nice(:,i,j),grp=grp(:,i,j))
-
                     call optprop_rad_vis( ib, ig, pp, pt, ph, po, &
-                        tau (:,i,j), w0  (:,i,j), phasefct(:,:,i,j), dz(:,i,j), & 
+                        tau (:,i,j), w0  (:,i,j), phasefct(:,:,i,j),dz(:,i,j), & 
                         plwc=plwc, pre=pre, piwc=piwc, pde=pde, pgwc=pgwc)
                   else
-
-                    call setup_rad_atmosphere(CCN, dn0, pi0, pi1,    &
-                        pip(:,i,j), th(:,i,j), rv(:,i,j), rc(:,i,j), &
-                        exner,pres, hr_factor(:,i,j)                 )
-
-
                     call optprop_rad_vis( ib, ig, pp, pt, ph, po,&
-                        tau (:,i,j), w0  (:,i,j), phasefct(:,:,i,j), dz(:,i,j), & 
+                        tau (:,i,j), w0  (:,i,j), phasefct(:,:,i,j),dz(:,i,j), & 
                         plwc=plwc, pre=pre)
                   end if
 
@@ -597,6 +570,11 @@ contains
                 do j = js, je  
                   do i = is, ie  
 
+                    if(radMcICA) then
+                      ib = ibandloop(i,j)
+                      ig = ibandg   (i,j)
+                    endif
+
                     ! Solver expects cumulative optical depth
                     do k = 2, nv
                       tau(k,i,j) = tau(k, i,j) + tau(k-1, i,j)
@@ -606,9 +584,9 @@ contains
                         phasefct(:, 3, i,j), phasefct(:, 4, i,j), fu1, fd1)
 
                     if (radMcICA) then
-                      xs_norm = power(solar_bands(ibandloop(i,j) ))/ bandweights(ibandloop(i,j))
+                      xs_norm = power(solar_bands(ib))/ bandweights(ib)
                     else
-                      xs_norm = gPointWeight(solar_bands(iband), igpt)*power(solar_bands(iband))
+                      xs_norm = gPointWeight(solar_bands(ib), ig)*power(solar_bands(ib))
                     end if
                     fds(:,i,j) = fds(:,i,j) + fd1(:) * xs_norm 
                     fus(:,i,j) = fus(:,i,j) + fu1(:) * xs_norm 
@@ -620,10 +598,12 @@ contains
 
               case (7) !tenstr
                 if (radMcICA) then
-                  if(myid.eq.0) print *,'ATTENTION :: You are using tenstream solver with MCICA -- this is not tested... it might not be meaningful! Beware that this is not the same as using an IPA solver together with MC-ICA!'
-                  xs_norm = power(solar_bands(ibandloop(3,3) ))/ bandweights(ibandloop(3,3))
+!                  if(myid.eq.0) print *,'ATTENTION :: You are using tenstream solver with MCICA -- this is not tested... it might not be meaningful! Beware that this is not the same as using an IPA solver together with MC-ICA!'
+                  ib = ibandloop(is,js)
+                  ig = ibandg   (is,js)
+                  xs_norm = power(solar_bands(ib))/ bandweights(ib)
                 else
-                  xs_norm = gPointWeight(solar_bands(iband), igpt)*power(solar_bands(iband))
+                  xs_norm = gPointWeight(solar_bands(ib), ig)*power(solar_bands(ib))
                 end if
 
 #ifdef HAVE_TENSTREAM
@@ -633,9 +613,9 @@ contains
                 call exit(1)
 #endif
 
-                fds     = fds      + fd3d  
-                fus     = fus      + fu3d  
-                fdiv_sol= fdiv_sol + fdiv3d
+                fds     = fds      + fd3d  !*xs_norm
+                fus     = fus      + fu3d  !*xs_norm
+                fdiv_sol= fdiv_sol + fdiv3d!*xs_norm
               end select
 
               if(ldebug) then
@@ -701,6 +681,7 @@ contains
 
           allocate( flxdiv(nzp, is:ie, js:je) )   ; flxdiv=0
           allocate( hr_factor(nzp, is:ie, js:je) ); hr_factor=0
+          allocate( dz(nv,is:ie, js:je) )
 
           ! initialize surface albedo, emissivity and skin temperature.
           ee = 1.0
@@ -709,19 +690,36 @@ contains
           ! solar zenith angle
           if (.not. fixed_sun) u0 = zenith(alat,time)
 
+          do j=js,je
+            do i=is,ie
+              if (present(ice).and.present(grp)) then
+                call setup_rad_atmosphere(CCN, dn0, pi0, pi1,    &
+                pip(:,i,j), th(:,i,j), rv(:,i,j), rc(:,i,j),     &
+                hr_factor(:,i,j), dz(:,i,j),         &
+                rr=rr(:,i,j),ice=ice(:,i,j),nice=nice(:,i,j),grp=grp(:,i,j))
+              else
+                call setup_rad_atmosphere(CCN, dn0, pi0, pi1,    &
+                pip(:,i,j), th(:,i,j), rv(:,i,j), rc(:,i,j),     &
+                hr_factor(:,i,j), dz(:,i,j)         )
+              end if
+            enddo
+          enddo
+
       end subroutine
   end subroutine rad_3d
-  subroutine setup_rad_atmosphere(CCN, dn0, pi0, pi1, pip, th, rv, rc,     exner,pres,hr_fac, rr,ice,nice,grp)
+  subroutine setup_rad_atmosphere(CCN, dn0, pi0, pi1, pip, th, rv, rc, hr_fac,dz,    rr,ice,nice,grp)
       use grid, only: dzi_m
       use defs, only: cp,cpr,nv,nv1,p00,pi,roice,rowt
+      use fuliou, only: thicks
       real, intent(in) :: CCN
       real, dimension (nzp), intent (in)           :: dn0, pi0, pi1
       real, dimension (nzp), intent (in)           :: pip, th, rv, rc
 
-      real,intent(out) :: exner(nzp), pres(nzp),hr_fac(nzp)
+      real,intent(out) :: hr_fac(nzp),dz(nv)
       !thos global vars are in radiation module...  ::  pp, pt, ph, po, pre, pde, plwc, piwc, prwc, pgwc
 
       real, optional, dimension (nzp), intent (in) :: rr,ice,nice,grp
+      real    :: exner(nzp), pres(nzp) 
 
       real :: prw, pri
       integer :: kk,k
@@ -767,6 +765,8 @@ contains
       end do
       pp(nv-nzp+2) = pres(nzp)/100. - 0.5*(pres(nzp-1)-pres(nzp)) / 100.
 
+      call thicks(pp, pt, ph, dz) 
+
       do k=2,nzp
         hr_fac(k)  = dzi_m(k)/(cp*dn0(k)*exner(k))
       enddo
@@ -775,7 +775,7 @@ contains
   !calc of optprop extracted from rad_ir:
   subroutine optprop_rad_ir( ibandloop, ibandg, pp, pt, ph, po, tau, w, pf, dz, plwc, pre, piwc, pde, pgwc)
       use cldwtr, only : cloud_water, cloud_ice, cloud_grp
-      use fuliou, only : thicks, gascon, combineopticalproperties,gases
+      use fuliou, only : gascon, combineopticalproperties,gases
       use ckd, only: ir_bands,solar_bands,center
       integer, intent(in) :: ibandloop,ibandg
 
@@ -785,8 +785,10 @@ contains
           pt,   & ! temperature [K] at mid points
           ph,   & ! humidity mixing ratio in kg/kg
           po      ! ozone mixing ratio
-      real, dimension(:)  , intent(out) :: tau,w,dz ! dim: (nv)
-      real, dimension(:,:), intent(out) :: pf       ! dim: (nv,4)
+
+      real, dimension(:)  , intent(out) :: tau,w  ! dim: (nv)
+      real, dimension(:,:), intent(out) :: pf     ! dim: (nv,4)
+      real, dimension(:)  , intent(in)  :: dz     ! dim: (nv)
 
       real, optional, dimension(:), intent (in)  :: & ! dim: (nv)
           plwc, & ! cloud liquid water content [g/m^3]
@@ -809,8 +811,6 @@ contains
       tau=0
       w=0
       pf=0
-
-      call thicks(pp, pt, ph, dz) 
 
       ib = ibandloop
       ig = ibandg
@@ -848,7 +848,7 @@ contains
   !calc of optprop extracted from rad_vis:
   subroutine optprop_rad_vis( ibandloop, ibandg, pp, pt, ph, po, tau, w, pf, dz, plwc, pre, piwc, pde, pgwc)
       use cldwtr, only : cloud_water, cloud_ice, cloud_grp
-      use fuliou, only : thicks, rayle, gascon, combineopticalproperties,gases
+      use fuliou, only : rayle, gascon, combineopticalproperties,gases
       use ckd, only: solar_bands,power,center
       integer, intent(in) :: ibandloop,ibandg
 
@@ -858,8 +858,10 @@ contains
           pt,   & ! temperature [K] at mid points
           ph,   & ! humidity mixing ratio in kg/kg
           po      ! ozone mixing ratio
-      real, dimension(:)  , intent(out) :: tau,w,dz     ! dim: (nv)
-      real, dimension(:,:), intent(out) :: pf           ! dim: (nv,4)
+
+      real, dimension(:)  , intent(out) :: tau,w  ! dim: (nv)
+      real, dimension(:,:), intent(out) :: pf     ! dim: (nv,4)
+      real, dimension(:)  , intent(in)  :: dz     ! dim: (nv)
 
       real, optional, dimension(:), intent (in)  :: & ! dim: (nv)
           plwc, & ! cloud liquid water content [g/m^3]
@@ -882,8 +884,6 @@ contains
       tau=0
       w  =0
       pf =0
-
-      call thicks(pp, pt, ph, dz) 
 
       ib = ibandloop
       ig = ibandg
@@ -958,7 +958,7 @@ contains
 
       endif
 
-      if(ldebug .and. myid.eq.0) print *,'returning band_uid for:',lsolar,iband,ibandg,'::',get_band_uid
+      if(ldebug) print *,myid,'returning band_uid for:',lsolar,iband,ibandg,'::',get_band_uid
       return
   end function
 
@@ -987,7 +987,7 @@ contains
 
       nxp=in_nxp;nyp=in_nyp;nv=in_nv
       dx=in_dx;dy=in_dy;phi0=in_phi0;u0=in_u0;albedo=in_albedo
-      if(ldebug.and.myid.eq.0) print *,'Calling tenstream wrapper with lsolar',lsolar,'nx/ny',nxp,nyp
+      if(ldebug.and.myid.eq.0) print *,'Tenstrwrapper lsol',lsolar,'nx/y',nxp,nyp,'uid',solution_uid,solution_time
 
       if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
         theta0=acos(u0)*180./3.141592653589793 !rad2deg
@@ -1037,17 +1037,17 @@ contains
         call tenstream_get_result(redn=edn,reup=eup,rabso=abso)
       endif
 
+
       do k=1,nv
-        fdn (k,:,:) = edn (:,:,k)
-        fup (k,:,:) = eup (:,:,k)
         fdiv(k,:,:) = abso(:,:,k) * deltaz(:,:,k)
       enddo
-      deallocate(abso)
-    
-      fdn (nv+1,:,:) = edn(:,:,nv+1)
-      fup (nv+1,:,:) = eup(:,:,nv+1)
       fdiv(nv+1,:,:) = edn(:,:,nv+1) - eup(:,:,nv+1)
+      deallocate(abso)
 
+      do k=1,nv+1
+        fdn (k,:,:) = edn (:,:,k)
+        fup (k,:,:) = eup (:,:,k)
+      enddo
       deallocate(edn )
       deallocate(eup )
 
@@ -1062,6 +1062,15 @@ contains
           call exit(-1)
         endif
       endif
+        if(lsolar.and.any([fdn,fup].lt.-1._ireals)) then
+          do k=1,nv+1
+            print *,myid,'DEBUG value less than zero in solar rad',k,phi0, theta0,albedo
+            print *,myid,'edn ::',k,minval(fdn (k,:,:))
+            print *,myid,'eup ::',k,minval(fup (k,:,:))
+            print *,myid,'div ::',k,minval(fdiv(k,:,:))
+          enddo
+          call exit(-1)
+        endif
   end subroutine
 #endif
 end module
