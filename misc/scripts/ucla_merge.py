@@ -70,12 +70,10 @@ def append_var(basename,varname):
   if 'coord_files' not in locals(): coord_files={}
   for f in sorted(files):
         try:
-          ident,coord,ending = f.split('.')
+          ident,coord,ending = [ i[::-1] for i in f[::-1].split('.',2) ] [::-1] # split filename but use maximum 2 splits to retain file identifier if it contains dots.
         except:
-          try:
-            ident,_,coord,ending = f.split('.')
-          except:
-            return -1
+          print "Couldnt split filename into ''ident,coord,ending'' :: ",f
+          return -1
 
         x,y = ( int(coord[:4]), int(coord[4:]) )
         if (x,y) not in coord_files.keys(): coord_files[(x,y)] = { 'fname':f, }
@@ -165,6 +163,9 @@ try:
 except:
   sys.exit(-1)
 
+files = sorted(glob(basename+'.0*.nc'))
+print "Opening files:",files
+
 for idim in [4,3,2,1]:
   try:
     varname = str( sys.argv[2] )
@@ -172,7 +173,7 @@ for idim in [4,3,2,1]:
   except:
     print "You did not specify a variable to convert.... I will try convert all vars"
     vars=[]
-    D = Dataset( glob(basename+'.0*.nc')[0], 'r' )
+    D = Dataset( files[0], 'r' )
     for v in D.variables:
       #      print 'Found Variable:',v.__str__()
       if len(D.variables[v].dimensions)>=idim: vars.append( v.__str__() )
