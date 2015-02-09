@@ -914,7 +914,7 @@ contains
         !" 2.1 - Calculate the surface resistance with vegetation
 
         !" a) Stomatal opening as a function of incoming short wave radiation
-        if ((iradtyp .eq. 4) .or. (iradtyp .eq. 5)) then
+        if ((iradtyp .eq. 4) .or. (iradtyp .eq. 5) .or. (iradtyp .eq. 6) .or. (iradtyp .eq. 7)) then
           f1  = 1. /min(1., (0.004 * max(0.,sflxd_av) + 0.05) &
                    / (0.81 * (0.004 * max(0.,sflxd_av) + 1.)) )
         else
