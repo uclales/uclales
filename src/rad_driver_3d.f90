@@ -91,8 +91,9 @@ contains
 
       integer i,j,k,kk,ierr
 
-      if(myid.eq.0.and.ldebug) print *,'calculate radiation',u0,'xm',xm,'ym',ym
-      if(ldebug) print *,myid,'calculate radiation xm',xm,'ym',ym
+#ifdef HAVE_TENSTREAM
+!      if(.not.radMcICA.and.nstep.ne.1) return
+#endif
 
       call init_rad_3d()
 
@@ -272,37 +273,17 @@ contains
                 solution_time = time*3600._ireals*24._ireals + dt*(nstep-1._ireals)/3._ireals !time is given in days + approx. a third at each rungekutta step
                 if(.not.need_new_solution(solution_uid,solution_time)) then
                   if(load_solution(solution_uid)) then
-                    allocate(edn (3:nxp-2,3:nyp-2,nv+1))
-                    allocate(eup (3:nxp-2,3:nyp-2,nv+1))
-                    allocate(abso(3:nxp-2,3:nyp-2,nv  ))
-                    call tenstream_get_result(redn=edn,reup=eup,rabso=abso)
-
-                    do k=1,nv
-                      fd3d  (k,:,:) = edn (:,:,k)
-                      fu3d  (k,:,:) = eup (:,:,k)
-                      fdiv3d(k,:,:) = abso(:,:,k) * dz(k,:,:)
-                    enddo
-                    deallocate(abso)
-
-                    fd3d  (nv+1,:,:) = edn(:,:,nv+1)
-                    fu3d  (nv+1,:,:) = eup(:,:,nv+1)
-                    fdiv3d(nv+1,:,:) = edn(:,:,nv+1) - eup(:,:,nv+1)
-
-                    deallocate(edn )
-                    deallocate(eup )
+                    call load_tenstream_solution(.False.,dz,u0,fd3d,fu3d,fdiv3d)
 
                     if (radMcICA) then
-                      xir_norm = 1./bandweights(ibandloop(is,js))
+                      xir_norm = 1./bandweights(ib)
                     else
                       xir_norm = gPointWeight(ir_bands(ib), ig)
                     end if
-                    fd3d  = fd3d  *xir_norm
-                    fu3d  = fu3d  *xir_norm
-                    fdiv3d= fdiv3d*xir_norm
 
-                    fdir = fdir       + fd3d  
-                    fuir = fuir       + fu3d  
-                    fdiv_th = fdiv_th + fdiv3d
+                    fdir = fdir       + fd3d  *xir_norm
+                    fuir = fuir       + fu3d  *xir_norm
+                    fdiv_th = fdiv_th + fdiv3d*xir_norm
                     cycle ! if we successfully loaded a solution, just cycle this spectral band
                   endif ! could load a solution
                 endif ! dont need to calc new solution
@@ -501,28 +482,8 @@ contains
                 solution_uid = get_band_uid( .True., ib, ig )
                 solution_time = time*3600._ireals*24._ireals + dt*(nstep-1._ireals)/3._ireals !time is given in days + approx. a third at each rungekutta step
                 if(.not.need_new_solution(solution_uid,solution_time)) then
-
                   if(load_solution(solution_uid)) then
-                    allocate(edn (3:nxp-2,3:nyp-2,nv+1))
-                    allocate(eup (3:nxp-2,3:nyp-2,nv+1))
-                    allocate(abso(3:nxp-2,3:nyp-2,nv  ))
-                    allocate(edir(3:nxp-2,3:nyp-2,nv+1))
-                    call tenstream_get_result(redir=edir,redn=edn,reup=eup,rabso=abso)
-
-                    do k=1,nv
-                      fd3d  (k,:,:) = edn (:,:,k) + edir(:,:,k)
-                      fu3d  (k,:,:) = eup (:,:,k)
-                      fdiv3d(k,:,:) = abso(:,:,k) * dz(k,:,:)
-                    enddo
-                    deallocate(abso)
-
-                    fd3d  (nv+1,:,:) = edn(:,:,nv+1) + edir(:,:,nv+1)
-                    fu3d  (nv+1,:,:) = eup(:,:,nv+1)
-                    fdiv3d(nv+1,:,:) = edir(:,:,nv+1) + edn(:,:,nv+1) - eup(:,:,nv+1)
-
-                    deallocate(edir)
-                    deallocate(edn )
-                    deallocate(eup )
+                    call load_tenstream_solution(.True.,dz,u0,fd3d,fu3d,fdiv3d)
 
                     fds     = fds      + fd3d  
                     fus     = fus      + fu3d  
@@ -613,9 +574,9 @@ contains
                 call exit(1)
 #endif
 
-                fds     = fds      + fd3d  !*xs_norm
-                fus     = fus      + fu3d  !*xs_norm
-                fdiv_sol= fdiv_sol + fdiv3d!*xs_norm
+                fds     = fds      + fd3d  
+                fus     = fus      + fu3d  
+                fdiv_sol= fdiv_sol + fdiv3d
               end select
 
               if(ldebug) then
@@ -977,17 +938,13 @@ contains
       real(ireals) :: dx,dy,phi0,u0,albedo
       real(ireals),dimension(3:in_nxp-2,3:in_nyp-2,in_nv)   :: kabs,ksca,g,deltaz
       real(ireals),dimension(:,:,:),allocatable :: planck
-      real(ireals),dimension(:,:,:),allocatable :: edir,edn,eup
-      real(ireals),dimension(:,:,:),allocatable :: abso
-
 
       integer(iintegers) :: k
       real(ireals)       :: theta0,incSolar
 
-
       nxp=in_nxp;nyp=in_nyp;nv=in_nv
       dx=in_dx;dy=in_dy;phi0=in_phi0;u0=in_u0;albedo=in_albedo
-      if(ldebug.and.myid.eq.0) print *,'Tenstrwrapper lsol',lsolar,'nx/y',nxp,nyp,'uid',solution_uid,solution_time
+      if(ldebug.and.myid.eq.0) print *,'Tenstrwrapper lsol',lsolar,'nx/y',nxp,nyp,nv,'uid',solution_uid,solution_time
 
       if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
         theta0=acos(u0)*180./3.141592653589793 !rad2deg
@@ -1024,32 +981,7 @@ contains
 
       call solve_tenstream(incSolar,solution_uid,solution_time)
 
-      allocate(edn (3:nxp-2,3:nyp-2,nv+1))
-      allocate(eup (3:nxp-2,3:nyp-2,nv+1))
-      allocate(abso(3:nxp-2,3:nyp-2,nv  ))
-
-      if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
-        allocate(edir(3:nxp-2,3:nyp-2,nv+1))
-        call tenstream_get_result(redir=edir,redn=edn,reup=eup,rabso=abso)
-        edn = edn+edir
-        deallocate(edir)
-      else
-        call tenstream_get_result(redn=edn,reup=eup,rabso=abso)
-      endif
-
-
-      do k=1,nv
-        fdiv(k,:,:) = abso(:,:,k) * deltaz(:,:,k)
-      enddo
-      fdiv(nv+1,:,:) = edn(:,:,nv+1) - eup(:,:,nv+1)
-      deallocate(abso)
-
-      do k=1,nv+1
-        fdn (k,:,:) = edn (:,:,k)
-        fup (k,:,:) = eup (:,:,k)
-      enddo
-      deallocate(edn )
-      deallocate(eup )
+      call load_tenstream_solution(lsolar,dz,in_u0,fdn,fup,fdiv)
 
       if(ldebug) then
         if(any(isnan([fdn,fup,fdiv]))) then
@@ -1071,6 +1003,54 @@ contains
           enddo
           call exit(-1)
         endif
+  end subroutine
+  subroutine load_tenstream_solution(lsolar,dz,u0,fdn,fup,fdiv)
+      logical ,intent(in) :: lsolar
+      real,dimension(:,:,:),intent(in) :: dz ! dimensions (nv,nxp-4,nyp-4)
+      real ,intent(in) :: u0
+      real,dimension(:,:,:),intent(out) :: fdn,fup,fdiv
+      real(ireals),dimension(:,:,:),allocatable :: edir,edn,eup
+      real(ireals),dimension(:,:,:),allocatable :: abso
+
+      integer :: i,j,k
+      integer :: is,ie,js,je,ks,ke
+      is = lbound(fdn,2); ie = ubound(fdn,2)
+      js = lbound(fdn,3); je = ubound(fdn,3)
+      ks = lbound(fdn,1); ke = ubound(fdn,1)
+
+      allocate(edn (is:ie,js:je,ke  ))
+      allocate(eup (is:ie,js:je,ke  ))
+      allocate(abso(is:ie,js:je,ke-1))
+
+      if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
+        allocate(edir(is:ie,js:je,ke  ))
+        call tenstream_get_result(redir=edir,redn=edn,reup=eup,rabso=abso)
+        edn = edn+edir
+        deallocate(edir)
+      else
+        call tenstream_get_result(redn=edn,reup=eup,rabso=abso)
+      endif
+
+
+      do k=ks,ke-1
+        fdiv(k,:,:) = abso(:,:,k) 
+      enddo
+      fdiv(ks:ke-1,:,:) = fdiv(ks:ke-1,:,:) * dz
+
+      fdiv(ke,:,:) = edn(:,:,ke) - eup(:,:,ke)
+      deallocate(abso)
+
+      do k=ks,ke
+        fdn (k,:,:) = edn (:,:,k)
+        fup (k,:,:) = eup (:,:,k)
+      enddo
+!      print *,myid,'load_tenstream_solution edn ::',edn (is,js,:)
+!      print *,myid,'load_tenstream_solution eup ::',eup (is,js,:)
+!      print *,myid,'load_tenstream_solution  dz ::',dz  (is,js,:)
+!      print *,myid,'load_tenstream_solution fdn ::',fdn (:,is,js)
+!      print *,myid,'load_tenstream_solution fup ::',fup (:,is,js)
+      deallocate(edn )
+      deallocate(eup )
   end subroutine
 #endif
 end module
