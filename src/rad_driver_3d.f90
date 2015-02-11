@@ -1024,11 +1024,11 @@ contains
 
       if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
         allocate(edir(is:ie,js:je,ke  ))
-        call tenstream_get_result(redir=edir,redn=edn,reup=eup,rabso=abso)
+        call tenstream_get_result(edir,edn,eup,abso)
         edn = edn+edir
         deallocate(edir)
       else
-        call tenstream_get_result(redn=edn,reup=eup,rabso=abso)
+        call tenstream_get_result(edir,edn,eup,abso)
       endif
 
 
