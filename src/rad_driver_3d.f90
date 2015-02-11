@@ -172,7 +172,6 @@ contains
       !if(myid.le.0) print *,'flx ::','sedn',sflxd(:,i,j),' eup',sflxu(:,i,j)
       !if(myid.le.0) print *,'div ::',' sol',fdiv_sol(:,i,j),' th',fdiv_th(:,i,j)
       !if(myid.le.0) print *,'flx ::',' flxdiv',flxdiv(:,i,j),'tt',tt(:,i,j)
-      !call mpi_barrier(mpi_comm_world,ierr)
       !call exit(1)
 
       deallocate( fus )
@@ -401,7 +400,7 @@ contains
           use solver, only : qft
           use fuliou, only : computesolarbandweights, select_bandg
           use ckd, only    : solar_bands,kg,power,gPointWeight
-          use mpi, only    : mpi_comm_world,mpi_barrier !TODO
+          use mpi, only    : mpi_comm_world
 
 !          use m_twostream, only: delta_eddington_twostream
 
@@ -589,7 +588,6 @@ contains
                   if(any(isnan( fus     (k,:,:)))) print *,myid,'nan in radiation tendency fus     ',k,fus     (k,:,:)
                   if(any(isnan( fdiv3d  (k,:,:)))) print *,myid,'nan in radiation tendency fdiv3d  ',k,fdiv3d  (k,:,:)
                   if(any(isnan( fdiv_sol(k,:,:)))) print *,myid,'nan in radiation tendency fdiv_sol',k,fdiv_sol(k,:,:)
-                  call mpi_barrier(MPI_COMM_WORLD,ierror)
                   if(any(isnan([fds     (k,:,:),fus     (k,:,:),fdiv_sol(k,:,:),fdiv3d  (k,:,:)]))) call exit(1)
                 enddo
               endif
