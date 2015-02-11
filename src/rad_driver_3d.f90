@@ -149,6 +149,7 @@ contains
       !TODO here the loop was truncated to 'nzp-3' in the original code -- why not use heating rate in every layer?!?
       do k=2,nzp-3
         tt(k,is:ie, js:je) = tt(k, is:ie, js:je) + flxdiv(k,:,:)*hr_factor(k, :,:)
+#ifndef _XLF
         if(ldebug) then
           if(any(isnan(rflx     (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency rflx  ',k,rflx    (k,:,:), any(isnan(sflx)),any(isnan(sflxu)),any(isnan(sflxd)),any(isnan(lflxu)),any(isnan(lflxd))
           if(any(isnan(fdiv_sol (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency divsol',k,fdiv_sol(k,:,:)
@@ -160,7 +161,8 @@ contains
 
           !                if(myid.le.0) print *,'heating rate ::',k,flxdiv(k,i,j),  hr_factor(k,i,j), - (rflx(k,i,j) - rflx(k-1,i,j))
           !        if(myid.le.0) print *,k,'solar',sflxd(k,3,3),sflxu(k,3,3),':: thermal',lflxd(k,3,3),lflxu(k,3,3)
-        endif
+      endif
+#endif
       end do
 
       !i=is
@@ -618,6 +620,8 @@ contains
                 fdiv_sol= fdiv_sol + fdiv3d!*xs_norm
               end select
 
+
+#ifndef _XLF
               if(ldebug) then
                 do k=1,nv1
                   if(any(isnan( fds     (k,:,:)))) print *,myid,'nan in radiation tendency fds     ',k,fds     (k,:,:)
@@ -628,6 +632,7 @@ contains
                   if(any(isnan([fds     (k,:,:),fus     (k,:,:),fdiv_sol(k,:,:),fdiv3d  (k,:,:)]))) call exit(1)
                 enddo
               endif
+#endif
 
             enddo !igpt
           enddo !iband
@@ -836,6 +841,7 @@ contains
       call gases (ir_bands(ib), ig, pp, pt, ph, po, tg )
       call combineOpticalProperties(tau, w, pf, tg)
 
+#ifndef _XLF
       if(ldebug) then
         if(any(isnan([tau, w, pf]))) then
           do k=1,size(pt)
@@ -844,6 +850,7 @@ contains
           call exit(-1)
         endif
       endif
+#endif
   end subroutine
   !calc of optprop extracted from rad_vis:
   subroutine optprop_rad_vis( ibandloop, ibandg, pp, pt, ph, po, tau, w, pf, dz, plwc, pre, piwc, pde, pgwc)
@@ -918,6 +925,7 @@ contains
       tau = tauNoGas; w = wNoGas; pf = pfNoGas
       call gases (solar_bands(ib), ig, pp, pt, ph, po, tg )
       call combineOpticalProperties(tau, w, pf, tg)
+#ifndef _XLF
       if(ldebug) then
         if(any(isnan([tau, w, pf]))) then
           do k=1,size(pt)
@@ -926,6 +934,7 @@ contains
           call exit(-1)
         endif
       endif
+#endif
   end subroutine
   function get_band_uid(lsolar,iband,ibandg)
       use ckd, only: solar_bands,ir_bands,kg
@@ -1002,11 +1011,13 @@ contains
         kabs  (:,:,k) = max(epsilon(kabs), tau(k,:,:)*(1.-w0(k,:,:)) / deltaz(:,:,k) )
         ksca  (:,:,k) = max(epsilon(ksca), tau(k,:,:)*    w0(k,:,:)  / deltaz(:,:,k) )
         g     (:,:,k) = pf (k,1,:,:)/3.
+#ifndef _XLF
         if(ldebug) then
           if(any(isnan(kabs(:,:,k)))) print *,myid,'tenstream_wrapper :: corrupt kabs',kabs(:,:,k),'::',tau(k,:,:),'::',w0(k,:,:),'::',deltaz(:,:,k)
           if(any(isnan(ksca(:,:,k)))) print *,myid,'tenstream_wrapper :: corrupt ksca',ksca(:,:,k),'::',tau(k,:,:),'::',w0(k,:,:),'::',deltaz(:,:,k)
           if(any(isnan(g   (:,:,k)))) print *,myid,'tenstream_wrapper :: corrupt g   ',g   (:,:,k),'::',pf (k,1,:,:)                                      
         endif
+#endif
       enddo
       if(.not. lsolar) then
         allocate(planck(3:nxp-2,3:nyp-2,nv+1))
@@ -1052,6 +1063,7 @@ contains
       deallocate(eup )
 
       if(ldebug) then
+#ifndef _XLF
         if(any(isnan([fdn,fup,fdiv]))) then
           do k=1,nv+1
             print *,myid,'DEBUG',k,phi0, theta0,albedo
@@ -1061,7 +1073,7 @@ contains
           enddo
           call exit(-1)
         endif
-      endif
+#endif
         if(lsolar.and.any([fdn,fup].lt.-1._ireals)) then
           do k=1,nv+1
             print *,myid,'DEBUG value less than zero in solar rad',k,phi0, theta0,albedo
@@ -1071,6 +1083,7 @@ contains
           enddo
           call exit(-1)
         endif
+    endif
   end subroutine
 #endif
 end module

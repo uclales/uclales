@@ -101,7 +101,7 @@ if(WITH_TENSTREAM)
   #  set (CMAKE_C_FLAGS "-cpp -W -Wall -Wuninitialized --std=c99" )
   list(APPEND CMAKE_MODULE_PATH "${TENSTREAM_DIR}/cmake/petsc_cmake_modules/")
   MESSAGE(STATUS "Using PETSC $ENV{PETSC_DIR} / $ENV{PETSC_ARCH} ")
-  find_package(PETSc REQUIRED)
+  find_package(PETSc)
   message(STATUS "Found Petsc:    ${PETSC_FOUND}" )
   message(STATUS "Petsc Includes: ${PETSC_INCLUDES}" )
   message(STATUS "Petsc Library : ${PETSC_LIBRARIES}")
@@ -126,9 +126,12 @@ if(WITH_TENSTREAM)
 
   add_definitions(-DHAVE_TENSTREAM)
 endif(WITH_TENSTREAM)
+# Find out if the compiler is XLF and if so give this to the C preprocessor
+string(COMPARE EQUAL ${CMAKE_Fortran_COMPILER_ID} "XL" _is_XLF)
+if(${_is_XLF})
+  add_definitions(-D_XLF)
+endif(${_is_XLF})
 
-#include_directories (${CMAKE_CURRENT_SOURCE_DIR})
-#add_subdirectory(tenstr_src)
 add_subdirectory(src)# tenstream)
 
 
