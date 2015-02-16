@@ -529,8 +529,15 @@ contains
   end subroutine appl_abort
 
   subroutine appl_finalize(ierr)
+#ifdef HAVE_TENSTREAM
+    use m_tenstream, only: destroy_tenstream
+#endif
 
     integer ierr
+
+#ifdef HAVE_TENSTREAM
+        call destroy_tenstream()
+#endif
     call mpi_finalize(ierr)
 
   end subroutine appl_finalize

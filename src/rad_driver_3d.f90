@@ -31,7 +31,6 @@
 module radiation_3d
 
   use grid, only       : nzp,nxp,nyp, deltax,deltay,zm
-  use grid, only       : xm,ym !TODO DEBUG
   use fuliou, only     : minSolarZenithCosForVis
   use mpi_interface, only : myid,ierror
   use radiation, only  : zenith, setup, pp, pt, ph,po, plwc, pre, prwc, piwc, pde, pgwc, &
@@ -73,7 +72,6 @@ contains
   subroutine rad_3d(alat, time, sknt, sfc_albedo, CCN, dn0, &
           pi0, pi1, pip, th, rv, rc, tt, rflx, sflx ,lflxu, lflxd,sflxu,sflxd, &
           albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa, rr,ice,nice,grp)
-!      use defs,only:nv1!TODO need only for debugging
 
       real, intent (in)    :: alat, time, sknt, sfc_albedo, CCN
       real, dimension (nzp), intent (in)                   :: dn0, pi0, pi1
@@ -926,7 +924,6 @@ contains
 
       endif
 
-      if(ldebug) print *,myid,'returning band_uid for:',lsolar,iband,ibandg,'::',get_band_uid
       return
   end function
 
@@ -963,8 +960,8 @@ contains
 
       do k=1,nv
         deltaz(:,:,k) = dz (k,:,:)
-        kabs  (:,:,k) = max(epsilon(kabs), tau(k,:,:)*(1.-w0(k,:,:)) / deltaz(:,:,k) )
-        ksca  (:,:,k) = max(epsilon(ksca), tau(k,:,:)*    w0(k,:,:)  / deltaz(:,:,k) )
+        kabs  (:,:,k) = max(epsilon(tau), tau(k,:,:)*(1.-w0(k,:,:)) / deltaz(:,:,k) )
+        ksca  (:,:,k) = max(epsilon(tau), tau(k,:,:)*    w0(k,:,:)  / deltaz(:,:,k) )
         g     (:,:,k) = pf (k,1,:,:)/3.
 #ifndef _XLF
         if(ldebug) then
