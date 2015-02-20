@@ -33,12 +33,11 @@ module radiation_3d
   use grid, only       : nzp,nxp,nyp, deltax,deltay,zm
   use fuliou, only     : minSolarZenithCosForVis
   use mpi_interface, only : myid,ierror
-  use radiation, only  : zenith, setup, pp, pt, ph,po, plwc, pre, prwc, piwc, pde, pgwc, &
+  use radiation, only  : zenith, setup, pp, pt, ph, po, pre, pde, plwc, piwc, prwc, pgwc, &
       u0, fixed_sun, radMcICA, rad_eff_radius !namelist parameters
 
 #ifdef HAVE_TENSTREAM
       use mpi_interface, only: nxpa,nypa
-      use mpi!, only : MPI_COMM_WORLD
       use m_tenstream, only: init_tenstream,set_optical_properties,solve_tenstream, destroy_tenstream, tenstream_get_result, need_new_solution, load_solution
       use m_data_parameters, only : ireals,iintegers
       use grid, only : dt,nstep
@@ -103,6 +102,7 @@ contains
           print *,k,'solar',fds(k,3,3),fus(k,3,3),fdiv_sol(k,3,3),':: thermal',fdir(k,3,3),fuir(k,3,3),fdiv_th(k,3,3)
         enddo
       endif
+
       !copy from radiation grid, to dynamics grid
       do k=1,nzp
         kk = ubound(fus,1) - (k-1)
@@ -156,20 +156,8 @@ contains
           if(any(isnan(flxdiv   (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency div',k,flxdiv   (k,:,:)
           if(any(isnan(tt       (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency tt',k,tt(k,:,:)
           if(any(isnan([hr_factor(k,:,:),flxdiv(k,:,:),tt(k,:,:),fdiv_sol (k,:,:),fdiv_th  (k,:,:),rflx     (k,:,:)]))) call exit(1)
-
-          !                if(myid.le.0) print *,'heating rate ::',k,flxdiv(k,i,j),  hr_factor(k,i,j), - (rflx(k,i,j) - rflx(k-1,i,j))
-          !        if(myid.le.0) print *,k,'solar',sflxd(k,3,3),sflxu(k,3,3),':: thermal',lflxd(k,3,3),lflxu(k,3,3)
         endif
       end do
-
-      !i=is
-      !j=js
-      !if(myid.le.0) print *,'flx ::','tedn',lflxd(:,i,j),' eup',lflxu(:,i,j)
-      !if(myid.le.0) print *,'flx ::','sedn',sflxd(:,i,j),' eup',sflxu(:,i,j)
-      !if(myid.le.0) print *,'div ::',' sol',fdiv_sol(:,i,j),' th',fdiv_th(:,i,j)
-      !if(myid.le.0) print *,'flx ::',' flxdiv',flxdiv(:,i,j),'tt',tt(:,i,j)
-      !call mpi_barrier(mpi_comm_world,ierr)
-      !call exit(1)
 
       deallocate( fus )
       deallocate( fds )
@@ -191,6 +179,7 @@ contains
           use defs, only: nv,nv1,pi
           use solver, only : qft
           use ckd, only: ir_bands,gPointWeight,kg
+          use mpi, only    : mpi_comm_world,mpi_integer
 
           real,dimension(nv1)  :: fu1,fd1
           real,dimension(nv1,  is:ie,js:je) :: fd3d,fu3d,fdiv3d
@@ -305,10 +294,17 @@ contains
                   endif
 
                   if (present(ice).and.present(grp)) then
+                    call setup_rad_atmosphere(CCN, dn0, pi0, pi1,    &
+                        pip(:,i,j), th(:,i,j), rv(:,i,j), rc(:,i,j),     &
+                        hr_factor(:,i,j), dz(:,i,j),         &
+                        rr=rr(:,i,j),ice=ice(:,i,j),nice=nice(:,i,j),grp=grp(:,i,j))
                     call optprop_rad_ir( ib, ig, pp, pt, ph, po, &
                         tau (:,i,j), w0  (:,i,j), phasefct(:,:,i,j),dz(:,i,j),  & 
                         plwc=plwc, pre=pre, piwc=piwc, pde=pde, pgwc=pgwc)
                   else
+                    call setup_rad_atmosphere(CCN, dn0, pi0, pi1,    &
+                        pip(:,i,j), th(:,i,j), rv(:,i,j), rc(:,i,j),     &
+                        hr_factor(:,i,j), dz(:,i,j)         )
                     call optprop_rad_ir( ib, ig, pp, pt, ph, po,&
                         tau (:,i,j), w0  (:,i,j), phasefct(:,:,i,j),dz(:,i,j), & 
                         plwc=plwc, pre=pre)
@@ -334,13 +330,6 @@ contains
                     call qft (.false., ee, zero, zero, bf(:,i,j), tau(:,i,j), w0(:,i,j), &   ! thermal qft
                         phasefct(:, 1, i,j), phasefct(:, 2, i,j),    &
                         phasefct(:, 3, i,j), phasefct(:, 4, i,j), fu1, fd1)
-!                    if(ib.eq.2 .and. myid.eq.0 .and. i.eq.3 .and. j.eq.3) then
-!                      do k=1,nv1
-!                        print *,'tenstr edn',fd1(k),fu1(k),bf(k,3,3),'::',fdir(k,i,j),fuir(k,i,j)
-!                      enddo
-!                      call exit(1)
-!                    endif
-
 
                     if (radMcICA) then
                       ib = ibandloop(i,j)
@@ -397,7 +386,7 @@ contains
           use solver, only : qft
           use fuliou, only : computesolarbandweights, select_bandg
           use ckd, only    : solar_bands,kg,power,gPointWeight
-          use mpi, only    : mpi_comm_world
+          use mpi, only    : mpi_comm_world,mpi_integer
 
 !          use m_twostream, only: delta_eddington_twostream
 
@@ -509,10 +498,17 @@ contains
                   endif
 
                   if (present(ice).and.present(grp)) then
+                    call setup_rad_atmosphere(CCN, dn0, pi0, pi1,    &
+                        pip(:,i,j), th(:,i,j), rv(:,i,j), rc(:,i,j),     &
+                        hr_factor(:,i,j), dz(:,i,j),         &
+                        rr=rr(:,i,j),ice=ice(:,i,j),nice=nice(:,i,j),grp=grp(:,i,j))
                     call optprop_rad_vis( ib, ig, pp, pt, ph, po, &
                         tau (:,i,j), w0  (:,i,j), phasefct(:,:,i,j),dz(:,i,j), & 
                         plwc=plwc, pre=pre, piwc=piwc, pde=pde, pgwc=pgwc)
                   else
+                    call setup_rad_atmosphere(CCN, dn0, pi0, pi1,    &
+                        pip(:,i,j), th(:,i,j), rv(:,i,j), rc(:,i,j),     &
+                        hr_factor(:,i,j), dz(:,i,j)         )
                     call optprop_rad_vis( ib, ig, pp, pt, ph, po,&
                         tau (:,i,j), w0  (:,i,j), phasefct(:,:,i,j),dz(:,i,j), & 
                         plwc=plwc, pre=pre)
@@ -547,17 +543,16 @@ contains
                     else
                       xs_norm = gPointWeight(solar_bands(ib), ig)*power(solar_bands(ib))
                     end if
-                    fds(:,i,j) = fds(:,i,j) + fd1(:) * xs_norm 
-                    fus(:,i,j) = fus(:,i,j) + fu1(:) * xs_norm 
+                    fd3d(:,i,j) = fd1(:) * xs_norm 
+                    fu3d(:,i,j) = fu1(:) * xs_norm 
+                    fdiv3d(1:nv,i,j) = ( (fd1(1:nv) - fu1(1:nv)) + (fu1(2:nv1) - fd1(2:nv1))   ) *xs_norm
+                    fdiv3d( nv1,i,j) = ( (fd1(nv1) - fu1(nv1))                                 ) *xs_norm
+
                   end do ! i
                 end do ! j
-                fdiv_sol(1:nv,:,:) = (fds(1:nv,:,:) - fus(1:nv,:,:)) + (fus(2:nv1,:,:) - fds(2:nv1,:,:))
-                fdiv_sol( nv1,:,:) = (fds(nv1,:,:) - fus(nv1,:,:))
-
 
               case (7) !tenstr
                 if (radMcICA) then
-!                  if(myid.eq.0) print *,'ATTENTION :: You are using tenstream solver with MCICA -- this is not tested... it might not be meaningful! Beware that this is not the same as using an IPA solver together with MC-ICA!'
                   ib = ibandloop(is,js)
                   ig = ibandg   (is,js)
                   xs_norm = power(solar_bands(ib))/ bandweights(ib)
@@ -572,10 +567,11 @@ contains
                 call exit(1)
 #endif
 
-                fds     = fds      + fd3d  
-                fus     = fus      + fu3d  
-                fdiv_sol= fdiv_sol + fdiv3d
-              end select
+              end select ! iradtyp
+
+              fds     = fds      + fd3d  
+              fus     = fus      + fu3d  
+              fdiv_sol= fdiv_sol + fdiv3d
 
               if(ldebug) then
                 do k=1,nv1
@@ -649,6 +645,11 @@ contains
           ! solar zenith angle
           if (.not. fixed_sun) u0 = zenith(alat,time)
 
+          ! TODO we do calculate profiles here and then again in thermal AND solar
+          ! TODO -- this is not elegent :( however not that straightforward to circumvent....
+          ! TODO need it here in case radiation solution is loaded from tenstream
+          ! TODO and need it at optprop calls because lwc is just 1D vector ... 
+          ! TODO  should refactor these parts also into 3D arrays but then loose historic coupling to 1D routines.
           do j=js,je
             do i=is,ie
               if (present(ice).and.present(grp)) then
@@ -890,7 +891,7 @@ contains
       use ckd, only: solar_bands,ir_bands,kg
       logical,intent(in) :: lsolar
       integer,intent(in) :: iband,ibandg
-      integer(iintegers) :: get_band_uid
+      integer :: get_band_uid
 
       integer :: ib,ig
 
@@ -922,6 +923,7 @@ contains
 
 #ifdef HAVE_TENSTREAM
   subroutine tenstream_wrapper(lsolar, in_nxp,in_nyp,in_nv,in_dx,in_dy,dz, in_phi0,in_u0, in_albedo,in_incSolar, tau, w0, pf, bf, fdn,fup,fdiv)
+      use mpi, only: mpi_comm_world
 
       logical                ,intent(in) :: lsolar
       integer                ,intent(in) :: in_nxp,in_nyp,in_nv
