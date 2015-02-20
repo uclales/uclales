@@ -92,7 +92,7 @@ def append_var(basename,varname):
           del(xd)
           del(zd)
       except Exception,e:
-          print e
+          pass
 
       D = Dataset(coord_files[(i,j)]['fname'] )
 
