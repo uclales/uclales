@@ -86,9 +86,17 @@ def append_var(basename,varname):
   for i in np.arange(nr_x):
     for j in np.arange(nr_y):
 
+      try:
+          del(td)
+          del(yd)
+          del(xd)
+          del(zd)
+      except Exception,e:
+          pass
+
       D = Dataset(coord_files[(i,j)]['fname'] )
 
-      print 'reading data from file:',coord_files[(i,j)]['fname'],' coords ',i,j
+#      print 'reading data from file:',coord_files[(i,j)]['fname'],' coords ',i,j
 
       l4d = len(D.variables[varname].dimensions[:])==4
       l3d = len(D.variables[varname].dimensions[:])==3
@@ -107,7 +115,7 @@ def append_var(basename,varname):
       if varname not in coord_files[(i,j)].keys(): 
         coord_files[(i,j)][varname] = D.variables[varname][:maxtime]
 
-      print "Coords of variable:",varname,'::',D.variables[varname].dimensions[:],[l1d,l2d,l3d,l4d], np.shape( D.variables[varname] ), np.shape(coord_files[(i,j)][varname])
+#      print "Coords of variable:",varname,'::',D.variables[varname].dimensions[:],[l1d,l2d,l3d,l4d], np.shape( D.variables[varname] ), np.shape(coord_files[(i,j)][varname])
 
       coord_files[td] = D.variables[ td ][:maxtime]
 
@@ -119,11 +127,11 @@ def append_var(basename,varname):
 
       if 'yd' in locals():
         if '{0:}.{1:}'.format(yd,j) not in coord_files.keys(): 
-          coord_files['{0:}.{1:}'.format(yd,j)] = D.variables[ yd ][:maxtime] #save y-dimension
+          coord_files['{0:}.{1:}'.format(yd,j)] = D.variables[ yd ][:] #save y-dimension
 
       if 'xd' in locals():
         if '{0:}.{1:}'.format(xd,i) not in coord_files.keys():
-          coord_files['{0:}.{1:}'.format(xd,i)] = D.variables[ xd ][:maxtime] #save x-dimension
+          coord_files['{0:}.{1:}'.format(xd,i)] = D.variables[ xd ][:] #save x-dimension
 
       D.close()
 
