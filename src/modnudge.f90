@@ -47,10 +47,12 @@ SAVE
 
   ! arrays for initial values
   real, dimension(:),allocatable::tn,rn,un,vn,wn
-
+!RV
+  real, allocatable :: rlz(:) 
+  integer kstrt
+!rv
+  real:: coef=1./60.
   real, allocatable :: rlx(:,:)
-  real::coef=1./60.
-
 ! LINDA, e
 contains
   subroutine initnudge(time)
@@ -231,35 +233,55 @@ contains
   subroutine nudge_bound
 
   use grid, only: nxp,nyp,nzp,a_tt,a_tp,a_rt,a_rp,&
-                  a_ut,a_up,a_vt,a_vp,a_wt,a_wp,liquid
+                  a_ut,a_up,a_vt,a_vp,a_wt,a_wp,liquid,outtend,wtendr, nstep,rkalpha,rkbeta, dt
   use mpi_interface, only : myid
 
   IMPLICIT NONE
   integer:: k,t,i,j
+  real    :: rk !rv
 
 
   if (firsttime) then
      firsttime = .false.
-     allocate(rlx(nxp,nyp))
-     allocate(tn(nzp),rn(nzp),un(nzp),vn(nzp),wn(nzp))
-     rlx(:,:)=0.0
+     !allocate(rlx(nxp,nyp)) 
+     !allocate(tn(nzp),rn(nzp),un(nzp),vn(nzp),wn(nzp))
+     allocate(rlz(nzp))
+     allocate(rn(nzp))
+     rlz(:)=0.0
      call initnudge_bound
+     
+     !test values:
+     if(myid==0) print*,' ------------------------------------------------------------ '
+     if(myid==0) print*,' ------------ in nudge_bound ------ rlz(:)=',rlz(kstrt-1:nzp)
+     if(myid==0) print*,' kstrt=',kstrt
+     if(myid==0) print*,' rn(kstrt:nzp)=',rn(kstrt:nzp)
+     if(myid==0) print*,' coef=',coef
+     if(myid==0) print*,' ------------------------------------------------------------ '
   end if
 
 ! relax towards initial conditions
-
-  do k=1,nzp
+  if(outtend) then !RV
+     if(nstep==1) rk = rkalpha(1)+rkalpha(2)!then 
+     if(nstep==2) rk = rkbeta(2)+rkbeta(3)
+     if(nstep==3) rk = rkalpha(3)
+  end if   !rv
+  
+  !do k=1,nzp
+  do k=kstrt,nzp !rv
      do i=1,nxp
         do j=1,nyp
-           a_tt(k,i,j)=a_tt(k,i,j)-(a_tp(k,i,j)-tn(k))*coef*rlx(i,j)
-           a_rt(k,i,j)=a_rt(k,i,j)-(a_rp(k,i,j)-rn(k))*coef*rlx(i,j)
-           a_ut(k,i,j)=a_ut(k,i,j)-(a_up(k,i,j)-un(k))*coef*rlx(i,j)
-           a_vt(k,i,j)=a_vt(k,i,j)-(a_vp(k,i,j)-vn(k))*coef*rlx(i,j)
-           a_wt(k,i,j)=a_wt(k,i,j)-(a_wp(k,i,j)-wn(k))*coef*rlx(i,j)
+           !a_tt(k,i,j)=a_tt(k,i,j)-(a_tp(k,i,j)-tn(k))*coef*rlx(i,j)
+           a_rt(k,i,j)=a_rt(k,i,j)-(a_rp(k,i,j)-rn(k))*coef*rlz(k)
+           if(outtend) then !RV
+              wtendr(k,i,j)=wtendr(k,i,j)-(a_rp(k,i,j)-rn(k))*coef*rlz(k)*rk*dt
+           end if !rv
+           !a_ut(k,i,j)=a_ut(k,i,j)-(a_up(k,i,j)-un(k))*coef*rlx(i,j)
+           !a_vt(k,i,j)=a_vt(k,i,j)-(a_vp(k,i,j)-vn(k))*coef*rlx(i,j)
+           !a_wt(k,i,j)=a_wt(k,i,j)-(a_wp(k,i,j)-wn(k))*coef*rlx(i,j)
         enddo
      enddo
   enddo
-
+  
   end subroutine nudge_bound
 !--------------------------------------------------------------------------
 
@@ -267,7 +289,7 @@ contains
   subroutine initnudge_bound
 
   use mpi_interface, only : myid,nxprocs,nyprocs
-  use grid, only: nxp,nyp,nzp,a_tp,a_rp,a_up,a_vp,a_wp,deltax
+  use grid, only: nxp,nyp,nzp,a_tp,a_rp,a_up,a_vp,a_wp,deltax,runtype,iradtyp,zt
   use defs, only: pi
 
   IMPLICIT NONE
@@ -279,61 +301,101 @@ contains
   real:: rnudge    ! relaxation zone [points]
   logical::flg
 
-  flg=.false.
 
-  xnudge=10.0
-  rnudge=xnudge*1000.0/deltax
-  nnudge=int(rnudge)
-  if (nnudge>nxp) flg=.true.
-
-! western boundary
-  if (mod(myid,nxprocs)<eps) then
-     print*,'western boundary, myid=',myid
-     if (flg) nnudge=nxp
-     do i=1,nnudge
-!       rlx(i,:)=1.0 ! step function
-        rlx(i,:)=(cos(real(i)*pi/(rnudge*2)))**2!cos2-function
+  !RV, simple nudging for z>8.8km to get rid of liquid in large domain runs
+  if(iradtyp == 3) then
+     
+     ! prepare rlz
+     flg=.false.
+     do k=1,nzp
+        if(zt(k)<8800.) then
+           rlz(k)=0.
+        else
+           rlz(k)=(zt(k)/zt(nzp))**10
+           if(.not. flg) then
+              flg=.true.
+              kstrt=k
+           end if
+        end if
      enddo
-  endif
-  ! relaxation zone extends over more than one processor
-  if ((myid>0).and.(mod(myid-1,nxprocs)<eps).and.(flg)) then
-     print*,'western boundary, 2nd proc, myid=',myid
-     do i=1,nnudge-nxp+4
-!       rlx(i,:)=1.0 ! step function
-        rlx(i,:)=(cos(real(i+nxp-4)*pi/(rnudge*2)))**2!cos2-function
+
+     ! read in/save initial conditions
+     if(runtype == 'INITIAL') then
+        do k=1,nzp
+           rn(k)=a_rp(k,3,3)
+        enddo
+        
+     else !'HISTORY'; read from nudge_in file!
+        open (21,file='nudge_in')
+        !write(6,*) 'rn(k)' 
+        do k=1,nzp
+           read(21,*,end=100) rn(k)
+           rn(k)=rn(k)/1000. !needs to be in kg/kg, nudge_in provides g/kg
+           !write(6,*) rn(k)
+        end do
+        close(21)
+     end if
+100  continue!rv
+     
+  else     
+     
+     flg=.false.
+     
+     xnudge=10.0
+     rnudge=xnudge*1000.0/deltax
+     nnudge=int(rnudge)
+     if (nnudge>nxp) flg=.true.
+     
+     ! western boundary
+     if (mod(myid,nxprocs)<eps) then
+        print*,'western boundary, myid=',myid
+        if (flg) nnudge=nxp
+        do i=1,nnudge
+           !       rlx(i,:)=1.0 ! step function
+           rlx(i,:)=(cos(real(i)*pi/(rnudge*2)))**2!cos2-function
+        enddo
+     endif
+     ! relaxation zone extends over more than one processor
+     if ((myid>0).and.(mod(myid-1,nxprocs)<eps).and.(flg)) then
+        print*,'western boundary, 2nd proc, myid=',myid
+        do i=1,nnudge-nxp+4
+           !       rlx(i,:)=1.0 ! step function
+           rlx(i,:)=(cos(real(i+nxp-4)*pi/(rnudge*2)))**2!cos2-function
+        enddo
+     endif
+     
+     ! eastern boundary
+     if (mod(myid+1,nxprocs)<eps) then
+        print*,'eastern boundary, myid=',myid
+        if (flg) nnudge=nxp
+        do i=nxp-nnudge+1,nxp
+           !       rlx(i,:)=1.0! step function
+           rlx(i,:)=(cos(real(nxp-i+1)*pi/(rnudge*2)))**2!cos2-function
+        enddo
+     endif
+     ! relaxation zone extends over more than one processor
+     if ((mod(myid+2,nxprocs)<eps).and.(flg)) then
+        print*,'eastern boundary, 2nd proc, myid=',myid
+        do i=2*nxp-nnudge+1-4,nxp
+           !       rlx(i,:)=1.0 ! step function
+           rlx(i,:)=(cos(real(2*nxp-i+1-4)*pi/(rnudge*2)))**2!cos2-function
+        enddo
+     endif
+     
+     ! read in/save initial conditions
+     
+     do k=1,nzp
+        tn(k)=a_tp(k,3,3)
+        rn(k)=a_rp(k,3,3)
+        un(k)=a_up(k,3,3)
+        vn(k)=a_vp(k,3,3)
+        wn(k)=0.0
      enddo
-  endif
-
-! eastern boundary
-  if (mod(myid+1,nxprocs)<eps) then
-     print*,'eastern boundary, myid=',myid
-     if (flg) nnudge=nxp
-     do i=nxp-nnudge+1,nxp
-!       rlx(i,:)=1.0! step function
-        rlx(i,:)=(cos(real(nxp-i+1)*pi/(rnudge*2)))**2!cos2-function
-     enddo
-  endif
-  ! relaxation zone extends over more than one processor
-  if ((mod(myid+2,nxprocs)<eps).and.(flg)) then
-     print*,'eastern boundary, 2nd proc, myid=',myid
-     do i=2*nxp-nnudge+1-4,nxp
-!       rlx(i,:)=1.0 ! step function
-        rlx(i,:)=(cos(real(2*nxp-i+1-4)*pi/(rnudge*2)))**2!cos2-function
-     enddo
-  endif
-
-! read in/save initial conditions
-
-  do k=1,nzp
-     tn(k)=a_tp(k,3,3)
-     rn(k)=a_rp(k,3,3)
-     un(k)=a_up(k,3,3)
-     vn(k)=a_vp(k,3,3)
-     wn(k)=0.0
-  enddo
-
-
-  end subroutine initnudge_bound
+     
+  end if
+  
+  
+end subroutine initnudge_bound
 ! LINDA, e
 
-end module
+end module modnudge
