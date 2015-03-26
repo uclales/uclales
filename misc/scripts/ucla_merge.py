@@ -5,33 +5,55 @@ import h5py as H
 from glob import glob
 import sys
 import os
+from time import sleep
+from datetime import datetime
+
+try:
+    from filelock import FileLock
+    have_lock=True
+except Exception,e:
+    print 'Couldnt import FileLock:',e
+    have_lock=False
 
 #--------------------------------------------------------------------------------------------------------------------------------
-def write_nc(basename, data, dims):
+def write_nc(basename,varname, data, dims, attributes=None):
+  fname= '{}'.format(basename)+'.merged.nc'
   try:
-    fname= basename+'.nc'
+  
+    if have_lock:
+        start = datetime.now()
+        lock = FileLock(fname+'.lock')
+        lock.acquire() # wait until file is ready for opening
+        print("Lock acquired. waited :: {}".format(datetime.now()-start) )
+
     if os.path.exists(fname):
       fmode='a'
     else:
       fmode='w'
-
     D=Dataset(fname,fmode)
-
+  
     for dim in dims:
       if dim[0] not in D.dimensions: 
         D.createDimension(dim[0], len(dim[1]) )
-        D.createVariable(dim[0] ,'f4',(dim[0],) )
-        D.variables[dim[0]][:] = dim[1]
-        print 'write_netcdf: write dim:',dim,'shape',np.shape(dim[1])
-
-    print 'write_netcdf: var: ',varname,' shape', np.shape(data)
-    D.createVariable(varname, 'f4', [ d[0] for d in dims ] , zlib=True,least_significant_digit=6, complevel=7)
-    D.variables[varname][:] = data
-
+        if dim[0] not in D.variables:
+            D.createVariable(dim[0] ,'f4',(dim[0],) )
+            D.variables[dim[0]][:] = dim[1]
+            print 'write_netcdf: write dim:',dim,'shape',np.shape(dim[1])
+  
+    if varname not in D.variables:
+        print 'write_netcdf: var: ',varname,' shape', np.shape(data)
+        D.createVariable(varname, 'f4', [ d[0] for d in dims ] , zlib=True,least_significant_digit=6, complevel=9)
+        D.variables[varname][:] = data
+        if attributes!=None:
+            print 'attributes',attributes
+            [ D.variables[varname].setncattr(att[0],att[1]) for att in attributes ]
+  
   except Exception,e:
     print 'error occured when we tried writing data to netcdf file',e
   finally:
-    D.close()
+    if 'D' in locals(): D.close()
+    if have_lock:
+        lock.release()
 
 def exists_nc(basename, varname):
   try:
@@ -56,10 +78,239 @@ def exists_nc(basename, varname):
   return exists
 #--------------------------------------------------------------------------------------------------------------------------------
 
+#-------------------------------Reduction functions------------------------------------------------------------------------------
+reduc_functions={ 
+        0:{ # coordinates
+        # coordinate:
+        'time'  : None,
+        'zt'    : None,
+        'zm'    : None,
+        'xt'    : None,
+        'xm'    : None,
+        'yt'    : None,
+        'ym'    : None,
+        },
+
+        1:{ # one dimensional variables
+        # .ts. variables:
+        'cfl'    : np.max ,
+        'maxdiv' : np.max ,
+        'zi1_bar': np.mean,
+        'zi2_bar': np.mean,
+        'zi3_bar': np.mean,
+        'vtke'   : np.mean,
+        'sfcbflx': np.mean,
+        'wmax'   : np.max ,
+        'tsrf'   : np.mean, 
+        'ustar'  : np.mean, 
+        'shf_bar': np.mean, 
+        'lhf_bar' : np.mean,
+        'zi_bar'  : np.mean,
+        'lwp_bar' : np.mean,
+        'lwp_var' : np.mean,
+        'zc'      : np.max ,
+        'zb'      : np.min ,
+        'cfrac'   : np.mean,
+        'lmax'    : np.max ,
+        'albedo'  : np.mean,
+        'rwp_bar' : np.mean,
+        'prcp'    : np.mean,
+        'pfrac'   : np.mean,
+        'CCN'     : np.mean,
+        'nrain'   : np.mean,
+        'nrcnt'   : np.sum ,
+        'zcmn'    : np.mean,
+        'zbmn'    : np.mean,
+        'tkeint'  : np.mean,
+        'lflxut'  : np.mean,
+        'lflxdt'  : np.mean,
+        'sflxut'  : np.mean,
+        'sflxdt'  : np.mean,
+        'thl_int' : np.mean,
+        'wvp_bar' : np.mean,
+        'wvp_var' : np.mean,
+        'iwp_bar' : np.mean,
+        'iwp_var' : np.mean,
+        'swp_bar' : np.mean,
+        'swp_var' : np.mean,
+        'gwp_bar' : np.mean,
+        'gwp_var' : np.mean,
+        'hwp_bar' : np.mean,
+        'hwp_var' : np.mean,
+        'Qnet'    : np.mean,
+        'G0'      : np.mean,
+        'tndskin' : np.mean,
+        'ra'      : np.mean,
+        'rsurf'   : np.mean,
+        'rsveg'   : np.mean,
+        'rssoil'  : np.mean,
+        'tskinav' : np.mean,
+        'qskinav' : np.mean,
+        'obl'     : np.mean,
+        'cliq'    : np.mean,
+        'a_Wl'    : np.mean,
+        'lflxutc' : np.mean,
+        'sflxutc' : np.mean,
+        'tsair'   : np.mean,
+        'sflxds'  : np.mean,
+        'sflxus'  : np.mean,
+        'lflxds'  : np.mean,
+        'lflxus'  : np.mean,
+        'sflxdsc' : np.mean,
+        'sflxusc' : np.mean,
+        'lflxdsc' : np.mean,
+        'lflxusc' : np.mean,
+
+        # .ps. variables:
+        'fsttm'   : np.mean,
+        'lsttm'   : np.mean,
+        'nsmp'    : np.mean,
+        
+        # 3d vars
+        'dn0'   : np.mean,
+        'u0'    : np.mean,
+        'v0'    : np.mean,
+        },
+
+        2 : { # 2d variables
+        # .ps. variables:
+        'dn0'     : np.mean,
+        'u0'      : np.mean,
+        'v0'      : np.mean,
+        'u'       : np.mean,
+        'v'       : np.mean,
+        't'       : np.mean,
+        'p'       : np.mean,
+        'u_2'     : np.mean,
+        'v_2'     : np.mean,
+        'w_2'     : np.mean,
+        't_2'     : np.mean,
+        'w_3'     : np.mean,
+        't_3'     : np.mean,
+        'tot_tw'  : np.mean,  # Total vertical flux of theta -- TODO should this be sum?
+        'sfs_tw'  : np.mean,
+        'tot_uw'  : np.mean,
+        'sfs_uw'  : np.mean,
+        'tot_vw'  : np.mean,
+        'sfs_vw'  : np.mean,
+        'tot_ww'  : np.mean,
+        'sfs_ww'  : np.mean,
+        'km'      : np.mean,
+        'kh'      : np.mean,
+        'lmbd'    : np.mean,
+        'lmbde'   : np.mean,
+        'sfs_tke' : np.mean,
+        'sfs_boy' : np.mean,
+        'sfs_shr' : np.mean,
+        'boy_prd' : np.mean,
+        'shr_prd' : np.mean,
+        'trans'   : np.mean,
+        'diss'    : np.mean,
+        'dff_u'   : np.mean,
+        'dff_v'   : np.mean,
+        'dff_w'   : np.mean,
+        'adv_u'   : np.mean,
+        'adv_v'   : np.mean,
+        'adv_w'   : np.mean,
+        'prs_u'   : np.mean,
+        'prs_v'   : np.mean,
+        'prs_w'   : np.mean,
+        'prd_uw'  : np.mean,
+        'storage' : np.mean,
+        'q'       : np.mean,
+        'q_2'     : np.mean,
+        'q_3'     : np.mean,
+        'tot_qw'  : np.mean,
+        'sfs_qw'  : np.mean,
+        'rflx'    : np.mean,
+        'rflx2'   : np.mean,
+        'sflx'    : np.mean,
+        'sflx2'   : np.mean,
+        'l'       : np.mean,
+        'l_2'     : np.mean,
+        'l_3'     : np.mean,
+        'tot_lw'  : np.mean,
+        'sed_lw'  : np.mean,
+        'cs1'     : np.mean,
+        'cnt_cs1' : np.mean,
+        'w_cs1'   : np.mean,
+        'tl_cs1'  : np.mean,
+        'tv_cs1'  : np.mean,
+        'rt_cs1'  : np.mean,
+        'rl_cs1'  : np.mean,
+        'wt_cs1'  : np.mean,
+        'wv_cs1'  : np.mean,
+        'wr_cs1'  : np.mean,
+        'cs2'     : np.mean,
+        'cnt_cs2' : np.mean,
+        'w_cs2'   : np.mean,
+        'tl_cs2'  : np.mean,
+        'tv_cs2'  : np.mean,
+        'rt_cs2'  : np.mean,
+        'rl_cs2'  : np.mean,
+        'wt_cs2'  : np.mean,
+        'wv_cs2'  : np.mean,
+        'wr_cs2'  : np.mean,
+        'Nc'      : np.mean,
+        'Nr'      : np.mean,
+        'rr'      : np.mean,
+        'prc_r'   : np.mean,
+        'evap'    : np.mean,
+        'frc_prc' : np.mean,
+        'prc_prc' : np.mean,
+        'frc_ran' : np.mean,
+        'hst_srf' : np.mean,
+        'lflxu'   : np.mean,
+        'lflxd'   : np.mean,
+        'sflxu'   : np.mean,
+        'sflxd'   : np.mean,
+        'cdsed'   : np.mean,
+        'i_nuc'   : np.mean,
+        'ice'     : np.mean,
+        'n_ice'   : np.mean,
+        'snow'    : np.mean,
+        'graupel' : np.mean,
+        'rsup'    : np.mean,
+        'prc_c'   : np.mean,
+        'prc_i'   : np.mean,
+        'prc_s'   : np.mean,
+        'prc_g'   : np.mean,
+        'prc_h'   : np.mean,
+        'hail'    : np.mean,
+        'qt_th'   : np.mean,
+        's_1'     : np.mean,
+        's_2'     : np.mean,
+        's_3'     : np.mean,
+        'RH'      : np.mean,
+        'lwuca'   : np.mean,
+        'lwdca'   : np.mean,
+        'swuca'   : np.mean,
+        'swdca'   : np.mean,
+        },
+
+        4: { # 4d variables
+        # .3d. variables:
+        'u'     : np.concatenate,
+        'v'     : np.concatenate,
+        'w'     : np.concatenate,
+        't'     : np.concatenate,
+        'p'     : np.concatenate,
+        'q'     : np.concatenate,
+        'l'     : np.concatenate,
+        'a_tt'  : np.concatenate,
+        'rflx'  : np.concatenate,
+        'lflxu' : np.concatenate,
+        'lflxd' : np.concatenate,
+        },
+        
+        }
+
+#--------------------------------------------------------------------------------------------------------------------------------
+
+
 maxtime=-1
 #--------------------------------------------------------------------------------------------------------------------------------
-def append_var(basename,varname):
-
+def append_var(basename,varname,reduc_func=np.mean):
   global maxtime
   if exists_nc(basename, varname):
     print "variable already exists",varname
@@ -96,12 +347,25 @@ def append_var(basename,varname):
 
       D = Dataset(coord_files[(i,j)]['fname'] )
 
+      attributes = dict([ [att,D.variables[varname].getncattr(att)] for att in ['longname','units'] ])
+      ndim=len(D.variables[varname].dimensions[:])
+
+      if varname in reduc_functions[0]: # this is coordinate variable....
+          return # dont want to save this
+
+      if varname in reduc_functions[ndim]:
+          reduc_func = reduc_functions[ndim][varname]
+      else:
+          print 'Need to supply reduction function vor variable',varname,'({}d)'.format(ndim)
+          sys.exit(-1)
+#      print 'Using reduc function',reduc_func.__name__,' for variable ',varname,'({}d)'.format(ndim)
+
 #      print 'reading data from file:',coord_files[(i,j)]['fname'],' coords ',i,j
 
-      l4d = len(D.variables[varname].dimensions[:])==4
-      l3d = len(D.variables[varname].dimensions[:])==3
-      l2d = len(D.variables[varname].dimensions[:])==2
-      l1d = len(D.variables[varname].dimensions[:])==1
+      l4d = ndim==4
+      l3d = ndim==3
+      l2d = ndim==2
+      l1d = ndim==1
 
       if l4d: td,yd,xd,zd = D.variables[varname].dimensions[:]
       if l3d: td,yd,xd    = D.variables[varname].dimensions[:]
@@ -136,12 +400,12 @@ def append_var(basename,varname):
       D.close()
 
     # append individual arrays in y dimension
-    if l3d or l4d: coord_files['concat_{0:}'.format(i)] = np.concatenate( [ coord_files[(i,j)].pop(varname) for j in np.arange(nr_y) ], axis=1 )
-    if l2d or l1d: coord_files['concat_{0:}'.format(i)] = np.mean       ( [ coord_files[(i,j)].pop(varname) for j in np.arange(nr_y) ], axis=0 )
+    if l3d or l4d: coord_files['concat_{0:}'.format(i)] = reduc_func  ( [ coord_files[(i,j)].pop(varname) for j in np.arange(nr_y) ], axis=1 )
+    if l2d or l1d: coord_files['concat_{0:}'.format(i)] = reduc_func  ( [ coord_files[(i,j)].pop(varname) for j in np.arange(nr_y) ], axis=0 )
 
   # append individual arrays in x dimension
-  if l3d or l4d: var = np.concatenate( [ coord_files.pop('concat_{0:}'.format(i)) for i in np.arange(nr_x) ], axis=2)
-  if l2d or l1d: var = np.mean       ( [ coord_files.pop('concat_{0:}'.format(i)) for i in np.arange(nr_x) ], axis=0)
+  if l3d or l4d: var = reduc_func ( [ coord_files.pop('concat_{0:}'.format(i)) for i in np.arange(nr_x) ], axis=2)
+  if l2d or l1d: var = reduc_func ( [ coord_files.pop('concat_{0:}'.format(i)) for i in np.arange(nr_x) ], axis=0)
 
   # append coordinate arrays for x and y axis
   if 'yd' in locals(): 
@@ -163,7 +427,8 @@ def append_var(basename,varname):
     data = var
     dims = [ [td,coord_files[td]], ]
 
-  write_nc(basename, data, dims)
+
+  write_nc(basename,varname, data, dims, attributes=attributes)
 #--------------------------------------------------------------------------------------------------------------------------------
 
 try:
@@ -174,18 +439,35 @@ except:
 files = sorted(glob(basename+'.0*.nc'))
 print "Opening files:",files
 
-for idim in [4,3,2,1]:
-  try:
-    varname = str( sys.argv[2] )
-    vars = [varname, ]
-  except:
-    print "You did not specify a variable to convert.... I will try convert all vars"
-    vars=[]
-    D = Dataset( files[0], 'r' )
-    for v in D.variables:
-      #      print 'Found Variable:',v.__str__()
-      if len(D.variables[v].dimensions)>=idim: vars.append( v.__str__() )
-    D.close()
+# Check for all possible variables:
+vars=[]
+D = Dataset( files[0], 'r' )
+for v in D.variables:
+    #      print 'Found Variable:',v.__str__()
+    # if len(D.variables[v].dimensions)>=idim: 
+    vars.append( v.__str__() )
+D.close()
 
+try:
+    varname = None
+    varname = str( sys.argv[2] )
+    if varname!='all':
+        if varname in vars:
+           vars = [varname, ]
+        else:
+            raise Exception('variable not found')
+
+except Exception,e:
+    print ''
+    print ''
+    print "Error occurred when we tried to find the correct variable (",varname,"): ",e
+    print "Possible variables are: 'all' or one of the following"
+    print ' '.join(vars)
+    print ''
+    print ''
+    sys.exit(0)
+
+
+for idim in [4,3,2,1]:
   for varname in vars:
     append_var(basename,varname)
