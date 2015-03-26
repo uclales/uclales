@@ -59,7 +59,7 @@ module radiation_3d
 
   logical,save :: linit=.False.
   logical,parameter :: ldebug=.False.
-! logical,parameter :: ldebug=.True.
+!  logical,parameter :: ldebug=.True.
 
 #ifdef HAVE_TENSTREAM
   integer(iintegers) :: solution_uid    ! is solution uid, each subband has one
@@ -951,7 +951,7 @@ contains
 
       nxp=in_nxp;nyp=in_nyp;nv=in_nv
       dx=in_dx;dy=in_dy;phi0=in_phi0;u0=in_u0;albedo=in_albedo
-      if(ldebug.and.myid.eq.0) print *,'Tenstrwrapper lsol',lsolar,'nx/y',nxp,nyp,nv,'uid',solution_uid,solution_time
+      if(ldebug.and.myid.eq.0) print *,'Tenstrwrapper lsol',lsolar,'nx/y',nxp,nyp,nv,'uid',solution_uid,solution_time,' shapes::',shape(dz),shape(fdn),shape(fup),shape(fdiv)
 
       if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
         theta0=acos(u0)*180./3.141592653589793 !rad2deg
@@ -1018,30 +1018,38 @@ contains
   subroutine load_tenstream_solution(lsolar,dz,u0,fdn,fup,fdiv)
       logical ,intent(in) :: lsolar
       real,dimension(:,:,:),intent(in) :: dz ! dimensions (nv,nxp-4,nyp-4)
-      real ,intent(in) :: u0
+      real,intent(in) :: u0
       real,dimension(:,:,:),intent(out) :: fdn,fup,fdiv
       real(ireals),dimension(:,:,:),allocatable :: edir,edn,eup
       real(ireals),dimension(:,:,:),allocatable :: abso
 
       integer :: i,j,k
       integer :: is,ie,js,je,ks,ke
+
+      if(ldebug.and.myid.eq.0) print *,'load_tenstream_solution',shape(dz),shape(fdn),shape(fup),shape(fdiv)
+
       is = lbound(fdn,2); ie = ubound(fdn,2)
       js = lbound(fdn,3); je = ubound(fdn,3)
       ks = lbound(fdn,1); ke = ubound(fdn,1)
 
-      allocate(edn (is:ie,js:je,ke  ))
-      allocate(eup (is:ie,js:je,ke  ))
-      allocate(abso(is:ie,js:je,ke-1))
+!      print *,myid,'load_tenstream_solution inp',lsolar,u0
+!      print *,myid,'load_tenstream_solution dz ',dz       
+!      print *,myid,'load_tenstream_solution dim1',is,ie
+!      print *,myid,'load_tenstream_solution dim1',js,je
+!      print *,myid,'load_tenstream_solution dim1',ks,ke
+
+      allocate(edn (is:ie,js:je,ks:ke  ))
+      allocate(eup (is:ie,js:je,ks:ke  ))
+      allocate(abso(is:ie,js:je,ks:ke-1))
 
       if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
-        allocate(edir(is:ie,js:je,ke  ))
+        allocate(edir(is:ie,js:je,ks:ke  ))
         call tenstream_get_result(edir,edn,eup,abso)
         edn = edn+edir
         deallocate(edir)
       else
         call tenstream_get_result(edir,edn,eup,abso)
       endif
-
 
       do k=ks,ke-1
         fdiv(k,:,:) = abso(:,:,k) 
