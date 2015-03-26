@@ -1160,7 +1160,9 @@ contains
   
     fdiv(nv+2-nzp:nv+1,:,:)= heat(:,3:nxp-2,3:nyp-2)
     
+#ifndef _XLF
     if(any(isnan(fdiv))) print *, 'fdiv 2 shows nan', fdiv
+#endif
     
   end subroutine nca_wrapper
 
