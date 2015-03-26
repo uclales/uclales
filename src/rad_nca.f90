@@ -335,7 +335,9 @@ contains
              
              hr_nca_3d_tmp(ilyr,ixx,iyy)  = (HR_up + HR_dn + HR_up_s + HR_dn_s)*pi
 
+#ifndef _XLF
              if(isnan(hr_nca_3d_tmp(ilyr,ixx,iyy))) print *, 'nca shows nan', ilyr, ixx, iyy, hr_nca_3d_tmp(ilyr,ixx,iyy)
+#endif
           enddo ! iyy
        enddo ! ixx   
     enddo ! end ilyr
