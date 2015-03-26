@@ -297,6 +297,7 @@ reduc_functions={
         'p'     : np.concatenate,
         'q'     : np.concatenate,
         'l'     : np.concatenate,
+        'a_tt'  : np.concatenate,
         'rflx'  : np.concatenate,
         'lflxu' : np.concatenate,
         'lflxd' : np.concatenate,
