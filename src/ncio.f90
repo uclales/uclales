@@ -260,13 +260,13 @@ contains
 
     use mpi_interface, only :myid
 
-    integer, parameter :: nnames = 47
+    integer, parameter :: nnames = 48
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,& !1
          'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,& !7 
          'w      ','t      ','p      ','q      ','l      ','r      '   ,& !13
          'n      ','rice   ','nice   ','rsnow  ','rgrp   ','nsnow  '   ,& !19
-         'ngrp   ','rhail  ','nhail  ','a_tt   ','rflx   ','lflxu  ','lflxd  '   ,& !26
+         'ngrp   ','rhail  ','nhail  ','a_rhl  ','a_rhs  ','rflx   ','lflxu  ','lflxd  '   ,& !26
          'shf    ','lhf    ','ustars ','a_tskin','a_qskin','tsoil  '   ,& !32
          'phiw   ','a_Qnet ','a_G0   ','mp_tlt ','mp_qt  ','mp_qr  '   ,& !38
          'mp_qi  ','mp_qs  ','mp_qg  ','mp_qh  '/)  !44-47
@@ -283,6 +283,7 @@ contains
     if (level  >= 4) nvar0 = nvar0+4
     if (level  >= 5) nvar0 = nvar0+4
     if (iradtyp > 1) nvar0 = nvar0+4
+    if (iradtyp > 6) nvar0 = nvar0+2
     if (isfctyp == 5) nvar0 = nvar0+9
     if (lmptend)      nvar0 = nvar0+7
 
@@ -332,20 +333,22 @@ contains
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(27)
     end if
-    if (iradtyp > 1) then
+    if (iradtyp > 6) then
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(28)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(29)
+    endif
+    if (iradtyp > 1) then
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(30)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(31)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(32)
     end if
 
     if (isfctyp == 5) then
-       nvar0 = nvar0+1
-       sanal(nvar0)=sbase(32)
        nvar0 = nvar0+1
        sanal(nvar0)=sbase(33)
        nvar0 = nvar0+1
@@ -362,10 +365,10 @@ contains
        sanal(nvar0)=sbase(39)
        nvar0 = nvar0+1
        sanal(nvar0)=sbase(40)
+       nvar0 = nvar0+1
+       sanal(nvar0)=sbase(41)
     end if
     if (lmptend) then
-       nvar0 = nvar0+1
-       sanal(nvar0) = sbase(41)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(42)
        nvar0 = nvar0+1
@@ -378,6 +381,8 @@ contains
        sanal(nvar0) = sbase(46)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(47)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(48)
     end if
 
     nbeg = nvar0+1
@@ -515,23 +520,28 @@ contains
     endif  
 
     if (iradtyp > 1)  then
-       nn = nn+1
-       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
-       if( associated(a_tt)) &
-       iret = nf90_put_var(ncid0, VarID, a_tt(:,i1:i2,j1:j2), start=ibeg, &
+      if( iradtyp .gt. 6 ) then ! 3D heating rates
+        nn = nn+1
+        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+        iret = nf90_put_var(ncid0, VarID, a_rhl(:,i1:i2,j1:j2), start=ibeg, &
             count=icnt)  
-       nn = nn+1
-       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
+        nn = nn+1
+        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+        iret = nf90_put_var(ncid0, VarID, a_rhs(:,i1:i2,j1:j2), start=ibeg, &
             count=icnt)  
-       nn = nn+1
-       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_lflxu(:,i1:i2,j1:j2), start=ibeg, &
-            count=icnt)
-       nn = nn+1
-       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
-            count=icnt)
+      endif
+      nn = nn+1
+      iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+      iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
+          count=icnt)  
+      nn = nn+1
+      iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+      iret = nf90_put_var(ncid0, VarID, a_lflxu(:,i1:i2,j1:j2), start=ibeg, &
+          count=icnt)
+      nn = nn+1
+      iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+      iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
+          count=icnt)
     end if
     !Malte: Land Surface Output for isfctyp=5
     if (isfctyp == 5) then 
@@ -1054,8 +1064,12 @@ contains
        if (itype==0) ncinfo = 'Sub-filter scale vertical flux of q'
        if (itype==1) ncinfo = 'W/m^2'
        if (itype==2) ncinfo = 'ttmt'
-    case('a_tt')
-       if (itype==0) ncinfo = 'Heating Rate'
+    case('a_rhl')
+       if (itype==0) ncinfo = 'Heating Rate Longwave'
+       if (itype==1) ncinfo = 'not sure'
+       if (itype==2) ncinfo = 'tttt'
+    case('a_rhs')
+       if (itype==0) ncinfo = 'Heating Rate Solar'
        if (itype==1) ncinfo = 'not sure'
        if (itype==2) ncinfo = 'tttt'
     case('rflx')

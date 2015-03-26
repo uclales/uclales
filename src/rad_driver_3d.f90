@@ -30,7 +30,7 @@
 
 module radiation_3d
 
-  use grid, only       : nzp,nxp,nyp, deltax,deltay,zm
+  use grid, only       : nzp,nxp,nyp, deltax,deltay,zm, a_rhl,a_rhs
   use fuliou, only     : minSolarZenithCosForVis
   use mpi_interface, only : myid,ierror
   use radiation, only  : zenith, setup, pp, pt, ph, po, pre, pde, plwc, piwc, prwc, pgwc, &
@@ -79,7 +79,7 @@ contains
       real, dimension (nzp,nxp,nyp), intent (inout)        :: tt, rflx, sflx, lflxu, lflxd, sflxu, sflxd
       real, dimension (nxp,nyp), intent (out),optional     :: albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa
 
-      real,allocatable,dimension(:,:,:) :: fus,fds,fdiv_sol,flxdiv
+      real,allocatable,dimension(:,:,:) :: fus,fds,fdiv_sol
       real,allocatable,dimension(:,:,:) :: fuir,fdir,fdiv_th
 
       real,allocatable,dimension(:,:,:) :: hr_factor, dz ! convert from flux divergence to heating rate
@@ -114,7 +114,9 @@ contains
         lflxd(k,is:ie,js:je)=fdir(kk,:,:)
 
         rflx  (k,is:ie,js:je) = sflx    (k ,is:ie,js:je) + fuir(kk,:,:) - fdir(kk,:,:)
-        flxdiv(k,is:ie,js:je) = fdiv_sol(kk,is:ie,js:je) + fdiv_th(kk,is:ie,js:je)
+        a_rhl(k,is:ie,js:je) = fdiv_th (kk,is:ie,js:je) * hr_factor(k, :,:)
+        a_rhs(k,is:ie,js:je) = fdiv_sol(kk,is:ie,js:je) * hr_factor(k, :,:)
+
       end do
 
       if (present(albedo)) then
@@ -147,16 +149,17 @@ contains
       end if
       !TODO here the loop was truncated to 'nzp-3' in the original code -- why not use heating rate in every layer?!?
       do k=2,nzp-3
-        tt(k,is:ie, js:je) = tt(k, is:ie, js:je) + flxdiv(k,:,:)*hr_factor(k, :,:)
+        tt(k,is:ie, js:je) = tt(k, is:ie, js:je) + a_rhl(k,is:ie,js:je) + a_rhs(k,is:ie,js:je)
 #ifndef _XLF
         if(ldebug) then
           if(any(isnan(rflx     (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency rflx  ',k,rflx    (k,:,:), any(isnan(sflx)),any(isnan(sflxu)),any(isnan(sflxd)),any(isnan(lflxu)),any(isnan(lflxd))
           if(any(isnan(fdiv_sol (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency divsol',k,fdiv_sol(k,:,:)
           if(any(isnan(fdiv_th  (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency divth ',k,fdiv_th (k,:,:)
           if(any(isnan(hr_factor(k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency hrf',k,hr_factor(k,:,:)
-          if(any(isnan(flxdiv   (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency div',k,flxdiv   (k,:,:)
+          if(any(isnan(a_rhl    (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency rhl',k,a_rhl(k,:,:)
+          if(any(isnan(a_rhs    (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency rhs',k,a_rhs(k,:,:)
           if(any(isnan(tt       (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency tt',k,tt(k,:,:)
-          if(any(isnan([hr_factor(k,:,:),flxdiv(k,:,:),tt(k,:,:),fdiv_sol (k,:,:),fdiv_th  (k,:,:),rflx     (k,:,:)]))) call exit(1)
+          if(any(isnan([hr_factor(k,:,:),a_rhl(k,:,:),a_rhs(k,:,:),tt(k,:,:),fdiv_sol (k,:,:),fdiv_th  (k,:,:),rflx     (k,:,:)]))) call exit(1)
         endif
 #endif
       end do
@@ -164,7 +167,6 @@ contains
       deallocate( fus )
       deallocate( fds )
       deallocate( fdiv_sol )
-      deallocate( flxdiv )
       deallocate( fuir )
       deallocate( fdir )
       deallocate( fdiv_th )
@@ -655,6 +657,11 @@ contains
 
           end if
 
+          ! reset 3d heating rate output from grid module
+          a_rhl = 0
+          a_rhs = 0
+
+          ! allocate work arrays
           allocate( fus     (nv1, is:ie, js:je) ) ; fus=0
           allocate( fds     (nv1, is:ie, js:je) ) ; fds=0
           allocate( fdiv_sol(nv1, is:ie, js:je) ) ; fdiv_sol=0
@@ -664,7 +671,6 @@ contains
           allocate( fdiv_th (nv1, is:ie, js:je) ) ; fdiv_th=0
 
 
-          allocate( flxdiv(nzp, is:ie, js:je) )   ; flxdiv=0
           allocate( hr_factor(nzp, is:ie, js:je) ); hr_factor=0
           allocate( dz(nv,is:ie, js:je) )
 

@@ -95,7 +95,7 @@ module grid
   ! 3D Arrays
   !irina
   real, dimension (:,:,:), allocatable ::                                     &
-       a_theta, a_pexnr, press, vapor, a_rflx, a_sflx, liquid, rsi,           &
+       a_theta, a_pexnr, press, vapor, a_rhs, a_rhl, a_rflx, a_sflx, liquid, rsi,           &
        a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7,                &
        a_lflxu, a_lflxd, a_sflxu, a_sflxd,a_km, &
        prc_c, prc_r, prc_i, prc_s, prc_g, prc_h , prc_acc,               &
@@ -206,6 +206,14 @@ contains
         a_lflxd_ca(:,:,:) = 0.
         memsize = memsize + nxyzp
        end if
+       if (iradtyp .gt. 6) then ! 3d radiation need heating rate output
+         allocate (a_rhs(nzp,nxp,nyp)) ! radiative heating solar 
+         a_rhs(:,:,:) = 0.
+         memsize = memsize + nxyzp
+         allocate (a_rhl(nzp,nxp,nyp)) ! radiative heating longwave
+         a_rhl(:,:,:) = 0.
+         memsize = memsize + nxyzp
+       endif
     end if
     !irina
     if (iradtyp > 2 .or. (iradtyp == 2 .and. level > 1)) then
