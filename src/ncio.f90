@@ -1056,7 +1056,7 @@ contains
        if (itype==2) ncinfo = 'ttmt'
     case('a_tt')
        if (itype==0) ncinfo = 'Heating Rate'
-       if (itype==1) ncinfo = '???'
+       if (itype==1) ncinfo = 'not sure'
        if (itype==2) ncinfo = 'tttt'
     case('rflx')
        if (itype==0) ncinfo = 'Total Radiative flux'
