@@ -200,6 +200,9 @@ contains
           integer :: iband, igpt,nrbands,nrgpts, ib, ig
           integer :: ibandloop(3:nxp-2, 3:nyp-2), ibandg(3:nxp-2, 3:nyp-2) ! for McICA, save wavelength band information for each pixel
 
+          !nca CK
+          real,dimension(nv1,is:ie,js:je) :: fuir_nca,fdir_nca,fdiv_th_nca,tau_nca
+
 #ifdef HAVE_TENSTREAM
           real(ireals),dimension(:,:,:),allocatable :: edn,eup
           real(ireals),dimension(:,:,:),allocatable :: abso
@@ -209,6 +212,11 @@ contains
           fdir    = 0 
           fuir    = 0 
           fdiv_th = 0 
+          fdiv_th_nca=0  !nca CK
+          fdir_nca=0
+          fuir_nca=0
+          tau_nca=0
+
 
           if (.not. allocated(bandweights)) then 
             allocate(bandweights(size(ir_bands)))
@@ -320,18 +328,19 @@ contains
 
               select case(iradtyp)
 
-              case (6) ! d4stream with 3d interface
-
-                do j = js, je  
-                  do i = is, ie  
+              case (6,8) ! d4stream with 3d interface
+                 
+                 do j = js, je  
+                    do i = is, ie  
 
                     ! Solver expects cumulative optical depth
-                    do k = 2, nv
-                      tau(k,i,j) = tau(k, i,j) + tau(k-1, i,j)
+                     do k = 2, nv
+                        tau_nca(k,i,j)=tau(k,i,j)
+                        tau(k,i,j) = tau(k, i,j) + tau(k-1, i,j)
                     end do
                     call qft (.false., ee, zero, zero, bf(:,i,j), tau(:,i,j), w0(:,i,j), &   ! thermal qft
-                        phasefct(:, 1, i,j), phasefct(:, 2, i,j),    &
-                        phasefct(:, 3, i,j), phasefct(:, 4, i,j), fu1, fd1)
+                       phasefct(:, 1, i,j), phasefct(:, 2, i,j),    &
+                       phasefct(:, 3, i,j), phasefct(:, 4, i,j), fu1, fd1)
 
                     if (radMcICA) then
                       ib = ibandloop(i,j)
@@ -340,13 +349,26 @@ contains
                     else
                       xir_norm = gPointWeight(ir_bands(ib), ig)
                     end if
-
+                    fdir_nca(:,i,j) =fd1(:)
+                    fuir_nca(:,i,j) =fu1(:)
                     fdir(:,i,j) = fdir(:,i,j) + fd1(:) * xir_norm 
                     fuir(:,i,j) = fuir(:,i,j) + fu1(:) * xir_norm 
                   end do ! i
                 end do ! j
                 fdiv_th(1:nv,:,:) = (fdir(1:nv,:,:) - fuir(1:nv,:,:)) + (fuir(2:nv1,:,:) - fdir(2:nv1,:,:))
                 fdiv_th( nv1,:,:) = (fdir( nv1,:,:) - fuir(nv1,:,:))
+
+
+                !Caro
+                if(iradtyp.eq.8) then
+                   !NCA hier aufrufen
+                   call nca_wrapper(nxp, nyp, nv, deltax, deltay, dz, tau_nca, w0, bf, fdir_nca , fuir_nca, fdiv3d)
+                
+                   !flxdiv updaten
+                   !give 3d heating to fdiv_th, layers above nzp remain 1d heating
+                   fdiv_th_nca(nv+2-nzp:nv+1,:,:) =  fdiv_th_nca(nv+2-nzp:nv+1,:,:) + fdiv3d(nv+2-nzp:nv+1,:,:)*xir_norm 
+               
+                endif
 
               case (7) !tenstr
 #ifdef HAVE_TENSTREAM
@@ -369,7 +391,11 @@ contains
 
             enddo !igpt
           enddo !iband
-
+     
+          if(iradtyp.eq.8) then
+             fdiv_th(nv+2-nzp:nv+1,:,:) = fdiv_th_nca(nv+2-nzp:nv+1,:,:) 
+          endif
+         
           !
           ! fuq2 is the surface emitted flux in the band 0 - 280 cm**-1 with a
           ! hk of 0.03.
@@ -553,7 +579,7 @@ contains
                   end do ! i
                 end do ! j
 
-              case (7) !tenstr
+              case (7,8) !tenstr
                 if (radMcICA) then
                   ib = ibandloop(is,js)
                   ig = ibandg   (is,js)
@@ -1072,4 +1098,70 @@ contains
       deallocate(eup )
   end subroutine
 #endif
+
+  ! Caro's stuff
+  subroutine nca_wrapper(nxp, nyp, nv, dx, dy, dz, tau, w0, bf, fdir, fuir, fdiv)
+    
+    use m_nca, only: nca
+
+    use mpi_interface, only : cyclics, cyclicc
+
+    integer :: req(16)
+    integer,intent(in) :: nxp,nyp,nv
+    real,intent(in) :: dx,dy
+    real,dimension(:,:,:),intent(in) :: tau,w0,dz,bf
+    real,dimension(:,:,:),intent(inout) ::fdir,fuir ! have dimensions (nv,nxp,nyp); bf with (nv1)
+    real,dimension(:,:,:),intent(out) :: fdiv ! have dimensions (nv,1:nxp-4,1:nyp-4);
+    real,dimension(nzp,nxp,nyp)   :: kabs ! needs one dimension more than heat does
+    real,dimension(nzp,nxp,nyp) :: heat
+
+    real :: fdir_ghosted(nzp,nxp,nyp)
+    real :: fuir_ghosted(nzp,nxp,nyp)
+    real :: w0_ghosted(nzp,nxp,nyp)
+    real :: dz_ghosted(nzp,nxp,nyp)
+    real :: bf_ghosted(nzp,nxp,nyp)
+    real :: tau_ghosted(nzp,nxp,nyp)
+
+    fdir_ghosted=-1!DEBUG
+    fuir_ghosted=-1!DEBUG
+    w0_ghosted=-1!DEBUG
+    bf_ghosted=-1!DEBUG
+    tau_ghosted=-1!DEBUG
+    dz_ghosted=-1!DEBUG
+
+    fdir_ghosted(:,3:nxp-2,3:nyp-2) = fdir(nv+2-nzp:nv+1,:,:)
+    fuir_ghosted(:,3:nxp-2,3:nyp-2) = fuir(nv+2-nzp:nv+1,:,:)
+    w0_ghosted(:,3:nxp-2,3:nyp-2) = w0(nv+1-nzp:nv,:,:)
+    tau_ghosted(:,3:nxp-2,3:nyp-2) = tau(nv+1-nzp:nv,:,:)
+    bf_ghosted(:,3:nxp-2,3:nyp-2) = bf(nv+2-nzp:nv+1,:,:)
+    dz_ghosted(:,3:nxp-2,3:nyp-2) = dz(nv+1-nzp:nv,:,:)
+
+    call cyclics(nzp,nxp,nyp,fdir_ghosted,req)
+    call cyclics(nzp,nxp,nyp,fuir_ghosted,req)
+    call cyclicc(nzp,nxp,nyp,fdir_ghosted,req)
+    call cyclicc(nzp,nxp,nyp,fuir_ghosted,req)
+    call cyclics(nzp,nxp,nyp,w0_ghosted,req)
+    call cyclics(nzp,nxp,nyp,tau_ghosted,req)
+    call cyclicc(nzp,nxp,nyp,w0_ghosted,req)
+    call cyclicc(nzp,nxp,nyp,tau_ghosted,req)
+    call cyclics(nzp,nxp,nyp,bf_ghosted,req)
+    call cyclics(nzp,nxp,nyp,dz_ghosted,req)
+    call cyclicc(nzp,nxp,nyp,bf_ghosted,req)
+    call cyclicc(nzp,nxp,nyp,dz_ghosted,req)
+
+
+    ! Get kabs from optical thicknes (tau)
+    kabs  = tau_ghosted*(1.-w0_ghosted) / dz_ghosted
+    
+    heat=0
+    call nca(nzp, nxp, nyp, dz_ghosted, bf_ghosted, kabs, heat, dx, dy, fdir_ghosted, fuir_ghosted) 
+    
+    fdiv=0
+  
+    fdiv(nv+2-nzp:nv+1,:,:)= heat(:,3:nxp-2,3:nyp-2)
+    
+    if(any(isnan(fdiv))) print *, 'fdiv 2 shows nan', fdiv
+    
+  end subroutine nca_wrapper
+
 end module
