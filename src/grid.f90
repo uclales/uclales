@@ -206,7 +206,7 @@ contains
         a_lflxd_ca(:,:,:) = 0.
         memsize = memsize + nxyzp
        end if
-       if (iradtyp .gt. 6) then ! 3d radiation need heating rate output
+       if (iradtyp .ge. 6) then ! 3d radiation need heating rate output
          allocate (a_rhs(nzp,nxp,nyp)) ! radiative heating solar 
          a_rhs(:,:,:) = 0.
          memsize = memsize + nxyzp

@@ -283,7 +283,7 @@ contains
     if (level  >= 4) nvar0 = nvar0+4
     if (level  >= 5) nvar0 = nvar0+4
     if (iradtyp > 1) nvar0 = nvar0+4
-    if (iradtyp > 6) nvar0 = nvar0+2
+    if (iradtyp >= 6) nvar0 = nvar0+2
     if (isfctyp == 5) nvar0 = nvar0+9
     if (lmptend)      nvar0 = nvar0+7
 
@@ -333,7 +333,7 @@ contains
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(27)
     end if
-    if (iradtyp > 6) then
+    if (iradtyp >= 6) then
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(28)
        nvar0 = nvar0+1
@@ -520,7 +520,7 @@ contains
     endif  
 
     if (iradtyp > 1)  then
-      if( iradtyp .gt. 6 ) then ! 3D heating rates
+      if( iradtyp .ge. 6 ) then ! 3D heating rates
         nn = nn+1
         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
         iret = nf90_put_var(ncid0, VarID, a_rhl(:,i1:i2,j1:j2), start=ibeg, &
