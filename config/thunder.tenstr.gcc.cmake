@@ -20,5 +20,4 @@ set(LIBS ${NETCDF_LIB_1} ${NETCDF_LIB_2} ${HDF5_LIBRARIES} ${SZIP_LIB} m z curl 
 
 # TENSTREAM LIB for 3D Radiation
 set(TENSTREAM_DIR       "/home/zmaw/m300362/tenstream/")
-set(TENSTREAM_CMAKE     "/home/zmaw/m300362/tenstream/config/default.cmake")
 set(TENSTREAM_BUILD_DIR "/home/zmaw/m300362/tenstream/build/")

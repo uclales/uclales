@@ -16,7 +16,6 @@ set(SZIP_LIB           "/home/opt/cosmo_tica_lib/ompi1.8.1/hdf5/HDF5-1.8.13-Linu
 set(LIBS ${NETCDF_LIB_1} ${NETCDF_LIB_2} ${HDF5_LIB_1} ${HDF5_LIB_2} ${SZIP_LIB} m z curl)
 
 # TENSTREAM LIB for 3D Radiation
-set(TENSTREAM_DIR       "../tenstream/")
-set(TENSTREAM_CMAKE     "../tenstream/config/default.cmake")
-set(TENSTREAM_BUILD_DIR "../tenstream/build/")
+set(TENSTREAM_DIR       "~/tenstream/")
+set(TENSTREAM_BUILD_DIR "~/tenstream/build/")
 
