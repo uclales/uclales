@@ -38,7 +38,7 @@ module radiation_3d
 
 #ifdef HAVE_TENSTREAM
       use mpi_interface, only: nxpa,nypa
-      use m_tenstream, only: init_tenstream,set_optical_properties,solve_tenstream, destroy_tenstream, tenstream_get_result, need_new_solution, load_solution
+      use m_tenstream, only: init_tenstream,set_optical_properties,solve_tenstream, destroy_tenstream, tenstream_get_result, need_new_solution
       use m_data_parameters, only : ireals,iintegers
       use grid, only : dt,nstep
 #endif      
@@ -271,8 +271,7 @@ contains
                 solution_uid=get_band_uid(.False., ib,ig)
                 solution_time = time*3600._ireals*24._ireals + dt*(nstep-1._ireals)/3._ireals !time is given in days + approx. a third at each rungekutta step
                 if(.not.need_new_solution(solution_uid,solution_time)) then
-                  if(load_solution(solution_uid)) then
-                    call load_tenstream_solution(.False.,dz,u0,fd3d,fu3d,fdiv3d)
+                    call load_tenstream_solution(.False.,dz,u0,solution_uid,fd3d,fu3d,fdiv3d)
 
                     if (radMcICA) then
                       xir_norm = 1./bandweights(ib)
@@ -284,7 +283,6 @@ contains
                     fuir = fuir       + fu3d  *xir_norm
                     fdiv_th = fdiv_th + fdiv3d*xir_norm
                     cycle ! if we successfully loaded a solution, just cycle this spectral band
-                  endif ! could load a solution
                 endif ! dont need to calc new solution
               endif
 #endif
@@ -499,14 +497,12 @@ contains
                 solution_uid = get_band_uid( .True., ib, ig )
                 solution_time = time*3600._ireals*24._ireals + dt*(nstep-1._ireals)/3._ireals !time is given in days + approx. a third at each rungekutta step
                 if(.not.need_new_solution(solution_uid,solution_time)) then
-                  if(load_solution(solution_uid)) then
-                    call load_tenstream_solution(.True.,dz,u0,fd3d,fu3d,fdiv3d)
+                    call load_tenstream_solution(.True.,dz,u0,solution_uid,fd3d,fu3d,fdiv3d)
 
                     fds     = fds      + fd3d  
                     fus     = fus      + fu3d  
                     fdiv_sol= fdiv_sol + fdiv3d
                     cycle ! cycle this spectral band
-                  endif ! could load a solution
                 endif ! dont need to calc new solution
               endif
 #endif
@@ -591,7 +587,7 @@ contains
                 end if
 
 #ifdef HAVE_TENSTREAM
-                call tenstream_wrapper(.True., nxp,nyp,nv,deltax,deltay,dz, zero,u0, sfc_albedo,xs_norm, tau, w0, phasefct,bf, fd3d,fu3d,fdiv3d)
+                call tenstream_wrapper(.True., nxp,nyp,nv,deltax,deltay,dz, 180.,u0, sfc_albedo,xs_norm, tau, w0, phasefct,bf, fd3d,fu3d,fdiv3d)
 #else
                 print *,'This build does not support the tenstream solver ... exiting!'
                 call exit(1)
@@ -975,7 +971,7 @@ contains
 
       integer(iintegers) :: nxp,nyp,nv
       real(ireals) :: dx,dy,phi0,u0,albedo
-      real(ireals),dimension(3:in_nxp-2,3:in_nyp-2,in_nv)   :: kabs,ksca,g,deltaz
+      real(ireals),dimension(in_nv, 3:in_nxp-2,3:in_nyp-2)   :: kabs,ksca,g,deltaz
       real(ireals),dimension(:,:,:),allocatable :: planck
 
       integer(iintegers) :: k
@@ -993,27 +989,24 @@ contains
         incSolar=0
       endif
 
-      do k=1,nv
-        deltaz(:,:,k) = dz (k,:,:)
-        kabs  (:,:,k) = max(epsilon(tau), tau(k,:,:)*(1.-w0(k,:,:)) / deltaz(:,:,k) )
-        ksca  (:,:,k) = max(epsilon(tau), tau(k,:,:)*    w0(k,:,:)  / deltaz(:,:,k) )
-        g     (:,:,k) = pf (k,1,:,:)/3.
+      deltaz = dz
+      kabs   = max(epsilon(tau), tau * (1. - w0) / dz )
+      ksca   = max(epsilon(tau), tau *       w0  / dz )
+      g      = pf (:,1,:,:)/3.
+
 #ifndef _XLF
-        if(ldebug) then
-          if(any(isnan(kabs(:,:,k)))) print *,myid,'tenstream_wrapper :: corrupt kabs',kabs(:,:,k),'::',tau(k,:,:),'::',w0(k,:,:),'::',deltaz(:,:,k)
-          if(any(isnan(ksca(:,:,k)))) print *,myid,'tenstream_wrapper :: corrupt ksca',ksca(:,:,k),'::',tau(k,:,:),'::',w0(k,:,:),'::',deltaz(:,:,k)
-          if(any(isnan(g   (:,:,k)))) print *,myid,'tenstream_wrapper :: corrupt g   ',g   (:,:,k),'::',pf (k,1,:,:)                                      
-        endif
+      if(ldebug) then
+        if(any(isnan(kabs))) print *,myid,'tenstream_wrapper :: corrupt kabs',kabs,'::',tau,'::',w0,'::',deltaz
+        if(any(isnan(ksca))) print *,myid,'tenstream_wrapper :: corrupt ksca',ksca,'::',tau,'::',w0,'::',deltaz
+        if(any(isnan(g   ))) print *,myid,'tenstream_wrapper :: corrupt g   ',g   ,'::',pf (:,1,:,:)                                      
+      endif
 #endif
-      enddo
       if(.not. lsolar) then
-        allocate(planck(3:nxp-2,3:nyp-2,nv+1))
-        do k=1,nv+1
-          planck(:,:,k) = bf (k,:,:)
-        enddo
+        allocate(planck(nv+1, 3:nxp-2,3:nyp-2))
+        planck = bf 
       endif
 
-      call init_tenstream(MPI_COMM_WORLD, nxp-4,nyp-4,nv, dx,dy,phi0, theta0, albedo, nxproc=nxpa, nyproc=nypa,  dz3d=deltaz)
+      call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxpa, nyproc=nypa,  dz3d=deltaz)
       if(lsolar) then
         call set_optical_properties( kabs, ksca, g )
       else
@@ -1022,7 +1015,7 @@ contains
 
       call solve_tenstream(incSolar,solution_uid,solution_time)
 
-      call load_tenstream_solution(lsolar,dz,in_u0,fdn,fup,fdiv)
+      call load_tenstream_solution(lsolar,dz,in_u0,solution_uid,fdn,fup,fdiv)
 
       if(ldebug) then
 #ifndef _XLF
@@ -1047,10 +1040,11 @@ contains
         endif
     endif
   end subroutine
-  subroutine load_tenstream_solution(lsolar,dz,u0,fdn,fup,fdiv)
+  subroutine load_tenstream_solution(lsolar,dz,u0,uid,fdn,fup,fdiv)
       logical ,intent(in) :: lsolar
       real,dimension(:,:,:),intent(in) :: dz ! dimensions (nv,nxp-4,nyp-4)
       real,intent(in) :: u0
+      integer(iintegers) :: uid
       real,dimension(:,:,:),intent(out) :: fdn,fup,fdiv
       real(ireals),dimension(:,:,:),allocatable :: edir,edn,eup
       real(ireals),dimension(:,:,:),allocatable :: abso
@@ -1070,31 +1064,31 @@ contains
 !      print *,myid,'load_tenstream_solution dim1',js,je
 !      print *,myid,'load_tenstream_solution dim1',ks,ke
 
-      allocate(edn (is:ie,js:je,ks:ke  ))
-      allocate(eup (is:ie,js:je,ks:ke  ))
-      allocate(abso(is:ie,js:je,ks:ke-1))
+      allocate(edn (ks:ke  ,is:ie,js:je))
+      allocate(eup (ks:ke  ,is:ie,js:je))
+      allocate(abso(ks:ke-1,is:ie,js:je))
 
       if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
-        allocate(edir(is:ie,js:je,ks:ke  ))
-        call tenstream_get_result(edir,edn,eup,abso)
+        allocate(edir(ks:ke, is:ie,js:je  ))
+        call tenstream_get_result(edir,edn,eup,abso,uid)
         edn = edn+edir
         deallocate(edir)
       else
-        call tenstream_get_result(edir,edn,eup,abso)
+        call tenstream_get_result(edir,edn,eup,abso,uid)
       endif
 
-      do k=ks,ke-1
-        fdiv(k,:,:) = abso(:,:,k) 
-      enddo
-      fdiv(ks:ke-1,:,:) = fdiv(ks:ke-1,:,:) * dz
+      fdiv(ks:ke-1,:,:) = abso(:,:,:) *dz
 
-      fdiv(ke,:,:) = edn(:,:,ke) - eup(:,:,ke)
+      fdiv(ke,:,:) = edn(ke,:,:) - eup(ke,:,:)
       deallocate(abso)
 
-      do k=ks,ke
-        fdn (k,:,:) = edn (:,:,k)
-        fup (k,:,:) = eup (:,:,k)
-      enddo
+      fdn = edn
+      fup = eup
+
+!      if( lsolar .and. any(fdiv.lt.0.) ) then
+!        print *,'Found values smaller than 0 in divergence:',minval(fdiv)
+!        call exit()
+!      endif
 !      print *,myid,'load_tenstream_solution edn ::',edn (is,js,:)
 !      print *,myid,'load_tenstream_solution eup ::',eup (is,js,:)
 !      print *,myid,'load_tenstream_solution  dz ::',dz  (is,js,:)
