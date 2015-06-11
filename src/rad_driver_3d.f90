@@ -43,6 +43,11 @@ module radiation_3d
   use grid, only : dt,nstep
 #endif      
 
+#ifdef _XLF
+  use ieee_arithmetic 
+#define isnan ieee_is_nan
+#endif
+
   implicit none
 
   private 
@@ -963,8 +968,8 @@ contains
 
       integer(iintegers) :: nxp,nyp,nv
       real(ireals) :: dx,dy,phi0,u0,albedo
-      real(ireals),dimension(in_nv, 3:in_nxp-2,3:in_nyp-2)   :: kabs,ksca,g,deltaz
-      real(ireals),dimension(:,:,:),allocatable :: planck
+      real(ireals),allocatable,dimension(:,:,:) :: kabs,ksca,g,deltaz ! dim(in_nv, 3:in_nxp-2,3:in_nyp-2)
+      real(ireals),allocatable,dimension(:,:,:) :: planck
 
       integer(iintegers) :: k
       real(ireals)       :: theta0,incSolar
@@ -974,43 +979,61 @@ contains
       if(ldebug.and.myid.eq.0) print *,'Tenstrwrapper lsol',lsolar,'nx/y',nxp,nyp,nv,'uid',solution_uid,solution_time,' shapes::',shape(dz),shape(fdn),shape(fup),shape(fdiv)
 
       if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
-        theta0=acos(u0)*180./3.141592653589793 !rad2deg
+        theta0=acos(u0)*180._ireals/3.141592653589793_ireals !rad2deg
         incSolar = in_incSolar
       else
         theta0=0
         incSolar=0
       endif
 
-      deltaz = dz
-      kabs   = max(epsilon(tau), tau * (1. - w0) / dz )
-      ksca   = max(epsilon(tau), tau *       w0  / dz )
-      g      = pf (:,1,:,:)/3.
+      if( kind(fdn) .ne. ireals) then !if we have different precision
+        if(.not.allocated(deltaz) ) allocate(deltaz(nv, 3:nxp-2,3:nyp-2))
+        if(.not.allocated(kabs  ) ) allocate(kabs  (nv, 3:nxp-2,3:nyp-2))
+        if(.not.allocated(ksca  ) ) allocate(ksca  (nv, 3:nxp-2,3:nyp-2))
+        if(.not.allocated(g     ) ) allocate(g     (nv, 3:nxp-2,3:nyp-2))
+        deltaz = dz
+        kabs   = max(epsilon(tau), tau * (one - w0) / dz )
+        ksca   = max(epsilon(tau), tau *        w0  / dz )
+        g      = pf (:,1,:,:)/3._ireals
 
-#ifndef _XLF
+        if(.not. lsolar) then
+          if(.not.allocated(planck) ) allocate(planck(nv+1, 3:nxp-2,3:nyp-2))
+          planck = bf 
+        endif
+
+        if(ldebug) then
+          if(any(isnan(kabs))) print *,myid,'tenstream_wrapper :: corrupt kabs',kabs,'::',tau,'::',w0,'::',deltaz
+          if(any(isnan(ksca))) print *,myid,'tenstream_wrapper :: corrupt ksca',ksca,'::',tau,'::',w0,'::',deltaz
+          if(any(isnan(g   ))) print *,myid,'tenstream_wrapper :: corrupt g   ',g   ,'::',pf (:,1,:,:)                                      
+        endif
+
+        call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxpa, nyproc=nypa,  dz3d=deltaz)
+        if(lsolar) then
+          call set_optical_properties( kabs, ksca, g )
+        else
+          call set_optical_properties( kabs, ksca, g, planck)
+        endif
+
+        call solve_tenstream(incSolar,solution_uid,solution_time)
+
+        call load_tenstream_solution(lsolar,dz,in_u0,solution_uid,fdn,fup,fdiv)
+
+      else ! same precision
+
+        call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxpa, nyproc=nypa,  dz3d=dz)
+        if(lsolar) then
+          call set_optical_properties( max(epsilon(tau), tau * (one - w0) / dz ), max(epsilon(tau), tau *       w0  / dz ), pf (:,1,:,:)/3._ireals )
+        else
+          call set_optical_properties( max(epsilon(tau), tau * (one - w0) / dz ), max(epsilon(tau), tau *       w0  / dz ), pf (:,1,:,:)/3._ireals, bf )
+        endif
+
+        call solve_tenstream(incSolar,solution_uid,solution_time)
+
+        call load_tenstream_solution(lsolar,dz,in_u0,solution_uid,fdn,fup,fdiv)
+
+      endif
+
       if(ldebug) then
-        if(any(isnan(kabs))) print *,myid,'tenstream_wrapper :: corrupt kabs',kabs,'::',tau,'::',w0,'::',deltaz
-        if(any(isnan(ksca))) print *,myid,'tenstream_wrapper :: corrupt ksca',ksca,'::',tau,'::',w0,'::',deltaz
-        if(any(isnan(g   ))) print *,myid,'tenstream_wrapper :: corrupt g   ',g   ,'::',pf (:,1,:,:)                                      
-      endif
-#endif
-      if(.not. lsolar) then
-        allocate(planck(nv+1, 3:nxp-2,3:nyp-2))
-        planck = bf 
-      endif
-
-      call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxpa, nyproc=nypa,  dz3d=deltaz)
-      if(lsolar) then
-        call set_optical_properties( kabs, ksca, g )
-      else
-        call set_optical_properties( kabs, ksca, g, planck)
-      endif
-
-      call solve_tenstream(incSolar,solution_uid,solution_time)
-
-      call load_tenstream_solution(lsolar,dz,in_u0,solution_uid,fdn,fup,fdiv)
-
-      if(ldebug) then
-#ifndef _XLF
         if(any(isnan([fdn,fup,fdiv]))) then
           do k=1,nv+1
             print *,myid,'DEBUG',k,phi0, theta0,albedo
@@ -1020,7 +1043,6 @@ contains
           enddo
           call exit(-1)
         endif
-#endif
         if(lsolar.and.any([fdn,fup].lt.-1._ireals)) then
           do k=1,nv+1
             print *,myid,'DEBUG value less than zero in solar rad',k,phi0, theta0,albedo
@@ -1056,26 +1078,40 @@ contains
 !      print *,myid,'load_tenstream_solution dim1',js,je
 !      print *,myid,'load_tenstream_solution dim1',ks,ke
 
-      allocate(edn (ks:ke  ,is:ie,js:je))
-      allocate(eup (ks:ke  ,is:ie,js:je))
-      allocate(abso(ks:ke-1,is:ie,js:je))
+      if( kind(fdn) .ne. ireals) then ! have different precision
+        if(.not.allocated(edn ) ) allocate(edn (ks:ke  ,is:ie,js:je))
+        if(.not.allocated(eup ) ) allocate(eup (ks:ke  ,is:ie,js:je))
+        if(.not.allocated(abso) ) allocate(abso(ks:ke-1,is:ie,js:je))
 
-      if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
-        allocate(edir(ks:ke, is:ie,js:je  ))
-        call tenstream_get_result(edir,edn,eup,abso,uid)
-        edn = edn+edir
-        deallocate(edir)
-      else
-        call tenstream_get_result(edir,edn,eup,abso,uid)
+        if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
+          if(.not.allocated(edir) ) allocate(edir(ks:ke  ,is:ie,js:je))
+          call tenstream_get_result(edir,edn,eup,abso,uid)
+          edn = edn+edir
+        else
+          call tenstream_get_result(edir,edn,eup,abso,uid)
+        endif
+
+        fdiv(ks:ke-1,:,:) = abso(:,:,:) *dz
+
+        fdiv(ke,:,:) = edn(ke,:,:) - eup(ke,:,:)
+        deallocate(abso)
+
+        fdn = edn
+        fup = eup
+      else ! have same precision
+        if(.not.allocated(abso) ) allocate(abso(ks:ke-1,is:ie,js:je))
+        if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
+          if(.not.allocated(edir) ) allocate(edir(ks:ke  ,is:ie,js:je))
+          call tenstream_get_result(edir,fdn,fup,abso,uid)
+          fdn = fdn+edir
+        else
+          call tenstream_get_result(edir,fdn,fup,abso,uid)
+        endif
+
+        fdiv(ks:ke-1,:,:) = abso(:,:,:) *dz
+
+        fdiv(ke,:,:) = fdn(ke,:,:) - fup(ke,:,:)
       endif
-
-      fdiv(ks:ke-1,:,:) = abso(:,:,:) *dz
-
-      fdiv(ke,:,:) = edn(ke,:,:) - eup(ke,:,:)
-      deallocate(abso)
-
-      fdn = edn
-      fup = eup
 
 !      if( lsolar .and. any(fdiv.lt.0.) ) then
 !        print *,'Found values smaller than 0 in divergence:',minval(fdiv)
@@ -1086,8 +1122,6 @@ contains
 !      print *,myid,'load_tenstream_solution  dz ::',dz  (is,js,:)
 !      print *,myid,'load_tenstream_solution fdn ::',fdn (:,is,js)
 !      print *,myid,'load_tenstream_solution fup ::',fup (:,is,js)
-      deallocate(edn )
-      deallocate(eup )
   end subroutine
 #endif
 
