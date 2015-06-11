@@ -986,7 +986,7 @@ contains
         incSolar=0
       endif
 
-      if( kind(fdn) .ne. ireals) then !if we have different precision
+#ifdef TENSTREAM_SINGLE
         if(.not.allocated(deltaz) ) allocate(deltaz(nv, 3:nxp-2,3:nyp-2))
         if(.not.allocated(kabs  ) ) allocate(kabs  (nv, 3:nxp-2,3:nyp-2))
         if(.not.allocated(ksca  ) ) allocate(ksca  (nv, 3:nxp-2,3:nyp-2))
@@ -1018,7 +1018,7 @@ contains
 
         call load_tenstream_solution(lsolar,dz,in_u0,solution_uid,fdn,fup,fdiv)
 
-      else ! same precision
+#else 
 
         call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxpa, nyproc=nypa,  dz3d=dz)
         if(lsolar) then
@@ -1031,28 +1031,29 @@ contains
 
         call load_tenstream_solution(lsolar,dz,in_u0,solution_uid,fdn,fup,fdiv)
 
-      endif
+#endif        
 
-      if(ldebug) then
-        if(any(isnan([fdn,fup,fdiv]))) then
-          do k=1,nv+1
-            print *,myid,'DEBUG',k,phi0, theta0,albedo
-            print *,myid,'edn ::',fdn (k,:,:)
-            print *,myid,'eup ::',fup (k,:,:)
-            print *,myid,'div ::',fdiv(k,:,:)
-          enddo
-          call exit(-1)
+        if(ldebug) then
+          if(any(isnan([fdn,fup,fdiv]))) then
+            do k=1,nv+1
+              print *,myid,'DEBUG',k,phi0, theta0,albedo
+              print *,myid,'edn ::',fdn (k,:,:)
+              print *,myid,'eup ::',fup (k,:,:)
+              print *,myid,'div ::',fdiv(k,:,:)
+            enddo
+            call exit(-1)
+          endif
+          if(lsolar.and.any([fdn,fup].lt.-1._ireals)) then
+            do k=1,nv+1
+              print *,myid,'DEBUG value less than zero in solar rad',k,phi0, theta0,albedo
+              print *,myid,'edn ::',k,minval(fdn (k,:,:))
+              print *,myid,'eup ::',k,minval(fup (k,:,:))
+              print *,myid,'div ::',k,minval(fdiv(k,:,:))
+            enddo
+            call exit(-1)
+          endif
         endif
-        if(lsolar.and.any([fdn,fup].lt.-1._ireals)) then
-          do k=1,nv+1
-            print *,myid,'DEBUG value less than zero in solar rad',k,phi0, theta0,albedo
-            print *,myid,'edn ::',k,minval(fdn (k,:,:))
-            print *,myid,'eup ::',k,minval(fup (k,:,:))
-            print *,myid,'div ::',k,minval(fdiv(k,:,:))
-          enddo
-          call exit(-1)
-        endif
-      endif
+
   end subroutine
   subroutine load_tenstream_solution(lsolar,dz,u0,uid,fdn,fup,fdiv)
       logical ,intent(in) :: lsolar
@@ -1072,13 +1073,13 @@ contains
       js = lbound(fdn,3); je = ubound(fdn,3)
       ks = lbound(fdn,1); ke = ubound(fdn,1)
 
-!      print *,myid,'load_tenstream_solution inp',lsolar,u0
-!      print *,myid,'load_tenstream_solution dz ',dz       
-!      print *,myid,'load_tenstream_solution dim1',is,ie
-!      print *,myid,'load_tenstream_solution dim1',js,je
-!      print *,myid,'load_tenstream_solution dim1',ks,ke
+      !      print *,myid,'load_tenstream_solution inp',lsolar,u0
+      !      print *,myid,'load_tenstream_solution dz ',dz       
+      !      print *,myid,'load_tenstream_solution dim1',is,ie
+      !      print *,myid,'load_tenstream_solution dim1',js,je
+      !      print *,myid,'load_tenstream_solution dim1',ks,ke
 
-      if( kind(fdn) .ne. ireals) then ! have different precision
+#ifdef TENSTREAM_SINGLE
         if(.not.allocated(edn ) ) allocate(edn (ks:ke  ,is:ie,js:je))
         if(.not.allocated(eup ) ) allocate(eup (ks:ke  ,is:ie,js:je))
         if(.not.allocated(abso) ) allocate(abso(ks:ke-1,is:ie,js:je))
@@ -1098,7 +1099,7 @@ contains
 
         fdn = edn
         fup = eup
-      else ! have same precision
+#else        
         if(.not.allocated(abso) ) allocate(abso(ks:ke-1,is:ie,js:je))
         if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
           if(.not.allocated(edir) ) allocate(edir(ks:ke  ,is:ie,js:je))
@@ -1111,7 +1112,7 @@ contains
         fdiv(ks:ke-1,:,:) = abso(:,:,:) *dz
 
         fdiv(ke,:,:) = fdn(ke,:,:) - fup(ke,:,:)
-      endif
+#endif
 
 !      if( lsolar .and. any(fdiv.lt.0.) ) then
 !        print *,'Found values smaller than 0 in divergence:',minval(fdiv)

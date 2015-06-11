@@ -108,6 +108,8 @@ if(WITH_TENSTREAM)
   message(STATUS "Petsc compiler: ${PETSC_COMPILER}" )
   message(STATUS "Petsc VERSION : ${PETSC_VERSION}" )
   message(STATUS "Petsc definiti: ${PETSC_DEFINITIONS}")
+  message(STATUS "Petsc variables ${petsc_conf_variables}")
+  message(STATUS "Petsc variables ${petsc_conf_variables_arch}")
 
   include_directories (${PETSC_INCLUDES})
   list (APPEND LIBS "${PETSC_LIBRARIES}")
@@ -123,9 +125,21 @@ if(WITH_TENSTREAM)
   #  include_directories (${ITAPS_INCLUDES} ${HDF5_INCLUDE_DIRS})
   #  list (APPEND LIBS "${HDF5_LIBRARIES}")
 
-
   add_definitions(-DHAVE_TENSTREAM)
+
+  file(STRINGS ${petsc_conf_variables_arch} PETSC_VARIABLES_STRINGS)
+  string(REGEX REPLACE ".*PETSC_PRECISION = ([a-z]+).*" "\\1"
+    PETSC_PRECISION ${PETSC_VARIABLES_STRINGS})
+  message(STATUS " Precision is :: ${PETSC_PRECISION} ")
+
+  string(COMPARE EQUAL ${PETSC_PRECISION} "single" _is_single)
+
+  if(${_is_single})
+    add_definitions(-DTENSTREAM_SINGLE)
+  endif(${_is_single})
+
 endif(WITH_TENSTREAM)
+
 # Find out if the compiler is XLF and if so give this to the C preprocessor
 string(COMPARE EQUAL ${CMAKE_Fortran_COMPILER_ID} "XL" _is_XLF)
 if(${_is_XLF})
