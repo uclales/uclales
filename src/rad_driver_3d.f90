@@ -37,10 +37,10 @@ module radiation_3d
       u0, fixed_sun, radMcICA, rad_eff_radius !namelist parameters
 
 #ifdef HAVE_TENSTREAM
-      use mpi_interface, only: nxpa,nypa
-      use m_tenstream, only: init_tenstream,set_optical_properties,solve_tenstream, destroy_tenstream, tenstream_get_result, need_new_solution
-      use m_data_parameters, only : ireals,iintegers
-      use grid, only : dt,nstep
+  use mpi_interface, only: nxpa,nypa
+  use m_tenstream, only: init_tenstream,set_optical_properties,solve_tenstream, destroy_tenstream, tenstream_get_result, need_new_solution
+  use m_data_parameters, only : ireals,iintegers
+  use grid, only : dt,nstep
 #endif      
 
   implicit none
@@ -89,12 +89,14 @@ contains
       integer i,j,k,kk,ierr
 
 #ifdef HAVE_TENSTREAM
-!      if(.not.radMcICA.and.nstep.ne.1) return
+      !if(.not.radMcICA.and.nstep.ne.1) return
 #endif
 
       call init_rad_3d()
 
-      call solar_rad()
+      if(u0.ge.minSolarZenithCosForVis) &
+          call solar_rad()
+
       call thermal_rad()
 
       if(ldebug.and.myid.le.0) then
@@ -164,16 +166,6 @@ contains
 #endif
       end do
 
-      deallocate( fus )
-      deallocate( fds )
-      deallocate( fdiv_sol )
-      deallocate( fuir )
-      deallocate( fdir )
-      deallocate( fdiv_th )
-
-      deallocate(hr_factor)
-      deallocate(dz)
-
       if(myid.eq.0.and.ldebug) print *,'calculate radiation ... done'
     contains
       subroutine thermal_rad()
@@ -202,8 +194,6 @@ contains
           integer :: iband, igpt,nrbands,nrgpts, ib, ig
           integer :: ibandloop(3:nxp-2, 3:nyp-2), ibandg(3:nxp-2, 3:nyp-2) ! for McICA, save wavelength band information for each pixel
 
-          !nca CK
-          real,dimension(nv1,is:ie,js:je) :: fuir_nca,fdir_nca,fdiv_th_nca,tau_nca
 
 #ifdef HAVE_TENSTREAM
           real(ireals),dimension(:,:,:),allocatable :: edn,eup
@@ -211,14 +201,22 @@ contains
           integer :: ierr
 #endif
 
+          real,allocatable,dimension(:,:,:) :: fuir_nca,fdir_nca,fdiv_th_nca,tau_nca
+
+          if(iradtyp.eq.8) then
+            allocate(fdiv_th_nca(nv1,is:ie,js:je) )
+            allocate(fdir_nca   (nv1,is:ie,js:je) )
+            allocate(fuir_nca   (nv1,is:ie,js:je) )
+            allocate(tau_nca    (nv1,is:ie,js:je) )
+            fdiv_th_nca=0
+            fdir_nca   =0
+            fuir_nca   =0
+            tau_nca    =0
+          endif
+
           fdir    = 0 
           fuir    = 0 
           fdiv_th = 0 
-          fdiv_th_nca=0  !nca CK
-          fdir_nca=0
-          fuir_nca=0
-          tau_nca=0
-
 
           if (.not. allocated(bandweights)) then 
             allocate(bandweights(size(ir_bands)))
@@ -271,18 +269,18 @@ contains
                 solution_uid=get_band_uid(.False., ib,ig)
                 solution_time = time*3600._ireals*24._ireals + dt*(nstep-1._ireals)/3._ireals !time is given in days + approx. a third at each rungekutta step
                 if(.not.need_new_solution(solution_uid,solution_time)) then
-                    call load_tenstream_solution(.False.,dz,u0,solution_uid,fd3d,fu3d,fdiv3d)
+                  call load_tenstream_solution(.False.,dz,u0,solution_uid,fd3d,fu3d,fdiv3d)
 
-                    if (radMcICA) then
-                      xir_norm = 1./bandweights(ib)
-                    else
-                      xir_norm = gPointWeight(ir_bands(ib), ig)
-                    end if
+                  if (radMcICA) then
+                    xir_norm = 1./bandweights(ib)
+                  else
+                    xir_norm = gPointWeight(ir_bands(ib), ig)
+                  end if
 
-                    fdir = fdir       + fd3d  *xir_norm
-                    fuir = fuir       + fu3d  *xir_norm
-                    fdiv_th = fdiv_th + fdiv3d*xir_norm
-                    cycle ! if we successfully loaded a solution, just cycle this spectral band
+                  fdir = fdir       + fd3d  *xir_norm
+                  fuir = fuir       + fu3d  *xir_norm
+                  fdiv_th = fdiv_th + fdiv3d*xir_norm
+                  cycle ! if we successfully loaded a solution, just cycle this spectral band
                 endif ! dont need to calc new solution
               endif
 #endif
@@ -296,11 +294,14 @@ contains
                       ib = ibandloop(i,j)
                       ig = ibandg   (i,j)
                     case (7) ! tenstream -- only use one random band.... due to
-                             ! horizontal correlations, it does not make sense to have
-                             !different spectral intervals horizontally
+                      ! horizontal correlations, it does not make sense to have
+                      !different spectral intervals horizontally
                       ib = ibandloop(is,js)
                       ig = ibandg   (is,js)
                     end select
+                  else
+                    ib = ib
+                    ig = ig
                   endif
 
                   if (present(ice).and.present(grp)) then
@@ -329,18 +330,20 @@ contains
               select case(iradtyp)
 
               case (6,8) ! d4stream with 3d interface
-                 
-                 do j = js, je  
-                    do i = is, ie  
+
+                if(iradtyp.eq.8) tau_nca = tau
+
+                do j = js, je  
+                  do i = is, ie  
 
                     ! Solver expects cumulative optical depth
-                     do k = 2, nv
-                        tau_nca(k,i,j)=tau(k,i,j)
-                        tau(k,i,j) = tau(k, i,j) + tau(k-1, i,j)
+                    do k = 2, nv
+
+                      tau(k,i,j) = tau(k, i,j) + tau(k-1, i,j)
                     end do
-                    call qft (.false., ee, zero, zero, bf(:,i,j), tau(:,i,j), w0(:,i,j), &   ! thermal qft
-                       phasefct(:, 1, i,j), phasefct(:, 2, i,j),    &
-                       phasefct(:, 3, i,j), phasefct(:, 4, i,j), fu1, fd1)
+                    call qft (.false., ee, zero, zero, bf(:,i,j), tau(:,i,j), w0(:,i,j),                    & ! thermal qft
+                        phasefct(:, 1, i,j), phasefct(:, 2, i,j), phasefct(:, 3, i,j), phasefct(:, 4, i,j), &
+                        fu1, fd1)
 
                     if (radMcICA) then
                       ib = ibandloop(i,j)
@@ -349,8 +352,12 @@ contains
                     else
                       xir_norm = gPointWeight(ir_bands(ib), ig)
                     end if
-                    fdir_nca(:,i,j) =fd1(:)
-                    fuir_nca(:,i,j) =fu1(:)
+
+                    if(iradtyp.eq.8) then
+                      fdir_nca(:,i,j) =fd1(:)
+                      fuir_nca(:,i,j) =fu1(:)
+                    endif
+
                     fdir(:,i,j) = fdir(:,i,j) + fd1(:) * xir_norm 
                     fuir(:,i,j) = fuir(:,i,j) + fu1(:) * xir_norm 
                   end do ! i
@@ -359,16 +366,12 @@ contains
                 fdiv_th( nv1,:,:) = (fdir( nv1,:,:) - fuir(nv1,:,:))
 
 
-                !Caro
                 if(iradtyp.eq.8) then
-                   !NCA hier aufrufen
-                   call nca_wrapper(nxp, nyp, nv, deltax, deltay, dz, tau_nca, w0, bf, fdir_nca , fuir_nca, fdiv3d)
-                
-                   !flxdiv updaten
-                   !give 3d heating to fdiv_th, layers above nzp remain 1d heating
-                   fdiv_th_nca(nv+2-nzp:nv+1,:,:) =  fdiv_th_nca(nv+2-nzp:nv+1,:,:) + fdiv3d(nv+2-nzp:nv+1,:,:)*xir_norm 
-               
+                  call nca_wrapper(nxp, nyp, nv, deltax, deltay, dz, tau_nca, w0, bf, fdir_nca , fuir_nca, fdiv3d)
+                  !give 3d heating to fdiv_th, layers above nzp remain 1d heating
+                  fdiv_th_nca(nv+2-nzp:nv+1,:,:) =  fdiv_th_nca(nv+2-nzp:nv+1,:,:) + fdiv3d(nv+2-nzp:nv+1,:,:)*xir_norm 
                 endif
+
 
               case (7) !tenstr
 #ifdef HAVE_TENSTREAM
@@ -391,21 +394,10 @@ contains
 
             enddo !igpt
           enddo !iband
-     
+
           if(iradtyp.eq.8) then
-             fdiv_th(nv+2-nzp:nv+1,:,:) = fdiv_th_nca(nv+2-nzp:nv+1,:,:) 
+            fdiv_th(nv+2-nzp:nv+1,:,:) = fdiv_th_nca(nv+2-nzp:nv+1,:,:) 
           endif
-         
-          !
-          ! fuq2 is the surface emitted flux in the band 0 - 280 cm**-1 with a
-          ! hk of 0.03.
-          ! TODO Fabian: what exactly does this mean? Is this a leftover of some refactoring? The Planck function is certainly not well defined here?! Definitely not if MCICA is used!!!
-!          do j = js, je  
-!            do i = is, ie  
-!              fuq2 = bf(nv1,i,j) * 0.03 * pi * ee
-!              fuir(:,i,j) = fuir(:,i,j) + fuq2
-!            end do ! i
-!          end do ! j
 
       end subroutine
       subroutine solar_rad()
@@ -497,12 +489,12 @@ contains
                 solution_uid = get_band_uid( .True., ib, ig )
                 solution_time = time*3600._ireals*24._ireals + dt*(nstep-1._ireals)/3._ireals !time is given in days + approx. a third at each rungekutta step
                 if(.not.need_new_solution(solution_uid,solution_time)) then
-                    call load_tenstream_solution(.True.,dz,u0,solution_uid,fd3d,fu3d,fdiv3d)
+                  call load_tenstream_solution(.True.,dz,u0,solution_uid,fd3d,fu3d,fdiv3d)
 
-                    fds     = fds      + fd3d  
-                    fus     = fus      + fu3d  
-                    fdiv_sol= fdiv_sol + fdiv3d
-                    cycle ! cycle this spectral band
+                  fds     = fds      + fd3d  
+                  fus     = fus      + fu3d  
+                  fdiv_sol= fdiv_sol + fdiv3d
+                  cycle ! cycle this spectral band
                 endif ! dont need to calc new solution
               endif
 #endif
@@ -516,8 +508,8 @@ contains
                       ib = ibandloop(i,j)
                       ig = ibandg   (i,j)
                     case (7) ! tenstream -- only use one random band.... due to
-                             ! horizontal correlations, it does not make sense to have
-                             !different spectral intervals horizontally
+                      ! horizontal correlations, it does not make sense to have
+                      !different spectral intervals horizontally
                       ib = ibandloop(is,js)
                       ig = ibandg   (is,js)
                     end select
@@ -686,13 +678,13 @@ contains
             do i=is,ie
               if (present(ice).and.present(grp)) then
                 call setup_rad_atmosphere(CCN, dn0, pi0, pi1,    &
-                pip(:,i,j), th(:,i,j), rv(:,i,j), rc(:,i,j),     &
-                hr_factor(:,i,j), dz(:,i,j),         &
-                rr=rr(:,i,j),ice=ice(:,i,j),nice=nice(:,i,j),grp=grp(:,i,j))
+                    pip(:,i,j), th(:,i,j), rv(:,i,j), rc(:,i,j),     &
+                    hr_factor(:,i,j), dz(:,i,j),         &
+                    rr=rr(:,i,j),ice=ice(:,i,j),nice=nice(:,i,j),grp=grp(:,i,j))
               else
                 call setup_rad_atmosphere(CCN, dn0, pi0, pi1,    &
-                pip(:,i,j), th(:,i,j), rv(:,i,j), rc(:,i,j),     &
-                hr_factor(:,i,j), dz(:,i,j)         )
+                    pip(:,i,j), th(:,i,j), rv(:,i,j), rc(:,i,j),     &
+                    hr_factor(:,i,j), dz(:,i,j)         )
               end if
             enddo
           enddo
@@ -1038,7 +1030,7 @@ contains
           enddo
           call exit(-1)
         endif
-    endif
+      endif
   end subroutine
   subroutine load_tenstream_solution(lsolar,dz,u0,uid,fdn,fup,fdiv)
       logical ,intent(in) :: lsolar
