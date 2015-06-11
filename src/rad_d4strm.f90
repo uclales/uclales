@@ -236,8 +236,8 @@ contains
     ! fuq2 is the surface emitted flux in the band 0 - 280 cm**-1 with a
     ! hk of 0.03.
     !
-    fuq2 = bf(nv1) * 0.03 * pi * ee
-    fuir(:) = fuir(:) + fuq2
+!    fuq2 = bf(nv1) * 0.03 * pi * ee
+!    fuir(:) = fuir(:) + fuq2
   end subroutine rad_ir
   ! ----------------------------------------------------------------------
   ! Subroutine rad_vis: Computes radiative fluxes using a band structure 
