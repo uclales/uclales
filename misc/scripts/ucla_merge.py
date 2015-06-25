@@ -8,12 +8,12 @@ import os
 from time import sleep
 from datetime import datetime
 
-try:
-    from filelock import FileLock
-    have_lock=True
-except Exception,e:
-    print 'Couldnt import FileLock:',e
-    have_lock=False
+#try:
+#    from filelock import FileLock
+#    have_lock=True
+#except Exception,e:
+#    print 'Couldnt import FileLock:',e
+have_lock=False
 
 #--------------------------------------------------------------------------------------------------------------------------------
 def write_nc(basename,varname, data, dims, attributes=None):
@@ -297,6 +297,8 @@ reduc_functions={
         'p'     : np.concatenate,
         'q'     : np.concatenate,
         'l'     : np.concatenate,
+        'r'     : np.concatenate,
+        'n'     : np.concatenate,
         'a_rhl'  : np.concatenate,
         'a_rhs'  : np.concatenate,
         'rflx'  : np.concatenate,
@@ -444,19 +446,22 @@ print "Opening files:",files
 vars=[]
 D = Dataset( files[0], 'r' )
 for v in D.variables:
-    #      print 'Found Variable:',v.__str__()
+    print 'Found Variable:',v.__str__()
     # if len(D.variables[v].dimensions)>=idim: 
     vars.append( v.__str__() )
 D.close()
 
 try:
-    varname = None
-    varname = str( sys.argv[2] )
-    if varname!='all':
-        if varname in vars:
-           vars = [varname, ]
-        else:
-            raise Exception('variable not found')
+    do_vars=[]
+    varnames = None
+    varnames = str( sys.argv[2] ).split()
+    if 'all' not in varnames:
+        for varname in varnames:
+            if varname in vars:
+                do_vars.append(varname)
+            else:
+                raise Exception('variable not found')
+        vars=do_vars
 
 except Exception,e:
     print ''
