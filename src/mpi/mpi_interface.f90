@@ -51,7 +51,7 @@ module mpi_interface
        ydisp,xcount,ycount
 
   integer :: stridetype,xstride,ystride,xystride,xylarry,xyzlarry,&
-       fxytype,fxyztype
+       fxytype,fxyztype,xstridep1,ystridep1,xystridep1
 
   integer ierror
 
@@ -412,6 +412,7 @@ contains
        call mpi_type_commit(ytype(i,2),ierr)
     enddo
 
+!##  original 
     call MPI_TYPE_VECTOR(nyp-4,nzp*2,nxp*nzp,MY_SIZE,stridetype,ierr)
     call MPI_TYPE_COMMIT(stridetype,ierr)
     call MPI_TYPE_VECTOR(nyp-4,nzp*2,nxp*nzp,MY_SIZE,xstride,ierr)
@@ -420,6 +421,17 @@ contains
     call MPI_TYPE_COMMIT(ystride,ierr)
     call MPI_TYPE_VECTOR(2,2*nzp,nxp*nzp,MY_SIZE,xystride,ierr)
     call MPI_TYPE_COMMIT(xystride,ierr)
+
+!## new for nzp+1 e.g. NCA-radiation
+    call MPI_TYPE_VECTOR(nyp-4,(nzp+1)*2,nxp*(nzp+1),MY_SIZE,stridetype,ierr)
+    call MPI_TYPE_COMMIT(stridetype,ierr)
+    call MPI_TYPE_VECTOR(nyp-4,(nzp+1)*2,nxp*(nzp+1),MY_SIZE,xstridep1,ierr)
+    call MPI_TYPE_COMMIT(xstridep1,ierr)
+    call MPI_TYPE_VECTOR(2,(nzp+1)*(nxp-4),nxp*(nzp+1),MY_SIZE,ystridep1,ierr)
+    call MPI_TYPE_COMMIT(ystridep1,ierr)
+    call MPI_TYPE_VECTOR(2,2*(nzp+1),nxp*(nzp+1),MY_SIZE,xystridep1,ierr)
+    call MPI_TYPE_COMMIT(xystridep1,ierr)
+
 
     call MPI_TYPE_VECTOR(nyp-4,nxp-4,nxpg-4,MY_SIZE,fxytype,ierr)
     call MPI_TYPE_COMMIT(fxytype,ierr)
@@ -432,16 +444,28 @@ contains
     call MPI_TYPE_VECTOR(nyp-4,(nxp-4)*nzp,nxp*nzp,MY_SIZE,xyzlarry,ierr)
     call MPI_TYPE_COMMIT(xyzlarry,ierr)
 
-
-
   end subroutine init_alltoall_reorder
 
-  ! ---------------------------------------------------------------------
-  ! subroutine cyclics: commits exchange cyclic x boundary conditions
-  !
-  subroutine cyclics(n1,n2,n3,var,req)
 
+! called by dynamics
+  subroutine cyclics(n1, n2, n3, var, req)
     integer, intent(in) :: n1,n2,n3
+    real, intent(inout) :: var(n1,n2,n3)
+    integer req(16)
+    call cyclicsinternal(n1, n2, n3, var, req, xstride, ystride, xystride)
+  end subroutine cyclics
+
+!called by NCA-radiation
+  subroutine cyclicsp1(n1, n2, n3, var, req)
+    integer, intent(in) :: n1,n2,n3
+    real, intent(inout) :: var(n1,n2,n3)
+    integer req(16)
+    call cyclicsinternal(n1, n2, n3, var, req, xstridep1, ystridep1, xystridep1)
+  end subroutine cyclicsp1
+
+
+  subroutine cyclicsinternal(n1,n2,n3,var,req,xstrideint,ystrideint,xystrideint)
+   integer, intent(in) :: n1,n2,n3,xstrideint,ystrideint,xystrideint
     real, intent(inout) :: var(n1,n2,n3)
     integer req(16)
     integer :: ierror, stats(MPI_STATUS_SIZE,16), pxfwd, pxback, pyfwd, pyback
@@ -470,44 +494,45 @@ contains
     pxynw = ranktable(wrxid-1,wryid+1)
     pxysw = ranktable(wrxid-1,wryid-1)
 
-    call mpi_isend(var(1,n2-3,3),1,xstride, pxfwd, 130, &
+    call mpi_isend(var(1,n2-3,3),1,xstrideint, pxfwd, 130, &
          MPI_COMM_WORLD, req(1), ierror)
-    call mpi_isend(var(1,3,3), 1, xstride, pxback, 140, &
+    call mpi_isend(var(1,3,3), 1, xstrideint, pxback, 140, &
          MPI_COMM_WORLD, req(2), ierror)
-    call mpi_irecv(var(1,n2-1,3), 1, xstride, pxfwd, 140, &
+    call mpi_irecv(var(1,n2-1,3), 1, xstrideint, pxfwd, 140, &
          MPI_COMM_WORLD, req(3), ierror)
-    call mpi_irecv(var(1,1,3), 1, xstride, pxback, 130, &
+    call mpi_irecv(var(1,1,3), 1, xstrideint, pxback, 130, &
          MPI_COMM_WORLD, req(4), ierror)
 
-    call mpi_isend(var(1,3,3), 1, ystride, pyback, 110, &
+    call mpi_isend(var(1,3,3), 1, ystrideint, pyback, 110, &
          MPI_COMM_WORLD, req(5), ierror)
-    call mpi_irecv(var(1,3,n3-1), 1, ystride, pyfwd, 110, &
+    call mpi_irecv(var(1,3,n3-1), 1, ystrideint, pyfwd, 110, &
          MPI_COMM_WORLD, req(6), ierror)
-    call mpi_isend(var(1,3,n3-3), 1, ystride, pyfwd, 120, &
+    call mpi_isend(var(1,3,n3-3), 1, ystrideint, pyfwd, 120, &
          MPI_COMM_WORLD, req(7), ierror)
-    call mpi_irecv(var(1,3,1), 1, ystride, pyback, 120, &
+    call mpi_irecv(var(1,3,1), 1, ystrideint, pyback, 120, &
          MPI_COMM_WORLD, req(8), ierror)
 
-    call mpi_isend(var(1,n2-3,n3-3), 1, xystride, pxyne, 150, &
+    call mpi_isend(var(1,n2-3,n3-3), 1, xystrideint, pxyne, 150, &
          MPI_COMM_WORLD, req(9), ierror)
-    call mpi_irecv(var(1,1,1), 1, xystride, pxysw, 150, &
+    call mpi_irecv(var(1,1,1), 1, xystrideint, pxysw, 150, &
          MPI_COMM_WORLD, req(10), ierror)
-    call mpi_isend(var(1,n2-3,3), 1, xystride, pxyse, 160, &
+    call mpi_isend(var(1,n2-3,3), 1, xystrideint, pxyse, 160, &
          MPI_COMM_WORLD, req(11), ierror)
-    call mpi_irecv(var(1,1,n3-1), 1, xystride, pxynw, 160, &
+    call mpi_irecv(var(1,1,n3-1), 1, xystrideint, pxynw, 160, &
          MPI_COMM_WORLD, req(12), ierror)
 
-    call mpi_isend(var(1,3,n3-3), 1, xystride, pxynw, 170, &
+    call mpi_isend(var(1,3,n3-3), 1, xystrideint, pxynw, 170, &
          MPI_COMM_WORLD, req(13), ierror)
-    call mpi_irecv(var(1,n2-1,1), 1, xystride, pxyse, 170, &
+    call mpi_irecv(var(1,n2-1,1), 1, xystrideint, pxyse, 170, &
          MPI_COMM_WORLD, req(14), ierror)
-    call mpi_isend(var(1,3,3), 1, xystride, pxysw, 180, &
+    call mpi_isend(var(1,3,3), 1, xystrideint, pxysw, 180, &
          MPI_COMM_WORLD, req(15), ierror)
-    call mpi_irecv(var(1,n2-1,n3-1), 1, xystride, pxyne, 180, &
+    call mpi_irecv(var(1,n2-1,n3-1), 1, xystrideint, pxyne, 180, &
          MPI_COMM_WORLD, req(16), ierror)
 
-  end subroutine cyclics
-  !
+    end subroutine cyclicsinternal
+
+
   !
   ! ---------------------------------------------------------------------
   ! subroutine cyclicc: comits excahnging cyclic boundary conditions

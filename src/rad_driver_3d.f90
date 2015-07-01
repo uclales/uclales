@@ -251,7 +251,7 @@ contains
             do igpt = 1, nrgpts
 
               if(radMcICA) then
-                if(iradtyp.eq.7) then
+                if(iradtyp.eq.7 .or. iradtyp.eq.8) then
                   ! tenstream -- only use one random band.... due to
                   ! horizontal correlations, it does not make sense to have
                   !different spectral intervals horizontally
@@ -367,14 +367,16 @@ contains
                     fuir(:,i,j) = fuir(:,i,j) + fu1(:) * xir_norm 
                   end do ! i
                 end do ! j
+
                 fdiv_th(1:nv,:,:) = (fdir(1:nv,:,:) - fuir(1:nv,:,:)) + (fuir(2:nv1,:,:) - fdir(2:nv1,:,:))
                 fdiv_th( nv1,:,:) = (fdir( nv1,:,:) - fuir(nv1,:,:))
 
 
                 if(iradtyp.eq.8) then
                   call nca_wrapper(nxp, nyp, nv, deltax, deltay, dz, tau_nca, w0, bf, fdir_nca , fuir_nca, fdiv3d)
+
                   !give 3d heating to fdiv_th, layers above nzp remain 1d heating
-                  fdiv_th_nca(nv+2-nzp:nv+1,:,:) =  fdiv_th_nca(nv+2-nzp:nv+1,:,:) + fdiv3d(nv+2-nzp:nv+1,:,:)*xir_norm 
+                  fdiv_th_nca(nv+2-nzp:nv,:,:) =  fdiv_th_nca(nv+2-nzp:nv,:,:) + fdiv3d(nv+2-nzp:nv,:,:)*xir_norm 
                 endif
 
 
@@ -401,7 +403,7 @@ contains
           enddo !iband
 
           if(iradtyp.eq.8) then
-            fdiv_th(nv+2-nzp:nv+1,:,:) = fdiv_th_nca(nv+2-nzp:nv+1,:,:) 
+            fdiv_th(nv+2-nzp:nv,:,:) = fdiv_th_nca(nv+2-nzp:nv,:,:) 
           endif
 
       end subroutine
@@ -1131,61 +1133,61 @@ contains
     
     use m_nca, only: nca
 
-    use mpi_interface, only : cyclics, cyclicc
+    use mpi_interface, only : cyclics, cyclicc, cyclicsp1
 
     integer :: req(16)
     integer,intent(in) :: nxp,nyp,nv
     real,intent(in) :: dx,dy
-    real,dimension(:,:,:),intent(in) :: tau,w0,dz,bf
-    real,dimension(:,:,:),intent(inout) ::fdir,fuir ! have dimensions (nv,nxp,nyp); bf with (nv1)
-    real,dimension(:,:,:),intent(out) :: fdiv ! have dimensions (nv,1:nxp-4,1:nyp-4);
-    real,dimension(nzp,nxp,nyp)   :: kabs ! needs one dimension more than heat does
-    real,dimension(nzp,nxp,nyp) :: heat
+    real,dimension(:,:,:),intent(in) :: tau,w0,dz     ! have dimensions (nv,nxp,nyp)
+    real,dimension(:,:,:),intent(in)  :: fdir,fuir,bf ! have dimensions (nv1,nxp,nyp)
+    real,dimension(:,:,:),intent(out) :: fdiv         ! have dimensions (nv,1:nxp-4,1:nyp-4)
+    real,dimension(nzp,nxp,nyp)   :: kabs             ! (nv,nxp,nyp)
+    real,dimension(nzp,nxp,nyp)   :: heat             ! (nv,nxp,nyp)
 
-    real :: fdir_ghosted(nzp,nxp,nyp)
-    real :: fuir_ghosted(nzp,nxp,nyp)
+    real :: fdir_ghosted(nzp+1,nxp,nyp)
+    real :: fuir_ghosted(nzp+1,nxp,nyp)
     real :: w0_ghosted(nzp,nxp,nyp)
     real :: dz_ghosted(nzp,nxp,nyp)
-    real :: bf_ghosted(nzp,nxp,nyp)
+    real :: bf_ghosted(nzp+1,nxp,nyp)
     real :: tau_ghosted(nzp,nxp,nyp)
 
-    fdir_ghosted=-1!DEBUG
-    fuir_ghosted=-1!DEBUG
-    w0_ghosted=-1!DEBUG
-    bf_ghosted=-1!DEBUG
-    tau_ghosted=-1!DEBUG
-    dz_ghosted=-1!DEBUG
+ !   fdir_ghosted=-1!DEBUG
+ !   fuir_ghosted=-1!DEBUG
+ !   w0_ghosted=-1!DEBUG
+ !   bf_ghosted=-1!DEBUG
+ !   tau_ghosted=-1!DEBUG
+ !   dz_ghosted=-1!DEBUG
 
-    fdir_ghosted(:,3:nxp-2,3:nyp-2) = fdir(nv+2-nzp:nv+1,:,:)
-    fuir_ghosted(:,3:nxp-2,3:nyp-2) = fuir(nv+2-nzp:nv+1,:,:)
+    fdir_ghosted(:,3:nxp-2,3:nyp-2) = fdir(nv+1-nzp:nv+1,:,:)
+    fuir_ghosted(:,3:nxp-2,3:nyp-2) = fuir(nv+1-nzp:nv+1,:,:)
     w0_ghosted(:,3:nxp-2,3:nyp-2) = w0(nv+1-nzp:nv,:,:)
     tau_ghosted(:,3:nxp-2,3:nyp-2) = tau(nv+1-nzp:nv,:,:)
-    bf_ghosted(:,3:nxp-2,3:nyp-2) = bf(nv+2-nzp:nv+1,:,:)
+    bf_ghosted(:,3:nxp-2,3:nyp-2) = bf(nv+1-nzp:nv+1,:,:)
     dz_ghosted(:,3:nxp-2,3:nyp-2) = dz(nv+1-nzp:nv,:,:)
 
-    call cyclics(nzp,nxp,nyp,fdir_ghosted,req)
-    call cyclics(nzp,nxp,nyp,fuir_ghosted,req)
-    call cyclicc(nzp,nxp,nyp,fdir_ghosted,req)
-    call cyclicc(nzp,nxp,nyp,fuir_ghosted,req)
-    call cyclics(nzp,nxp,nyp,w0_ghosted,req)
-    call cyclics(nzp,nxp,nyp,tau_ghosted,req)
-    call cyclicc(nzp,nxp,nyp,w0_ghosted,req)
-    call cyclicc(nzp,nxp,nyp,tau_ghosted,req)
-    call cyclics(nzp,nxp,nyp,bf_ghosted,req)
-    call cyclics(nzp,nxp,nyp,dz_ghosted,req)
-    call cyclicc(nzp,nxp,nyp,bf_ghosted,req)
-    call cyclicc(nzp,nxp,nyp,dz_ghosted,req)
+    call cyclicsp1(nzp+1,nxp,nyp,fdir_ghosted,req)
+    call cyclicsp1(nzp+1,nxp,nyp,fuir_ghosted,req)
+    call cyclicc(nzp+1,nxp,nyp,fdir_ghosted,req)
+    call cyclicc(nzp+1,nxp,nyp,fuir_ghosted,req)
+    call cyclicsp1(nzp+1,nxp,nyp,bf_ghosted,req)
+    call cyclicc(nzp+1,nxp,nyp,bf_ghosted,req)
 
+    call cyclics(nzp,nxp,nyp,w0_ghosted,req)
+    call cyclicc(nzp,nxp,nyp,w0_ghosted,req)
+    call cyclics(nzp,nxp,nyp,tau_ghosted,req)
+    call cyclicc(nzp,nxp,nyp,tau_ghosted,req)
+    call cyclics(nzp,nxp,nyp,dz_ghosted,req)
+    call cyclicc(nzp,nxp,nyp,dz_ghosted,req)
 
     ! Get kabs from optical thicknes (tau)
     kabs  = tau_ghosted*(1.-w0_ghosted) / dz_ghosted
     
     heat=0
-    call nca(nzp, nxp, nyp, dz_ghosted, bf_ghosted, kabs, heat, dx, dy, fdir_ghosted, fuir_ghosted) 
+    call nca(nzp, dz_ghosted, bf_ghosted, kabs, heat, dx, dy, fdir_ghosted, fuir_ghosted) 
     
     fdiv=0
   
-    fdiv(nv+2-nzp:nv+1,:,:)= heat(:,3:nxp-2,3:nyp-2)
+    fdiv(nv+1-nzp:nv,:,:) = heat(1:nzp,3:nxp-2,3:nyp-2)
     
 #ifndef _XLF
     if(any(isnan(fdiv))) print *, 'fdiv 2 shows nan', fdiv
