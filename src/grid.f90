@@ -759,6 +759,13 @@ contains
        allocate(seed(nseed))
        read(10) seed
        call random_seed(put=seed)
+
+       if(nxp-4 .eq. 2*(nxpx-4) .and. nyp-4.eq.2*(nypx-4))  then ! TODO This is a really bad hack but gets stuff done.
+         print *,'******************************** EXPERIMENTAL!!!! :: read_coarse_history ********************************'
+         call read_coarse_history()
+         return
+       endif
+
        if (nxpx /= nxp .or. nypx /= nyp .or. nzpx /= nzp)  then
           if (myid == 0) print *, nxp, nyp, nzp, nxpx, nypx, nzpx
           call appl_abort(-1)
@@ -823,6 +830,147 @@ contains
        end if
 
     end if
+
+    contains
+      subroutine read_coarse_history()
+          integer :: k
+
+          real :: hist_xt ((size(xt))/2+2)
+          real :: hist_xm ((size(xm))/2+2)
+          real :: hist_yt ((size(yt))/2+2)
+          real :: hist_ym ((size(ym))/2+2)
+
+          real :: hist_a_ustar (size(a_ustar,1)/2+2, size(a_ustar,2)/2+2 )
+          real :: hist_a_tstar (size(a_tstar,1)/2+2, size(a_tstar,2)/2+2 )
+          real :: hist_a_rstar (size(a_rstar,1)/2+2, size(a_rstar,2)/2+2 )
+          real :: hist_a_pexnr (size(a_pexnr,1), size(a_pexnr,2)/2+2, size(a_pexnr,3)/2+2 )
+          real,allocatable :: hist_a_sp (:,:,:)  ! (size(a_sp   ,1), size(a_sp   ,2)/2+2, size(a_sp   ,3)/2+2 )
+
+          read ( 10) hist_xt  ,&! ( lbound( hist_xt   ,1):ubound ( hist_xt  ,1):c),&
+                     hist_xm  ,&! ( lbound( hist_xm   ,1):ubound ( hist_xm  ,1):c),&
+                     hist_yt  ,&! ( lbound( hist_yt   ,1):ubound ( hist_yt  ,1):c),&
+                     hist_ym  ,&! ( lbound( hist_ym   ,1):ubound ( hist_ym  ,1):c),&
+                     zt  ,&! ( lbound( hist_zt   ,1):ubound ( hist_zt  ,1):c),&
+                     zm  ,&! ( lbound( hist_zm   ,1):ubound ( hist_zm  ,1):c),&
+                     dn0      ,&! ( lbound( hist_dn0  ,1):ubound ( hist_dn0 ,1):c),&
+                     th0      ,&! ( lbound( hist_th0  ,1):ubound ( hist_th0 ,1):c),&
+                     u0       ,&! ( lbound( hist_u0   ,1):ubound ( hist_u0  ,1):c),&
+                     v0       ,&! ( lbound( hist_v0   ,1):ubound ( hist_v0  ,1):c),&
+                     pi0      ,&! ( lbound( hist_pi0  ,1):ubound ( hist_pi0 ,1):c),&
+                     pi1      ,&! ( lbound( hist_pi1  ,1):ubound ( hist_pi1 ,1):c),&
+                     rt0      ,&! ( lbound( hist_rt0  ,1):ubound ( hist_rt0 ,1):c),&
+                     psrf 
+
+          read (10) hist_a_ustar,&
+                    hist_a_tstar,& 
+                    hist_a_rstar
+
+          call remap2d(hist_a_ustar, a_ustar)
+          call remap2d(hist_a_tstar, a_tstar)
+          call remap2d(hist_a_rstar, a_rstar)
+
+          read (10) hist_a_pexnr
+          
+          do k=lbound(a_pexnr,1),ubound(a_pexnr,1)
+            call remap2d(hist_a_pexnr(k,:,:), a_pexnr(k,:,:))
+          enddo
+
+          !Malte: Restart land surface
+          if (isfctyp == 5) then
+            stop 'history coarsening for isfctyp == 5 not supported'
+            read(10) a_tsoil
+            read(10) a_phiw
+            read(10) a_tskin
+            read(10) a_qskin
+            read(10) a_Wl
+            read(10) a_sflxd
+            read(10) a_sflxu
+            read(10) a_lflxd
+            read(10) a_lflxu
+            read(10) a_sflxd_avn
+            read(10) a_sflxu_avn
+            read(10) a_lflxd_avn
+            read(10) a_lflxu_avn
+          end if
+          !End Malte
+
+          do n=1,nscl
+            call newvar(n)
+            if (n <= nsclx) then
+              allocate( hist_a_sp(size(a_sp   ,1), size(a_sp   ,2)/2+2, size(a_sp   ,3)/2+2) )
+              read (10) hist_a_sp
+              do k=lbound(a_sp,1),ubound(a_sp,1)
+                call remap2d(hist_a_sp(k,:,:), a_sp(k,:,:))
+              enddo
+              deallocate(hist_a_sp)
+            endif
+          end do
+          do n=nscl+1,nsclx
+            read (10)
+          end do
+          if(level>=3) then
+            stop 'history coarsening for level>=3 not supported'
+            read(10) prc_acc, rev_acc
+          end if
+          if(lwaterbudget) then
+            stop 'history coarsening for lwaterbudget not supported'
+            read(10) cnd_acc, cev_acc
+          end if
+          read(10) nv2, nsmp
+          allocate (svctr(nzp,nv2))
+          read(10) svctr
+
+          close(10)
+          !
+          ! adjust namelist and basic state appropriately
+          !
+          if (thx /= th00) then
+            if (myid == 0) print "('  th00 changed  -  ',2f8.2)",th00,thx
+            a_tp(:,:,:) = a_tp(:,:,:) + thx - th00
+          end if
+          if (umx /= umean) then
+            if (myid == 0) print "('  umean changed  -  ',2f8.2)",umean,umx
+            a_up = a_up + umx - umean
+            u0 = u0 + umx - umean
+          end if
+          if (vmx /= vmean) then
+            if (myid == 0) print "('  vmean changed  -  ',2f8.2)",vmean,vmx
+            a_vp = a_vp + vmx - vmean
+            v0 = v0 +vmx - vmean
+          end if
+
+      end subroutine
+      subroutine remap2d(coarse,fine)
+          real, intent(in)  :: coarse(:,:)
+          real, intent(out) :: fine  (:,:)
+          integer :: i,j
+
+          ! Corners should not be important?
+          fine(1:2,1:2)                                                 = coarse(1:2,1:2)                                                
+          fine(1:2,size(fine,2)-1:size(fine,2))                         = coarse(1:2,size(coarse,2)-1:size(coarse,2))                         
+          fine(size(fine,1)-1:size(fine,1),1:2)                         = coarse(size(coarse,1)-1:size(coarse,1),1:2)                         
+          fine(size(fine,1)-1:size(fine,1),size(fine,2)-1:size(fine,2)) = coarse(size(coarse,1)-1:size(coarse,1),size(coarse,2)-1:size(coarse,2)) 
+          !boundaries are taken as is from coarse grid
+          fine(                        1:2, 3:size(fine,2)-2:2) = coarse(                            1:2, 3:size(coarse,2)-2)
+          fine(                        1:2, 4:size(fine,2)-2:2) = coarse(                            1:2, 3:size(coarse,2)-2)
+          fine(size(fine,1)-1:size(fine,1), 3:size(fine,2)-2:2) = coarse(size(coarse,1)-1:size(coarse,1), 3:size(coarse,2)-2)
+          fine(size(fine,1)-1:size(fine,1), 4:size(fine,2)-2:2) = coarse(size(coarse,1)-1:size(coarse,1), 3:size(coarse,2)-2)
+
+          fine(3:size(fine,1)-2:2,                         1:2) = coarse(3:size(coarse,1)-2,                             1:2)
+          fine(4:size(fine,1)-2:2,                         1:2) = coarse(3:size(coarse,1)-2,                             1:2)
+          fine(3:size(fine,1)-2:2, size(fine,2)-1:size(fine,2)) = coarse(3:size(coarse,1)-2, size(coarse,2)-1:size(coarse,2))
+          fine(4:size(fine,1)-2:2, size(fine,2)-1:size(fine,2)) = coarse(3:size(coarse,1)-2, size(coarse,2)-1:size(coarse,2))
+
+          do j=0,size(coarse,2)-5
+            do i=0,size(coarse,1)-5
+              fine(2*i+3, 2*j+3) = coarse(i+3,j+3)
+              fine(2*i+3, 2*j+4) = (coarse(i+3,j+3) + coarse(i+3,j+4) )/2
+              fine(2*i+4, 2*j+3) = (coarse(i+3,j+3) + coarse(i+4,j+3) )/2
+              fine(2*i+4, 2*j+4) = (coarse(i+3,j+3) + coarse(i+3,j+4) + coarse(i+4,j+3) + coarse(i+4,j+4) ) /4
+            enddo
+          enddo
+
+      end subroutine
 
   end subroutine read_hist
   !
