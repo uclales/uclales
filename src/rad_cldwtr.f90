@@ -199,8 +199,14 @@ contains
           ww(k) = 0.0
           gg    = 0.
        end if
-       if (ww(k).lt.0.) print*,'bad ww, ',ww(k),ib,k,cwmks
-       if (tw(k).lt.0.) print*,'bad tw, ',tw(k),ib,k,cwmks
+       if (ww(k).lt.0.) then
+         print*,'bad ww, ',ww(k),ib,k,cwmks
+         stop 'bad ww'
+       endif
+       if (tw(k).lt.0.) then
+         print*,'bad tw, ',tw(k),ib,k,cwmks
+         stop 'bad tw'
+       endif
     end do
 
     return
