@@ -439,6 +439,19 @@ contains
        tv = pt(i)*(1+0. + ep2*ph(i) )
        dz(i) = (R/g) * tv * alog( pp(i+1) / pp(i) )
     end do
+
+    !todo -- dirty fix: Fabian does not know why he would get flipped pressures from uclales --
+    !                   but as a quick fix for the radiation, lets just overwrite dz 
+    !                   -- this should however be investigated thoroughly!
+    if(dz(nv).le.dz(nv-1)) dz(nv) = dz(nv-1)
+
+    if(any(dz.lt.0)) then
+      do  i = 1, nv
+        tv = pt(i)*(1+0. + ep2*ph(i) )
+        print *,'Error in dz',dz(i),'(',i,') ::', pp(i),pp(i+1),pt(i),ph(i),':: tv',tv
+      end do
+      stop 'Error in dz'
+    endif
     
   end subroutine thicks
   ! ----------------------------------------------------------------------

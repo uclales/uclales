@@ -756,6 +756,16 @@ contains
       end do
       pp(nv-nzp+2) = pres(nzp)/100. - 0.5*(pres(nzp-1)-pres(nzp)) / 100.
 
+!      do k=1,nv
+!        if(pp(k).gt.pp(k+1)) then
+!          print *,'Error in Pressure computation, upper layer has more pressure than lower',pp(k).gt.pp(k+1)
+!          print *,'pp',pp
+!          print *,'pres',pres
+!          print *,'exner',exner
+!          stop 'pressure error'
+!        endif
+!      enddo
+
       call thicks(pp, pt, ph, dz) 
 
       do k=2,nzp

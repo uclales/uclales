@@ -200,11 +200,11 @@ contains
           gg    = 0.
        end if
        if (ww(k).lt.0.) then
-         print*,'bad ww, ',ww(k),ib,k,cwmks
+         print*,'bad ww, ',ww(k),ib,k,cwmks,'input',ib,'::',pre,'::', pcw,'::', dz
          stop 'bad ww'
        endif
        if (tw(k).lt.0.) then
-         print*,'bad tw, ',tw(k),ib,k,cwmks
+         print*,'bad tw, ',tw(k),ib,k,cwmks,'input',ib,'::',pre,'::', pcw,'::', dz
          stop 'bad tw'
        endif
     end do
