@@ -18,7 +18,7 @@ complvl=1
 
 #--------------------------------------------------------------------------------------------------------------------------------
 def write_nc(basename,varname, data, dims, attributes=None):
-  fname= '{}'.format(basename)+'.merged.nc'
+  fname= '{0:}'.format(basename)+'.merged.nc'
   try:
   
     if have_lock:
