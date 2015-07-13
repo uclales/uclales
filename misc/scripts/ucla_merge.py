@@ -14,6 +14,7 @@ from datetime import datetime
 #except Exception,e:
 #    print 'Couldnt import FileLock:',e
 have_lock=False
+complvl=1
 
 #--------------------------------------------------------------------------------------------------------------------------------
 def write_nc(basename,varname, data, dims, attributes=None):
@@ -42,7 +43,7 @@ def write_nc(basename,varname, data, dims, attributes=None):
   
     if varname not in D.variables:
         print 'write_netcdf: var: ',varname,' shape', np.shape(data)
-        D.createVariable(varname, 'f4', [ d[0] for d in dims ] , zlib=True,least_significant_digit=6, complevel=9)
+        D.createVariable(varname, 'f4', [ d[0] for d in dims ] , zlib=True,least_significant_digit=6, complevel=complvl)
         D.variables[varname][:] = data
         if attributes!=None:
             print 'attributes',attributes
@@ -57,11 +58,13 @@ def write_nc(basename,varname, data, dims, attributes=None):
 
 def exists_nc(basename, varname):
   try:
-    fname= basename+'.nc'
+    fname= basename+'.merged.nc'
     if os.path.exists(fname):
       fmode='r'
     else:
-      return False
+      exists = False
+      print 'Checking if {0:} exists in file {1:} :: File not found => {2:}'.format(varname,fname,exists)
+      return exists 
 
     D=Dataset(fname,fmode)
 
@@ -75,6 +78,8 @@ def exists_nc(basename, varname):
     exists=False
   finally:
     if 'D' in locals(): D.close()
+
+  print 'Checking if {0:} exists in file {1:} :: {2:}'.format(varname,basename,exists)
   return exists
 #--------------------------------------------------------------------------------------------------------------------------------
 
