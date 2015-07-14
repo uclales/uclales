@@ -381,6 +381,7 @@ def append_var(basename,varname,reduc_func=np.mean):
       if l1d: td,         = D.variables[varname].dimensions[:]
 
       if maxtime==-1:
+        if td!='time': continue
         maxtime = len(D.variables[ td ][:])
         print 'maxtime is',maxtime
 
