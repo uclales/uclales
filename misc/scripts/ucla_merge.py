@@ -381,9 +381,11 @@ def append_var(basename,varname,reduc_func=np.mean):
       if l1d: td,         = D.variables[varname].dimensions[:]
 
       if maxtime==-1:
-        if td!='time': continue
-        maxtime = len(D.variables[ td ][:])
-        print 'maxtime is',maxtime
+        if td!='time':
+          pass
+        else:
+          maxtime = len(D.variables[ td ][:])
+          print 'maxtime is',maxtime
 
       if varname not in coord_files[(i,j)].keys(): 
         coord_files[(i,j)][varname] = D.variables[varname][:maxtime]
