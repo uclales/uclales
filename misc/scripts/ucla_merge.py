@@ -379,11 +379,11 @@ def append_var(basename,varname,reduc_func=np.mean):
       if l1d: td,         = D.variables[varname].dimensions[:]
 
       if varname not in coord_files[(i,j)].keys(): 
-        coord_files[(i,j)][varname] = D.variables[varname]
+          coord_files[(i,j)][varname] = D.variables[varname][:]
 
 #      print "Coords of variable:",varname,'::',D.variables[varname].dimensions[:],[l1d,l2d,l3d,l4d], np.shape( D.variables[varname] ), np.shape(coord_files[(i,j)][varname])
 
-      coord_files[td] = D.variables[ td ]
+      coord_files[td] = D.variables[ td ][:]
 
       try:
         coord_files[zd] = D.variables[ zd ][:]
@@ -475,4 +475,8 @@ except Exception,e:
 
 for idim in [4,3,2,1]:
   for varname in vars:
-    append_var(basename,varname)
+      D = Dataset( files[0], 'r' )
+      ndim = len(np.shape(D.variables[varname]))
+      D.close()
+      if ndim == idim:
+          append_var(basename,varname)
