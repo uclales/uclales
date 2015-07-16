@@ -47,7 +47,7 @@ def write_nc(basename,varname, data, dims, attributes=None):
         D.variables[varname][:] = data
         if attributes!=None:
             print 'attributes',attributes
-            [ D.variables[varname].setncattr(att[0],att[1]) for att in attributes ]
+            [ D.variables[varname].setncattr(att,val) for att,val in attributes.iteritems() ]
   
   except Exception,e:
     print 'error occured when we tried writing data to netcdf file',e
