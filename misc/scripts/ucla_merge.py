@@ -317,7 +317,9 @@ reduc_functions={
 
 
 #--------------------------------------------------------------------------------------------------------------------------------
+maxtime=-1
 def append_var(basename,varname,reduc_func=np.mean):
+  global maxtime
   if exists_nc(basename, varname):
     print "variable already exists",varname
     return
@@ -378,12 +380,18 @@ def append_var(basename,varname,reduc_func=np.mean):
       if l2d: td,zd       = D.variables[varname].dimensions[:]
       if l1d: td,         = D.variables[varname].dimensions[:]
 
+      if maxtime==-1:
+        if td!='time':
+          pass
+        else:
+          maxtime = len(D.variables[ td ][:])
+          print 'maxtime is',maxtime
+
+
       if varname not in coord_files[(i,j)].keys(): 
-          coord_files[(i,j)][varname] = D.variables[varname][:]
+          coord_files[(i,j)][varname] = D.variables[varname][:maxtime]
 
-#      print "Coords of variable:",varname,'::',D.variables[varname].dimensions[:],[l1d,l2d,l3d,l4d], np.shape( D.variables[varname] ), np.shape(coord_files[(i,j)][varname])
-
-      coord_files[td] = D.variables[ td ][:]
+      coord_files[td] = D.variables[ td ][:maxtime]
 
       try:
         coord_files[zd] = D.variables[ zd ][:]
