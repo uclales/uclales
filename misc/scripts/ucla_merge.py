@@ -14,7 +14,7 @@ from datetime import datetime
 #except Exception,e:
 #    print 'Couldnt import FileLock:',e
 have_lock=False
-complvl=1
+complvl=3
 
 #--------------------------------------------------------------------------------------------------------------------------------
 def write_nc(basename,varname, data, dims, attributes=None):
@@ -33,21 +33,36 @@ def write_nc(basename,varname, data, dims, attributes=None):
       fmode='w'
     D=Dataset(fname,fmode)
   
-    for dim in dims:
-      if dim[0] not in D.dimensions: 
-        D.createDimension(dim[0], len(dim[1]) )
-        if dim[0] not in D.variables:
-            D.createVariable(dim[0] ,'f4',(dim[0],) )
-            D.variables[dim[0]][:] = dim[1]
-            print 'write_netcdf: write dim:',dim,'shape',np.shape(dim[1])
+    try:
+        for dim in dims:
+          if dim[0] not in D.dimensions: 
+            D.createDimension(dim[0], len(dim[1]) )
+            if dim[0] not in D.variables:
+                D.createVariable(dim[0] ,'f4',(dim[0],) )
+                D.variables[dim[0]][:] = dim[1]
+                print 'write_netcdf: write dim:',dim,'shape',np.shape(dim[1])
+    except Exception,e:
+        print 'Error happened writing dimensions',e
+        raise(e)
   
-    if varname not in D.variables:
-        print 'write_netcdf: var: ',varname,' shape', np.shape(data)
-        D.createVariable(varname, 'f4', [ d[0] for d in dims ] , zlib=True,least_significant_digit=6, complevel=complvl)
-        D.variables[varname][:] = data
-        if attributes!=None:
-            print 'attributes',attributes
-            [ D.variables[varname].setncattr(att,val) for att,val in attributes.iteritems() ]
+    try:
+        if varname not in D.variables:
+            print 'write_netcdf: var: ',varname,' shape', np.shape(data),' nc dimensions:',[ d[0] for d in dims ]
+            fillval = attributes.pop('_FillValue') if attributes!=None else None
+
+            D.createVariable(varname, 'f4', [ d[0] for d in dims ] , zlib=True,least_significant_digit=6, complevel=complvl,fill_value=fillval)
+            D.variables[varname][:] = data
+
+            try:
+                if attributes!=None:
+                    print 'attributes',attributes
+                    [ D.variables[varname].setncattr(att,val) for att,val in attributes.iteritems() ]
+            except Exception,e:
+                print 'Error happened writing attributes',e
+                raise(e)
+    except Exception,e:
+        print 'Error happened writing data',e
+        raise(e)
   
   except Exception,e:
     print 'error occured when we tried writing data to netcdf file',e
@@ -98,199 +113,199 @@ reduc_functions={
 
         1:{ # one dimensional variables
         # .ts. variables:
-        'cfl'    : np.max ,
-        'maxdiv' : np.max ,
-        'zi1_bar': np.mean,
-        'zi2_bar': np.mean,
-        'zi3_bar': np.mean,
-        'vtke'   : np.mean,
-        'sfcbflx': np.mean,
-        'wmax'   : np.max ,
-        'tsrf'   : np.mean, 
-        'ustar'  : np.mean, 
-        'shf_bar': np.mean, 
-        'lhf_bar' : np.mean,
-        'zi_bar'  : np.mean,
-        'lwp_bar' : np.mean,
-        'lwp_var' : np.mean,
-        'zc'      : np.max ,
-        'zb'      : np.min ,
-        'cfrac'   : np.mean,
-        'lmax'    : np.max ,
-        'albedo'  : np.mean,
-        'rwp_bar' : np.mean,
-        'prcp'    : np.mean,
-        'pfrac'   : np.mean,
-        'CCN'     : np.mean,
-        'nrain'   : np.mean,
-        'nrcnt'   : np.sum ,
-        'zcmn'    : np.mean,
-        'zbmn'    : np.mean,
-        'tkeint'  : np.mean,
-        'lflxut'  : np.mean,
-        'lflxdt'  : np.mean,
-        'sflxut'  : np.mean,
-        'sflxdt'  : np.mean,
-        'thl_int' : np.mean,
-        'wvp_bar' : np.mean,
-        'wvp_var' : np.mean,
-        'iwp_bar' : np.mean,
-        'iwp_var' : np.mean,
-        'swp_bar' : np.mean,
-        'swp_var' : np.mean,
-        'gwp_bar' : np.mean,
-        'gwp_var' : np.mean,
-        'hwp_bar' : np.mean,
-        'hwp_var' : np.mean,
-        'Qnet'    : np.mean,
-        'G0'      : np.mean,
-        'tndskin' : np.mean,
-        'ra'      : np.mean,
-        'rsurf'   : np.mean,
-        'rsveg'   : np.mean,
-        'rssoil'  : np.mean,
-        'tskinav' : np.mean,
-        'qskinav' : np.mean,
-        'obl'     : np.mean,
-        'cliq'    : np.mean,
-        'a_Wl'    : np.mean,
-        'lflxutc' : np.mean,
-        'sflxutc' : np.mean,
-        'tsair'   : np.mean,
-        'sflxds'  : np.mean,
-        'sflxus'  : np.mean,
-        'lflxds'  : np.mean,
-        'lflxus'  : np.mean,
-        'sflxdsc' : np.mean,
-        'sflxusc' : np.mean,
-        'lflxdsc' : np.mean,
-        'lflxusc' : np.mean,
+        'cfl'     : np.nanmax ,
+        'maxdiv'  : np.nanmax ,
+        'zi1_bar' : np.nanmean,
+        'zi2_bar' : np.nanmean,
+        'zi3_bar' : np.nanmean,
+        'vtke'    : np.nanmean,
+        'sfcbflx' : np.nanmean,
+        'wmax'    : np.nanmax ,
+        'tsrf'    : np.nanmean, 
+        'ustar'   : np.nanmean, 
+        'shf_bar' : np.nanmean, 
+        'lhf_bar' : np.nanmean,
+        'zi_bar'  : np.nanmean,
+        'lwp_bar' : np.nanmean,
+        'lwp_var' : np.nanmean,
+        'zc'      : np.nanmax ,
+        'zb'      : np.nanmin ,
+        'cfrac'   : np.nanmean,
+        'lmax'    : np.nanmax ,
+        'albedo'  : np.nanmean,
+        'rwp_bar' : np.nanmean,
+        'prcp'    : np.nanmean,
+        'pfrac'   : np.nanmean,
+        'CCN'     : np.nanmean,
+        'nrain'   : np.nanmean,
+        'nrcnt'   : np.nansum ,
+        'zcmn'    : np.nanmean,
+        'zbmn'    : np.nanmean,
+        'tkeint'  : np.nanmean,
+        'lflxut'  : np.nanmean,
+        'lflxdt'  : np.nanmean,
+        'sflxut'  : np.nanmean,
+        'sflxdt'  : np.nanmean,
+        'thl_int' : np.nanmean,
+        'wvp_bar' : np.nanmean,
+        'wvp_var' : np.nanmean,
+        'iwp_bar' : np.nanmean,
+        'iwp_var' : np.nanmean,
+        'swp_bar' : np.nanmean,
+        'swp_var' : np.nanmean,
+        'gwp_bar' : np.nanmean,
+        'gwp_var' : np.nanmean,
+        'hwp_bar' : np.nanmean,
+        'hwp_var' : np.nanmean,
+        'Qnet'    : np.nanmean,
+        'G0'      : np.nanmean,
+        'tndskin' : np.nanmean,
+        'ra'      : np.nanmean,
+        'rsurf'   : np.nanmean,
+        'rsveg'   : np.nanmean,
+        'rssoil'  : np.nanmean,
+        'tskinav' : np.nanmean,
+        'qskinav' : np.nanmean,
+        'obl'     : np.nanmean,
+        'cliq'    : np.nanmean,
+        'a_Wl'    : np.nanmean,
+        'lflxutc' : np.nanmean,
+        'sflxutc' : np.nanmean,
+        'tsair'   : np.nanmean,
+        'sflxds'  : np.nanmean,
+        'sflxus'  : np.nanmean,
+        'lflxds'  : np.nanmean,
+        'lflxus'  : np.nanmean,
+        'sflxdsc' : np.nanmean,
+        'sflxusc' : np.nanmean,
+        'lflxdsc' : np.nanmean,
+        'lflxusc' : np.nanmean,
 
         # .ps. variables:
-        'fsttm'   : np.mean,
-        'lsttm'   : np.mean,
-        'nsmp'    : np.mean,
+        'fsttm'   : np.nanmean,
+        'lsttm'   : np.nanmean,
+        'nsmp'    : np.nanmean,
         
         # 3d vars
-        'dn0'   : np.mean,
-        'u0'    : np.mean,
-        'v0'    : np.mean,
+        'dn0'   : np.nanmean,
+        'u0'    : np.nanmean,
+        'v0'    : np.nanmean,
         },
 
         2 : { # 2d variables
         # .ps. variables:
-        'dn0'     : np.mean,
-        'u0'      : np.mean,
-        'v0'      : np.mean,
-        'u'       : np.mean,
-        'v'       : np.mean,
-        't'       : np.mean,
-        'p'       : np.mean,
-        'u_2'     : np.mean,
-        'v_2'     : np.mean,
-        'w_2'     : np.mean,
-        't_2'     : np.mean,
-        'w_3'     : np.mean,
-        't_3'     : np.mean,
-        'tot_tw'  : np.mean,  # Total vertical flux of theta -- TODO should this be sum?
-        'sfs_tw'  : np.mean,
-        'tot_uw'  : np.mean,
-        'sfs_uw'  : np.mean,
-        'tot_vw'  : np.mean,
-        'sfs_vw'  : np.mean,
-        'tot_ww'  : np.mean,
-        'sfs_ww'  : np.mean,
-        'km'      : np.mean,
-        'kh'      : np.mean,
-        'lmbd'    : np.mean,
-        'lmbde'   : np.mean,
-        'sfs_tke' : np.mean,
-        'sfs_boy' : np.mean,
-        'sfs_shr' : np.mean,
-        'boy_prd' : np.mean,
-        'shr_prd' : np.mean,
-        'trans'   : np.mean,
-        'diss'    : np.mean,
-        'dff_u'   : np.mean,
-        'dff_v'   : np.mean,
-        'dff_w'   : np.mean,
-        'adv_u'   : np.mean,
-        'adv_v'   : np.mean,
-        'adv_w'   : np.mean,
-        'prs_u'   : np.mean,
-        'prs_v'   : np.mean,
-        'prs_w'   : np.mean,
-        'prd_uw'  : np.mean,
-        'storage' : np.mean,
-        'q'       : np.mean,
-        'q_2'     : np.mean,
-        'q_3'     : np.mean,
-        'tot_qw'  : np.mean,
-        'sfs_qw'  : np.mean,
-        'rflx'    : np.mean,
-        'rflx2'   : np.mean,
-        'sflx'    : np.mean,
-        'sflx2'   : np.mean,
-        'l'       : np.mean,
-        'l_2'     : np.mean,
-        'l_3'     : np.mean,
-        'tot_lw'  : np.mean,
-        'sed_lw'  : np.mean,
-        'cs1'     : np.mean,
-        'cnt_cs1' : np.mean,
-        'w_cs1'   : np.mean,
-        'tl_cs1'  : np.mean,
-        'tv_cs1'  : np.mean,
-        'rt_cs1'  : np.mean,
-        'rl_cs1'  : np.mean,
-        'wt_cs1'  : np.mean,
-        'wv_cs1'  : np.mean,
-        'wr_cs1'  : np.mean,
-        'cs2'     : np.mean,
-        'cnt_cs2' : np.mean,
-        'w_cs2'   : np.mean,
-        'tl_cs2'  : np.mean,
-        'tv_cs2'  : np.mean,
-        'rt_cs2'  : np.mean,
-        'rl_cs2'  : np.mean,
-        'wt_cs2'  : np.mean,
-        'wv_cs2'  : np.mean,
-        'wr_cs2'  : np.mean,
-        'Nc'      : np.mean,
-        'Nr'      : np.mean,
-        'rr'      : np.mean,
-        'prc_r'   : np.mean,
-        'evap'    : np.mean,
-        'frc_prc' : np.mean,
-        'prc_prc' : np.mean,
-        'frc_ran' : np.mean,
-        'hst_srf' : np.mean,
-        'lflxu'   : np.mean,
-        'lflxd'   : np.mean,
-        'sflxu'   : np.mean,
-        'sflxd'   : np.mean,
-        'cdsed'   : np.mean,
-        'i_nuc'   : np.mean,
-        'ice'     : np.mean,
-        'n_ice'   : np.mean,
-        'snow'    : np.mean,
-        'graupel' : np.mean,
-        'rsup'    : np.mean,
-        'prc_c'   : np.mean,
-        'prc_i'   : np.mean,
-        'prc_s'   : np.mean,
-        'prc_g'   : np.mean,
-        'prc_h'   : np.mean,
-        'hail'    : np.mean,
-        'qt_th'   : np.mean,
-        's_1'     : np.mean,
-        's_2'     : np.mean,
-        's_3'     : np.mean,
-        'RH'      : np.mean,
-        'lwuca'   : np.mean,
-        'lwdca'   : np.mean,
-        'swuca'   : np.mean,
-        'swdca'   : np.mean,
+        'dn0'     : np.nanmean,
+        'u0'      : np.nanmean,
+        'v0'      : np.nanmean,
+        'u'       : np.nanmean,
+        'v'       : np.nanmean,
+        't'       : np.nanmean,
+        'p'       : np.nanmean,
+        'u_2'     : np.nanmean,
+        'v_2'     : np.nanmean,
+        'w_2'     : np.nanmean,
+        't_2'     : np.nanmean,
+        'w_3'     : np.nanmean,
+        't_3'     : np.nanmean,
+        'tot_tw'  : np.nanmean,  # Total vertical flux of theta -- TODO should this be sum?
+        'sfs_tw'  : np.nanmean,
+        'tot_uw'  : np.nanmean,
+        'sfs_uw'  : np.nanmean,
+        'tot_vw'  : np.nanmean,
+        'sfs_vw'  : np.nanmean,
+        'tot_ww'  : np.nanmean,
+        'sfs_ww'  : np.nanmean,
+        'km'      : np.nanmean,
+        'kh'      : np.nanmean,
+        'lmbd'    : np.nanmean,
+        'lmbde'   : np.nanmean,
+        'sfs_tke' : np.nanmean,
+        'sfs_boy' : np.nanmean,
+        'sfs_shr' : np.nanmean,
+        'boy_prd' : np.nanmean,
+        'shr_prd' : np.nanmean,
+        'trans'   : np.nanmean,
+        'diss'    : np.nanmean,
+        'dff_u'   : np.nanmean,
+        'dff_v'   : np.nanmean,
+        'dff_w'   : np.nanmean,
+        'adv_u'   : np.nanmean,
+        'adv_v'   : np.nanmean,
+        'adv_w'   : np.nanmean,
+        'prs_u'   : np.nanmean,
+        'prs_v'   : np.nanmean,
+        'prs_w'   : np.nanmean,
+        'prd_uw'  : np.nanmean,
+        'storage' : np.nanmean,
+        'q'       : np.nanmean,
+        'q_2'     : np.nanmean,
+        'q_3'     : np.nanmean,
+        'tot_qw'  : np.nanmean,
+        'sfs_qw'  : np.nanmean,
+        'rflx'    : np.nanmean,
+        'rflx2'   : np.nanmean,
+        'sflx'    : np.nanmean,
+        'sflx2'   : np.nanmean,
+        'l'       : np.nanmean,
+        'l_2'     : np.nanmean,
+        'l_3'     : np.nanmean,
+        'tot_lw'  : np.nanmean,
+        'sed_lw'  : np.nanmean,
+        'cs1'     : np.nanmean,
+        'cnt_cs1' : np.nanmean,
+        'w_cs1'   : np.nanmean,
+        'tl_cs1'  : np.nanmean,
+        'tv_cs1'  : np.nanmean,
+        'rt_cs1'  : np.nanmean,
+        'rl_cs1'  : np.nanmean,
+        'wt_cs1'  : np.nanmean,
+        'wv_cs1'  : np.nanmean,
+        'wr_cs1'  : np.nanmean,
+        'cs2'     : np.nanmean,
+        'cnt_cs2' : np.nanmean,
+        'w_cs2'   : np.nanmean,
+        'tl_cs2'  : np.nanmean,
+        'tv_cs2'  : np.nanmean,
+        'rt_cs2'  : np.nanmean,
+        'rl_cs2'  : np.nanmean,
+        'wt_cs2'  : np.nanmean,
+        'wv_cs2'  : np.nanmean,
+        'wr_cs2'  : np.nanmean,
+        'Nc'      : np.nanmean,
+        'Nr'      : np.nanmean,
+        'rr'      : np.nanmean,
+        'prc_r'   : np.nanmean,
+        'evap'    : np.nanmean,
+        'frc_prc' : np.nanmean,
+        'prc_prc' : np.nanmean,
+        'frc_ran' : np.nanmean,
+        'hst_srf' : np.nanmean,
+        'lflxu'   : np.nanmean,
+        'lflxd'   : np.nanmean,
+        'sflxu'   : np.nanmean,
+        'sflxd'   : np.nanmean,
+        'cdsed'   : np.nanmean,
+        'i_nuc'   : np.nanmean,
+        'ice'     : np.nanmean,
+        'n_ice'   : np.nanmean,
+        'snow'    : np.nanmean,
+        'graupel' : np.nanmean,
+        'rsup'    : np.nanmean,
+        'prc_c'   : np.nanmean,
+        'prc_i'   : np.nanmean,
+        'prc_s'   : np.nanmean,
+        'prc_g'   : np.nanmean,
+        'prc_h'   : np.nanmean,
+        'hail'    : np.nanmean,
+        'qt_th'   : np.nanmean,
+        's_1'     : np.nanmean,
+        's_2'     : np.nanmean,
+        's_3'     : np.nanmean,
+        'RH'      : np.nanmean,
+        'lwuca'   : np.nanmean,
+        'lwdca'   : np.nanmean,
+        'swuca'   : np.nanmean,
+        'swdca'   : np.nanmean,
         },
 
         4: { # 4d variables
@@ -304,8 +319,8 @@ reduc_functions={
         'l'     : np.concatenate,
         'r'     : np.concatenate,
         'n'     : np.concatenate,
-        'a_rhl'  : np.concatenate,
-        'a_rhs'  : np.concatenate,
+        'a_rhl' : np.concatenate,
+        'a_rhs' : np.concatenate,
         'rflx'  : np.concatenate,
         'lflxu' : np.concatenate,
         'lflxd' : np.concatenate,
@@ -336,7 +351,6 @@ def append_var(basename,varname,reduc_func=np.mean):
 
         x,y = ( int(coord[:4]), int(coord[4:]) )
         if (x,y) not in coord_files.keys(): coord_files[(x,y)] = { 'fname':f, }
-#        print 'Addind to coords:',x,y
 
   nr_y = len(np.unique ([ k[1] for k in coord_files.keys() ]))
   nr_x = len(np.unique ([ k[0] for k in coord_files.keys() ]))
@@ -355,7 +369,7 @@ def append_var(basename,varname,reduc_func=np.mean):
 
       D = Dataset(coord_files[(i,j)]['fname'] )
 
-      attributes = dict([ [att,D.variables[varname].getncattr(att)] for att in ['longname','units'] ])
+      attributes = dict([ [att,D.variables[varname].getncattr(att)] for att in D.variables[varname].ncattrs() ])
       ndim=len(D.variables[varname].dimensions[:])
 
       if varname in reduc_functions[0]: # this is coordinate variable....
@@ -387,10 +401,19 @@ def append_var(basename,varname,reduc_func=np.mean):
           maxtime = len(D.variables[ td ][:])
           print 'maxtime is',maxtime
 
+#      import ipdb;ipdb.set_trace()
 
+      # set FillValues to NaN -- reduc functions will not care em then
+      if type(D.variables[varname][:]) is np.ma.core.MaskedArray:
+        valid = lambda x: np.where(x[:].mask==False,x[:].data,np.NaN)
+      else:
+        valid = lambda x: x
+
+      # Save data into coord_files construct -- will later merge these
       if varname not in coord_files[(i,j)].keys(): 
-          coord_files[(i,j)][varname] = D.variables[varname][:maxtime]
+          coord_files[(i,j)][varname] = valid( D.variables[varname][:maxtime] )
 
+      # Save coordinates for variable:
       coord_files[td] = D.variables[ td ][:maxtime]
 
       try:
@@ -409,17 +432,24 @@ def append_var(basename,varname,reduc_func=np.mean):
 
       D.close()
 
+      #print 'shape single variable',np.shape(coord_files[(i,j)][varname])
+
+    #print 'shape single variable',np.shape( [ coord_files[(i,j)][varname] for j in np.arange(nr_y) ])
+
     # append individual arrays in y dimension
     if l3d or l4d: coord_files['concat_{0:}'.format(i)] = reduc_func  ( [ coord_files[(i,j)].pop(varname) for j in np.arange(nr_y) ], axis=1 )
     if l2d or l1d: coord_files['concat_{0:}'.format(i)] = reduc_func  ( [ coord_files[(i,j)].pop(varname) for j in np.arange(nr_y) ], axis=0 )
+
+    #print 'shape yval', np.shape(coord_files['concat_{0:}'.format(i)])
 
   # append individual arrays in x dimension
   if l3d or l4d: var = reduc_func ( [ coord_files.pop('concat_{0:}'.format(i)) for i in np.arange(nr_x) ], axis=2)
   if l2d or l1d: var = reduc_func ( [ coord_files.pop('concat_{0:}'.format(i)) for i in np.arange(nr_x) ], axis=0)
 
+  #print 'shape xval', np.shape(var)
+
   # append coordinate arrays for x and y axis
   if 'yd' in locals(): 
-#    import ipdb;ipdb.set_trace()
     coord_files[yd] = np.concatenate( [ coord_files.pop('{0:}.{1:}'.format(yd,j)) for j in np.arange(nr_y) ], axis=1 ) 
   if 'xd' in locals(): 
     coord_files[xd] = np.concatenate( [ coord_files.pop('{0:}.{1:}'.format(xd,i)) for i in np.arange(nr_x) ], axis=2 ) 
@@ -437,7 +467,6 @@ def append_var(basename,varname,reduc_func=np.mean):
     data = var
     dims = [ [td,coord_files[td]], ]
 
-
   write_nc(basename,varname, data, dims, attributes=attributes)
 #--------------------------------------------------------------------------------------------------------------------------------
 
@@ -454,7 +483,6 @@ vars=[]
 D = Dataset( files[0], 'r' )
 for v in D.variables:
     print 'Found Variable:',v.__str__()
-    # if len(D.variables[v].dimensions)>=idim: 
     vars.append( v.__str__() )
 D.close()
 
