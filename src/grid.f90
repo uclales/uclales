@@ -843,7 +843,9 @@ contains
           real :: hist_a_ustar (size(a_ustar,1)/2+2, size(a_ustar,2)/2+2 )
           real :: hist_a_tstar (size(a_tstar,1)/2+2, size(a_tstar,2)/2+2 )
           real :: hist_a_rstar (size(a_rstar,1)/2+2, size(a_rstar,2)/2+2 )
+          real :: hist_rev_acc (size(rev_acc,1)/2+2, size(rev_acc,2)/2+2 )
           real :: hist_a_pexnr (size(a_pexnr,1), size(a_pexnr,2)/2+2, size(a_pexnr,3)/2+2 )
+          real :: hist_prc_acc (size(prc_acc,1)/2+2, size(prc_acc,2)/2+2, size(prc_acc,3) )
           real,allocatable :: hist_a_sp (:,:,:)  ! (size(a_sp   ,1), size(a_sp   ,2)/2+2, size(a_sp   ,3)/2+2 )
 
           read ( 10) hist_xt  ,&! ( lbound( hist_xt   ,1):ubound ( hist_xt  ,1):c),&
@@ -909,9 +911,14 @@ contains
             read (10)
           end do
           if(level>=3) then
-            stop 'history coarsening for level>=3 not supported'
-            read(10) prc_acc, rev_acc
+            read(10) hist_prc_acc, hist_rev_acc
+
+            do k=lbound(prc_acc,3),ubound(prc_acc,3)
+              call remap2d(hist_prc_acc(:,:,k), prc_acc(:,:,k))
+            enddo
+            call remap2d(hist_rev_acc, rev_acc)
           end if
+
           if(lwaterbudget) then
             stop 'history coarsening for lwaterbudget not supported'
             read(10) cnd_acc, cev_acc
