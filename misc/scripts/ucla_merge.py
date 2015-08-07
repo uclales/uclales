@@ -306,7 +306,22 @@ reduc_functions={
         'lwdca'   : np.nanmean,
         'swuca'   : np.nanmean,
         'swdca'   : np.nanmean,
+
+
         },
+
+        3: { # 3d variables
+        # .2d. variables:
+        'shf'     : np.concatenate,
+        'lhf'     : np.concatenate,
+        'ustars'  : np.concatenate,
+        'a_tskin' : np.concatenate,
+        'a_qskin' : np.concatenate,
+        'a_Qnet'  : np.concatenate,
+        'a_Qnet'  : np.concatenate,
+        'a_G0'    : np.concatenate,
+        },
+        
 
         4: { # 4d variables
         # .3d. variables:
@@ -324,6 +339,9 @@ reduc_functions={
         'rflx'  : np.concatenate,
         'lflxu' : np.concatenate,
         'lflxd' : np.concatenate,
+
+        'tsoil' : np.concatenate,
+        'phiw'  : np.concatenate,
         },
         
         }
