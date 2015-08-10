@@ -49,13 +49,12 @@ contains
     use defs, only: vonk, p00, rcp, g, cp, alvl, ep2
     use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, zt, psrf,   &
          th00, umean, vmean, dn0, level, a_ustar, a_tstar, a_rstar,        &
-         uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, nstep, a_tskin, a_qskin,  &
-         isfctyp, a_phiw, a_tsoil, a_Wl, obl
+         uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, a_tskin, a_qskin,  &
+         isfctyp, obl
     use thrm, only: rslf
     use stat, only: sfc_stat, sflg
     use util, only : get_avg3
     use mpi_interface, only : nypg, nxpg, double_array_par_sum
-    use mpi_interface, only: myid
 
     implicit none
 
@@ -444,7 +443,7 @@ contains
     c1    = 3.14159/2. - 3.*log(2.)
 
     ustar =  wnd*klnz
-    if (bflx /= 0.0) then
+    if (bflx /= 0) then
        do iterate=1,4
           lmo   = -(ustar**3)/(bflx*vonk + eps)
           zeta  = z/lmo
@@ -484,7 +483,7 @@ contains
   subroutine srfcscls(n2,n3,z,z0,th00,u,dth,ustar,tstar,obl,drt,rstar)
 
     use defs, only : vonk, g, ep2
-    use grid ,only: nstep, runtype, level, a_theta, vapor
+    use grid ,only: runtype, level
     use mpi_interface, only : myid
 
     implicit none
@@ -513,10 +512,10 @@ contains
     real, intent(inout), optional :: rstar(n2,n3)  ! scale value of qt
 
     logical, save :: first_call=.True.
-    integer       :: i,j,iterate,iter
+    integer       :: i,j,iter
     real          :: lnz, klnz, betg
     real          :: zeta, lmo, dtv
-    real          :: thv,Rib,Lstart,Lend,Lold,fx,fxdif,Ldif,zeff
+    real          :: Lold,Ldif,zeff
     logical       :: exititer
 
     lnz   = log(z/z0)
@@ -534,7 +533,7 @@ contains
           !
           ! Neutral case
           ! 
-          if (dtv == 0.) then
+          if (dtv == 0) then
             ustar(i,j) =  vonk*u(i,j)/lnz
             tstar(i,j) =  vonk*dtv/(pr*lnz)
             lmo        = -1.e10
@@ -655,7 +654,7 @@ contains
   !
   subroutine getobl
     use defs, only: g,ep2
-    use grid, only: nzp,nxp,nyp,a_up,a_vp,a_theta,umean,vmean,vapor,zt,u0,v0,obl
+    use grid, only: nxp,nyp,umean,vmean,zt,obl
     implicit none
 
     integer        :: i,j,iter
@@ -840,12 +839,11 @@ contains
   subroutine lsm
 
     use defs, only: p00, stefan, rcp, cp, R, alvl, rowt, g
-    use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, liquid, zt, &
-                    psrf, th00, umean, vmean, dn0, iradtyp, dt, &
-                    a_lflxu, a_lflxd, a_sflxu, a_sflxd, nstep, press, &
+    use grid, only: nxp, nyp, a_theta, vapor, zt, &
+                    psrf, dn0, iradtyp, dt, &
+                    a_lflxu, a_lflxd, a_sflxu, a_sflxd, nstep, &
                     a_lflxu_avn, a_lflxd_avn, a_sflxu_avn, a_sflxd_avn, &
-                    a_tsoil, a_phiw, a_tskin, a_Wl, a_qskin, a_Qnet, a_G0
-    use mpi_interface, only: myid
+                    a_tsoil, a_phiw, a_tskin, a_Wl, a_Qnet, a_G0
 
     integer  :: i, j, k
     real     :: f1, f2, f3, f4, fsoil !Correction functions for Jarvis-Stewart
@@ -1005,7 +1003,7 @@ contains
         Bcoef   = 4. * stefan * (tskinm(i,j)* exner) ** 3. + fH &
                   + fLE * dqsatdT + lambdaskin(i,j)
 
-        if (Cskin(i,j) == 0.) then
+        if (abs(Cskin(i,j)) .le. epsilon(Cskin) ) then
           a_tskin(i,j) = Acoef * Bcoef ** (-1.) / exner
         else
           a_tskin(i,j) = (1. + rk3coef/Cskin(i,j) * Bcoef) ** (-1.) / exner * ((tskinm(i,j)*exner) + rk3coef/Cskin(i,j) * Acoef) 
@@ -1024,7 +1022,7 @@ contains
         LEsoil    = - fLEsoil * ( vapor(2,i,j) - qskinn)
         LEliq     = - fLEliq  * ( vapor(2,i,j) - qskinn)
 
-        if(LE(i,j) == 0.) then
+        if(LE(i,j) == 0) then
           rsurf(i,j) = 1.e8           ! "WHY???
         else
           rsurf(i,j) = -0.5*(dn0(1)+dn0(2)) * alvl * (vapor(2,i,j) - qskinn) &
@@ -1110,21 +1108,20 @@ contains
   !
   subroutine lsm_ocean
 
-    use defs, only: p00, stefan, rcp, cp, R, alvl, rowt, g
-    use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, liquid, zt, &
-                    psrf, th00, umean, vmean, dn0, iradtyp, dt, &
-                    a_lflxu, a_lflxd, a_sflxu, a_sflxd, nstep, press, &
+    use defs, only: p00, stefan, rcp, cp, R, alvl, g
+    use grid, only: nxp, nyp, a_theta, vapor, zt, &
+                    psrf, dn0, iradtyp, dt, &
+                    a_lflxu, a_lflxd, a_sflxu, a_sflxd, nstep, &
                     a_lflxu_avn, a_lflxd_avn, a_sflxu_avn, a_sflxd_avn, &
-                    a_tsoil, a_phiw, a_tskin, a_Wl, a_qskin, a_Qnet, a_G0
-    use mpi_interface, only: myid
+                    a_tsoil, a_phiw, a_tskin, a_Wl, a_Qnet
 
-    integer  :: i, j, k
-    real     :: f1, f2, f3, f4, fsoil !Correction functions for Jarvis-Stewart
+    integer  :: i, j
+    real     :: f1, f2, f3, f4 !Correction functions for Jarvis-Stewart
     real     :: lflxu_av, lflxd_av, sflxu_av, sflxd_av
     real     :: tsurfm, Tatm, qskinn, exnerair, exner, pair, thetaavg
-    real     :: e, esat, qsat, desatdT, dqsatdT, Acoef, Bcoef
-    real     :: fH, fLE, fLEveg, fLEsoil, fLEliq, LEveg, LEsoil, LEliq
-    real     :: Wlmx, rk3coef=0
+    real     :: esat, qsat, desatdT, dqsatdT, Acoef, Bcoef
+    real     :: fH, fLE
+    real     :: rk3coef=0
 
 
     thetaavg  = sum(a_theta(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
@@ -1240,7 +1237,7 @@ contains
         Bcoef   = 4. * stefan * (tskinm(i,j)* exner) ** 3. + fH &
                   + fLE * dqsatdT
 
-        if (Cskin(i,j) == 0.) then
+        if (abs(Cskin(i,j)) .le. epsilon(Cskin) ) then
           a_tskin(i,j) = Acoef * Bcoef ** (-1.) / exner
         else
           a_tskin(i,j) = (1. + rk3coef/Cskin(i,j) * Bcoef) ** (-1.) / exner &
