@@ -42,6 +42,7 @@ contains
   !   isfctyp=3: bulk aerodynamic law with coefficients (drtcon, dthcon)
   !   isfctyp=4: regulate surface temperature to yield a constant surface buoyancy flux
   !   isfctyp=5: surface temperature and humidity determined using LSM (van Heerwaarden)
+  !   isfctyp=6: surface temperature and humidity determined using stripped LSM (Cathy Hohenegger), mimic ocean
   !
   subroutine surface(sst,time_in)
 
@@ -235,7 +236,7 @@ contains
     ! ----------------------------------------------------------------------
     ! Malte: Get surface fluxes using a land surface model (van Heerwarden)
     !
-    case(5)
+    case(5:6)
        !Initialize Land Surface 
        if (init_lsm) then
           call initlsm(sst,time_in)
@@ -261,8 +262,12 @@ contains
        ! a) Calculate Monin Obuhkov Length from surface scalars
        do j=3,nyp-2
          do i=3,nxp-2
-           dtdz(i,j) = thetaav(i,j) - tskinav(i,j)
-           drdz(i,j) = vaporav(i,j) - qskinav(i,j)
+           if(isfctyp.eq.6) then
+             sst          = tskinav(i,j)*(psrf/p00)**(rcp)
+             qskinav(i,j) = rslf(psrf,sst)
+           endif
+           dtdz(i,j)    = thetaav(i,j) - tskinav(i,j)
+           drdz(i,j)    = vaporav(i,j) - qskinav(i,j)
          end do
        end do
 
@@ -283,8 +288,13 @@ contains
          end do
        end do
 
-       !Get skin temperature and humidity from land surface model (van Heerwaarden)
-       call lsm
+       if(isfctyp.eq.5) then
+         !Get skin temperature and humidity from land surface model (van Heerwaarden)
+         call lsm
+       else if(isfctyp.eq.6) then
+         ! Use stripped down srfc model to mimic ocean
+         call lsm_ocean
+       endif
 
        !Update tskin and qskin (local or filtered) for flux calculation
        if (local) then
@@ -1092,6 +1102,191 @@ contains
 
 
   end subroutine lsm
+
+  !
+  ! ----------------------------------------------------------
+  ! Stripped down LSM  to mimic saturated ocean -- neglecting vegetation or land effects
+  ! Changes from Cathy Hohenegger(personal communication) -- todo: CH check if all changes make sense
+  !
+  subroutine lsm_ocean
+
+    use defs, only: p00, stefan, rcp, cp, R, alvl, rowt, g
+    use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, liquid, zt, &
+                    psrf, th00, umean, vmean, dn0, iradtyp, dt, &
+                    a_lflxu, a_lflxd, a_sflxu, a_sflxd, nstep, press, &
+                    a_lflxu_avn, a_lflxd_avn, a_sflxu_avn, a_sflxd_avn, &
+                    a_tsoil, a_phiw, a_tskin, a_Wl, a_qskin, a_Qnet, a_G0
+    use mpi_interface, only: myid
+
+    integer  :: i, j, k
+    real     :: f1, f2, f3, f4, fsoil !Correction functions for Jarvis-Stewart
+    real     :: lflxu_av, lflxd_av, sflxu_av, sflxd_av
+    real     :: tsurfm, Tatm, qskinn, exnerair, exner, pair, thetaavg
+    real     :: e, esat, qsat, desatdT, dqsatdT, Acoef, Bcoef
+    real     :: fH, fLE, fLEveg, fLEsoil, fLEliq, LEveg, LEsoil, LEliq
+    real     :: Wlmx, rk3coef=0
+
+
+    thetaavg  = sum(a_theta(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
+    pair      = psrf*exp(-1.*g*(zt(2)-zt(1))/2/R/thetaavg)
+    exner     = (psrf/p00)**rcp
+    exnerair  = (pair/p00)**rcp   
+  
+    ! CH Caution !!!!! todo: what is the reason for this?
+    exnerair  = (psrf/p00)**rcp
+
+
+    !"1.0 - Compute water content per layer
+    phitot  = 0
+    phifrac = 0
+
+    do j = 3, nyp-2
+      do i = 3, nxp-2
+
+        !" 1.1 - Calculate net radiation (average over nradtime)
+        if(iradtyp .ge. 4) then
+          if(nstep == 1) then
+
+            a_sflxd_avn(2:nradtime,i,j) = a_sflxd_avn(1:nradtime-1,i,j)
+            a_sflxu_avn(2:nradtime,i,j) = a_sflxu_avn(1:nradtime-1,i,j)
+            a_lflxd_avn(2:nradtime,i,j) = a_lflxd_avn(1:nradtime-1,i,j)
+            a_lflxu_avn(2:nradtime,i,j) = a_lflxu_avn(1:nradtime-1,i,j)
+
+            a_sflxd_avn(1,i,j) = a_sflxd(2,i,j)
+            a_sflxu_avn(1,i,j) = a_sflxu(2,i,j)
+            a_lflxd_avn(1,i,j) = a_lflxd(2,i,j)
+            a_lflxu_avn(1,i,j) = a_lflxu(2,i,j)
+
+          end if
+
+          !Surface radiation averaged over nradtime but depends on location
+          sflxd_av = sum(a_sflxd_avn(:,i,j))/nradtime
+          sflxu_av = sum(a_sflxu_avn(:,i,j))/nradtime
+          lflxd_av = sum(a_lflxd_avn(:,i,j))/nradtime
+          lflxu_av = sum(a_lflxu_avn(:,i,j))/nradtime
+
+          !Surface radiation averaged over domain per timestep
+          !sflxd_av = sum(a_sflxd(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+          !sflxu_av = sum(a_sflxu(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+          !lflxd_av = sum(a_lflxd(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+          !lflxu_av = sum(a_lflxu(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+
+          Qnetn(i,j) = (sflxd_av - sflxu_av + lflxd_av - lflxu_av)
+
+          !Switch between homogeneous and heterogeneous net radiation
+          !a_Qnet(:,:) = sum(Qnetm(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+          a_Qnet(i,j) = Qnetn(i,j)
+
+        else
+          !" Not using full radiation: use average radiation from Namelist
+          a_Qnet(i,j) = Qnetav
+        end if
+
+        !" 2.1 - Calculate the surface resistance with vegetation
+
+        !" a) Stomatal opening as a function of incoming short wave radiation
+        f1 = 1
+
+        !" b) Soil moisture availability
+        f2 = 1
+
+        !" c) Response of stomata to vapor deficit of atmosphere
+        Tatm    = a_theta(2,i,j)*exnerair
+        esat = 0.611e3 * exp(17.2694 * (Tatm - 273.16) / (Tatm - 35.86))
+        f3   = 1 
+
+        !" d) Response to temperature
+        f4   = 1
+        rsveg(i,j)  = 0
+
+        !" 2.2 - Calculate soil resistance based on ECMWF method
+        rssoil(i,j) = 0
+
+        !" 2.3 - Calculate the heat transport properties of the soil.
+        !" Put in init function, as we don't have prognostic soil moisture atm.
+
+        !"Save temperature and liquid water from previous timestep 
+        if (nstep == 1) then
+          tskinm(i,j) = a_tskin(i,j)
+          Wlm(i,j)    = a_Wl(i,j)
+        end if
+
+        !"Solve the surface temperature implicitly including variations in LWout
+        tsurfm  = tskinm(i,j) * exner
+        esat    = 0.611e3 * exp(17.2694 * (tsurfm-273.16) / (tsurfm-35.86))
+        qsat    = 0.622 * esat / psrf
+        desatdT = esat * (17.2694 / (tsurfm-35.86) - 17.2694 *  &
+                  (tsurfm-273.16) / (tsurfm-35.86)**2.)
+        dqsatdT = 0.622 * desatdT / psrf
+
+        !" Remove LWup from Qnet calculation (if running without radiation)
+        a_Qnet(i,j) = a_Qnet(i,j) + stefan * (tskinm(i,j)*exner)**4.
+
+!        Wlmx      = LAI(i,j) * Wmax
+        a_Wl(i,j) = 0
+        cliq(i,j) = 0
+
+        !" Calculate coefficients for surface fluxes
+        fH      = 0.5*(dn0(1)+dn0(2)) * cp / ra(i,j) 
+        fLE     = 0.5*(dn0(1)+dn0(2)) * alvl / ra(i,j)
+
+        !" Weighted timestep in runge-kutta scheme
+        rk3coef = dt / (4 - float(nstep))
+
+        !" Compute skin temperature from linarized surface energy balance
+        Acoef   = a_Qnet(i,j) - stefan * (tskinm(i,j)*exner) **4. &
+                  + 4. * stefan * (tskinm(i,j)*exner)**4. + fH*Tatm &
+                  + fLE * (dqsatdT* (tskinm(i,j)*exner) - qsat + vapor(2,i,j))
+        Bcoef   = 4. * stefan * (tskinm(i,j)* exner) ** 3. + fH &
+                  + fLE * dqsatdT
+
+        if (Cskin(i,j) == 0.) then
+          a_tskin(i,j) = Acoef * Bcoef ** (-1.) / exner
+        else
+          a_tskin(i,j) = (1. + rk3coef/Cskin(i,j) * Bcoef) ** (-1.) / exner &
+                       * ((tskinm(i,j)*exner) + rk3coef/Cskin(i,j) * Acoef) 
+        end if
+
+        a_Qnet(i,j) = a_Qnet(i,j) - (stefan* (tskinm(i,j)*exner)**4.  &
+                    + 4.*stefan * (tskinm(i,j)*exner)**3. *(a_tskin(i,j)*exner - &
+                    tskinm(i,j)*exner))
+
+        qskinn    = (dqsatdT * (a_tskin(i,j)*exner - tskinm(i,j)*exner) + qsat)
+
+        LE(i,j)   = - fLE     * ( vapor(2,i,j) - qskinn)
+
+        rsurf(i,j) = 0
+
+        H(i,j)    = - fH  * ( a_theta(2,i,j)*exner - a_tskin(i,j)*exner )
+        tndskin(i,j) = Cskin(i,j)*(a_tskin(i,j) - tskinm(i,j)) * exner / rk3coef
+
+        !" Save temperature and liquid water from previous timestep 
+        if(nstep == 1) then
+          tsoilm(:,i,j) = a_tsoil(:,i,j)
+          phiwm(:,i,j)  = a_phiw(:,i,j)
+        end if
+
+        !" Calculate soil heat capacity and conductivity(based on water content)
+        lambda   (:,i,j) = 0
+        lambdah  (:,i,j) = 0
+        gammas   (:,i,j) = 0
+        lambdas  (:,i,j) = 0
+        lambdash (:,i,j) = 0
+
+
+        !" Solve the diffusion equation for the heat transport
+        a_tsoil(:,i,j) = 0
+
+        !" Solve the diffusion equation for the moisture transport (closed bottom for now)
+        a_phiw(:,i,j) = 0
+
+      end do
+    end do
+     
+    call qtsurf
+
+
+  end subroutine lsm_ocean
 
 end module srfc
 

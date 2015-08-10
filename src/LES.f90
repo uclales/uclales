@@ -202,8 +202,8 @@ contains
           call appl_abort(0)
        endif
 
-       if(isfctyp == 5 .and. level == 0) then 
-          if (myid == 0) print *, ' Land surface scheme (isfctyp=5) without moisture (level=0) not supported'
+       if( ((isfctyp.eq.5).or.(isfctyp.eq.6)) .and. level == 0) then 
+          if (myid == 0) print *, ' Land surface scheme (isfctyp=5 or 6) without moisture (level=0) not supported'
           call appl_abort(0)
        endif
 

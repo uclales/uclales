@@ -239,7 +239,7 @@ contains
     if (level >=2) call ts_lvl2(nzp, nxp, nyp, a_rp, a_scr2, zt)
 
     ! BvS: only when LSM initialized
-    if ((isfctyp == 5) .and. (init_lsm .eqv. .false.)) then
+    if (((isfctyp.eq.5).or.(isfctyp.eq.6)) .and. (init_lsm .eqv. .false.)) then
       call accum_lsm(nxp,nyp,a_Qnet,a_G0,tndskin,ra,rsurf,rsveg,rssoil,a_tskin,a_qskin,obl,cliq,a_Wl,Cskinav)
     end if
 
@@ -1612,7 +1612,7 @@ contains
   !
   !---------------------------------------------------------------------
   ! SUBROUTINE ACCUM_LSM: Accumulates timeseries statistics
-  ! for land surface variables (if isfctyp=5)
+  ! for land surface variables (if isfctyp=5/6)
   !
   subroutine accum_lsm(nxp, nyp, a_Qnet, a_G0, tndskin, ra, rsurf, rsveg, &
                        rsoil, a_tskin,a_qskin, obl, cliq, a_Wl, Cskinav)

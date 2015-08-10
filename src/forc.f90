@@ -130,7 +130,7 @@ contains
     ! Sw-up/down = f(lat,lon,doy,tUTC,albedo)
     ! Lw-up/down = Boltzman
     case (5)
-      if(isfctyp .ne. 5) then
+      if( (isfctyp.ne.5) .and. (isfctyp.ne.6)) then
         print*,'surface rad only works with interactive land surface'
         stop
       end if
