@@ -284,7 +284,7 @@ contains
     if (level  >= 5) nvar0 = nvar0+4
     if (iradtyp > 1) nvar0 = nvar0+4
     if (iradtyp >= 6) nvar0 = nvar0+2
-    if (isfctyp == 5) nvar0 = nvar0+9
+    if ((isfctyp.eq.5).or.(isfctyp.eq.6)) nvar0 = nvar0+9
     if (lmptend)      nvar0 = nvar0+7
 
     allocate (sanal(nvar0))
@@ -348,7 +348,7 @@ contains
        sanal(nvar0) = sbase(32)
     end if
 
-    if (isfctyp == 5) then
+    if ((isfctyp.eq.5).or.(isfctyp.eq.6)) then
        nvar0 = nvar0+1
        sanal(nvar0)=sbase(33)
        nvar0 = nvar0+1
@@ -543,8 +543,8 @@ contains
       iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
           count=icnt)
     end if
-    !Malte: Land Surface Output for isfctyp=5
-    if (isfctyp == 5) then 
+    !Malte: Land Surface Output for isfctyp=5/6
+    if ((isfctyp.eq.5).or.(isfctyp.eq.6)) then 
        iret = nf90_inq_varid(ncid0, sanal(nn+1), VarID)
        iret = nf90_put_var(ncid0, VarID, wt_sfc(i1:i2,j1:j2)*cp*(dn0(1)+dn0(2))*0.5, &
               start=ibegsfc, count=icntsfc)

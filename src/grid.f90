@@ -78,7 +78,8 @@ module grid
   ! 2D Arrays (surface fluxes)
   !
   real, dimension (:,:), allocatable :: albedo, a_ustar, a_tstar, a_rstar,    &
-       uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, trac_sfc, sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa, sflxu_toa_ca,sflxd_toa_ca,lflxu_toa_ca,lflxd_toa_ca, &
+       uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, trac_sfc,                      &
+       sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa, sflxu_toa_ca,sflxd_toa_ca,lflxu_toa_ca,lflxd_toa_ca, &
        cnd_acc, &  ! accumulated condensation  [kg/m2] (diagnostic for 2D output)
        cev_acc, &  ! accumulated evaporation of cloud water [kg/m2] (diagnostic for 2D output)
        rev_acc, &  ! accumulated evaporation of rainwater   [kg/m2] (diagnostic for 2D output)
@@ -350,7 +351,7 @@ contains
     if (level > 0) allocate(wq_sfc(nxp,nyp),a_rstar(nxp,nyp))
 
     !Malte: allocate Land surface variables for restart
-    if (isfctyp == 5) then
+    if ((isfctyp.eq.5).or.(isfctyp.eq.6)) then
        allocate (a_tsoil(4,nxp,nyp))
        allocate (a_phiw (4,nxp,nyp))
        allocate (a_tskin (nxp,nyp))
@@ -687,7 +688,7 @@ contains
     write(10) a_pexnr
 
     !Malte: Restart land surface
-    if (isfctyp == 5) then
+    if ((isfctyp.eq.5).or.(isfctyp.eq.6)) then
        write(10) a_tsoil
        write(10) a_phiw
        write(10) a_tskin
@@ -771,12 +772,15 @@ contains
           call appl_abort(-1)
        end if
 
-       read (10) xt, xm, yt, ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf
+
+       read (10) xt,xm, yt, ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf
        read (10) a_ustar, a_tstar, a_rstar
        read (10) a_pexnr
 
+       print *,size(a_ustar),size(a_pexnr),size(xt),size(ym)
+
        !Malte: Restart land surface
-       if (isfctyp == 5) then
+       if ((isfctyp.eq.5).or.(isfctyp.eq.6)) then
           read(10) a_tsoil
           read(10) a_phiw
           read(10) a_tskin
