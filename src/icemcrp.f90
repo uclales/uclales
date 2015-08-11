@@ -40,13 +40,14 @@ module mcrp
        a_rhailp, a_rhailt,  & ! hail mass
        a_nhailp, a_nhailt,  & ! hail number
        prc_c, prc_r, prc_i, prc_s, prc_g, prc_h, & 
-       lwaterbudget, prc_acc, rev_acc, a_rct, cnd_acc, cev_acc, a_cld,prc_lev, lmptend
+       lwaterbudget, prc_acc, rev_acc, a_rct, cnd_acc, cev_acc, a_cld,prc_lev, lmptend, outtend, prect, precr
 
   USE parallele_umgebung, ONLY: isIO,double_global_maxval,global_maxval,global_minval,global_maxval_stdout,global_sumval_stdout
   USE modcross, ONLY: calcintpath
 
   use thrm, only : thermo, fll_tkrs, esl, esi
   use util, only : get_avg3, azero, sclrset
+
   implicit none
 
   logical            :: lpartdrop      = .false.        !< Switch for rain drop like particles
@@ -197,7 +198,6 @@ contains
        debug = .false.
     end if
 
-
     call fll_tkrs(nzp,nxp,nyp,a_theta,a_pexnr,pi0,pi1,a_scr1,rs=a_scr2)
     select case (level)
     case(2)
@@ -320,11 +320,21 @@ contains
     real, dimension(n1,n2,n3), intent (inout),optional :: prc_i, prc_s, prc_g
 
     real, dimension(n1) :: tl,temp,rv,rc,nrain,rrain,nice, nin_active,rice,nsnow,rsnow,ngrp,rgrp,rs,rsi,s_i,r1
+    real :: rk  !rv
+    real, dimension(n1) :: res,res1
+
     integer :: i, j,n
 !as    logical,save  :: firsttime = .true.
     !     real :: dtrk
     !
 !as    if(firsttime) call initmcrp(level,firsttime)
+
+    if(outtend) then !RV
+       if(nstep==1) rk = rkalpha(1)+rkalpha(2)!then 
+       if(nstep==2) rk = rkbeta(2)+rkbeta(3)
+       if(nstep==3) rk = rkalpha(3)
+    end if   !rv
+
     allocate(convice(n1),convliq(n1))
     if(lpartdrop .and. nstep==3) allocate(a_npauto(nzp,nxp,nyp))
     if(lpartdrop .and. nstep==3) a_npauto(:,:,:) = 0.
@@ -483,6 +493,12 @@ contains
           rpt(2:n1,i,j) = max(rpt(2:n1,i,j) +(rrain(2:n1) - rp(2:n1,i,j))/dt,-rp(2:n1,i,j)/dt)
           npt(2:n1,i,j) = max(npt(2:n1,i,j) +(nrain(2:n1) - np(2:n1,i,j))/dt,-np(2:n1,i,j)/dt)
           
+
+	  if(outtend) then !RV
+  	     prect(2:n1,i,j)  = prect(2:n1,i,j) + rk*(tl(2:n1) - thl(2:n1,i,j))
+	     precr(2:n1,i,j)  = precr(2:n1,i,j) + rk*(rv(2:n1) - vapor(2:n1,i,j)) + rk*(rc(2:n1) - rcld(2:n1,i,j))
+          end if   !rv
+
           if (present(rct)) then
 !             rct(2:n1,i,j) = (rc(2:n1) - rcld(2:n1,i,j))/dt
 !             rct(2:n1,i,j) = rtt(2:n1,i,j) +(rc(2:n1) - rcld(2:n1,i,j))/dt
@@ -498,9 +514,18 @@ contains
        end do
     end do
 
+ !   if (sflg .and. outtend) then !RV
+ !      call get_avg3(n1,n2,n3,prect,res)
+ !      call updtst(n1,'tnd',9,res,1) 
+ !      call get_avg3(n1,n2,n3,precr,res1)
+ !      call updtst(n1,'tnd',10,res1,1)
+ !   end if !rv
+
     deallocate(convice,convliq)
     !print *,maxval(s_i),maxloc(s_i)
   end subroutine mcrph
+
+
   real elemental function snownr(mu, t, qsg)
     real, intent(in) :: mu, t, qsg
     real, parameter :: zn0s1 = 7.6275e6, zn0s2 = -0.107, zams = 0.038

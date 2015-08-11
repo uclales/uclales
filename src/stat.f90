@@ -32,7 +32,7 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 68, nvar2 = 128 ! number of time series and profiles
+  integer, parameter :: nvar1 = 68, nvar2 = 130 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2
   real, save         :: fsttm, lsttm
 
@@ -77,7 +77,7 @@ module stat
        'hail   ','qt_th  ','s_1    ','s_2    ','s_3    ','RH     ', & !109
        'lwuca  ','lwdca  ','swuca  ','swdca  ','wtendt ','wtendr ', & !115
        'sgtendt','sgtendr','adtendt','adtendr','turtent','turtenr', & !121
-       'dtdt   ','dqdt   '/)		     			      !127
+       'dtdt   ','dqdt   ','prect  ','precr  '/)		      !127
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:)
@@ -774,7 +774,7 @@ contains
   !
   subroutine accum_lvl3(n1, n2, n3, dn0, zm, rc, rr, nr, rrate, CCN)
 
-    use grid, only : a_pexnr,pi0,pi1
+    use grid, only : a_pexnr,pi0,pi1,prect,precr, outtend
     use defs, only : alvl,cp
 
     integer, intent (in) :: n1,n2,n3
@@ -886,6 +886,13 @@ contains
     ssclr(25) = CCN*1.e-6 ! approximately per cc (but actually #/kg * 10^-6)
     ssclr(26) = nrsum ! Nr in dm^-3 (1/liter)
     ssclr(27) = nrcnt
+
+    if (outtend) then !RV
+      call get_avg3(n1,n2,n3,prect,a1)
+      svctr(:,129)=svctr(:,129)+a1
+      call get_avg3(n1,n2,n3,precr,a1)
+      svctr(:,130)=svctr(:,130)+a1
+    end if !rv
 
   end subroutine accum_lvl3
   !
@@ -1533,6 +1540,10 @@ contains
 	  nn=127   !dtdt
        case(8)
 	  nn=128   !dqdt
+       !case(9)
+!	  nn=129   !prect
+!       case(10)
+!	  nn=130   !precr
        case default
 	  nn = 0
        end select

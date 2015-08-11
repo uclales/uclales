@@ -125,9 +125,11 @@ module grid
 ! linda, e 
 
  !RV: ls tendencies due to subsidence, sgs diff & advection
-  real, dimension (:,:,:), allocatable  :: wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt
-  real  :: w0 = 7.5e-3
-  real  :: Qrate = 2.5/86400. !rv
+  real, dimension (:,:,:), allocatable  :: wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt, precr, prect
+  real,allocatable  :: w0 = 7.5e-3
+  real,allocatable  :: Qrate = 2.5/86400. !
+  character(len=6)  :: radbel = 'FIXED' !rv, use interactive 'INTACT' or prescribed 'FIXED' radiation in bellon routine (iradtyp=3)
+
 
   character(40)      :: zname      = 'zt'
   character(40)      :: zhname     = 'zm'
@@ -450,8 +452,10 @@ contains
        allocate(adtendr(nzp,nxp,nyp))
        allocate(dtdt(nzp,nxp,nyp))
        allocate(dqdt(nzp,nxp,nyp))
+       allocate(precr(nzp,nxp,nyp))
+       allocate(prect(nzp,nxp,nyp))
 
-       memsize = memsize + 8*nxyzp
+       memsize = memsize + 10*nxyzp
 
        wtendt(:,:,:) = 0.            
        wtendr(:,:,:) = 0.
@@ -461,6 +465,8 @@ contains
        adtendr(:,:,:) = 0.
        dtdt(:,:,:) = 0.            
        dqdt(:,:,:) = 0.
+       precr(:,:,:) = 0.            
+       prect(:,:,:) = 0.
     end if !rv
    
 
@@ -742,7 +748,7 @@ contains
 
     !RV: write accumulated tendencies
     if (outtend) then
-       write(10) wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt
+       write(10) wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt, precr, prect
     end if !rv
     close(10)
 
@@ -833,7 +839,7 @@ contains
 
        !RV: read accumulated tendencies
        if (outtend) then
-          read(10) wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt
+          read(10) wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt, precr, prect
        end if !rv
 
        close(10)

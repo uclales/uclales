@@ -391,7 +391,7 @@ contains
   !
   subroutine bellon(n1,n2,n3,flx,sflx,zt,dzi_t,dzi_m,tt,tl,rtt,rt, ut,u,vt,v)
 
-    use grid, only : outtend, wtendt, wtendr, nstep,rkalpha,rkbeta, dt, Qrate, w0 !RV
+    use grid, only : outtend, wtendt, wtendr, nstep,rkalpha,rkbeta, dt, Qrate, w0, radbel !RV
     use util, only : get_avg3
     use stat, only : sflg, updtst  !rv
 
@@ -429,7 +429,7 @@ contains
              wk = w0*(1.-exp(-zt(k)/H))
              grad = Qrate/wk
 	     flx(k,i,j)  = wk*((tl(kp1,i,j)-tl(k,i,j))*dzi_t(k)-grad)
-	     sflx(k,i,j) = wk*((rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)-grad)
+	     !sflx(k,i,j) = wk*((rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)-grad)!wird gar nirgends mehr benutzt...k
              tt(k,i,j) = tt(k,i,j) + flx(k,i,j)
 	     rtt(k,i,j)= rtt(k,i,j) + wk*(rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)
 

@@ -265,7 +265,7 @@ contains
 
     use mpi_interface, only :myid
 
-    integer, parameter :: nnames = 50
+    integer, parameter :: nnames = 52
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,& !1
          'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,& !7 
@@ -275,7 +275,7 @@ contains
          'shf    ','lhf    ','ustars ','a_tskin','a_qskin','tsoil  '   ,& !31
          'phiw   ','a_Qnet ','a_G0   ','mp_tlt ','mp_qt  ','mp_qr  '   ,& !37
          'mp_qi  ','mp_qs  ','mp_qg  ','mp_qh  ','wtendt ','wtendr '  , & !43
-         'turtent','turtenr'/)    !49-50
+         'turtent','turtenr','prect  ','precr  '/)    !49-52
 
 
     real, intent (in) :: time
@@ -290,7 +290,7 @@ contains
     if (iradtyp > 1) nvar0 = nvar0+3
     if (isfctyp == 5) nvar0 = nvar0+9
     if (lmptend)      nvar0 = nvar0+7
-    if (outtend)      nvar0 = nvar0+4
+    if (outtend)      nvar0 = nvar0+6
 
     allocate (sanal(nvar0))
     sanal(1:nbase) = sbase(1:nbase)
@@ -392,6 +392,10 @@ contains
        sanal(nvar0) = sbase(49)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(50)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(51)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(52)
     end if
 
     nbeg = nvar0+1
@@ -626,7 +630,15 @@ contains
          iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
          iret = nf90_put_var(ncid0, VarID, sgtendr(:,i1:i2,j1:j2)+adtendr(:,i1:i2,j1:j2), start=ibeg, &
               count=icnt)
-    end if
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, prect(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, precr(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+   end if
 
 !     if (nn /= nvar0) then
 !        if (myid == 0) print *, 'ABORTING:  Anal write error'
@@ -1607,6 +1619,14 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('dqdt')    
        if (itype==0) ncinfo = 'dqdt'
+       if (itype==1) ncinfo = 'kg/kg/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('prect')    
+       if (itype==0) ncinfo = 'precip tnd of theta_l'
+       if (itype==1) ncinfo = 'K/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('precr')    
+       if (itype==0) ncinfo = 'precip tnd of qt'
        if (itype==1) ncinfo = 'kg/kg/s'
        if (itype==2) ncinfo = 'tttt'
    case default
