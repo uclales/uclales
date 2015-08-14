@@ -335,7 +335,12 @@ module lsmdata
     phitot(:,:)    = phitot(:,:) / zsoil(ksoilmax)
 
     do k = 1, ksoilmax
-      phifrac(k,:,:) = a_phiw(k,:,:) * dzsoil(k) / zsoil(ksoilmax) / phitot(:,:)
+      phifrac(k,:,:) = a_phiw(k,:,:) * dzsoil(k) / zsoil(ksoilmax) 
+      where (phitot.ge. epsilon(phitot) )
+        phifrac(k,:,:) = phifrac(k,:,:) / phitot(:,:)
+      elsewhere
+        phifrac(k,:,:) = 0
+      endwhere
     end do
 
     ! Set root fraction per layer for short grass (not used for now!!!)
