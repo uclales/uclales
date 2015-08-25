@@ -742,6 +742,8 @@ contains
     integer, dimension(:), allocatable :: seed
     logical :: exans
     real :: umx, vmx, thx
+    real :: xtx(size(xt)), xmx(size(xm))
+    real :: ytx(size(yt)), ymx(size(ym))
     !
     ! open input file.
     !
@@ -767,17 +769,36 @@ contains
          return
        endif
 
+       if ((nxpx == 2*nxp) .and. (nypx == 2*nyp))  then
+         print *,'Domain size of history is twice the suspected grid', nxp, nyp, nzp, '::', nxpx, nypx, nzpx
+         print *,'I will assume this is on purpose and use the bigger grid as provided'
+         nxpx=nxp
+         nypx=nyp
+         print *,xt
+         print *,xm
+       end if
+
        if (nxpx /= nxp .or. nypx /= nyp .or. nzpx /= nzp)  then
-          if (myid == 0) print *, nxp, nyp, nzp, nxpx, nypx, nzpx
+         print *,'Domain size of history is different from suspected grid', nxp, nyp, nzp, '::', nxpx, nypx, nzpx
           call appl_abort(-1)
        end if
 
+       read (10) xtx,xmx, ytx, ymx, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf
 
-       read (10) xt,xm, yt, ym, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf
+       if (any(xtx .ne. xt) .or. any(ytx .ne. yt))  then ! TODO Super bad hack, this does not give any credit to model physics!
+         print *,'Is the domain size of history twice the suspected grid?', xt, '::', xtx
+         print *,'I will assume this is on purpose and use the bigger grid as provided'
+         print *,xt
+         print *,xm
+       else
+         xt=xtx
+         xm=xmx
+         yt=ytx
+         ym=ymx
+       end if
+
        read (10) a_ustar, a_tstar, a_rstar
        read (10) a_pexnr
-
-       print *,size(a_ustar),size(a_pexnr),size(xt),size(ym)
 
        !Malte: Restart land surface
        if ((isfctyp.eq.5).or.(isfctyp.eq.6)) then
