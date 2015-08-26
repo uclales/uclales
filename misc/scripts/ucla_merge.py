@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import numpy as np
 from netCDF4 import Dataset
-import h5py as H
+#import h5py as H
 from glob import glob
 import sys
 import os
