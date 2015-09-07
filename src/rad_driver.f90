@@ -232,6 +232,7 @@ module radiation
   ! allows us to recompute the same background matching after a history start
   !
   subroutine setup(background,n1,npts,nv1,nv,zp,pi0)
+    use mpi_interface, only: myid
 
     character (len=10), intent (in) :: background
     integer, intent (in) :: n1
@@ -245,7 +246,7 @@ module radiation
     real    :: pa, pb, ptop, ptest, test, dp1, dp2, dp3, Tsurf, pp2
 
     open ( unit = 08, file = background, status = 'old' )
-    print *, 'Reading Background Sounding: ',background
+    if(myid.eq.0) print *, 'Reading Background Sounding: ',background
     read (08,*) Tsurf, ns
     allocate ( sp(ns), st(ns), sh(ns), so(ns), sl(ns))
     do k=1,ns
