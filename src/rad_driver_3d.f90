@@ -984,6 +984,8 @@ contains
       integer(iintegers) :: k
       real(ireals)       :: theta0,incSolar
 
+      real :: max_g = .99999
+
       nxp=in_nxp;nyp=in_nyp;nv=in_nv
       dx=in_dx;dy=in_dy;phi0=in_phi0;u0=in_u0;albedo=in_albedo
       if(ldebug.and.myid.eq.0) print *,'Tenstrwrapper lsol',lsolar,'nx/y',nxp,nyp,nv,'uid',solution_uid,solution_time,' shapes::',shape(dz),shape(fdn),shape(fup),shape(fdiv)
@@ -1004,7 +1006,7 @@ contains
         deltaz = dz
         kabs   = max(epsilon(tau), tau * (one - w0) / dz )
         ksca   = max(epsilon(tau), tau *        w0  / dz )
-        g      = min( one, pf (:,1,:,:)/3._ireals ) !todo: optprop used with ice microphysics gives g>1 -- we should fix the issue instead of constraining the value!
+        g      = min( max_g, pf (:,1,:,:)/3._ireals ) !todo: optprop used with ice microphysics gives g>1 -- we should fix the issue instead of constraining the value!
 
         if(.not. lsolar) then
           if(.not.allocated(planck) ) allocate(planck(nv+1, 3:nxp-2,3:nyp-2))
@@ -1032,9 +1034,9 @@ contains
 
         call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxpa, nyproc=nypa,  dz3d=dz)
         if(lsolar) then
-          call set_optical_properties( max(epsilon(tau), tau * (one - w0) / dz ), max(epsilon(tau), tau *       w0  / dz ), min(one, pf (:,1,:,:)/3._ireals) )
+          call set_optical_properties( max(epsilon(tau), tau * (one - w0) / dz ), max(epsilon(tau), tau *       w0  / dz ), min(max_g, pf (:,1,:,:)/3._ireals) )
         else
-          call set_optical_properties( max(epsilon(tau), tau * (one - w0) / dz ), max(epsilon(tau), tau *       w0  / dz ), min(one, pf (:,1,:,:)/3._ireals), bf )
+          call set_optical_properties( max(epsilon(tau), tau * (one - w0) / dz ), max(epsilon(tau), tau *       w0  / dz ), min(max_g, pf (:,1,:,:)/3._ireals), bf )
         endif
 
         call solve_tenstream(incSolar,solution_uid,solution_time)
