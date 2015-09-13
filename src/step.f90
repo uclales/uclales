@@ -1,4 +1,4 @@
-!----------------------------------------------------------------------------
+!_----------------------------------------------------------------------------
 ! This file is part of UCLALES.
 !
 ! UCLALES is free software; you can redistribute it and/or modify
@@ -61,6 +61,8 @@ contains
     use stat, only : savg_intvl, ssam_intvl, write_ps, close_stat
     use thrm, only : thermo
 
+    use lset, only : ls_checkcons
+
     real, parameter    :: peak_cfl = 0.5
 
     real    :: t1,t2,tplsdt,begtime,cflmax,gcflmax
@@ -86,7 +88,6 @@ contains
        tplsdt = time + dt + 0.1*dt
        statflg = (min(mod(tplsdt,ssam_intvl),mod(tplsdt,savg_intvl)) < dt  &
             .or. tplsdt >= timmax .or. tplsdt < 2.*dt) 
-
        call t_step
        time  = time + dt
 
@@ -94,6 +95,7 @@ contains
        call double_scalar_par_max(cflmax,gcflmax)
        cflmax = gcflmax
        dt = min(dtlong,dt*peak_cfl/(cflmax+epsilon(1.)))
+       !dt = dt*10e-3
        !
        ! output control
        !
@@ -147,6 +149,7 @@ contains
               istp, time, t2-t1
        endif
 
+!       if (istp==1) stop
     enddo
 
     call write_hist(1, time)
@@ -163,7 +166,11 @@ contains
   subroutine t_step
 
     use grid, only : level, dt, nstep, a_tt, a_up, a_vp, a_wp, dxi, dyi, dzi_t, &
-         nxp, nyp, nzp, dn0,a_scr1, u0, v0, a_ut, a_vt, a_wt, zt
+         nxp, nyp, nzp, dn0,a_scr1, u0, v0, a_ut, a_vt, a_wt, zt,               &
+         levset, a_rp, a_phi, a_alpha, a_beta, ls_cellkind, q0, q1, lstep, &!eckhard: needed for level set method
+         dzi_m, qscr, euler                                                 !eckhard: needed for level set method
+    use lset, only : ls_ghost,ls_advance,ls_finalize,ls_checkcons,ls_checkcells, &
+         ls_nonconservative_fix
     use stat, only : sflg, statistics
     use sgsm, only : diffuse
     !irina
@@ -178,13 +185,21 @@ contains
     use lsvar, only : varlscale
     use util, only : velset,get_avg
 
-    integer :: k
+    integer :: k, rksteps 
     real :: xtime
     character (len=11)    :: fname = 'debugXX.dat'
 
     xtime = time/86400. + strtim
 
-    do nstep = 1,3
+    if (euler==1) then
+       rksteps=1
+    else
+       rksteps=3
+    end if
+    ! eckhard: loops through nsteps 1 to 3 for euler=0, does only 3rd step if
+    ! euler=1. This makes sure statistics are collected when using the Euler
+    ! method, which is done in the third RK step.
+    do nstep = 4 - rksteps, 3
 
        ! Add additional criteria to ensure that some profile statistics that are  
        ! updated every 'ssam_intvl' outside the main statistics module
@@ -196,31 +211,32 @@ contains
 
        call tendencies(nstep)
        call thermo(level)
-!irina : should I called only at nstep=3 ?
+
        if (lsvarflg) then
-      ! print *, 'step', lsvarflg
-       call varlscale(time,case_name,sst,div,u0,v0)
+          call varlscale(time,case_name,sst,div,u0,v0)
        end if
        call surface(sst)      
-!       
+       
+       call ls_advance(time)
+
+       call ls_ghost
        call diffuse
        call fadvect
        call ladvect
        if (level >= 1) then
           call thermo(level)
-!irina   
-        ! print *, 'sst bef forcing',sst     
-         !print *, "tt",a_tt(:,5,5)
           call forcings(xtime,cntlat,sst,div,case_name)
-         !print *, "tt",a_tt(:,5,5)
           call micro(level)
        end if
        call corlos 
        call buoyancy
        call sponge
        call update (nstep)
+       call ls_nonconservative_fix
        call poisson 
        call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
+
+       call ls_finalize
 
     end do
  
@@ -238,7 +254,8 @@ contains
   subroutine tendencies(nstep)
 
     use grid, only : a_ut, a_vt, a_wt, a_tt, a_rt, a_rpt, a_npt, a_xt1,  &
-         a_xt2, nscl, nxyzp, level
+         a_xt2, a_phit1, a_phit2, nscl, nxyzp, nxp, nyp, nzp, level,     &
+         levset
     use util, only : azero
 
     integer, intent (in) :: nstep
@@ -256,6 +273,9 @@ contains
           a_rpt =>a_xt1(:,:,:,6)
           a_npt =>a_xt1(:,:,:,7)
        end if
+       if (levset >= 1) then
+          call azero(nxyzp,a_phit1)
+       end if
     case(2)
        call azero(nxyzp*nscl,a_xt2)
        a_ut => a_xt2(:,:,:,1)
@@ -267,6 +287,9 @@ contains
           a_rpt =>a_xt2(:,:,:,6)
           a_npt =>a_xt2(:,:,:,7)
        end if
+       if (levset >= 1) then
+          call azero(nxyzp,a_phit2)
+       end if
     end select
 
   end subroutine tendencies
@@ -277,14 +300,20 @@ contains
   subroutine update(nstep)
 
     use grid, only : a_xp, a_xt1, a_xt2, a_up, a_vp, a_wp, a_sp, dzi_t, dt,  &
-         nscl, nxp, nyp, nzp, newvar,level,rkalpha,rkbeta
-    use util, only : sclrset,velset
+         nscl, nxp, nyp, nzp, newvar,level,rkalpha,rkbeta,                   &
+         a_phi, a_phit1, a_phit2, levset, a_alpha, a_beta , lstep, &
+         ls_cellkind, euler
+    use util, only : sclrset,velset,phiset
 
     integer, intent (in) :: nstep
 
     integer :: n
-
-    a_xp = a_xp + dt *(rkalpha(nstep)*a_xt1 + rkbeta(nstep)*a_xt2)
+    
+    if (euler==1) then
+        a_xp = a_xp + dt *a_xt1
+    else
+        a_xp = a_xp + dt *(rkalpha(nstep)*a_xt1 + rkbeta(nstep)*a_xt2)
+    end if
 
     call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
 
@@ -293,7 +322,14 @@ contains
        call sclrset('mixd',nzp,nxp,nyp,a_sp,dzi_t)
     end do
 
-
+    if (levset >= 1) then
+        if (euler==1) then
+            a_phi = a_phi + dt*a_phit1
+        else
+            a_phi = a_phi + dt *(rkalpha(nstep)*a_phit1 + rkbeta(nstep)*a_phit2)
+        end if
+        call phiset(nzp,nxp,nyp,a_phi,dzi_t) 
+    end if
 
   end subroutine update
   ! 
@@ -361,14 +397,18 @@ contains
   subroutine boyanc(n1,n2,n3,level,wt,th,rt,rv,th00,scr)
 
     use defs, only: g, ep2
+    use grid, only: a_rp, ls_q0p, ls_q1p, a_alpha, ls_buoy, levset
+    use lset, only: bfunc
 
     integer, intent(in) :: n1,n2,n3,level
     real, intent(in)    :: th00,th(n1,n2,n3),rt(n1,n2,n3),rv(n1,n2,n3)
     real, intent(inout) :: wt(n1,n2,n3)
     real, intent(out)   :: scr(n1,n2,n3)
 
-    integer :: k, i, j
+    integer :: k, i, j, prescribed
     real :: gover2
+
+    prescribed = 0
 
     gover2  = 0.5*g
  
@@ -384,7 +424,22 @@ contains
                 scr(k,i,j)=gover2*(th(k,i,j)/th00-1.)
              end do
           end if
-          
+          if ((prescribed==1).and.(levset>=1)) then !overwrite buoyancy
+             do k=1,n1
+                scr(k,i,j) = 0.5*(     a_alpha(k,i,j)  * bfunc(ls_q1p(k,i,j)) &
+                                 + (1.-a_alpha(k,i,j)) * bfunc(ls_q0p(k,i,j)) )
+                ls_buoy(k,i,j) = 2.*scr(k,i,j)
+             end do
+          end if
+          if ((prescribed==1).and.(levset==-1)) then !overwrite buoyancy
+             do k=1,n1
+                scr(k,i,j) = 0.5*bfunc(a_rp(k,i,j))
+                ls_buoy(k,i,j) = 2.*scr(k,i,j)
+             end do
+          end if
+          !
+          ! for the case without level set
+          !
           do k=2,n1-2
              wt(k,i,j)=wt(k,i,j)+scr(k,i,j)+scr(k+1,i,j)
           end do
@@ -495,5 +550,54 @@ contains
     divergence = maxval(s1)
 
   end function divergence
+
+
+  subroutine extvel
+
+    use grid, only : a_up, a_vp, a_wp, dn0, xm, zm, nxp, nyp, nzp
+    use defs, only : pi
+
+    integer :: i, k, kk, velcase
+    real    :: U0, omega, z, ang, r, xc, zc
+
+    velcase = 2
+    U0      = 1.0
+    omega   = 2.*pi/628.
+
+    select case(velcase)
+
+      case(1)
+      a_up = 0.0
+      a_vp = 0.0
+      a_wp = U0*sin(omega*time)
+
+      case(2)
+      xc = 0.0
+      zc = 50.0
+      a_vp = 0.0
+      do k=1,nzp
+        z = zm(k)-50.
+        do i=1,nxp
+          r = ((xm(i)-xc)**2. + (z)**2.)**0.5
+          if (xm(i)-xc > -tiny(1.)) then
+            ang = atan(z/(xm(i) - xc + tiny(1.0) ))
+          else
+            ang = pi + atan(z/(xm(i) - xc + tiny(1.0) ))
+          end if
+          a_up(k,i,:) = -sin(ang)*omega*r
+          a_wp(k,i,:) =  cos(ang)*omega*r
+          a_vp(k,i,:) = 0.0!(a_up(k,i,3)**2. + a_wp(k,i,3)**2.)**.5
+        end do
+      end do
+
+
+      case default
+        a_up = 0.0
+        a_vp = 0.0
+        a_wp = U0*sin(2.*pi*(1./40.)*time)
+ 
+      end select
+
+  end subroutine extvel
 
 end module step

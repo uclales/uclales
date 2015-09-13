@@ -81,7 +81,7 @@ contains
 
     integer, save :: timeID=0, ztID=0, zmID=0, xtID=0, xmID=0, ytID=0, ymID=0,&
          dim_mttt(4) = 0, dim_tmtt(4) = 0, dim_ttmt(4) = 0, dim_tttt(4) = 0  ,&
-         dim_tt(2)  = 0, dim_mt(2)  = 0
+         dim_tt(2)  = 0, dim_mt(2)  = 0, dim_mmmt(4) = 0 !eckhard: dim_mmmt for level set function, defined on grid nodes
 
     character (len=7) :: xnm
     integer :: iret, n, VarID
@@ -106,6 +106,7 @@ contains
        dim_mttt= (/zmID,xtID,ytID,timeId/)  ! wpoint
        dim_tmtt= (/ztID,xmID,ytID,timeId/)  ! upoint
        dim_ttmt= (/ztId,xtID,ymID,timeId/)  ! vpoint
+       dim_mmmt= (/zmID,xmID,ymID,timeID/)  ! eckhard: phi/corner point
 
        do n=1,nVar
           select case(trim(ncinfo(2,sx(n))))
@@ -144,6 +145,12 @@ contains
           case ('ttmt')
              if (present(n2) .and. present(n3)) then
                 iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_ttmt,VarID)
+             else
+                iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_mt,VarID)
+             end if
+          case ('mmmt')
+             if (present(n2) .and. present(n3)) then
+                iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_mmmt,VarID)
              else
                 iret=nf90_def_var(ncID,sx(n),NF90_FLOAT,dim_mt,VarID)
              end if
@@ -747,7 +754,62 @@ contains
        if (itype==0) ncinfo = 'Sedimentation Flux (positive downward)'
        if (itype==1) ncinfo = 'kg/kg m/s'
        if (itype==2) ncinfo = 'ttmt'
-
+    case('phi')
+       if (itype==0) ncinfo = 'Level set function'
+       if (itype==1) ncinfo = 'm'
+       if (itype==2) ncinfo = 'mmmt'
+    case('alpha')
+       if (itype==0) ncinfo = 'Cell volume fraction of dry fluid'
+       if (itype==1) ncinfo = '-'
+       if (itype==2) ncinfo = 'tttt'
+    case('beta_z')
+       if (itype==0) ncinfo = 'Face fraction of dry fluid'
+       if (itype==1) ncinfo = '-'
+       if (itype==2) ncinfo = 'ttmt'
+    case('beta_x')
+       if (itype==0) ncinfo = 'Face fraction of dry fluid'
+       if (itype==1) ncinfo = '-'
+       if (itype==2) ncinfo = 'ttmt'
+    case('beta_y')
+       if (itype==0) ncinfo = 'Face fraction of dry fluid'
+       if (itype==1) ncinfo = '-'
+       if (itype==2) ncinfo = 'ttmt'
+    case('q0')
+       if (itype==0) ncinfo = 'Spread moist field'
+       if (itype==1) ncinfo = '-'
+       if (itype==2) ncinfo = 'tttt'
+    case('q1')
+       if (itype==0) ncinfo = 'Spread dry field'
+       if (itype==1) ncinfo = '-'
+       if (itype==2) ncinfo = 'tttt'
+    case('nx')
+       if (itype==0) ncinfo = 'Level set normal x comp.'
+       if (itype==1) ncinfo = '-'
+       if (itype==2) ncinfo = 'mmmt'
+    case('ny')
+       if (itype==0) ncinfo = 'Level set normal y comp.'
+       if (itype==1) ncinfo = '-'
+       if (itype==2) ncinfo = 'mmmt'
+    case('nz')
+       if (itype==0) ncinfo = 'Level set normal z comp.'
+       if (itype==1) ncinfo = '-'
+       if (itype==2) ncinfo = 'mmmt'
+    case('ls_u')
+       if (itype==0) ncinfo = 'Zonal level set transport velocity'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'mmmt'
+    case('ls_v')
+       if (itype==0) ncinfo = 'Meridional level set transport velocity'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'mmmt'
+    case('ls_w')
+       if (itype==0) ncinfo = 'Vertical level set transport velocity'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'mmmt'
+    case('b')
+       if (itype==0) ncinfo = 'Buoyancy'
+       if (itype==1) ncinfo = 'm/s/s'
+       if (itype==2) ncinfo = 'tttt'
     case default
        if (myid==0) print *, 'ABORTING: variable not found '
        call appl_abort(0)

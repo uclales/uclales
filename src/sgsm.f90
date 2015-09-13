@@ -137,25 +137,26 @@ contains
        call azero(nxyp,sxy2)
        if ( associated(a_tp,a_sp) ) call atob(nxyp,wt_sfc,sxy1)
        if ( associated(a_rp,a_sp) ) call atob(nxyp,wq_sfc,sxy1)
-
+    
        if (sflg) call azero(nxyzp,a_scr1)
-
+    
        call diffsclr(nzp,nxp,nyp,dt,dxi,dyi,dzi_m,dzi_t,dn0,sxy1,sxy2   &
             ,a_sp,a_scr2,a_st,a_scr1)
 
        if (sflg) then
-
+    
           call get_avg3(nzp,nxp,nyp,a_scr1,sz1)
-
+    
           call updtst(nzp,'sgs',n-3,sz1,1)
           if (associated(a_sp,a_tp))                                          &
              call sgsflxs(nzp,nxp,nyp,level,liquid,vapor,a_theta,a_scr1,'tl')
           if (associated(a_sp,a_rp))                                          &
              call sgsflxs(nzp,nxp,nyp,level,liquid,vapor,a_theta,a_scr1,'rt')
-
-       endif
+    
+       !endif
        call cyclics(nzp,nxp,nyp,a_st,req)
        call cyclicc(nzp,nxp,nyp,a_st,req)
+       end if
     enddo
 
   end subroutine diffuse
@@ -688,8 +689,8 @@ contains
           indh=indh+1
           do k=2,n1-1
              sct(k,i,j)= sct(k,i,j) + dti*(sxz5(indh,k)-scp(k,i,j))           &
-                  -((szx1(k,i)-szx1(k,i-1))                                   &
-                  *dxi + (-(scp(k,i,j+1)-scp(k,i,j))*dyi*0.25*(xkh(k,i,j)     &
+                  -((szx1(k,i)-szx1(k,i-1))*dxi                               &
+                  + (-(scp(k,i,j+1)-scp(k,i,j))*dyi*0.25*(xkh(k,i,j)          &
                   +xkh(k,i,j+1)+xkh(k-1,i,j)+xkh(k-1,i,j+1))+(scp(k,i,j)      &
                   -scp(k,i,j-1))*dyi*0.25*(xkh(k,i,j-1)+xkh(k,i,j)            &
                   +xkh(k-1,i,j-1)+xkh(k-1,i,j)))*dyi) /dn0(k)

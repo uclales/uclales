@@ -38,7 +38,7 @@ module mpi_interface
   !
 
   integer :: myid, pecount, nxpg, nypg, nxg, nyg, nbytes, intsize, &
-       MY_SIZE, MY_CMPLX
+       MY_SIZE, MY_CMPLX, MY_INT
   integer :: xcomm, ycomm,commxid,commyid
   integer :: nxnzp,nynzp,fftinix,fftiniy
   integer :: wrxid, wryid, nxprocs, nyprocs
@@ -51,7 +51,7 @@ module mpi_interface
        ydisp,xcount,ycount
 
   integer :: stridetype,xstride,ystride,xystride,xylarry,xyzlarry,&
-       fxytype,fxyztype
+       fxytype,fxyztype,intxstride,intystride,intxystride
 
 contains
   !
@@ -83,8 +83,10 @@ contains
     select case(kind(0))
     case (4)
        intsize=4
+       MY_INT = MPI_INTEGER
     case (8)
        intsize=8
+       MY_INT = MPI_LONG_LONG_INT
     case default
        stop "int kind not supported"
     end select
@@ -410,6 +412,12 @@ contains
     call MPI_TYPE_COMMIT(ystride,ierr)
     call MPI_TYPE_VECTOR(2,2*nzp,nxp*nzp,MY_SIZE,xystride,ierr)
     call MPI_TYPE_COMMIT(xystride,ierr)
+    call MPI_TYPE_VECTOR(nyp-4,nzp*2,nxp*nzp,MY_INT,intxstride,ierr)
+    call MPI_TYPE_COMMIT(intxstride,ierr)
+    call MPI_TYPE_VECTOR(2,nzp*(nxp-4),nxp*nzp,MY_INT,intystride,ierr)
+    call MPI_TYPE_COMMIT(intystride,ierr)
+    call MPI_TYPE_VECTOR(2,2*nzp,nxp*nzp,MY_INT,intxystride,ierr)
+    call MPI_TYPE_COMMIT(intxystride,ierr)
 
     call MPI_TYPE_VECTOR(nyp-4,nxp-4,nxpg-4,MY_SIZE,fxytype,ierr)
     call MPI_TYPE_COMMIT(fxytype,ierr)
@@ -497,6 +505,78 @@ contains
          MPI_COMM_WORLD, req(16), ierror)
 
   end subroutine cyclics
+  ! ---------------------------------------------------------------------
+  ! subroutine intcyclics: commits exchange cyclic x boundary conditions
+  !    for integer arrays
+  !
+  subroutine intcyclics(n1,n2,n3,var,req)
+
+    integer, intent(in)    :: n1,n2,n3
+    integer, intent(inout) :: var(n1,n2,n3)
+    integer req(16)
+    integer :: ierror, stats(MPI_STATUS_SIZE,16), pxfwd, pxback, pyfwd, pyback
+    integer :: pxyne,pxyse,pxynw,pxysw
+
+    if (nypg == 5) then
+       var(:,:,1) = var(:,:,3)
+       var(:,:,2) = var(:,:,3)
+       var(:,:,4) = var(:,:,3)
+       var(:,:,5) = var(:,:,3)
+    end if
+    if (nxpg == 5) then
+       var(:,1,:) = var(:,3,:)
+       var(:,2,:) = var(:,3,:)
+       var(:,4,:) = var(:,3,:)
+       var(:,5,:) = var(:,3,:)
+    end if
+
+    pxfwd = ranktable(wrxid+1,wryid)
+    pxback =ranktable(wrxid-1,wryid)
+    pyfwd = ranktable(wrxid,wryid+1)
+    pyback =ranktable(wrxid,wryid-1)
+
+    pxyne = ranktable(wrxid+1,wryid+1)
+    pxyse = ranktable(wrxid+1,wryid-1)
+    pxynw = ranktable(wrxid-1,wryid+1)
+    pxysw = ranktable(wrxid-1,wryid-1)
+
+    call mpi_isend(var(1,n2-3,3),1,intxstride, pxfwd, 130, &
+         MPI_COMM_WORLD, req(1), ierror)
+    call mpi_isend(var(1,3,3), 1, intxstride, pxback, 140, &
+         MPI_COMM_WORLD, req(2), ierror)
+    call mpi_irecv(var(1,n2-1,3), 1, intxstride, pxfwd, 140, &
+         MPI_COMM_WORLD, req(3), ierror)
+    call mpi_irecv(var(1,1,3), 1, intxstride, pxback, 130, &
+         MPI_COMM_WORLD, req(4), ierror)
+
+    call mpi_isend(var(1,3,3), 1, intystride, pyback, 110, &
+         MPI_COMM_WORLD, req(5), ierror)
+    call mpi_irecv(var(1,3,n3-1), 1, intystride, pyfwd, 110, &
+         MPI_COMM_WORLD, req(6), ierror)
+    call mpi_isend(var(1,3,n3-3), 1, intystride, pyfwd, 120, &
+         MPI_COMM_WORLD, req(7), ierror)
+    call mpi_irecv(var(1,3,1), 1, intystride, pyback, 120, &
+         MPI_COMM_WORLD, req(8), ierror)
+
+    call mpi_isend(var(1,n2-3,n3-3), 1, intxystride, pxyne, 150, &
+         MPI_COMM_WORLD, req(9), ierror)
+    call mpi_irecv(var(1,1,1), 1, intxystride, pxysw, 150, &
+         MPI_COMM_WORLD, req(10), ierror)
+    call mpi_isend(var(1,n2-3,3), 1, intxystride, pxyse, 160, &
+         MPI_COMM_WORLD, req(11), ierror)
+    call mpi_irecv(var(1,1,n3-1), 1, intxystride, pxynw, 160, &
+         MPI_COMM_WORLD, req(12), ierror)
+
+    call mpi_isend(var(1,3,n3-3), 1, intxystride, pxynw, 170, &
+         MPI_COMM_WORLD, req(13), ierror)
+    call mpi_irecv(var(1,n2-1,1), 1, intxystride, pxyse, 170, &
+         MPI_COMM_WORLD, req(14), ierror)
+    call mpi_isend(var(1,3,3), 1, intxystride, pxysw, 180, &
+         MPI_COMM_WORLD, req(15), ierror)
+    call mpi_irecv(var(1,n2-1,n3-1), 1, intxystride, pxyne, 180, &
+         MPI_COMM_WORLD, req(16), ierror)
+
+  end subroutine intcyclics
   !
   !
   ! ---------------------------------------------------------------------
@@ -510,6 +590,19 @@ contains
     call mpi_waitall(16,req,stats,ierror)
 
   end subroutine cyclicc
+  !
+  !
+  ! ---------------------------------------------------------------------
+  ! subroutine intcyclicc: comits excahnging cyclic boundary conditions
+  subroutine intcyclicc(n1,n2,n3,var,req)
+
+    integer :: ierror, stats(MPI_STATUS_SIZE,16)
+    integer :: req(16),n1,n2,n3
+    integer :: var(n1,n2,n3)
+
+    call mpi_waitall(16,req,stats,ierror)
+
+  end subroutine intcyclicc
 
   subroutine appl_abort(apperr)
 
@@ -622,6 +715,21 @@ contains
          MPI_COMM_WORLD, ierror)
 
   end subroutine double_scalar_par_max
+  !
+  !---------------------------------------------------------------------------
+  ! get maximum across processors (integer version) (eckhard)
+  !
+  subroutine int_scalar_par_max(xxl,xxg)
+
+    integer, intent(out) :: xxg
+    integer, intent(in) :: xxl
+    integer:: mpiop,ierror
+
+
+    call mpi_allreduce(xxl,xxg,1,MPI_INTEGER, MPI_MAX, &
+         MPI_COMM_WORLD, ierror)
+
+  end subroutine int_scalar_par_max
 
 
   subroutine double_scalar_par_sum(xxl,xxg)

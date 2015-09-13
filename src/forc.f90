@@ -139,7 +139,7 @@ contains
     real, intent (in)   :: zm(n1),dzi_t(n1),dn0(n1),rt(n1,n2,n3)
     real, intent (inout):: tt(n1,n2,n3)
     real, intent (out)  :: flx(n1,n2,n3)
-    real, parameter     :: xka= 50.0, fr0=60.0
+    real, parameter     :: xka= 20.0, fr0=60.0
 
     integer :: i,j,k, km1, ki
     real    :: smoke(n2,n3)

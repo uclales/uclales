@@ -5,7 +5,7 @@
 ! it under the terms of the GNU General Public License as published by
 ! the Free Software Foundation; either version 3 of the License, or
 ! (at your option) any later version.
-!
+        !
 ! UCLALES is distributed in the hope that it will be useful,
 ! but WITHOUT ANY WARRANTY; without even the implied warranty of
 ! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -50,13 +50,24 @@ module grid
   integer           :: nfpt = 10           ! number of rayleigh friction points
   real              :: distim = 300.0      ! dissipation timescale
 
+  !
+  ! Level set method
+  !
+  integer :: dynfracts = 0       ! eckhard: 0 = frozen vol. and face fracts., 1 = dynamic fracts.
+  integer :: euler  = 1          ! eckhard: 0 = RK3, 1 = Euler-forward (1st-order)
+  integer :: levset = 0          ! eckhard: 0 = level set method switched off
+  integer :: bandw  = 5          ! eckhard: width of the level set band, if = 0, solve on full domain
+  integer :: fdmthd = 2          ! eckhard: FD method for level set transport, 1st order upwd (0), 2nd-order upwd (1), 2nd-order ENO (2)
+  integer :: lstep               ! eckhard: indicates current ghost fluid
+
+
   character (len=7), allocatable, save :: sanal(:)
   character (len=80):: expnme = 'Default' ! Experiment name
   character (len=80):: filprf = 'x'       ! File Prefix
   character (len=7) :: runtype = 'INITIAL'! Run Type Selection
 
-    real, parameter ::  rkalpha(3) = (/ 8./15., -17./60.,  3./4. /), &
-         rkbeta(3)  = (/    0.0,   5./12., -5./12./)
+  real, parameter ::  rkalpha(3) = (/ 8./15., -17./60.,  3./4. /), &
+                      rkbeta(3)  = (/    0.0,   5./12., -5./12./)
 
 
   character (len=7),  private :: v_snm='sxx    ' 
@@ -67,7 +78,7 @@ module grid
   integer           :: nz, nxyzp, nxyp, nstep
   real              :: dxi, dyi, dt, psrf
   real, dimension(:), allocatable :: xt, xm, yt, ym, zt, zm, dzi_t, dzi_m,        &
-       u0, v0, pi0, pi1, th0, dn0, rt0, spngt, spngm, wsavex, wsavey
+       u0, v0, pi0, pi1, th0, dn0, rt0, spngt, spngm, wsavex, wsavey, rz, rzmt
   !
   ! 2D Arrays (surface fluxes)
   !
@@ -80,6 +91,29 @@ module grid
        a_theta, a_pexnr, press, vapor, liquid, a_rflx, a_sflx, precip,        &
        a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7,                &
        a_lflxu, a_lflxd, a_sflxu, a_sflxd
+  !
+  ! 3D arrays for level set method
+  !
+  real, dimension (:,:,:),   allocatable,target :: a_phi,a_phitilde,a_phit1,a_phit2
+  real, dimension (:,:,:),   allocatable,target :: qscr,q0,q1,ls_buoy !eckhard: volume fraction in cut cells
+  real, dimension (:,:,:,:), allocatable,target :: ls_q0 !eckhard: ghost fluid arrays
+  real, dimension (:,:,:,:), allocatable,target :: ls_q1 !eckhard: ghost fluid arrays
+  real, dimension (:,:,:,:), allocatable,target :: ls_u
+  real, dimension (:,:,:,:), allocatable :: a_beta,a_betabar
+  real, dimension (:,:,:),   allocatable :: a_alpha,a_alphabar,ls_absdphi, ls_nx, &
+       ls_ny, ls_nz,ls_phidx,ls_phidy,ls_phidz 
+  real, allocatable :: qt_change, th_change
+  integer, dimension (:,:,:), allocatable :: ls_cellkind,ls_nodekind
+  integer, dimension (:,:),   allocatable :: ls_G,ls_Gtilde,ls_Gp,ls_Gm,ls_B,ls_dB,ls_UCN,ls_CN ! UCN...nodes of uncut cells
+  integer, allocatable :: ls_nG,ls_nGtilde,ls_nGp,ls_nGm,ls_nB,ls_ndB,ls_nUCN,ls_nCN ! number of cells in the subsets G, B, U, and dB
+  !
+  ! Pointers for level set variabels
+  !
+  real, dimension (:,:,:), pointer :: ls_up, ls_vp, ls_wp, ls_q0p, ls_q1p
+  !
+  ! debugging stuff for the level set method
+  !
+  integer :: stp
   !
   ! Named pointers (to 3D arrays) 
   !
@@ -205,6 +239,82 @@ contains
     if (level >= 3) then
        allocate(precip(nzp,nxp,nyp))
        memsize = memsize + nxyzp
+    end if
+
+    if (levset >= 1) then
+        allocate( a_phi(nzp,nxp,nyp) )
+        allocate( a_phitilde(nzp,nxp,nyp) )
+        allocate( a_phit1(nzp,nxp,nyp), a_phit2(nzp,nxp,nyp) )
+        allocate( a_alpha(nzp,nxp,nyp) )
+        allocate( a_alphabar(nzp,nxp,nyp) )
+        allocate( ls_buoy(nzp,nxp,nyp) )
+        allocate( a_beta(nzp,nxp,nyp,3) )
+        allocate( a_betabar(nzp,nxp,nyp,3) )
+        allocate( ls_q0(nzp,nxp,nyp,nscl) )
+        allocate( ls_q1(nzp,nxp,nyp,nscl) )
+        allocate( ls_u(nzp,nxp,nyp,3) )
+        allocate( ls_phidx(nzp,nxp,nyp), ls_phidy(nzp,nxp,nyp),ls_phidz(nzp,nxp,nyp) )
+        allocate( ls_nx(nzp,nxp,nyp), ls_ny(nzp,nxp,nyp), ls_nz(nzp,nxp,nyp) )
+        allocate( ls_absdphi( nzp,nxp,nyp ) )
+        allocate( ls_G(nxp*nyp*nzp,3)  )
+        allocate( ls_Gtilde(nxp*nyp*nzp,3)  )
+        allocate( ls_Gm(nxp*nyp*nzp,3)  )
+        allocate( ls_Gp(nxp*nyp*nzp,3)  )
+        allocate( ls_B(nxp*nyp*nzp,3)  )
+        allocate( ls_dB(nxp*nyp*nzp,3) )
+        allocate( ls_UCN(nxp*nyp*nzp,3) )
+        allocate( ls_CN(nxp*nyp*nzp,3) )
+        allocate( ls_nG, ls_nGtilde, ls_nB, ls_ndB, ls_nUCN, ls_nCN, ls_nGm, ls_nGp)
+        allocate( ls_cellkind(nzp,nxp,nyp), ls_nodekind(nzp,nxp,nyp))
+        allocate( qscr(nzp,nxp,nyp), q0(nzp,nxp,nyp), q1(nzp,nxp,nyp) )
+        allocate( qt_change, th_change )
+        a_phi(:,:,:)       = 0.
+        a_phitilde(:,:,:)  = 0.
+        a_phit1(:,:,:)     = 0.
+        a_phit2(:,:,:)     = 0.
+        a_alpha(:,:,:)     = 0.
+        a_alphabar(:,:,:)  = 0.
+        a_beta(:,:,:,:)    = 0.
+        a_betabar(:,:,:,:) = 0.
+        ls_q0(:,:,:,:) = 0.
+        ls_buoy(:,:,:) = 0.
+        ls_q1(:,:,:,:) = 0.
+        ls_u(:,:,:,:)  = 0.
+        ls_nx(:,:,:) = 0.
+        ls_ny(:,:,:) = 0.
+        ls_nz(:,:,:) = 0.
+        ls_phidx(:,:,:) = 0.
+        ls_phidy(:,:,:) = 0.
+        ls_phidz(:,:,:) = 0.
+        ls_absdphi(:,:,:)  = 0.
+        ls_cellkind(:,:,:) = 0 
+        ls_nodekind(:,:,:) = 0 
+        ls_G(:,:)      = 0
+        ls_Gtilde(:,:) = 0
+        ls_Gm(:,:)  = 0
+        ls_Gp(:,:)  = 0
+        ls_B(:,:)   = 0
+        ls_dB(:,:)  = 0
+        ls_UCN(:,:) = 0
+        ls_CN(:,:)  = 0
+        ls_nGtilde  = -42
+        ls_nG       = -42
+        ls_nGm      = -42
+        ls_nGp      = -42
+        ls_nB       = 0
+        ls_ndB      = 0
+        ls_nUCN     = 0
+        ls_nCN      = 0
+        qt_change = 0.0
+        th_change = 0.0
+        memsize     = memsize + (1+2+1+3+1)*nxyzp + 5*nxp*nyp + 3*nxyzp
+
+        ls_up   => ls_u (:,:,:,1)
+        ls_vp   => ls_u (:,:,:,2)
+        ls_wp   => ls_u (:,:,:,3)
+        ls_q0p  => ls_q0(:,:,:,5)
+        ls_q1p  => ls_q1(:,:,:,5)
+ 
     end if
 
     a_ustar(:,:) = 0.
@@ -334,7 +444,7 @@ contains
      end do
   case default
      zm(1)=0.
-     do k=1,nzp
+     do k=2,nzp
         zm(k)=zm(k-1)+deltaz
      end do
   end select
@@ -385,6 +495,7 @@ contains
   ! compute other arrays based on the vertical grid.
   !   dzi_m: inverse of distance between thermal points k+1 and k
   !   dzi_t: inverse of distance between momentum points k and k-1
+  !   rz:    ratio dzi_t(k)/(dzi_t(k) + dzi_t(k+1)) !eckhard
   !
   allocate (dzi_m(nzp))
   do k=1,nzp-1
@@ -397,6 +508,18 @@ contains
      dzi_t(k)=1./(zm(k)-zm(k-1))
   end do
   dzi_t(1)=dzi_t(2)*dzi_t(2)/dzi_t(3)
+
+  if (levset >= 1) then
+    allocate (rz(nzp))
+    allocate (rzmt(nzp))
+    do k=1, nzp-1
+      rz(k) = 1./(dzi_t(k)) / ( 1./(dzi_t(k)) + 1./(dzi_t(k+1)) )
+    end do
+    rz(nzp)=rz(nzp-1)*rz(nzp-1)/rz(nzp-2)
+    do k=1, nzp
+      rzmt(k) = dzi_m(k)/dzi_t(k)
+    end do
+  end if
   !
   ! set timesteps
   !
@@ -419,12 +542,14 @@ contains
     use mpi_interface, only :myid
 
 !irina
-    integer, parameter :: nnames = 23
+    integer, parameter :: nnames = 35
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,&
          'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,&  
          'w      ','t      ','p      ','q      ','l      ','r      '   ,&
-         'n      ','stke   ','rflx   ', 'lflxu  ','lflxd  '/)
+         'n      ','stke   ','rflx   ','lflxu  ','lflxd  ','phi    '   ,&
+         'alpha  ','beta_z ','q0     ','q1     ','nx     ','ny     '   ,&
+         'nz     ','ls_u   ','ls_v   ','ls_w   ','b      ' /)
 
     real, intent (in) :: time
     integer           :: nbeg, nend
@@ -435,6 +560,9 @@ contains
     if (level  >= 3) nvar0 = nvar0+2
     !irina
     if (iradtyp > 1) nvar0 = nvar0+3
+
+    if (levset >= 1) nvar0 = nvar0+1  ! add level set scalar 'phi'
+    if (levset == 2) nvar0 = nvar0+12 ! add alpha, beta_z, q0, q1, and n_[x,y,z]
 
     allocate (sanal(nvar0))
     sanal(1:nbase) = sbase(1:nbase)
@@ -475,6 +603,34 @@ contains
        sanal(nvar0) = sbase(nbase+8)
     end if
 
+    if (levset >= 1) then
+      nvar0 = nvar0+1
+      sanal(nvar0) = sbase(nbase+9)  !eckhard: adds level set function 'phi' to the list
+    end if
+    if (levset == 2) then
+      nvar0 = nvar0+1
+      sanal(nvar0) = sbase(nbase+10)
+      nvar0 = nvar0+1
+      sanal(nvar0) = sbase(nbase+11)
+      nvar0 = nvar0+1
+      sanal(nvar0) = sbase(nbase+12)
+      nvar0 = nvar0+1
+      sanal(nvar0) = sbase(nbase+13)
+      nvar0 = nvar0+1
+      sanal(nvar0) = sbase(nbase+14)
+      nvar0 = nvar0+1
+      sanal(nvar0) = sbase(nbase+15)
+      nvar0 = nvar0+1
+      sanal(nvar0) = sbase(nbase+16)
+      nvar0 = nvar0+1
+      sanal(nvar0) = sbase(nbase+17)
+      nvar0 = nvar0+1
+      sanal(nvar0) = sbase(nbase+18)
+      nvar0 = nvar0+1
+      sanal(nvar0) = sbase(nbase+19)
+      nvar0 = nvar0+1
+      sanal(nvar0) = sbase(nbase+20)
+    end if
 
     nbeg = nvar0+1
     nend = nvar0+naddsc
@@ -596,7 +752,62 @@ contains
             count=icnt)
     end if
 
+    if (levset >= 1) then
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, 'phi', VarID)
+       iret = nf90_put_var(ncid0, VarID, a_phi(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+    end if
+    if (levset == 2) then
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, 'alpha', VarID)
+       iret = nf90_put_var(ncid0, VarID,  a_alpha(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, 'q0', VarID)
+       iret = nf90_put_var(ncid0, VarID, ls_q0(:,i1:i2,j1:j2,5), start=ibeg, &
+            count=icnt)
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, 'q1', VarID)
+       iret = nf90_put_var(ncid0, VarID, ls_q1(:,i1:i2,j1:j2,5), start=ibeg, &
+            count=icnt)
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, 'beta_z', VarID)
+       iret = nf90_put_var(ncid0, VarID, a_beta(:,i1:i2,j1:j2,1), start=ibeg, &
+            count=icnt)
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, 'nx', VarID)
+       iret = nf90_put_var(ncid0, VarID, ls_nx(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, 'ny', VarID)
+       iret = nf90_put_var(ncid0, VarID, ls_ny(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, 'nz', VarID)
+       iret = nf90_put_var(ncid0, VarID, ls_nz(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, 'ls_u', VarID)
+       iret = nf90_put_var(ncid0, VarID, ls_up(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, 'ls_v', VarID)
+       iret = nf90_put_var(ncid0, VarID, ls_vp(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, 'ls_w', VarID)
+       iret = nf90_put_var(ncid0, VarID, ls_wp(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+       nn = nn+1
+       iret = nf90_inq_varid(ncid0, 'b', VarID)
+       iret = nf90_put_var(ncid0, VarID, ls_buoy(:,i1:i2,j1:j2), start=ibeg, &
+            count=icnt)
+    end if
+
+
     if (nn /= nvar0) then
+       write(*,*) nn,nvar0
        if (myid == 0) print *, 'ABORTING:  Anal write error'
        call appl_abort(0)
     end if
@@ -759,6 +970,51 @@ contains
     end if
 
   end subroutine newvar
+
+
+  subroutine newvar_ls(inum,lstep,istep)
+
+    integer, intent(in) :: inum,lstep
+    integer, optional, intent(in)   :: istep
+
+    if (lstep == 1) a_sp =>ls_q1 (:,:,:,inum) ! free atmosphere first
+    if (lstep == 2) a_sp =>ls_q0 (:,:,:,inum) ! then boundary layer
+
+    if (present(istep)) then
+       select case (istep)
+       case(1)
+          a_st=>a_xt1(:,:,:,inum)
+       case(2)
+          a_st=>a_xt2(:,:,:,inum)
+       case(3)
+          a_st=>a_xt1(:,:,:,inum)
+       end select
+    end if
+
+  end subroutine newvar_ls
+  !
+  ! ----------------------------------------------------------------------
+  ! Subroutine newphi: Shifts the variabe pointer the array of the level set
+  ! function and shifts tenedency pointer to level set tendency arrays
+  !
+  subroutine newphi(istep)
+
+    integer, optional, intent(in)   :: istep
+
+    a_sp =>a_phi(:,:,:)
+
+    if (present(istep)) then
+       select case (istep)
+       case(1)
+          a_st=>a_phit1(:,:,:)
+       case(2)
+          a_st=>a_phit2(:,:,:)
+       case(3)
+          a_st=>a_phit1(:,:,:)
+       end select
+    end if
+
+  end subroutine newphi
 
 end module grid
 

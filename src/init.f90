@@ -28,7 +28,7 @@ module init
   integer               :: itsflg = 1
 !  integer, dimension(1) :: seed
   real, dimension(nns)  :: us,vs,ts,thds,ps,hs,rts,rss,tks,xs
-  real                  :: zrand = 200.
+  real                  :: zrand = 650.
   character  (len=80)   :: hfilin = 'test.'  
 
 contains
@@ -43,6 +43,7 @@ contains
     use stat, only : init_stat
     use mpi_interface, only : appl_abort, myid
     use thrm, only : thermo
+    use reinit, only : reinitialize
 !
 
     implicit none
@@ -89,14 +90,19 @@ contains
   ! 
   subroutine fldinit
 
-    use defs, only : alvl, cpr, cp, p00
+    use defs, only : alvl, cpr, cp, p00, pi
     use util, only : azero, atob
     use thrm, only : thermo, rslf
+    use lset, only : ls_characterize,ls_normals,ls_fixmixed
+    use reinit, only : reinitialize
 
     implicit none
 
-    integer :: i,j,k
+    integer :: i,j,k,inicase
     real    :: exner, pres, tk, rc, xran(nzp)
+    real    :: zinv,x0,x1,z0,z1,checkx,checkz, &
+               d00,d01,d11,d10
+    real    :: xc,zc,r,r2,front,back,top,bttm,wdth,lgth,angle !slotted disc
 
     call htint(ns,ts,hs,nzp,th0,zt)
 
@@ -141,19 +147,214 @@ contains
     end if
 
     k=1
-    do while( zt(k+1) <= zrand .and. k < nzp)
+    do while( zt(min(k+1, nzp)) <= zrand .and. k < nzp)
        k=k+1
-       xran(k) = 0.2*(zrand - zt(k))/zrand
+       xran(k) = 0.1!0.2*(zrand - zt(k))/zrand
     end do
     call random_pert(nzp,nxp,nyp,zt,a_tp,xran,k) 
 
-    if (associated(a_rp)) then
-       k=1
-       do while( zt(k+1) <= zrand .and. k < nzp)
-          k=k+1
-          xran(k) = 5.0e-5*(zrand - zt(k))/zrand
+    !if (associated(a_rp)) then
+    !   k=1
+    !   do while( zt(min(k+1, nzp)) <= zrand .and. k < nzp)
+    !      k=k+1
+    !      xran(k) = 5.0e-5*(zrand - zt(k))/zrand
+    !   end do
+    !   call random_pert(nzp,nxp,nyp,zt,a_rp,xran,k) 
+    !end if
+
+    if (levset >= 1) then
+       zinv = 700.01 !inversion height
+       inicase = 0
+
+       select case(inicase)
+
+       case(1) !sinusoidal wave
+         do j=1,nyp
+         do i=1,nxp
+         do k=1,nzp
+             zinv = .54 - 0.05*cos(2.0d0*pi*(xm(i))/1.0d0)
+             a_phi(k,i,j) = zm(k) - zinv
+             if (zt(k)<zinv) then
+                a_rp(k,i,j) = 0.0
+             else
+                a_rp(k,i,j) = 1.0
+             end if
+         end do
+         end do
+         end do
+
+       case(2) !parabolic circle
+         do j=1,nyp
+         do i=1,nxp
+         do k=1,nzp
+             a_phi(k,i,j) = 250  - ((ym(j) )**2 + ((zm(k)) - 700.6)**2)**0.5
+         end do
+         end do
+         end do
+
+       case(3) !cloud layer
+         do j=1,nyp
+         do i=1,nxp
+         do k=1,nzp
+             a_phi(k,i,j) = max(-zm(k) + 0.79,zm(k)-1.24)
+             if (zt(k)<1.24.and.zt(k)>0.79) then
+                a_rp(k,i,j) = 0.0
+             else
+                a_rp(k,i,j) = 1.0
+             end if
+         end do
+         end do
+         end do
+
+       case(4) !total water mixing ratio
+         do j=1,nyp
+           do i=1,nxp
+             do k=1,nzp
+               a_phi(k,i,j) = a_rp(k,i,j)
+             end do
+           end do
+         end do
+
+       case(5) !rectangle
+       x0 = -10.
+       x1 =  10.
+       z0 =  40.
+       z1 =  60.
+       a_phi = 5.
+       do j=1,nyp
+         do i=1,nxp
+           do k=1,nzp
+             checkx = (ym(j)-x0)*(ym(j)-x1)
+             checkz = (zm(k)-z0)*(zm(k)-z1)
+             if ((checkx<0.) .and. (checkz<0.)) then !inside rectangle
+               a_phi(k,i,j) = -min(abs(ym(j)-x0), abs(ym(j)-x1), abs(zm(k)-z0), abs(zm(k)-z1))
+             else if ((checkx>=0) .and. (checkz>=0)) then !outside rectangle, corners are closest
+               d00 = (ym(j)-x0)**2 + (zm(k)-z0)**2
+               d01 = (ym(j)-x0)**2 + (zm(k)-z1)**2
+               d11 = (ym(j)-x1)**2 + (zm(k)-z1)**2
+               d10 = (ym(j)-x1)**2 + (zm(k)-z0)**2
+               a_phi(k,i,j) = sqrt(min(d00,d01,d11,d10))
+             else if ((checkx<0) .and. .not.(checkz<0)) then !within stripe above or below rectangle
+               a_phi(k,i,j) = min(abs(zm(k)-z0),abs(zm(k)-z1))
+             else !within stripe right of or left of the rectangle
+               a_phi(k,i,j) = min(abs(ym(j)-x0),abs(ym(j)-x1)) 
+             end if
+           end do
+         end do
        end do
-       call random_pert(nzp,nxp,nyp,zt,a_rp,xran,k) 
+
+       case(6) ! slotted disc in the x-z plane
+       !disc centre
+       xc = 0.
+       zc = 50.
+       r = 15.
+       lgth = 25.
+       wdth = 5.
+
+       front = xc + (r**2. - wdth**2./4.)**.5 !position of the open slot end
+       back  = xc + r - lgth ! position of the closed slot end
+       top   = zc + .5*wdth
+       bttm  = top - wdth
+       angle = asin(.5*wdth/R)
+
+       !1) circle
+       do i=1,nxp
+         do j=1,nyp
+           do k=1,nzp
+             a_phi(k,i,j) = ( (xm(i) - xc)**2. + (zm(k) - zc)**2. )**.5 - r
+           end do
+         end do
+       end do
+
+       !2) outer angular segment
+       do i=1,nxp
+         do j=1,nyp
+           do k=1,nzp
+             if ( (abs( atan((zm(k)-zc)/(xm(i)-xc+tiny(xc)) )) < angle) .and. (xm(i) > front)) then
+               a_phi(k,i,j) = min(( (xm(i)-front)**2. + (zm(k)-(zc+.5*wdth))**2. )**.5, &
+                                  ( (xm(i)-front)**2. + (zm(k)-(zc-.5*wdth))**2. )**.5  ) 
+             end if
+           end do
+         end do
+       end do
+
+       !3) within the disc above and below the slot
+       do i=1,nxp
+         do j=1,nyp
+           do k=1,nzp
+             r2 = ((zm(k)-zc)**2. + (xm(i)-xc)**2.)**.5
+             if ( (r2 < r) .and. (xm(i) > back) .and. (abs(zm(k)-zc) > 0.5*wdth) ) then
+               a_phi(k,i,j) = - min( abs(a_phi(k,i,j)), abs(zm(k) - (zc+.5*wdth)), &
+                                                        abs(zm(k) - (zc-.5*wdth))  )
+             end if
+           end do
+         end do
+       end do
+
+       !4) within the disc left of the slot
+       do i=1,nxp
+         do j=1,nyp
+           do k=1,nzp
+             r2 = ((zm(k)-zc)**2. + (xm(i)-xc)**2.)**.5
+             if ( (r2 < r) .and. (xm(i) < back) .and. (zm(k) > bttm) .and. (zm(k) < top) ) then
+               a_phi(k,i,j) = - min( abs(a_phi(k,i,j)), abs(xm(i) - back) ) 
+             end if
+           end do
+         end do
+       end do
+
+       !5) within the disc, in the segment between corner of the slot and circular segment
+       do i=1,nxp
+         do j=1,nyp
+           do k=1,nzp
+             r2 = ((zm(k)-zc)**2. + (xm(i)-xc)**2.)**.5
+             if ( (r2 < r) .and. (xm(i) < back) ) then
+             if (zm(k)>top) then
+               a_phi(k,i,j) = - min( abs(a_phi(k,i,j)), ((xm(i) - back)**2. + (zm(k) - top)**2.)**.5 ) 
+             else if (zm(k)<bttm) then
+               a_phi(k,i,j) = - min( abs(a_phi(k,i,j)), ((xm(i) - back)**2. + (zm(k) - bttm)**2.)**.5 ) 
+             end if
+             end if
+           end do
+         end do
+       end do
+       
+       !6) the slot
+       do i=1,nxp
+         do j=1,nyp
+           do k=1,nzp
+             r2 = ((zm(k)-zc)**2. + (xm(i)-xc)**2.)**.5
+             if ( (xm(i) > back) .and. (xm(i) < front).and.(zm(k) > zc-.5*wdth).and.(zm(k) < zc+.5*wdth) ) then
+               a_phi(k,i,j) = min( abs(xm(i) - back), abs(zm(k)-(zc+.5*wdth)), abs(zm(k)-(zc-.5*wdth)) ) 
+             end if
+           end do
+         end do
+       end do
+
+       case default !signed distance function for horizontal layer at z = zinv
+       do j=1,nyp
+         do i=1,nxp
+           do k=1,nzp
+             a_phi(k,i,j) = zm(k) - zinv
+           end do
+         end do
+       end do
+
+       end select
+       call reinitialize(a_phi, zm, nxp, nyp, nzp, dxi, dyi, dzi_t)
+       call ls_characterize
+       call ls_fixmixed(nzp,nxp,nyp,nscl,a_xp,a_alpha,dzi_t,dzi_m,ls_q0) !use ls_q0 as scratch array
+       call ls_normals('cntr',ls_nx,ls_ny,ls_nz)
+    end if
+    if (levset == -1) then
+         do j=1,nyp
+         do i=1,nxp
+         do k=1,nzp
+             zinv = .54 - 0.05*cos(2.0d0*pi*(xm(i))/1.0d0)
+             a_rp(k,i,j) = 0.5 * (1. + erf((zm(k) - zinv)*5*dxi))
+         end do
+         end do
+         end do
     end if
 
     call azero(nxyzp,a_wp)
@@ -504,6 +705,8 @@ contains
     do k=2,kmx
        allocate (rand_temp(3:n2g-2,3:n3g-2))
        call random_number(rand_temp)
+       ! make the random pert. between -1 and 1
+       rand_temp = 2.0d0 * (rand_temp - 0.5d0)
        rand(3:n2-2, 3:n3-2)=rand_temp(3+xoffset(wrxid):n2+xoffset(wrxid)-2, &
             3+yoffset(wryid):n3+yoffset(wryid)-2)
        deallocate (rand_temp)
@@ -537,7 +740,6 @@ contains
          /3x,'with test value of: ',E12.5,                     &
          /3x,'and a magnitude of: ',E12.5)
   end subroutine random_pert
-
 !irina
   !----------------------------------------------------------------------
   ! Lsvar_init if lsvarflg is true reads the lsvar forcing from the respective
@@ -565,8 +767,5 @@ contains
  
     return
   end subroutine lsvar_init
-
-  !
-
 
 end module init

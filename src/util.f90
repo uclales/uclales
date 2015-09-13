@@ -19,12 +19,74 @@
 !
 module util
 
-  use mpi_interface, only : cyclics, cyclicc
+  use mpi_interface, only : cyclics, cyclicc, intcyclics, intcyclicc
   implicit none
 
   integer, save :: fftinix=0, fftiniy=0
 
 contains
+  !
+  ! ----------------------------------------------------------------------
+  ! PHISET:  Set boundary conditions for level set function
+  !
+  subroutine phiset(n1,n2,n3,phi,dz)
+
+    logical, parameter  :: cyclic = .true.
+    integer, intent(in) :: n1,n2,n3
+    real, intent(inout) :: phi(n1,n2,n3)
+    real, intent(in)    :: dz(n1)
+
+    integer :: i, j, k, req(16)
+    if (cyclic) then
+      !
+      ! top/bottom boundary conditions (zero curvature)
+      !
+      do j=1,n3
+         do i=1,n2
+            phi(n1,i,j)     = phi(n1-2,i,j) + dz(n1-1)/dz(n1) * 2.*(phi(n1-2,i,j) - phi(n1-3,i,j))
+            phi(1, i,j)    = phi(3,   i,j) - dz(2)/dz(1) * 2.*(phi(4,i,j) - phi(3,i,j))
+         enddo
+      enddo
+      call cyclics (n1,n2,n3,phi,req)
+      call cyclicc (n1,n2,n3,phi,req)
+    else
+      call cyclics (n1,n2,n3,phi,req)
+      call cyclicc (n1,n2,n3,phi,req)
+      do i=3,n2
+          do j=1,n3
+              phi(1,i,j) = 3*phi(3,i,j) - 2*phi(4,i,j)
+              phi(n1,i,j)   = 3*phi(n1-2,i,j) - 2*phi(n1-3,i,j)
+          end do
+      end do
+      do k = 1,n1
+        do j = 1,n3
+          !
+          ! -x face of domain
+          !
+          phi(k,2,j) = 2*phi(k,3,j) -   phi(k,4,j)
+          phi(k,1,j) = 3*phi(k,3,j) - 2*phi(k,4,j)
+          !
+          ! +x face of domain
+          !
+          phi(k,n2-1,j) = 2*phi(k,n2-2,j) -   phi(k,n2-3,j)
+          phi(k,n2  ,j) = 3*phi(k,n2-2,j) - 2*phi(k,n2-3,j)
+        end do
+        do  i = 1,n2
+          !
+          ! -y face of domain
+          !
+          phi(k,i,2) = 2*phi(k,i,3) -   phi(k,i,4)
+          phi(k,i,1) = 3*phi(k,i,3) - 2*phi(k,i,4)
+          !
+          ! +y face of domain
+          !
+          phi(k,i,n3) = 2*phi(k,i,n3-2) -   phi(k,i,n3-3)
+          phi(k,i,n3) = 3*phi(k,i,n3-2) - 2*phi(k,i,n3-3)
+        end do
+      end do
+    end if
+
+  end subroutine phiset
   ! ----------------------------------------------------------------------
   ! Subroutine sclrset: Sets upper and lower boundaries to a constant
   ! gradient via extrapolation, or a zero-gradient condition depending
@@ -67,6 +129,28 @@ contains
     call cyclicc(n1,n2,n3,a,req)
 
   end subroutine sclrset
+  !
+  !
+  !
+  subroutine markerset(n1,n2,n3,a)
+
+    use mpi_interface, only : myid, appl_abort
+
+    integer, intent(in)    :: n1,n2,n3
+    integer, intent(inout) :: a(n1,n2,n3)
+
+    integer :: i,j,req(16)
+    do j=1,n3
+       do i=1,n2
+          a(1,i,j)  = a(2,i,j)
+          a(n1,i,j) = a(n1-1,i,j)
+       end do
+    end do
+
+    call intcyclics(n1,n2,n3,a,req)
+    call intcyclicc(n1,n2,n3,a,req)
+
+  end subroutine markerset
   !
   ! ----------------------------------------------------------------------
   ! VELSET:  Sets boundary conditions for velocity

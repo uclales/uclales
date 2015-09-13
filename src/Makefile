@@ -26,6 +26,8 @@ $(LES_ARC)(rad_gcss.o)   \
 $(LES_ARC)(forc.o)   \
 $(LES_ARC)(lsvar.o)   \
 $(LES_ARC)(advf.o)   \
+$(LES_ARC)(reinit.o)   \
+$(LES_ARC)(lset.o)   \
 $(LES_ARC)(advl.o)   \
 $(LES_ARC)(srfc.o)   \
 $(LES_ARC)(prss.o)   \

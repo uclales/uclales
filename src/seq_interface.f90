@@ -191,6 +191,36 @@ contains
     var(:,n2-1:,n3-1:) = var(:,3:4,3:4)
     
   end subroutine cyclics
+  ! ---------------------------------------------------------------------
+  ! subroutine intcyclics: commits exchange cyclic x boundary conditions
+  !
+  subroutine intcyclics(n1,n2,n3,var,req)
+
+    integer, intent(in)    :: n1,n2,n3,req(16)
+    integer, intent(inout) :: var(n1,n2,n3)
+
+    if (n3 == 5) then
+       var(:,:,1) = var(:,:,3)
+       var(:,:,2) = var(:,:,3)
+       var(:,:,4) = var(:,:,3)
+       var(:,:,5) = var(:,:,3)
+    end if
+    if (n2 == 5) then
+       var(:,1,:) = var(:,3,:)
+       var(:,2,:) = var(:,3,:)
+       var(:,4,:) = var(:,3,:)
+       var(:,5,:) = var(:,3,:)
+    end if
+
+    var(:,:2,:) = var(:,n2-3:n2-2,:)
+    var(:,n2-1:,:) = var(:,3:4,:)
+
+    var(:,:,:2) = var(:,:,n3-3:n3-2)
+    var(:,:,n3-1:) = var(:,:,3:4)
+    var(:,:2,:2) = var(:,n2-3:n2-2,n3-3:n3-2)
+    var(:,n2-1:,n3-1:) = var(:,3:4,3:4)
+    
+  end subroutine intcyclics
   !
   ! ---------------------------------------------------------------------
   ! subroutine cyclicc: comits excahnging cyclic boundary conditions
@@ -200,6 +230,15 @@ contains
     real :: var(n1,n2,n3)
 
   end subroutine cyclicc
+  !
+  ! ---------------------------------------------------------------------
+  ! subroutine intcyclicc: comits excahnging cyclic boundary conditions
+  subroutine intcyclicc(n1,n2,n3,var,req)
+
+    integer :: n1,n2,n3,req(16)
+    integer :: var(n1,n2,n3)
+
+  end subroutine intcyclicc
   !
   ! ---------------------------------------------------------------------
   subroutine appl_abort(ierr)
@@ -292,6 +331,18 @@ contains
     xxg=xxl
 
   end subroutine double_scalar_par_max
+  !
+  !---------------------------------------------------------------------------
+  ! get maximum across processors (integer version) (eckhard)
+  !
+  subroutine int_scalar_par_max(xxl,xxg)
+
+    integer, intent(out) :: xxg
+    integer, intent(in) :: xxl
+
+    xxg=xxl
+
+  end subroutine int_scalar_par_max
   !
   !---------------------------------------------------------------------------
   subroutine double_scalar_par_sum(xxl,xxg)
