@@ -460,14 +460,14 @@ def append_var(basename,varname,reduc_func=np.mean):
       data = valid( D.variables[varname][:maxtime] )
 
       longname = D.variables[varname].longname
+
       # conditionally sampled data needs to be renormalized to global number of number of conditionally sampled data
       # i.e. here multiply it by local sampling rate and later renormalize with global sample number
-      if 'over cs1' in longname:
-        Ncs1 = D.variables['cnt_cs1'][:maxtime] # number of cs1 with dim: (time,zt)
-        data *= Ncs1
-      if 'over cs2' in longname:
-        Ncs2 = D.variables['cnt_cs2'][:maxtime] # number of cs2 with dim: (time,zt)
-        data *= Ncs2
+      normalize_cs = lambda data, csvarname: data * D.variables['cnt_{0:}'.format(csvarname)][:] if 'over {0:}'.format(csvarname) in longname else data
+      data = normalize_cs(data, 'cs1')
+      data = normalize_cs(data, 'cs2')
+
+
 
       if varname not in coord_files[(i,j)].keys(): 
           coord_files[(i,j)][varname] = data
@@ -527,14 +527,17 @@ def append_var(basename,varname,reduc_func=np.mean):
     dims = [ [td,coord_files[td]], ]
 
   # conditionally sampled data needs to be renormalized to global number of number of conditionally sampled data
-  if 'over cs1' in longname:
-    append_var(basename,'cnt_cs1')
-    Ncs1 = load_ncvar(basename,'cnt_cs1')[:maxtime] # number of cs1 with dim: (time,zt)
-    data /= Ncs1
-  if 'over cs2' in longname:
-    append_var(basename,'cnt_cs2')
-    Ncs2 = load_ncvar(basename,'cnt_cs2')[:maxtime] # number of cs2 with dim: (time,zt)
-    data /= Ncs2
+  def renormalize_cs(data, longname, csvarname, basename):
+    if 'over {0:}'.format(csvarname) in longname:
+      append_var(basename,'cnt_{0:}'.format(csvarname))
+      Ncs = load_ncvar(basename,'cnt_{0:}'.format(csvarname)) # number of cs with dim: (time,zt)
+      return data / Ncs
+    else:
+      return data
+
+
+  data = renormalize_cs(data, longname, 'cs1', basename)
+  data = renormalize_cs(data, longname, 'cs2', basename)
 
   write_nc(basename,varname, data, dims, attributes=attributes)
 #--------------------------------------------------------------------------------------------------------------------------------
