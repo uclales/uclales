@@ -764,18 +764,20 @@ contains
        call random_seed(put=seed)
 
        if(nxp-4 .eq. 2*(nxpx-4) .and. nyp-4.eq.2*(nypx-4))  then ! TODO This is a really bad hack but gets stuff done.
-         print *,'******************************** EXPERIMENTAL!!!! :: read_coarse_history ********************************'
+         if(myid.eq.0) print *,'******************************** EXPERIMENTAL!!!! :: read_coarse_history ********************************'
          call read_coarse_history()
          return
        endif
 
        if ((nxpx == 2*nxp) .and. (nypx == 2*nyp))  then
-         print *,'Domain size of history is twice the suspected grid', nxp, nyp, nzp, '::', nxpx, nypx, nzpx
-         print *,'I will assume this is on purpose and use the bigger grid as provided'
+         if(myid.eq.0) then
+           print *,'Domain size of history is twice the suspected grid', nxp, nyp, nzp, '::', nxpx, nypx, nzpx
+           print *,'I will assume this is on purpose and use the bigger grid as provided'
+           print *,xt
+           print *,xm
+         endif
          nxpx=nxp
          nypx=nyp
-         print *,xt
-         print *,xm
        end if
 
        if (nxpx /= nxp .or. nypx /= nyp .or. nzpx /= nzp)  then
@@ -786,10 +788,12 @@ contains
        read (10) xtx,xmx, ytx, ymx, zt, zm, dn0, th0, u0, v0, pi0, pi1, rt0, psrf
 
        if (any(xtx .ne. xt) .or. any(ytx .ne. yt))  then ! TODO Super bad hack, this does not give any credit to model physics!
-         print *,'Is the domain size of history twice the suspected grid?', xt, '::', xtx
-         print *,'I will assume this is on purpose and use the bigger grid as provided'
-         print *,xt
-         print *,xm
+         if(myid.eq.0) then
+           print *,'Is the domain size of history twice the suspected grid?', xt, '::', xtx
+           print *,'I will assume this is on purpose and use the bigger grid as provided'
+           print *,xt
+           print *,xm
+         endif
        else
          xt=xtx
          xm=xmx

@@ -921,7 +921,6 @@ contains
       tau = tauNoGas; w = wNoGas; pf = pfNoGas
       call gases (solar_bands(ib), ig, pp, pt, ph, po, tg )
       call combineOpticalProperties(tau, w, pf, tg)
-#ifndef _XLF
       if(ldebug) then
         if(any(isnan([tau, w, pf]))) then
           do k=1,size(pt)
@@ -930,7 +929,6 @@ contains
           call exit(-1)
         endif
       endif
-#endif
   end subroutine
   function get_band_uid(lsolar,iband,ibandg)
       use ckd, only: solar_bands,ir_bands,kg
@@ -1006,7 +1004,7 @@ contains
         deltaz = dz
         kabs   = max(epsilon(tau), tau * (one - w0) / dz )
         ksca   = max(epsilon(tau), tau *        w0  / dz )
-        g      = pf (:,1,:,:)/3._ireals
+        g      = min( one, pf (:,1,:,:)/3._ireals ) !todo: optprop used with ice microphysics gives g>1 -- we should fix the issue instead of constraining the value!
 
         if(.not. lsolar) then
           if(.not.allocated(planck) ) allocate(planck(nv+1, 3:nxp-2,3:nyp-2))
@@ -1034,9 +1032,9 @@ contains
 
         call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxpa, nyproc=nypa,  dz3d=dz)
         if(lsolar) then
-          call set_optical_properties( max(epsilon(tau), tau * (one - w0) / dz ), max(epsilon(tau), tau *       w0  / dz ), pf (:,1,:,:)/3._ireals )
+          call set_optical_properties( max(epsilon(tau), tau * (one - w0) / dz ), max(epsilon(tau), tau *       w0  / dz ), min(one, pf (:,1,:,:)/3._ireals) )
         else
-          call set_optical_properties( max(epsilon(tau), tau * (one - w0) / dz ), max(epsilon(tau), tau *       w0  / dz ), pf (:,1,:,:)/3._ireals, bf )
+          call set_optical_properties( max(epsilon(tau), tau * (one - w0) / dz ), max(epsilon(tau), tau *       w0  / dz ), min(one, pf (:,1,:,:)/3._ireals), bf )
         endif
 
         call solve_tenstream(incSolar,solution_uid,solution_time)
