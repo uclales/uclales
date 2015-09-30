@@ -8,6 +8,10 @@ import os
 from time import sleep
 from datetime import datetime
 
+def nanaverage(a,weights):
+    indices = ~np.isnan(a)
+    return np.average(a[indices], weights=weights[indices])
+
 #try:
 #    from filelock import FileLock
 #    have_lock=True
@@ -17,6 +21,19 @@ have_lock=False
 complvl=3
 
 #--------------------------------------------------------------------------------------------------------------------------------
+def load_ncvar(basename,varname):
+  fname= '{0:}'.format(basename)+'.merged.nc'
+  try:
+    D=Dataset(fname,'r')
+    return D.variables[varname][:]
+    
+  except Exception,e:
+    print 'Could not load variable {0:} from merged nc file because {1:}'.format(varname,e)
+    raise(e)
+
+  finally:
+    D.close()
+  
 def write_nc(basename,varname, data, dims, attributes=None):
   fname= '{0:}'.format(basename)+'.merged.nc'
   try:
@@ -252,25 +269,25 @@ reduc_functions={
         'tot_lw'  : np.nanmean,
         'sed_lw'  : np.nanmean,
         'cs1'     : np.nanmean,
-        'cnt_cs1' : np.nanmean,
-        'w_cs1'   : np.nanmean,
-        'tl_cs1'  : np.nanmean,
-        'tv_cs1'  : np.nanmean,
-        'rt_cs1'  : np.nanmean,
-        'rl_cs1'  : np.nanmean,
-        'wt_cs1'  : np.nanmean,
-        'wv_cs1'  : np.nanmean,
-        'wr_cs1'  : np.nanmean,
+        'cnt_cs1' : np.nansum,
+        'w_cs1'   : np.nanmean, #nanaverage,
+        'tl_cs1'  : np.nanmean, #nanaverage,
+        'tv_cs1'  : np.nanmean, #nanaverage,
+        'rt_cs1'  : np.nanmean, #nanaverage,
+        'rl_cs1'  : np.nanmean, #nanaverage,
+        'wt_cs1'  : np.nanmean, #nanaverage,
+        'wv_cs1'  : np.nanmean, #nanaverage,
+        'wr_cs1'  : np.nanmean, #nanaverage,
         'cs2'     : np.nanmean,
         'cnt_cs2' : np.nanmean,
-        'w_cs2'   : np.nanmean,
-        'tl_cs2'  : np.nanmean,
-        'tv_cs2'  : np.nanmean,
-        'rt_cs2'  : np.nanmean,
-        'rl_cs2'  : np.nanmean,
-        'wt_cs2'  : np.nanmean,
-        'wv_cs2'  : np.nanmean,
-        'wr_cs2'  : np.nanmean,
+        'w_cs2'   : np.nanmean, #nanaverage,
+        'tl_cs2'  : np.nanmean, #nanaverage,
+        'tv_cs2'  : np.nanmean, #nanaverage,
+        'rt_cs2'  : np.nanmean, #nanaverage,
+        'rl_cs2'  : np.nanmean, #nanaverage,
+        'wt_cs2'  : np.nanmean, #nanaverage,
+        'wv_cs2'  : np.nanmean, #nanaverage,
+        'wr_cs2'  : np.nanmean, #nanaverage,
         'Nc'      : np.nanmean,
         'Nr'      : np.nanmean,
         'rr'      : np.nanmean,
@@ -356,6 +373,8 @@ def append_var(basename,varname,reduc_func=np.mean):
   if exists_nc(basename, varname):
     print "variable already exists",varname
     return
+  else:
+    print 'merging new variable',varname
 
   files=glob(basename+'.0*.nc')
 
@@ -400,7 +419,7 @@ def append_var(basename,varname,reduc_func=np.mean):
           sys.exit(-1)
 #      print 'Using reduc function',reduc_func.__name__,' for variable ',varname,'({}d)'.format(ndim)
 
-#      print 'reading data from file:',coord_files[(i,j)]['fname'],' coords ',i,j
+      print 'reading data from file:',coord_files[(i,j)]['fname'],' coords ',i,j
 
       l4d = ndim==4
       l3d = ndim==3
@@ -428,8 +447,20 @@ def append_var(basename,varname,reduc_func=np.mean):
         valid = lambda x: x
 
       # Save data into coord_files construct -- will later merge these
+      data = valid( D.variables[varname][:maxtime] )
+
+      longname = D.variables[varname].longname
+      # conditionally sampled data needs to be renormalized to global number of number of conditionally sampled data
+      # i.e. here multiply it by local sampling rate and later renormalize with global sample number
+      if 'over cs1' in longname:
+        Ncs1 = D.variables['cnt_cs1'][:maxtime] # number of cs1 with dim: (time,zt)
+        data *= Ncs1
+      if 'over cs2' in longname:
+        Ncs2 = D.variables['cnt_cs2'][:maxtime] # number of cs2 with dim: (time,zt)
+        data *= Ncs2
+
       if varname not in coord_files[(i,j)].keys(): 
-          coord_files[(i,j)][varname] = valid( D.variables[varname][:maxtime] )
+          coord_files[(i,j)][varname] = data
 
       # Save coordinates for variable:
       coord_files[td] = D.variables[ td ][:maxtime]
@@ -484,6 +515,16 @@ def append_var(basename,varname,reduc_func=np.mean):
   if l1d:
     data = var
     dims = [ [td,coord_files[td]], ]
+
+  # conditionally sampled data needs to be renormalized to global number of number of conditionally sampled data
+  if 'over cs1' in longname:
+    append_var(basename,'cnt_cs1')
+    Ncs1 = load_ncvar(basename,'cnt_cs1')[:maxtime] # number of cs1 with dim: (time,zt)
+    data /= Ncs1
+  if 'over cs2' in longname:
+    append_var(basename,'cnt_cs2')
+    Ncs2 = load_ncvar(basename,'cnt_cs2')[:maxtime] # number of cs2 with dim: (time,zt)
+    data /= Ncs2
 
   write_nc(basename,varname, data, dims, attributes=attributes)
 #--------------------------------------------------------------------------------------------------------------------------------
