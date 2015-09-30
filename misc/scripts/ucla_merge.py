@@ -67,6 +67,8 @@ def write_nc(basename,varname, data, dims, attributes=None):
             print 'write_netcdf: var: ',varname,' shape', np.shape(data),' nc dimensions:',[ d[0] for d in dims ]
             fillval = attributes.pop('_FillValue') if attributes!=None else None
 
+            data[np.isnan(data)] = fillval
+
             D.createVariable(varname, 'f4', [ d[0] for d in dims ] , zlib=True,least_significant_digit=6, complevel=complvl,fill_value=fillval)
             D.variables[varname][:] = data
 
