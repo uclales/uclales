@@ -281,7 +281,7 @@ reduc_functions={
         'wv_cs1'  : np.nanmean, #nanaverage,
         'wr_cs1'  : np.nanmean, #nanaverage,
         'cs2'     : np.nanmean,
-        'cnt_cs2' : np.nanmean,
+        'cnt_cs2' : np.nansum,
         'w_cs2'   : np.nanmean, #nanaverage,
         'tl_cs2'  : np.nanmean, #nanaverage,
         'tv_cs2'  : np.nanmean, #nanaverage,
