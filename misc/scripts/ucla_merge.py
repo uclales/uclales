@@ -427,7 +427,7 @@ def append_var(basename,varname,reduc_func=np.mean):
           sys.exit(-1)
 #      print 'Using reduc function',reduc_func.__name__,' for variable ',varname,'({}d)'.format(ndim)
 
-      print 'reading data from file:',coord_files[(i,j)]['fname'],' coords ',i,j
+#      print 'reading data from file:',coord_files[(i,j)]['fname'],' coords ',i,j
 
       l4d = ndim==4
       l3d = ndim==3
