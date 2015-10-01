@@ -270,26 +270,26 @@ reduc_functions={
         'l_3'     : np.nanmean,
         'tot_lw'  : np.nanmean,
         'sed_lw'  : np.nanmean,
-        'cs1'     : np.nanmean,
+        'cs1'     : np.nansum,
         'cnt_cs1' : np.nansum,
-        'w_cs1'   : np.nanmean, #nanaverage,
-        'tl_cs1'  : np.nanmean, #nanaverage,
-        'tv_cs1'  : np.nanmean, #nanaverage,
-        'rt_cs1'  : np.nanmean, #nanaverage,
-        'rl_cs1'  : np.nanmean, #nanaverage,
-        'wt_cs1'  : np.nanmean, #nanaverage,
-        'wv_cs1'  : np.nanmean, #nanaverage,
-        'wr_cs1'  : np.nanmean, #nanaverage,
-        'cs2'     : np.nanmean,
+        'w_cs1'   : np.nansum, 
+        'tl_cs1'  : np.nansum, 
+        'tv_cs1'  : np.nansum, 
+        'rt_cs1'  : np.nansum, 
+        'rl_cs1'  : np.nansum, 
+        'wt_cs1'  : np.nansum, 
+        'wv_cs1'  : np.nansum, 
+        'wr_cs1'  : np.nansum, 
+        'cs2'     : np.nansum,
         'cnt_cs2' : np.nansum,
-        'w_cs2'   : np.nanmean, #nanaverage,
-        'tl_cs2'  : np.nanmean, #nanaverage,
-        'tv_cs2'  : np.nanmean, #nanaverage,
-        'rt_cs2'  : np.nanmean, #nanaverage,
-        'rl_cs2'  : np.nanmean, #nanaverage,
-        'wt_cs2'  : np.nanmean, #nanaverage,
-        'wv_cs2'  : np.nanmean, #nanaverage,
-        'wr_cs2'  : np.nanmean, #nanaverage,
+        'w_cs2'   : np.nansum, 
+        'tl_cs2'  : np.nansum, 
+        'tv_cs2'  : np.nansum, 
+        'rt_cs2'  : np.nansum, 
+        'rl_cs2'  : np.nansum, 
+        'wt_cs2'  : np.nansum, 
+        'wv_cs2'  : np.nansum, 
+        'wr_cs2'  : np.nansum, 
         'Nc'      : np.nanmean,
         'Nr'      : np.nanmean,
         'rr'      : np.nanmean,
@@ -460,14 +460,6 @@ def append_var(basename,varname,reduc_func=np.mean):
       data = valid( D.variables[varname][:maxtime] )
 
       longname = D.variables[varname].longname
-
-      # conditionally sampled data needs to be renormalized to global number of number of conditionally sampled data
-      # i.e. here multiply it by local sampling rate and later renormalize with global sample number
-      normalize_cs = lambda data, csvarname: data * D.variables['cnt_{0:}'.format(csvarname)][:] if 'over {0:}'.format(csvarname) in longname else data
-      data = normalize_cs(data, 'cs1')
-      data = normalize_cs(data, 'cs2')
-
-
 
       if varname not in coord_files[(i,j)].keys(): 
           coord_files[(i,j)][varname] = data
