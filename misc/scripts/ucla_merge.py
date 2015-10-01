@@ -270,7 +270,7 @@ reduc_functions={
         'l_3'     : np.nanmean,
         'tot_lw'  : np.nanmean,
         'sed_lw'  : np.nanmean,
-        'cs1'     : np.nansum,
+        'cs1'     : np.nanmean,
         'cnt_cs1' : np.nansum,
         'w_cs1'   : np.nansum, 
         'tl_cs1'  : np.nansum, 
@@ -280,7 +280,7 @@ reduc_functions={
         'wt_cs1'  : np.nansum, 
         'wv_cs1'  : np.nansum, 
         'wr_cs1'  : np.nansum, 
-        'cs2'     : np.nansum,
+        'cs2'     : np.nanmean,
         'cnt_cs2' : np.nansum,
         'w_cs2'   : np.nansum, 
         'tl_cs2'  : np.nansum, 
@@ -520,7 +520,7 @@ def append_var(basename,varname,reduc_func=np.mean):
 
   # conditionally sampled data needs to be renormalized to global number of number of conditionally sampled data
   def renormalize_cs(data, longname, csvarname, basename):
-    if 'over {0:}'.format(csvarname) in longname:
+    if ('over {0:}'.format(csvarname) in longname) or ('and {0:}'.format(csvarname) in longname):
       append_var(basename,'cnt_{0:}'.format(csvarname))
       Ncs = load_ncvar(basename,'cnt_{0:}'.format(csvarname)) # number of cs with dim: (time,zt)
       return data / Ncs
