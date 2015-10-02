@@ -174,7 +174,7 @@ contains
       if(myid.eq.0.and.ldebug) print *,'calculate radiation ... done'
     contains
       subroutine thermal_rad()
-          use grid, only       : iradtyp
+          use grid, only       : iradtyp, a_tskin
           use ckd   , only: llimit, rlimit
           use fuliou, only: computeIRBandWeights, planck, select_bandg
           use defs, only: nv,nv1,pi
@@ -326,7 +326,11 @@ contains
                         plwc=plwc, pre=pre)
                   end if
 
-                  call planck(pt, sknt, llimit(ir_bands(ib)), rlimit(ir_bands(ib)), bf(:,i,j))
+                  if (allocated(a_tskin)) then ! have lsm to give surface temp
+                    call planck(pt, a_tskin(i,j), llimit(ir_bands(ib)), rlimit(ir_bands(ib)), bf(:,i,j))
+                  else
+                    call planck(pt, sknt, llimit(ir_bands(ib)), rlimit(ir_bands(ib)), bf(:,i,j))
+                  endif
 
                 end do ! j
               end do ! i
