@@ -984,12 +984,16 @@ contains
       real(ireals) :: dx,dy,phi0,u0,albedo
       real(ireals),allocatable,dimension(:,:,:) :: kabs,ksca,g,deltaz ! dim(in_nv, 3:in_nxp-2,3:in_nyp-2)
       real(ireals),allocatable,dimension(:,:,:) :: planck
+      integer(iintegers) :: nxproc(size(nxpa)), nyproc(size(nypa))
 
       integer(iintegers) :: k
       real(ireals)       :: theta0,incSolar
 
-      nxp=in_nxp;nyp=in_nyp;nv=in_nv
-      dx=in_dx;dy=in_dy;phi0=in_phi0;u0=in_u0;albedo=in_albedo
+
+      nxp=in_nxp; nyp=in_nyp; nv=in_nv
+      dx=in_dx; dy=in_dy
+      phi0=in_phi0; u0=in_u0; albedo=in_albedo
+      nxproc=nxpa; nyproc=nypa
       if(ldebug.and.myid.eq.0) print *,'Tenstrwrapper lsol',lsolar,'nx/y',nxp,nyp,nv,'uid',solution_uid,solution_time,' shapes::',shape(dz),shape(fdn),shape(fup),shape(fdiv)
 
       if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
@@ -1021,7 +1025,7 @@ contains
           if(any(isnan(g   ))) print *,myid,'tenstream_wrapper :: corrupt g   ',g   ,'::',pf (:,1,:,:)                                      
         endif
 
-        call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxpa, nyproc=nypa,  dz3d=deltaz)
+        call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxproc, nyproc=nyproc,  dz3d=deltaz)
         if(lsolar) then
           call set_optical_properties( kabs, ksca, g )
         else
@@ -1034,7 +1038,7 @@ contains
 
 #else 
 
-        call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxpa, nyproc=nypa,  dz3d=dz)
+        call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxproc, nyproc=nyproc,  dz3d=dz)
         if(lsolar) then
           call set_optical_properties( max(epsilon(tau), tau * (one - w0) / dz ), max(epsilon(tau), tau *       w0  / dz ), min(one, pf (:,1,:,:)/3._ireals) )
         else
