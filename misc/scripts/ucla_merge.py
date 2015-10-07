@@ -534,49 +534,50 @@ def append_var(basename,varname,reduc_func=np.mean):
   write_nc(basename,varname, data, dims, attributes=attributes)
 #--------------------------------------------------------------------------------------------------------------------------------
 
-try:
-  basename = str( sys.argv[1] )
-except:
-  sys.exit(-1)
-
-files = sorted(glob(basename+'.0*.nc'))
-print "Opening files:",files
-
-# Check for all possible variables:
-vars=[]
-D = Dataset( files[0], 'r' )
-for v in D.variables:
-    print 'Found Variable:',v.__str__()
-    vars.append( v.__str__() )
-D.close()
-
-try:
-    do_vars=[]
-    varnames = None
-    varnames = str( sys.argv[2] ).split()
-    if 'all' not in varnames:
-        for varname in varnames:
-            if varname in vars:
-                do_vars.append(varname)
-            else:
-                raise Exception('variable not found')
-        vars=do_vars
-
-except Exception,e:
-    print ''
-    print ''
-    print "Error occurred when we tried to find the correct variable (",varname,"): ",e
-    print "Possible variables are: 'all' or one of the following"
-    print ' '.join(vars)
-    print ''
-    print ''
-    sys.exit(0)
-
-
-for idim in [4,3,2,1]:
-  for varname in vars:
-      D = Dataset( files[0], 'r' )
-      ndim = len(np.shape(D.variables[varname]))
-      D.close()
-      if ndim == idim:
-          append_var(basename,varname)
+if __name__ == "__main__":
+  try:
+    basename = str( sys.argv[1] )
+  except:
+    sys.exit(-1)
+  
+  files = sorted(glob(basename+'.0*.nc'))
+  print "Opening files:",files
+  
+  # Check for all possible variables:
+  vars=[]
+  D = Dataset( files[0], 'r' )
+  for v in D.variables:
+      print 'Found Variable:',v.__str__()
+      vars.append( v.__str__() )
+  D.close()
+  
+  try:
+      do_vars=[]
+      varnames = None
+      varnames = str( sys.argv[2] ).split()
+      if 'all' not in varnames:
+          for varname in varnames:
+              if varname in vars:
+                  do_vars.append(varname)
+              else:
+                  raise Exception('variable not found')
+          vars=do_vars
+  
+  except Exception,e:
+      print ''
+      print ''
+      print "Error occurred when we tried to find the correct variable (",varname,"): ",e
+      print "Possible variables are: 'all' or one of the following"
+      print ' '.join(vars)
+      print ''
+      print ''
+      sys.exit(0)
+  
+  
+  for idim in [4,3,2,1]:
+    for varname in vars:
+        D = Dataset( files[0], 'r' )
+        ndim = len(np.shape(D.variables[varname]))
+        D.close()
+        if ndim == idim:
+            append_var(basename,varname)
