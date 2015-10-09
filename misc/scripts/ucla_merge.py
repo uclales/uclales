@@ -1,583 +1,345 @@
 #!/usr/bin/env python
+"""
+Collects ucla-LES output data from multiple netCDF files
+"""
 import numpy as np
 from netCDF4 import Dataset
-#import h5py as H
 from glob import glob
-import sys
 import os
-from time import sleep
-from datetime import datetime
+from contextlib import closing
 
-def nanaverage(a,weights):
-    indices = ~np.isnan(a)
-    return np.average(a[indices], weights=weights[indices])
+REDUCTION_FUNCTIONS = [
+    (np.nanmax, ['cfl', 'lmax', 'maxdiv', 'wmax', 'zc']),
+    (np.nanmean, [
+        'CCN', 'G0', 'Nc', 'Nr', 'Qnet', 'RH', 'a_Wl', 'adv_u',
+        'adv_v', 'adv_w', 'albedo', 'boy_prd', 'cdsed', 'cfrac',
+        'cliq', 'cs1', 'cs2', 'dff_u', 'dff_v', 'dff_w', 'diss',
+        'dn0', 'evap', 'frc_prc', 'frc_ran', 'fsttm', 'graupel',
+        'gwp_bar', 'gwp_var', 'hail', 'hst_srf', 'hwp_bar', 'hwp_var',
+        'i_nuc', 'ice', 'iwp_bar', 'iwp_var', 'kh', 'km', 'l', 'l_2',
+        'l_3', 'lflxd', 'lflxds', 'lflxdsc', 'lflxdt', 'lflxu', 'lflxus',
+        'lflxusc', 'lflxut', 'lflxutc', 'lhf_bar', 'lmbd', 'lmbde',
+        'lsttm', 'lwdca', 'lwp_bar', 'lwp_var', 'lwuca', 'n_ice', 'nrain',
+        'nsmp', 'obl', 'p', 'pfrac', 'prc_c', 'prc_g', 'prc_h', 'prc_i',
+        'prc_prc', 'prc_r', 'prc_s', 'prcp', 'prd_uw', 'prs_u', 'prs_v',
+        'prs_w', 'q', 'q_2', 'q_3', 'qskinav', 'qt_th', 'ra', 'rflx', 'rflx2',
+        'rr', 'rssoil', 'rsup', 'rsurf', 'rsveg', 'rwp_bar', 's_1', 's_2',
+        's_3', 'sed_lw', 'sfcbflx', 'sflx', 'sflx2', 'sflxd', 'sflxds',
+        'sflxdsc', 'sflxdt', 'sflxu', 'sflxus', 'sflxusc', 'sflxut',
+        'sflxutc', 'sfs_boy', 'sfs_qw', 'sfs_shr', 'sfs_tke', 'sfs_tw',
+        'sfs_uw', 'sfs_vw', 'sfs_ww', 'shf_bar', 'shr_prd', 'snow', 'storage',
+        'swdca', 'swp_bar', 'swp_var', 'swuca', 't', 't_2', 't_3', 'thl_int',
+        'tkeint', 'tndskin', 'tot_lw', 'tot_qw', 'tot_tw', 'tot_uw', 'tot_vw',
+        'tot_ww', 'trans', 'tsair', 'tskinav', 'tsrf', 'u', 'u0', 'u_2',
+        'ustar', 'v', 'v0', 'v_2', 'vtke', 'w_2', 'w_3', 'wvp_bar', 'wvp_var',
+        'zbmn', 'zcmn', 'zi1_bar', 'zi2_bar', 'zi3_bar', 'zi_bar',
+        'time', 'xd', 'xm', 'xt', 'ym', 'yt', 'zm', 'zt']),
+    (np.nanmin, ['zb']),
+    (np.nansum, [
+        'cnt_cs1', 'cnt_cs2', 'nrcnt', 'rl_cs1', 'rl_cs2', 'rt_cs1', 'rt_cs2',
+        'tl_cs1', 'tl_cs2', 'tv_cs1', 'tv_cs2', 'w_cs1', 'w_cs2', 'wr_cs1',
+        'wr_cs2', 'wt_cs1', 'wt_cs2', 'wv_cs1', 'wv_cs2'])
+]
 
-#try:
-#    from filelock import FileLock
-#    have_lock=True
-#except Exception,e:
-#    print 'Couldnt import FileLock:',e
-have_lock=False
-complvl=3
+REDUCTION_FUNCTIONS_REV = {field: func
+                           for func, fields in REDUCTION_FUNCTIONS
+                           for field in fields}
 
-#--------------------------------------------------------------------------------------------------------------------------------
-def load_ncvar(basename,varname):
-  fname= '{0:}'.format(basename)+'.merged.nc'
-  try:
-    D=Dataset(fname,'r')
-    return D.variables[varname][:]
-    
-  except Exception,e:
-    print 'Could not load variable {0:} from merged nc file because {1:}'.format(varname,e)
-    raise(e)
 
-  finally:
-    D.close()
-  
-def write_nc(basename,varname, data, dims, attributes=None):
-  fname= '{0:}'.format(basename)+'.merged.nc'
-  try:
-  
-    if have_lock:
-        start = datetime.now()
-        lock = FileLock(fname+'.lock')
-        lock.acquire() # wait until file is ready for opening
-        print("Lock acquired. waited :: {}".format(datetime.now()-start) )
-
-    if os.path.exists(fname):
-      fmode='a'
+def valid(array_like):
+    """
+    Returns an array or masked array as plain array
+    with NaN on invalid fields.
+    """
+    if isinstance(array_like, np.ma.core.MaskedArray):
+        return np.where(array_like.mask, np.NaN, array_like.data)
     else:
-      fmode='w'
-    D=Dataset(fname,fmode)
-  
-    try:
-        for dim in dims:
-          if dim[0] not in D.dimensions: 
-            D.createDimension(dim[0], len(dim[1]) )
-            if dim[0] not in D.variables:
-                D.createVariable(dim[0] ,'f4',(dim[0],) )
-                D.variables[dim[0]][:] = dim[1]
-                print 'write_netcdf: write dim:',dim,'shape',np.shape(dim[1])
-    except Exception,e:
-        print 'Error happened writing dimensions',e
-        raise(e)
-  
-    try:
-        if varname not in D.variables:
-            print 'write_netcdf: var: ',varname,' shape', np.shape(data),' nc dimensions:',[ d[0] for d in dims ]
-            fillval = attributes.pop('_FillValue') if attributes!=None else None
-
-            data[np.isnan(data)] = fillval
-
-            D.createVariable(varname, 'f4', [ d[0] for d in dims ] , zlib=True,least_significant_digit=6, complevel=complvl,fill_value=fillval)
-            D.variables[varname][:] = data
-
-            try:
-                if attributes!=None:
-                    print 'attributes',attributes
-                    [ D.variables[varname].setncattr(att,val) for att,val in attributes.iteritems() ]
-            except Exception,e:
-                print 'Error happened writing attributes',e
-                raise(e)
-    except Exception,e:
-        print 'Error happened writing data',e
-        raise(e)
-  
-  except Exception,e:
-    print 'error occured when we tried writing data to netcdf file',e
-  finally:
-    if 'D' in locals(): D.close()
-    if have_lock:
-        lock.release()
-
-def exists_nc(basename, varname):
-  try:
-    fname= basename+'.merged.nc'
-    if os.path.exists(fname):
-      fmode='r'
-    else:
-      exists = False
-      print 'Checking if {0:} exists in file {1:} :: File not found => {2:}'.format(varname,fname,exists)
-      return exists 
-
-    D=Dataset(fname,fmode)
-
-    if varname in D.variables:
-      exists=True
-    else:
-      exists=False
-
-  except Exception,e:
-    print 'error occured when we checked if variable exists',e
-    exists=False
-  finally:
-    if 'D' in locals(): D.close()
-
-  print 'Checking if {0:} exists in file {1:} :: {2:}'.format(varname,basename,exists)
-  return exists
-#--------------------------------------------------------------------------------------------------------------------------------
-
-#-------------------------------Reduction functions------------------------------------------------------------------------------
-reduc_functions={ 
-        0:{ # coordinates
-        # coordinate:
-        'time'  : None,
-        'zt'    : None,
-        'zm'    : None,
-        'xt'    : None,
-        'xm'    : None,
-        'yt'    : None,
-        'ym'    : None,
-        },
-
-        1:{ # one dimensional variables
-        # .ts. variables:
-        'cfl'     : np.nanmax ,
-        'maxdiv'  : np.nanmax ,
-        'zi1_bar' : np.nanmean,
-        'zi2_bar' : np.nanmean,
-        'zi3_bar' : np.nanmean,
-        'vtke'    : np.nanmean,
-        'sfcbflx' : np.nanmean,
-        'wmax'    : np.nanmax ,
-        'tsrf'    : np.nanmean, 
-        'ustar'   : np.nanmean, 
-        'shf_bar' : np.nanmean, 
-        'lhf_bar' : np.nanmean,
-        'zi_bar'  : np.nanmean,
-        'lwp_bar' : np.nanmean,
-        'lwp_var' : np.nanmean,
-        'zc'      : np.nanmax ,
-        'zb'      : np.nanmin ,
-        'cfrac'   : np.nanmean,
-        'lmax'    : np.nanmax ,
-        'albedo'  : np.nanmean,
-        'rwp_bar' : np.nanmean,
-        'prcp'    : np.nanmean,
-        'pfrac'   : np.nanmean,
-        'CCN'     : np.nanmean,
-        'nrain'   : np.nanmean,
-        'nrcnt'   : np.nansum ,
-        'zcmn'    : np.nanmean,
-        'zbmn'    : np.nanmean,
-        'tkeint'  : np.nanmean,
-        'lflxut'  : np.nanmean,
-        'lflxdt'  : np.nanmean,
-        'sflxut'  : np.nanmean,
-        'sflxdt'  : np.nanmean,
-        'thl_int' : np.nanmean,
-        'wvp_bar' : np.nanmean,
-        'wvp_var' : np.nanmean,
-        'iwp_bar' : np.nanmean,
-        'iwp_var' : np.nanmean,
-        'swp_bar' : np.nanmean,
-        'swp_var' : np.nanmean,
-        'gwp_bar' : np.nanmean,
-        'gwp_var' : np.nanmean,
-        'hwp_bar' : np.nanmean,
-        'hwp_var' : np.nanmean,
-        'Qnet'    : np.nanmean,
-        'G0'      : np.nanmean,
-        'tndskin' : np.nanmean,
-        'ra'      : np.nanmean,
-        'rsurf'   : np.nanmean,
-        'rsveg'   : np.nanmean,
-        'rssoil'  : np.nanmean,
-        'tskinav' : np.nanmean,
-        'qskinav' : np.nanmean,
-        'obl'     : np.nanmean,
-        'cliq'    : np.nanmean,
-        'a_Wl'    : np.nanmean,
-        'lflxutc' : np.nanmean,
-        'sflxutc' : np.nanmean,
-        'tsair'   : np.nanmean,
-        'sflxds'  : np.nanmean,
-        'sflxus'  : np.nanmean,
-        'lflxds'  : np.nanmean,
-        'lflxus'  : np.nanmean,
-        'sflxdsc' : np.nanmean,
-        'sflxusc' : np.nanmean,
-        'lflxdsc' : np.nanmean,
-        'lflxusc' : np.nanmean,
-
-        # .ps. variables:
-        'fsttm'   : np.nanmean,
-        'lsttm'   : np.nanmean,
-        'nsmp'    : np.nanmean,
-        
-        # 3d vars
-        'dn0'   : np.nanmean,
-        'u0'    : np.nanmean,
-        'v0'    : np.nanmean,
-        },
-
-        2 : { # 2d variables
-        # .ps. variables:
-        'dn0'     : np.nanmean,
-        'u0'      : np.nanmean,
-        'v0'      : np.nanmean,
-        'u'       : np.nanmean,
-        'v'       : np.nanmean,
-        't'       : np.nanmean,
-        'p'       : np.nanmean,
-        'u_2'     : np.nanmean,
-        'v_2'     : np.nanmean,
-        'w_2'     : np.nanmean,
-        't_2'     : np.nanmean,
-        'w_3'     : np.nanmean,
-        't_3'     : np.nanmean,
-        'tot_tw'  : np.nanmean,  # Total vertical flux of theta -- TODO should this be sum?
-        'sfs_tw'  : np.nanmean,
-        'tot_uw'  : np.nanmean,
-        'sfs_uw'  : np.nanmean,
-        'tot_vw'  : np.nanmean,
-        'sfs_vw'  : np.nanmean,
-        'tot_ww'  : np.nanmean,
-        'sfs_ww'  : np.nanmean,
-        'km'      : np.nanmean,
-        'kh'      : np.nanmean,
-        'lmbd'    : np.nanmean,
-        'lmbde'   : np.nanmean,
-        'sfs_tke' : np.nanmean,
-        'sfs_boy' : np.nanmean,
-        'sfs_shr' : np.nanmean,
-        'boy_prd' : np.nanmean,
-        'shr_prd' : np.nanmean,
-        'trans'   : np.nanmean,
-        'diss'    : np.nanmean,
-        'dff_u'   : np.nanmean,
-        'dff_v'   : np.nanmean,
-        'dff_w'   : np.nanmean,
-        'adv_u'   : np.nanmean,
-        'adv_v'   : np.nanmean,
-        'adv_w'   : np.nanmean,
-        'prs_u'   : np.nanmean,
-        'prs_v'   : np.nanmean,
-        'prs_w'   : np.nanmean,
-        'prd_uw'  : np.nanmean,
-        'storage' : np.nanmean,
-        'q'       : np.nanmean,
-        'q_2'     : np.nanmean,
-        'q_3'     : np.nanmean,
-        'tot_qw'  : np.nanmean,
-        'sfs_qw'  : np.nanmean,
-        'rflx'    : np.nanmean,
-        'rflx2'   : np.nanmean,
-        'sflx'    : np.nanmean,
-        'sflx2'   : np.nanmean,
-        'l'       : np.nanmean,
-        'l_2'     : np.nanmean,
-        'l_3'     : np.nanmean,
-        'tot_lw'  : np.nanmean,
-        'sed_lw'  : np.nanmean,
-        'cs1'     : np.nanmean,
-        'cnt_cs1' : np.nansum,
-        'w_cs1'   : np.nansum, 
-        'tl_cs1'  : np.nansum, 
-        'tv_cs1'  : np.nansum, 
-        'rt_cs1'  : np.nansum, 
-        'rl_cs1'  : np.nansum, 
-        'wt_cs1'  : np.nansum, 
-        'wv_cs1'  : np.nansum, 
-        'wr_cs1'  : np.nansum, 
-        'cs2'     : np.nanmean,
-        'cnt_cs2' : np.nansum,
-        'w_cs2'   : np.nansum, 
-        'tl_cs2'  : np.nansum, 
-        'tv_cs2'  : np.nansum, 
-        'rt_cs2'  : np.nansum, 
-        'rl_cs2'  : np.nansum, 
-        'wt_cs2'  : np.nansum, 
-        'wv_cs2'  : np.nansum, 
-        'wr_cs2'  : np.nansum, 
-        'Nc'      : np.nanmean,
-        'Nr'      : np.nanmean,
-        'rr'      : np.nanmean,
-        'prc_r'   : np.nanmean,
-        'evap'    : np.nanmean,
-        'frc_prc' : np.nanmean,
-        'prc_prc' : np.nanmean,
-        'frc_ran' : np.nanmean,
-        'hst_srf' : np.nanmean,
-        'lflxu'   : np.nanmean,
-        'lflxd'   : np.nanmean,
-        'sflxu'   : np.nanmean,
-        'sflxd'   : np.nanmean,
-        'cdsed'   : np.nanmean,
-        'i_nuc'   : np.nanmean,
-        'ice'     : np.nanmean,
-        'n_ice'   : np.nanmean,
-        'snow'    : np.nanmean,
-        'graupel' : np.nanmean,
-        'rsup'    : np.nanmean,
-        'prc_c'   : np.nanmean,
-        'prc_i'   : np.nanmean,
-        'prc_s'   : np.nanmean,
-        'prc_g'   : np.nanmean,
-        'prc_h'   : np.nanmean,
-        'hail'    : np.nanmean,
-        'qt_th'   : np.nanmean,
-        's_1'     : np.nanmean,
-        's_2'     : np.nanmean,
-        's_3'     : np.nanmean,
-        'RH'      : np.nanmean,
-        'lwuca'   : np.nanmean,
-        'lwdca'   : np.nanmean,
-        'swuca'   : np.nanmean,
-        'swdca'   : np.nanmean,
+        return array_like
 
 
-        },
+def calculate_transposition_rule(decomposition_dimensions, dimensions):
+    """
+    Calculates how a combined array of many subdomains with decomposition
+    dimensions as first axes must be transposed such that a reshape will
+    result in correct concatenation of the decomposed dimensions.
 
-        3: { # 3d variables
-        # .2d. variables:
-        'shf'     : np.concatenate,
-        'lhf'     : np.concatenate,
-        'ustars'  : np.concatenate,
-        'a_tskin' : np.concatenate,
-        'a_qskin' : np.concatenate,
-        'a_Qnet'  : np.concatenate,
-        'a_Qnet'  : np.concatenate,
-        'a_G0'    : np.concatenate,
-        },
-        
-
-        4: { # 4d variables
-        # .3d. variables:
-        'u'     : np.concatenate,
-        'v'     : np.concatenate,
-        'w'     : np.concatenate,
-        't'     : np.concatenate,
-        'p'     : np.concatenate,
-        'q'     : np.concatenate,
-        'l'     : np.concatenate,
-        'r'     : np.concatenate,
-        'rice'  : np.concatenate,
-        'nice'  : np.concatenate,
-        'rsnow' : np.concatenate,
-        'rgrp'  : np.concatenate,
-        'nsnow' : np.concatenate,
-        'ngrp'  : np.concatenate,
-        'rhail' : np.concatenate,
-        'nhail' : np.concatenate,
-        'n'     : np.concatenate,
-        'a_rhl' : np.concatenate,
-        'a_rhs' : np.concatenate,
-        'rflx'  : np.concatenate,
-        'lflxu' : np.concatenate,
-        'lflxd' : np.concatenate,
-
-        'tsoil' : np.concatenate,
-        'phiw'  : np.concatenate,
-        },
-        
-        }
-
-#--------------------------------------------------------------------------------------------------------------------------------
-
-
-#--------------------------------------------------------------------------------------------------------------------------------
-maxtime=-1
-def append_var(basename,varname,reduc_func=np.mean):
-  global maxtime
-  if exists_nc(basename, varname):
-    print "variable already exists",varname
-    return
-  else:
-    print 'merging new variable',varname
-
-  files=glob(basename+'.0*.nc')
-
-  if 'coord_files' not in locals(): coord_files={}
-  for f in sorted(files):
+    Example:
+    If an array with ``dimensions`` ('x', 'y', 'z') would have been decomposed
+    into ('x', 'y'), the x axis of the subdomain must be swapped with the
+    y axis of the decomposition. The correct transposition rule would be
+    therefore: (0, 2, 1, 3, 4).
+    """
+    subdomain_positions = []
+    for i, dim in enumerate(decomposition_dimensions):
         try:
-          ident,coord,ending = [ i[::-1] for i in f[::-1].split('.',2) ] [::-1] # split filename but use maximum 2 splits to retain file identifier if it contains dots.
-        except:
-          print "Couldnt split filename into ''ident,coord,ending'' :: ",f
-          return -1
+            subdomain_positions.append((dimensions.index(dim), -1))
+        except ValueError:
+            subdomain_positions.append((-1, i))  # will not be concatenated
+    dimension_positions = [(i, 0) for i in xrange(len(dimensions))]
+    new_order = zip(
+        *sorted(enumerate(subdomain_positions + dimension_positions),
+                key=lambda x: x[1]))[0]
+    print 'new_order:', new_order
+    return new_order
 
-        x,y = ( int(coord[:4]), int(coord[4:]) )
-        if (x,y) not in coord_files.keys(): coord_files[(x,y)] = { 'fname':f, }
 
-  nr_y = len(np.unique ([ k[1] for k in coord_files.keys() ]))
-  nr_x = len(np.unique ([ k[0] for k in coord_files.keys() ]))
-
-
-  for i in np.arange(nr_x):
-    for j in np.arange(nr_y):
-
-      try:
-          del(td)
-          del(yd)
-          del(xd)
-          del(zd)
-      except Exception,e:
-          pass
-
-      D = Dataset(coord_files[(i,j)]['fname'] )
-
-      attributes = dict([ [att,D.variables[varname].getncattr(att)] for att in D.variables[varname].ncattrs() ])
-      ndim=len(D.variables[varname].dimensions[:])
-
-      if varname in reduc_functions[0]: # this is coordinate variable....
-          return # dont want to save this
-
-      if varname in reduc_functions[ndim]:
-          reduc_func = reduc_functions[ndim][varname]
-      else:
-          print 'Need to supply reduction function vor variable',varname,'({}d)'.format(ndim)
-          sys.exit(-1)
-#      print 'Using reduc function',reduc_func.__name__,' for variable ',varname,'({}d)'.format(ndim)
-
-#      print 'reading data from file:',coord_files[(i,j)]['fname'],' coords ',i,j
-
-      l4d = ndim==4
-      l3d = ndim==3
-      l2d = ndim==2
-      l1d = ndim==1
-
-      if l4d: td,yd,xd,zd = D.variables[varname].dimensions[:]
-      if l3d: td,yd,xd    = D.variables[varname].dimensions[:]
-      if l2d: td,zd       = D.variables[varname].dimensions[:]
-      if l1d: td,         = D.variables[varname].dimensions[:]
-
-      if maxtime==-1:
-        if td!='time':
-          pass
-        else:
-          maxtime = len(D.variables[ td ][:])
-          print 'maxtime is',maxtime
-
-#      import ipdb;ipdb.set_trace()
-
-      # set FillValues to NaN -- reduc functions will not care em then
-      if type(D.variables[varname][:]) is np.ma.core.MaskedArray:
-        valid = lambda x: np.where(x[:].mask==False,x[:].data,np.NaN)
-      else:
-        valid = lambda x: x
-
-      # Save data into coord_files construct -- will later merge these
-      data = valid( D.variables[varname][:maxtime] )
-
-      longname = D.variables[varname].longname
-
-      if varname not in coord_files[(i,j)].keys(): 
-          coord_files[(i,j)][varname] = data
-
-      # Save coordinates for variable:
-      coord_files[td] = D.variables[ td ][:maxtime]
-
-      try:
-        coord_files[zd] = D.variables[ zd ][:]
-      except: # if there is no z axis, just use the indices
-        if l4d: coord_files[zd] = np.arange( np.shape( D.variables[varname] )[3] )
-        if l2d: coord_files[zd] = np.arange( np.shape( D.variables[varname] )[1] )
-
-      if 'yd' in locals():
-        if '{0:}.{1:}'.format(yd,j) not in coord_files.keys(): 
-          coord_files['{0:}.{1:}'.format(yd,j)] = D.variables[ yd ][:] #save y-dimension
-
-      if 'xd' in locals():
-        if '{0:}.{1:}'.format(xd,i) not in coord_files.keys():
-          coord_files['{0:}.{1:}'.format(xd,i)] = D.variables[ xd ][:] #save x-dimension
-
-      D.close()
-
-      #print 'shape single variable',np.shape(coord_files[(i,j)][varname])
-
-    #print 'shape single variable',np.shape( [ coord_files[(i,j)][varname] for j in np.arange(nr_y) ])
-
-    # append individual arrays in y dimension
-    if l3d or l4d: coord_files['concat_{0:}'.format(i)] = reduc_func  ( [ coord_files[(i,j)].pop(varname) for j in np.arange(nr_y) ], axis=1 )
-    if l2d or l1d: coord_files['concat_{0:}'.format(i)] = reduc_func  ( [ coord_files[(i,j)].pop(varname) for j in np.arange(nr_y) ], axis=0 )
-
-    #print 'shape yval', np.shape(coord_files['concat_{0:}'.format(i)])
-
-  # append individual arrays in x dimension
-  if l3d or l4d: var = reduc_func ( [ coord_files.pop('concat_{0:}'.format(i)) for i in np.arange(nr_x) ], axis=2)
-  if l2d or l1d: var = reduc_func ( [ coord_files.pop('concat_{0:}'.format(i)) for i in np.arange(nr_x) ], axis=0)
-
-  #print 'shape xval', np.shape(var)
-
-  # append coordinate arrays for x and y axis
-  if 'yd' in locals(): 
-    coord_files[yd] = np.concatenate( [ coord_files.pop('{0:}.{1:}'.format(yd,j)) for j in np.arange(nr_y) ], axis=1 ) 
-  if 'xd' in locals(): 
-    coord_files[xd] = np.concatenate( [ coord_files.pop('{0:}.{1:}'.format(xd,i)) for i in np.arange(nr_x) ], axis=2 ) 
-
-  if l4d:
-    data = var.swapaxes(2,3).swapaxes(1,2) # from [time,y,x,z] to [time,z,y,x]
-    dims = [ [td,coord_files[td]], [zd,coord_files[zd]], [yd,coord_files[yd]], [xd,coord_files[xd]] ]
-  if l3d:
-    data = var.swapaxes(1,2) # from [time,y,x] to [time,y,x]
-    dims = [ [td,coord_files[td]], [yd,coord_files[yd]], [xd,coord_files[xd]] ]
-  if l2d:
-    data = var
-    dims = [ [td,coord_files[td]], [zd,coord_files[zd]] ]
-  if l1d:
-    data = var
-    dims = [ [td,coord_files[td]], ]
-
-  # conditionally sampled data needs to be renormalized to global number of number of conditionally sampled data
-  def renormalize_cs(data, longname, csvarname, basename):
-    if ('over {0:}'.format(csvarname) in longname) or ('and {0:}'.format(csvarname) in longname):
-      append_var(basename,'cnt_{0:}'.format(csvarname))
-      Ncs = load_ncvar(basename,'cnt_{0:}'.format(csvarname)) # number of cs with dim: (time,zt)
-      return data / Ncs
+def calculate_concatenated_shape(decomposition_dimensions,
+                                 decomposition_shape,
+                                 dimensions,
+                                 shape):
+    """
+    Calculates the resulting shape of the concatenation of an array decomposed
+    into subdomains along ``decomposition_dimensions`` into
+    ``decomposition_shape`` subdomains.
+    """
+    print decomposition_dimensions, decomposition_shape
+    remaining_size = reduce(lambda a, b: a * b,
+                            [size
+                             for name, size in zip(decomposition_dimensions,
+                                                   decomposition_shape)
+                             if name not in dimensions],
+                            1)
+    rescale_dict = dict(zip(decomposition_dimensions, decomposition_shape))
+    new_shape = tuple(size * rescale_dict.get(name, 1)
+                      for name, size in zip(dimensions, shape))
+    print 'new size:', remaining_size, new_shape
+    if remaining_size == 1:
+        return new_shape
     else:
-      return data
+        return (remaining_size,) + new_shape
 
 
-  data = renormalize_cs(data, longname, 'cs1', basename)
-  data = renormalize_cs(data, longname, 'cs2', basename)
+def get_nc_attrs(var):
+    """
+    Get all attributes of a netCDF4 variable
+    """
+    return {name: var.getncattr(name) for name in var.ncattrs()}
 
-  write_nc(basename,varname, data, dims, attributes=attributes)
-#--------------------------------------------------------------------------------------------------------------------------------
 
-if __name__ == "__main__":
-  try:
-    basename = str( sys.argv[1] )
-  except:
-    sys.exit(-1)
-  
-  files = sorted(glob(basename+'.0*.nc'))
-  print "Opening files:",files
-  
-  # Check for all possible variables:
-  vars=[]
-  D = Dataset( files[0], 'r' )
-  for v in D.variables:
-      print 'Found Variable:',v.__str__()
-      vars.append( v.__str__() )
-  D.close()
-  
-  try:
-      do_vars=[]
-      varnames = None
-      varnames = str( sys.argv[2] ).split()
-      if 'all' not in varnames:
-          for varname in varnames:
-              if varname in vars:
-                  do_vars.append(varname)
-              else:
-                  raise Exception('variable not found')
-          vars=do_vars
-  
-  except Exception,e:
-      print ''
-      print ''
-      print "Error occurred when we tried to find the correct variable (",varname,"): ",e
-      print "Possible variables are: 'all' or one of the following"
-      print ' '.join(vars)
-      print ''
-      print ''
-      sys.exit(0)
-  
-  
-  for idim in [4,3,2,1]:
-    for varname in vars:
-        D = Dataset( files[0], 'r' )
-        ndim = len(np.shape(D.variables[varname]))
-        D.close()
-        if ndim == idim:
-            append_var(basename,varname)
+class NetCDFCollector(object):
+
+    """
+    Collects data from local subdomains
+    """
+    decomposition_dimensions = [
+        ('xt', 'yt'),
+        ('xm', 'ym')]
+    subdomain_id_size = 4
+
+    def __init__(self, basename, complevel=3):
+        self.basename = basename
+        self.complevel = complevel
+        self.files = sorted(glob(basename + '.0*.nc'))
+        with closing(Dataset(self.files[0], 'r')) as dataset:
+            self.variables = {name: {"shape": var.shape,
+                                     "dimensions": var.dimensions,
+                                     "dtype": var.dtype,
+                                     "attributes": get_nc_attrs(var)}
+                              for name, var in dataset.variables.items()}
+        self.subdomain_shape = tuple(
+            max(pos) + 1 for pos in zip(*map(self.file_coords, self.files)))
+        ntimes = []
+        for filename in self.files:
+            with closing(Dataset(filename, 'r')) as dataset:
+                try:
+                    ntimes.append(len(dataset.variables['time']))
+                except KeyError:
+                    pass
+        if len(ntimes) > 0:
+            self.maxtime = min(ntimes)
+        else:
+            self.maxtime = None
+        print 'maxtime is', self.maxtime
+
+        subdomain_size = {dim: size
+                          for dims in self.decomposition_dimensions
+                          for dim, size in zip(dims, self.subdomain_shape)}
+        self.dimensions = {
+            dim: size * subdomain_size.get(dim, 1)
+            for var in self.variables.values()
+            for dim, size in zip(var["dimensions"], var["shape"])
+        }
+        openmode = 'a' if os.path.exists(self.merged_filename) else 'w'
+        with closing(Dataset(self.merged_filename, openmode)) as dataset:
+            for dim, size in self.dimensions.items():
+                if dim not in dataset.dimensions:
+                    dataset.createDimension(dim, size=size)
+
+    @property
+    def merged_filename(self):
+        """
+        The name of the merged netCDF file
+        """
+        return '%s.merged.nc' % self.basename
+
+    def variable_exists(self, varname):
+        """
+        Checks if variable exists in output netCDF
+        """
+        with closing(Dataset(self.merged_filename)) as dataset:
+            return varname in dataset.variables
+
+    def file_coords(self, filename):
+        """
+        Calculates subdomain coordinates from filename
+        """
+        coord = list(reversed(filename.split('.')))[1]
+        char_count = self.subdomain_id_size
+        dimension_count = len(self.decomposition_dimensions)
+        return tuple(map(int, [coord[i*char_count:(i+1)*char_count]
+                               for i in xrange(dimension_count)]))
+
+    def find_decomposition_dimenstions(self, dimensions):
+        """
+        Finds the name of the dimensions on which a variable
+        defined on ``dimensions`` is decomposed.
+        """
+        possible_dimensions = map(set, zip(*self.decomposition_dimensions))
+        dimensions = set(dimensions)
+
+        dec_dimensions = []
+        for i, dims in enumerate(possible_dimensions):
+            dimset = dims & dimensions
+            if len(dimset) > 1:
+                raise ValueError('bad dimensions: %s' % str(dimensions))
+            if len(dimset) == 0:
+                dec_dimensions.append('__dummy_dimension_%d' % i)
+            else:
+                dec_dimensions.append(dimset.pop())
+        return tuple(dec_dimensions)
+
+    def load_variable(self, varname):
+        """
+        Loads a variable from all source files,
+        can be indexed by subdomain position
+        """
+        data = {}
+        for filename in self.files:
+            with closing(Dataset(filename, 'r')) as dataset:
+                data[self.file_coords(filename)] = valid(
+                    # dataset.variables[varname][:self.maxtime])
+                    dataset.variables[varname][:])
+        return data
+
+    def concatenate_data(self, varname, data):
+        """
+        Concatenates data as loaded by ``load_variable`` into one array.
+
+        .. note::
+
+            All subdomain axes which are not contained in the variable will be
+            concatenated into an additional zeroth axis.
+        """
+        var_info = self.variables[varname]
+        intermediate_shape = self.subdomain_shape + var_info["shape"]
+        temp = np.zeros(intermediate_shape, dtype=var_info["dtype"])
+        decomposition_dimensions = self.find_decomposition_dimenstions(
+            var_info["dimensions"])
+        print intermediate_shape
+        for pos, values in data.items():
+            temp[pos] = values
+        temp = temp.transpose(
+            calculate_transposition_rule(decomposition_dimensions,
+                                         var_info["dimensions"]))
+        temp = temp.reshape(
+            calculate_concatenated_shape(decomposition_dimensions,
+                                         self.subdomain_shape,
+                                         var_info["dimensions"],
+                                         var_info["shape"]))
+        return temp
+
+    def collect_variable(self,
+                         varname,
+                         reduction_function=None,
+                         skip_if_already_there=True):
+        """
+        Collects one variable ``varname`` from all netCDF-Files available.
+        """
+        if skip_if_already_there and self.variable_exists(varname):
+            return
+        print "collecting variable %s" % varname
+        data = self.load_variable(varname)
+        data = self.concatenate_data(varname, data)
+        print "before reduction:", varname, data.shape
+        need_reduction = len(data.shape) != len(
+            self.variables[varname]["shape"])
+        if need_reduction:
+            if reduction_function is None:
+                reduction_function = REDUCTION_FUNCTIONS_REV[varname]
+            data = reduction_function(data, axis=0)
+        print "after reduction:", varname, data.shape
+
+        with closing(Dataset(self.merged_filename, 'a')) as dataset:
+            attributes = self.variables[varname]["attributes"]
+            fillvalue = attributes.get('_FillValue', -999)
+            try:
+                var = dataset.variables[varname]
+            except KeyError:
+                var = dataset.createVariable(
+                    varname,
+                    self.variables[varname]["dtype"],
+                    self.variables[varname]["dimensions"],
+                    fill_value=fillvalue,
+                    complevel=self.complevel)
+            for attr_name, attr_value in attributes.items():
+                if attr_name == '_FillValue':
+                    continue
+                setattr(var, attr_name, attr_value)
+            data[np.isnan(data)] = fillvalue
+            var[:] = data
+
+        # conditionally sampled data needs to be renormalized to global number
+        # of number of conditionally sampled data
+        # def renormalize_cs(data, longname, csvarname, basename):
+        #     if ('over {0:}'.format(csvarname) in longname)
+        #             or ('and {0:}'.format(csvarname) in longname):
+        #         append_var(basename,'cnt_{0:}'.format(csvarname))
+        #         # number of cs with dim: (time,zt)
+        #         Ncs = load_ncvar(basename,'cnt_{0:}'.format(csvarname))
+        #         return data / Ncs
+        #     else:
+        #         return data
+
+        # data = renormalize_cs(data, longname, 'cs1', basename)
+        # data = renormalize_cs(data, longname, 'cs2', basename)
+
+    def collect(self, variables=None):
+        """
+        Collect all or selected ``variables``.
+        """
+        variable_names = set(self.variables)
+        print 'Found Variables:', variable_names
+
+        if variables is None:
+            selected_variables = variable_names
+        else:
+            selected_variables = variables
+            missing_variables = selected_variables - variable_names
+            if len(missing_variables) > 0:
+                raise ValueError('the following variables are missing: %s',
+                                 str(missing_variables))
+
+        map(self.collect_variable,
+            sorted(selected_variables,
+                   key=lambda x: len(self.variables[x]["shape"])))
+
+
+def _main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Merge uclales output files.')
+    parser.add_argument('basename', type=str,
+                        help='basename of the netCDF files')
+    parser.add_argument('variables', type=str, nargs='+',
+                        help='variables to extract (all: all of them)')
+    args = parser.parse_args()
+
+    collector = NetCDFCollector(args.basename)
+    selected_variables = set(args.variables)
+    if 'all' in selected_variables:
+        collector.collect()
+    else:
+        collector.collect(selected_variables)
+
+if __name__ == '__main__':
+    _main()
