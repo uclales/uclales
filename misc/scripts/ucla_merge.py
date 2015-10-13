@@ -213,12 +213,19 @@ class NetCDFCollector(object):
         Loads a variable from all source files,
         can be indexed by subdomain position
         """
+        dimensions = self.variables[varname]['dimensions'] # list of dim names
+        slices = [ slice(None) for _ in dimensions ]       # create list of slices as [:,:,...]
+        try:
+            slices[dimensions.index("time")] = slice(None, self.maxtime, None) # restrict time slice to maxtime
+        except ValueError: # dont have time axis, e.g. axis variables
+            pass
+        slices = tuple(slices)
+
         data = {}
         for filename in self.files:
             with closing(Dataset(filename, 'r')) as dataset:
                 data[self.file_coords(filename)] = valid(
-                    # dataset.variables[varname][:self.maxtime])
-                    dataset.variables[varname][:])
+                    dataset.variables[varname][slices])
         return data
 
     def concatenate_data(self, varname, data):
@@ -236,8 +243,10 @@ class NetCDFCollector(object):
         decomposition_dimensions = self.find_decomposition_dimenstions(
             var_info["dimensions"])
         print intermediate_shape
+
         for pos, values in data.items():
             temp[pos] = values
+
         temp = temp.transpose(
             calculate_transposition_rule(decomposition_dimensions,
                                          var_info["dimensions"]))
@@ -287,6 +296,9 @@ class NetCDFCollector(object):
                 setattr(var, attr_name, attr_value)
             data[np.isnan(data)] = fillvalue
             var[:] = data
+
+
+        print "done collecting variable %s" % varname
 
         # conditionally sampled data needs to be renormalized to global number
         # of number of conditionally sampled data
