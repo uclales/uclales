@@ -22,7 +22,7 @@ module stat
   use mpi_interface, only : myid
   use ncio, only : open_nc, define_nc
   use grid, only : level, isfctyp, svctr, ssclr, nv1, nv2, nsmp
-  use util, only : get_avg, get_cor, get_avg3, get_cor3, get_var3, get_csum
+  use util, only : get_avg, get_cor, get_avg3, get_cor3, get_var3, get_csum, get_var
   !use forc, only : Qrate !rv
 
 !irina
@@ -32,7 +32,7 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 68, nvar2 = 130 ! number of time series and profiles
+  integer, parameter :: nvar1 = 68, nvar2 = 133 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2
   real, save         :: fsttm, lsttm
 
@@ -77,7 +77,8 @@ module stat
        'hail   ','qt_th  ','s_1    ','s_2    ','s_3    ','RH     ', & !109
        'lwuca  ','lwdca  ','swuca  ','swdca  ','wtendt ','wtendr ', & !115
        'sgtendt','sgtendr','adtendt','adtendr','turtent','turtenr', & !121
-       'dtdt   ','dqdt   ','prect  ','precr  '/)		      !127
+       'dtdt   ','dqdt   ','prect  ','precr  ','totradt','swradt ', & !127
+       'cs1_2  '/)                                                    !133
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:)
@@ -600,7 +601,7 @@ contains
 
     integer                   :: k, i, j, km1, kp1
     logical                   :: aflg
-    real                      :: xy1mx
+    real                      :: xy1mx, cs1_tmp
     real, dimension(n1)       :: a1, a2, a3, tvbar, svar1, svar2, svar3
     real, dimension(n2,n3)    :: scr, xy1, xy2
     real, dimension(n1,n2,n3) :: svar,tvar
@@ -693,6 +694,7 @@ contains
 
     if (debug) WRITE (0,*) 'accum_lvl2: sampling, tv2    myid=',myid
     xy1mx = 0.
+
     do k=1,n1
        kp1 = min(n1,k+1)
        aflg = .false.
@@ -707,9 +709,12 @@ contains
              end if
           end do
        end do
-
-       svctr(k,64)=svctr(k,64)+get_avg(1,n2,n3,1,xy1)
+       
+       cs1_tmp = get_avg(1,n2,n3,1,xy1)
+       svctr(k,64)=svctr(k,64) + cs1_tmp
+       svctr(k,133)=svctr(k,133) + get_var(1,n2,n3,xy1,cs1_tmp)
        svctr(k,74)=svctr(k,74)+get_avg(1,n2,n3,1,xy2)
+
        if (aflg) then
           svctr(k,65)=svctr(k,65)+get_csum(1,n2,n3,1,xy1,xy1)
           svctr(k,66)=svctr(k,66)+get_csum(n1,n2,n3,k,w,xy1)
@@ -1540,10 +1545,10 @@ contains
 	  nn=127   !dtdt
        case(8)
 	  nn=128   !dqdt
-       !case(9)
-!	  nn=129   !prect
-!       case(10)
-!	  nn=130   !precr
+       case(9)
+	  nn=131   !totradt
+       case(10)
+	  nn=132   !swradt
        case default
 	  nn = 0
        end select

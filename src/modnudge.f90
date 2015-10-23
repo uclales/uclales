@@ -289,7 +289,7 @@ contains
   subroutine initnudge_bound
 
   use mpi_interface, only : myid,nxprocs,nyprocs
-  use grid, only: nxp,nyp,nzp,a_tp,a_rp,a_up,a_vp,a_wp,deltax,runtype,iradtyp,zt
+  use grid, only: nxp,nyp,nzp,a_tp,a_rp,a_up,a_vp,a_wp,deltax,runtype,iradtyp,zt,iradbel
   use defs, only: pi
 
   IMPLICIT NONE
@@ -303,7 +303,7 @@ contains
 
 
   !RV, simple nudging for z>8.8km to get rid of liquid in large domain runs
-  if(iradtyp == 3) then
+  if(iradtyp == 3 .or. iradbel) then
      
      ! prepare rlz
      flg=.false.

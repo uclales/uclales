@@ -265,7 +265,7 @@ contains
 
     use mpi_interface, only :myid
 
-    integer, parameter :: nnames = 52
+    integer, parameter :: nnames = 54
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,& !1
          'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,& !7 
@@ -275,7 +275,7 @@ contains
          'shf    ','lhf    ','ustars ','a_tskin','a_qskin','tsoil  '   ,& !31
          'phiw   ','a_Qnet ','a_G0   ','mp_tlt ','mp_qt  ','mp_qr  '   ,& !37
          'mp_qi  ','mp_qs  ','mp_qg  ','mp_qh  ','wtendt ','wtendr '  , & !43
-         'turtent','turtenr','prect  ','precr  '/)    !49-52
+         'turtent','turtenr','prect  ','precr  ','totradt','swradt '/)    !49-54
 
 
     real, intent (in) :: time
@@ -290,7 +290,7 @@ contains
     if (iradtyp > 1) nvar0 = nvar0+3
     if (isfctyp == 5) nvar0 = nvar0+9
     if (lmptend)      nvar0 = nvar0+7
-    if (outtend)      nvar0 = nvar0+6
+    if (outtend)      nvar0 = nvar0+8
 
     allocate (sanal(nvar0))
     sanal(1:nbase) = sbase(1:nbase)
@@ -396,6 +396,10 @@ contains
        sanal(nvar0) = sbase(51)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(52)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(53)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(54)
     end if
 
     nbeg = nvar0+1
@@ -637,6 +641,14 @@ contains
          nn = nn+1
          iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
          iret = nf90_put_var(ncid0, VarID, precr(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, totradt(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, swradt(:,i1:i2,j1:j2), start=ibeg, &
               count=icnt)
    end if
 
@@ -1249,6 +1261,10 @@ contains
        if (itype==0) ncinfo = 'Conditionally sampled fraction of flow'
        if (itype==1) ncinfo = '-'
        if (itype==2) ncinfo = 'tttt'
+    case('cs1_2')
+       if (itype==0) ncinfo = 'Variance of conditionally sampled fraction of flow'
+       if (itype==1) ncinfo = '-'
+       if (itype==2) ncinfo = 'tttt'
     case('cnt_cs1')
        if (itype==0) ncinfo = 'Sum of I_cs1'
        if (itype==1) ncinfo = '#'
@@ -1628,6 +1644,14 @@ contains
     case('precr')    
        if (itype==0) ncinfo = 'precip tnd of qt'
        if (itype==1) ncinfo = 'kg/kg/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('totradt')    
+       if (itype==0) ncinfo = 'total radiative tnd'
+       if (itype==1) ncinfo = 'K/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('swradt')    
+       if (itype==0) ncinfo = 'shortwave radiative tnd'
+       if (itype==1) ncinfo = 'K/s'
        if (itype==2) ncinfo = 'tttt'
    case default
        if (myid==0) print *, 'ABORTING: variable not found in ncinfo, ',trim(short_name)

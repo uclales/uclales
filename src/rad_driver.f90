@@ -21,6 +21,8 @@ module radiation
 
   use defs, only       : cp, rcp, cpr, rowt, roice, p00, pi, nv1, nv, SolarConstant
   use fuliou, only     : rad, minSolarZenithCosForVis
+  use mpi_interface, only : myid
+  use grid, only       : Qrate, dt !RV
   implicit none
  character (len=10), parameter :: background = 'backrad_in'
  ! character (len=19), parameter :: background = 'datafiles/s11.lay'
@@ -40,7 +42,7 @@ module radiation
   contains
 
     subroutine d4stream(n1, n2, n3, alat, time, sknt, sfc_albedo, CCN, dn0, &
-         pi0, pi1, dzi_m, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,sflxd, albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa, rr,ice,nice,grp)
+         pi0, pi1, dzi_m, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,sflxd, albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa, rr,ice,nice,grp, rk, tottend, swtend)
 
 
       integer, intent (in) :: n1, n2, n3
@@ -51,8 +53,11 @@ module radiation
       real, dimension (n1,n2,n3), intent (inout)        :: tt, rflx, sflx, lflxu, lflxd, sflxu, sflxd
       real, dimension (n2,n3), intent (out),optional    :: albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa
 
-      integer :: kk
-      real    :: xfact, prw, pri, p0(n1), exner(n1), pres(n1)
+      integer :: kk,ntop
+      real    :: xfact, prw, pri, p0(n1), exner(n1), pres(n1),weight
+
+      real, optional, intent (in)      :: rk
+      real, optional, intent (inout)   :: tottend(n1,n2,n3), swtend(n1,n2,n3)
 
       if (first_time) then
          p0(n1) = (p00*(pi0(n1)/cp)**cpr) / 100.
@@ -94,7 +99,7 @@ module radiation
             do k=2,n1
                kk = nv-(k-2)
                !irina
-               pt(kk) = th(k,i,j)*exner(k)
+             pt(kk) = th(k,i,j)*exner(k)
                !old
              !  pt(kk) = tk(k,i,j)
                ph(kk) = max(0.,rv(k,i,j))
@@ -140,7 +145,7 @@ module radiation
                call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
                     fds, fus, fdir, fuir, plwc=plwc, pre=pre, piwc=piwc, pde=pde, pgwc=pgwc, useMcICA=radMcICA)
             else
-               call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
+               call rad(sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
                     fds, fus, fdir, fuir, plwc=plwc, pre=pre, useMcICA=radMcICA)
             end if
 
@@ -186,15 +191,19 @@ module radiation
             if (present(lflxd_toa)) then
               lflxd_toa(i,j) = fdir(1)
             end if
-            do k=2,n1-3
+            do k=2,n1-2
                xfact  = dzi_m(k)/(cp*dn0(k)*exner(k))
                tt(k,i,j) = tt(k,i,j) - (rflx(k,i,j) - rflx(k-1,i,j))*xfact
+	       if(present(tottend)) then !RV
+		  tottend(k,i,j) = tottend(k,i,j) - (rflx(k,i,j) - rflx(k-1,i,j))*xfact*dt*rk
+ 		  swtend(k,i,j) = swtend(k,i,j) - (sflx(k,i,j) - sflx(k-1,i,j))*xfact*dt*rk
+     	       end if !rv
             end do
          end do
       end do
-
+      
     end subroutine d4stream
-
+    
   !
   ! ---------------------------------------------------------------------------
   ! BvS: Simple parameterized surface radiation for LSM
@@ -243,15 +252,26 @@ module radiation
     integer :: k, ns, norig, index
     logical :: blend
     real    :: pa, pb, ptop, ptest, test, dp1, dp2, dp3, Tsurf, pp2
+    logical :: debug = .false.
 
     open ( unit = 08, file = background, status = 'old' )
-    print *, 'Reading Background Sounding: ',background
+    if (myid == 0) print *, 'Reading Background Sounding: ',background
     read (08,*) Tsurf, ns
     allocate ( sp(ns), st(ns), sh(ns), so(ns), sl(ns))
     do k=1,ns
        read ( 08, *) sp(k), st(k), sh(k), so(k), sl(k)
     enddo
     close (08)
+    if (myid == 0 .and. debug) then
+      write (*,*) 'Background profiles:'
+      do k=1,ns
+        write(*,'(i6,5e15.5)') k, sp(k), st(k), sh(k), so(k), sl(k)
+      enddo
+      write (*,*) 'Input profile:'
+      do k=1,n1
+        write(*,'(i6,5e15.5)') k, zp(k)
+      enddo
+    end if
 
     !
     ! identify what part, if any, of background sounding to use
@@ -268,6 +288,10 @@ module radiation
        end do
        k=k-1           ! identify first level above top of input
        blend = .True.
+       if (myid == 0) then !RV
+         write (*,*) '  ptop = ',ptop
+         write (*,*) '  k    = ',k
+       end if
     else
        blend = .False.
     end if
@@ -295,6 +319,12 @@ module radiation
        nv1 = n1
     end if
     nv = nv1-1
+    if (myid == 0) then
+      write (*,*) '  npts  = ',npts
+      write (*,*) '  norig = ',norig
+      write (*,*) '  nv1   = ',nv1
+      write (*,*) '  nv    = ',nv 
+    end if
     !
     ! allocate the arrays for the sounding data to be used in the radiation
     ! profile and then fill them first with the sounding data, by afill, then
@@ -329,7 +359,14 @@ module radiation
             pp2 = (p00*(pi0(nv-k+2)/cp)**cpr) / 100.
             index  = getindex(sp,ns,pp2)
             po(k) =  intrpl(sp(index),so(index),sp(index+1),so(index+1),pp2)
+       end do
+       if (myid == 0) then
+         write (*,*) 'Profiles after blending'   
+         write (*,'(a5,4a15)') 'k','pp','pt','ph','po'
+         do k=1,nv
+           write (*,'(i5,4e15.5)') k,pp(k),pt(k),ph(k),po(k)
          end do
+       end if
 
     end if
   
@@ -390,6 +427,11 @@ module radiation
 
     day    = floor(time)
     lamda  = alat*pi/180.
+
+    ! no diurnal cycle, RV
+    zenith = lamda
+    return
+
     d      = 2.*pi*int(time)/365.
     sig    = d + pi/180.*(279.9340 + 1.914827*sin(d) - 0.7952*cos(d) &
          &                      + 0.019938*sin(2.*d) - 0.00162*cos(2.*d))

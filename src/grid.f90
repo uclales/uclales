@@ -125,10 +125,10 @@ module grid
 ! linda, e 
 
  !RV: ls tendencies due to subsidence, sgs diff & advection
-  real, dimension (:,:,:), allocatable  :: wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt, precr, prect
-  real,allocatable  :: w0 = 7.5e-3
-  real,allocatable  :: Qrate = 2.5/86400. !
-  character(len=6)  :: radbel = 'FIXED' !rv, use interactive 'INTACT' or prescribed 'FIXED' radiation in bellon routine (iradtyp=3)
+  real, dimension (:,:,:), allocatable  :: wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt, precr, prect, totradt, swradt !add radiation tendencies.
+  real  :: w0 = 7.5e-3
+  real  :: Qrate = 2.5/86400. !
+  logical  :: iradbel = .false. !rv, .true. for interactive radiation with bellon case; d4stream (use iradtyp=4)
 
 
   character(40)      :: zname      = 'zt'
@@ -454,8 +454,10 @@ contains
        allocate(dqdt(nzp,nxp,nyp))
        allocate(precr(nzp,nxp,nyp))
        allocate(prect(nzp,nxp,nyp))
+       allocate(totradt(nzp,nxp,nyp))
+       allocate(swradt(nzp,nxp,nyp))
 
-       memsize = memsize + 10*nxyzp
+       memsize = memsize + 12*nxyzp
 
        wtendt(:,:,:) = 0.            
        wtendr(:,:,:) = 0.
@@ -467,6 +469,8 @@ contains
        dqdt(:,:,:) = 0.
        precr(:,:,:) = 0.            
        prect(:,:,:) = 0.
+       totradt(:,:,:) = 0.            
+       swradt(:,:,:) = 0.
     end if !rv
    
 
@@ -748,7 +752,7 @@ contains
 
     !RV: write accumulated tendencies
     if (outtend) then
-       write(10) wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt, precr, prect
+       write(10) wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt, precr, prect, totradt, swradt
     end if !rv
     close(10)
 
@@ -839,7 +843,7 @@ contains
 
        !RV: read accumulated tendencies
        if (outtend) then
-          read(10) wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt, precr, prect
+          read(10) wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt, precr, prect, totradt, swradt
        end if !rv
 
        close(10)

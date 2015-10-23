@@ -291,9 +291,31 @@ contains
 
 
   end subroutine get_var3
+  !
+  !---------------------------------------------------------------------
+  ! function get_var: gets variance field from k'th level RV,for cs1_2
+  !
+  real function get_var(n1,n2,n3,a,b)
+
+
+    integer,intent(in) :: n1,n2,n3
+    real,intent(in) :: a(n2,n3),b
+
+    integer      :: i,j
+
+    get_var = 0.
+    do j=3,n3-2
+       do i=3,n2-2
+             get_var = get_var + (a(i,j)-b)**2
+       end do
+    end do
+    get_var = get_var/real((n3-4)*(n2-4))
+
+
+  end function get_var
   ! 
   !-------------------------------------------------------------------
-  ! function get_var: gets square of a field from k'th level 
+  ! function get_sqr: gets square of a field from k'th level 
   ! 
   real function get_sqr(n1,n2,n3,k,a)
 

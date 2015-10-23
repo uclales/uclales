@@ -24,9 +24,11 @@ module forc
   !irina
   use rad_gcss, only  : gcss_rad
   !cgils
-  use grid, only      : wfls, dthldtls, dqtdtls, sfc_albedo, lrad_ca !, Qrate, w0
+  use grid, only      : wfls, dthldtls, dqtdtls, sfc_albedo, outtend, wtendt, wtendr, & 	
+		        nstep,rkalpha,rkbeta, dt, lrad_ca, w0, Qrate, iradbel,totradt,swradt !RV
   use modnudge, only  : nudge, nudge_bound, lnudge_bound !LINDA 
-  use stat, only : sflg
+  use stat, only      : sflg, updtst  !rv
+  use util, only      : get_avg3
 
   implicit none
 
@@ -39,12 +41,9 @@ module forc
   real, dimension(nls)  :: sst_ls=0.
   real, dimension(nls)  :: ugeo_ls=0.
   real, dimension(nls)  :: vgeo_ls=0.
+  !real, optional        :: Qrate = 2.5/86400. !RV, for Bellon case
   !cgils
   logical :: lstendflg=.false.
-  !real  :: w0 = 7.5e-3 !RV
-  !real  :: Qrate = 2.5/86400. !rv
- 
-  !public ::  Qrate 
 
 contains
   !
@@ -64,7 +63,7 @@ contains
 
 !irina
     real, optional, intent (in) :: time_in, cntlat, sst, div, time_in_2
-    real, dimension (nzp):: um,vm
+    real, dimension (nzp):: um,vm,res3,res4
 
     character (len=8), intent (in) :: case_name
     integer :: i, j, k, kp1
@@ -72,6 +71,14 @@ contains
 
 !irina
     real :: alpha, beta, gamma, delta, uinf !linda
+    real    :: rk !RV
+
+
+    if(outtend) then !RV
+        if(nstep==1) rk = rkalpha(1)+rkalpha(2)!then 
+    	if(nstep==2) rk = rkbeta(2)+rkbeta(3)
+    	if(nstep==3) rk = rkalpha(3)
+    end if   !rv
 
     select case(iradtyp)
     case (1)
@@ -88,20 +95,58 @@ contains
               a_rflx, a_sflx, zt, zm, dzi_t, a_tt, a_tp, a_rt, a_rp)
        end select
     case (3)
-       call bellon(nzp, nxp, nyp, a_rflx, a_sflx, zt, dzi_t, dzi_m, a_tt, a_tp&
-            ,a_rt, a_rp, a_ut, a_up, a_vt, a_vp)
+       call bellon(nzp, nxp, nyp, zt, dzi_t, dzi_m, a_tt, a_tp&
+            ,a_rt, a_rp, a_ut, a_up, a_vt, a_vp,iradtyp,rk)
     case (4)
        if (present(time_in) .and. present(cntlat) .and. present(sst)) then
           !irina
           !a_scr1 = a_theta/a_pexnr
           select case (level)
           case(3)
-             call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,   &
-                  dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt,&
-                  a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
-                  rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
-                  lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
-          case(4,5)
+             !RV, call interactive radiation here. (adapted from Axel)
+             if (iradbel) then
+                call bellon(nzp, nxp, nyp, zt, dzi_t, dzi_m, a_tt, a_tp &
+             		,a_rt, a_rp, a_ut, a_up, a_vt, a_vp,iradtyp,rk)
+             end if
+             if (iradbel.and.time_in_2.lt.3600) then
+               ! no explicit radiation, to avoid spinup problems
+               do j=3,nyp-2
+                 do i=3,nxp-2
+                   do k=2,nzp-2
+                     a_tt(k,i,j) = a_tt(k,i,j)  - Qrate
+		     if (outtend) then !RV
+			if(nstep==1) totradt(k,i,j) = totradt(k,i,j) - Qrate*dt
+      			if (sflg) then
+   			   call get_avg3(nzp, nxp, nyp,totradt,res3)
+       			   call updtst(nzp,'tnd',9,res3,1)!rm /acumtime
+			end if
+	             end if
+                   enddo
+                 enddo
+               enddo
+             else
+	       if (outtend) then
+               	  call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,   &
+                     dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt,&
+                     a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
+                     rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
+                     lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa,rk=rk,tottend=totradt,swtend=swradt)
+
+      		  if (sflg) then
+   		     call get_avg3(nzp, nxp, nyp,totradt,res3)
+       		     call updtst(nzp,'tnd',9,res3,1)
+   		     call get_avg3(nzp, nxp, nyp,swradt,res4)
+       		     call updtst(nzp,'tnd',10,res4,1)
+		  end if
+	       else
+               	  call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,   &
+                     dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt,&
+                     a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
+                     rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
+                     lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
+	       end if
+             end if
+         case(4,5)
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,   &
                   dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt,&
                   a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
@@ -389,62 +434,43 @@ contains
   ! -------------------------------------------------------------------
   ! subroutine bellon_rad:  call simple radiative parameterization
   !
-  subroutine bellon(n1,n2,n3,flx,sflx,zt,dzi_t,dzi_m,tt,tl,rtt,rt, ut,u,vt,v)
+  subroutine bellon(n1,n2,n3,zt,dzi_t,dzi_m,tt,tl,rtt,rt, ut,u,vt,v,iradtyp, rk)
 
-    use grid, only : outtend, wtendt, wtendr, nstep,rkalpha,rkbeta, dt, Qrate, w0, radbel !RV
-    use util, only : get_avg3
-    use stat, only : sflg, updtst  !rv
-
-    integer, intent (in) :: n1,n2, n3
+    integer, intent (in) :: n1,n2, n3, iradtyp
+    real, optional, intent (in)	 :: rk
 
     real, dimension (n1), intent (in)            :: zt, dzi_t, dzi_m
     real, dimension (n1, n2, n3), intent (inout) :: tt, tl, rtt, rt, ut,u,vt,v
-    real,  dimension (n1, n2, n3), intent (out)  :: flx, sflx
-   !real, parameter      :: w0= 7.5e-3, H=1000., Qrate = 2.5/86400.
     real, parameter  :: H=1000.
 
     integer :: i,j,k,kp1
     real    :: grad,wk
     real,dimension(n1) :: res,res1
-    real    :: rk !RV
-    !real    :: acumtime = 0.     !rv
-
-    if(outtend) then !RV
-       if(nstep==1) rk = rkalpha(1)+rkalpha(2)!then 
-          !acumtime=acumtime+dt  !accumulate time to get correct mean tendency
-        !end if
-    	if(nstep==2) rk = rkbeta(2)+rkbeta(3)
-    	if(nstep==3) rk = rkalpha(3)
-    end if   !rv
 
     do j=3,n3-2
        do i=3,n2-2
           !
           ! subsidence
           !
-          flx(1,i,j)  = 0.
-          sflx(1,i,j) = 0.
           do k=2,n1-2
              kp1 = k+1
              wk = w0*(1.-exp(-zt(k)/H))
-             grad = Qrate/wk
-	     flx(k,i,j)  = wk*((tl(kp1,i,j)-tl(k,i,j))*dzi_t(k)-grad)
-	     !sflx(k,i,j) = wk*((rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)-grad)!wird gar nirgends mehr benutzt...k
-             tt(k,i,j) = tt(k,i,j) + flx(k,i,j)
+	     if(iradtyp.eq.4) then
+                tt(k,i,j) = tt(k,i,j) + wk*(tl(kp1,i,j)-tl(k,i,j))*dzi_t(k)
+	     else 
+                tt(k,i,j) = tt(k,i,j) + wk*(tl(kp1,i,j)-tl(k,i,j))*dzi_t(k) - Qrate
+	     end if
+
 	     rtt(k,i,j)= rtt(k,i,j) + wk*(rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)
 
 	     if(outtend) then !RV
-	     	wtendt(k,i,j)  = wtendt(k,i,j) + wk*dzi_t(k)*rk*dt*(tl(kp1,i,j)-tl(k,i,j))  
+	     	wtendt(k,i,j) = wtendt(k,i,j) + wk*dzi_t(k)*rk*dt*(tl(kp1,i,j)-tl(k,i,j))  
              	wtendr(k,i,j) = wtendr(k,i,j) + wk*dzi_t(k)*rk*dt*(rt(kp1,i,j)-rt(k,i,j)) 
 	     end if   !rv
 
              ut(k,i,j) =  ut(k,i,j) + wk*(u(kp1,i,j)-u(k,i,j))*dzi_m(k)
              vt(k,i,j) =  vt(k,i,j) + wk*(v(kp1,i,j)-v(k,i,j))*dzi_m(k)
           end do
-          flx(n1,  i,j)  = 0.
-          flx(n1-1,i,j)  = 0.
-          sflx(n1,  i,j) = 0.
-          sflx(n1-1,i,j) = 0.
        enddo
     enddo
 
@@ -453,9 +479,6 @@ contains
        call updtst(n1,'tnd',1,res,1) !call updtst(n1,'tnd',1,res/acumtime,1)
        call get_avg3(n1,n2,n3,wtendr,res1)
        call updtst(n1,'tnd',2,res1,1)!rm /acumtime
-       !wtendt = 0.
-       !wtendr = 0.
-       !acumtime = 0.
     end if !rv
 
   end subroutine bellon
