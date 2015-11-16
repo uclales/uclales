@@ -230,54 +230,58 @@ contains
     real    :: gg, wght, cwmks
     real    :: fw1, fw2, fw3, wf1, wf2, wf3, wf4, x1, x2, x3, x4,  fd
 
+    !fu&liou only fits optical props for up to 80 mu particles
+    !todo: may be we should use tau = 3/2 lwc/reff to rescale optprop?
+    real,parameter :: pde_limit=80 
+
     if (.not.iceInitialized) stop 'TERMINATING: Ice not Initialized'
 
     do k = 1, nv
-       cwmks = pci(k)!here we don't need the factor 1000
-       if ( (cwmks .ge. 1.e-5).and.(pde(k).gt.0.)) then
-	     fw1 = pde(k)
-	     fw2 = fw1 * pde(k)
-	     fw3 = fw2 * pde(k)
-             ti(k) = dz(k) * cwmks * ( ap(1,ib) + &
-      	     ap(2,ib) / fw1 + ap(3,ib) / fw2 )
-             wi(k) = 1.0 - ( bp(1,ib) + bp(2,ib) * fw1 + &
-      	     bp(3,ib) * fw2 + bp(4,ib) * fw3 )
-             if (wi(k).lt.0.) print*,'bad wi, ',wi(k),ib,k,bp(1,ib),bp(2,ib),bp(3,ib),bp(4,ib),fw1,fw2,fw3
-             if (ti(k).lt.0.) print*,'bad ti, ',ti(k),ib,k,cwmks,dz(k),ap(1,ib),ap(2,ib),ap(3,ib),fw1,fw2
-	     if ( ib .le. mbs ) then ! shortwave
-	       fd = dps(1,ib) + dps(2,ib) * fw1 + &
-               dps(3,ib) * fw2 + dps(4,ib) * fw3
-               wf1 = cps(1,1,ib) + cps(2,1,ib) * fw1 + &
-               cps(3,1,ib) * fw2 + cps(4,1,ib) * fw3
-               wwi(k,1) = ( 1.0 - fd ) * wf1 + 3.0 * fd
-	       wf2 = cps(1,2,ib) + cps(2,2,ib) * fw1 + &
-               cps(3,2,ib) * fw2 + cps(4,2,ib) * fw3
-               wwi(k,2) = ( 1.0 - fd ) * wf2 + 5.0 * fd
-       	       wf3 = cps(1,3,ib) + cps(2,3,ib) * fw1 + &
-               cps(3,3,ib) * fw2 + cps(4,3,ib) * fw3
-               wwi(k,3) = ( 1.0 - fd ) * wf3 + 7.0 * fd
-               wf4 = cps(1,4,ib) + cps(2,4,ib) * fw1 + &
-               cps(3,4,ib) * fw2 + cps(4,4,ib) * fw3
-               wwi(k,4) = ( 1.0 - fd ) * wf4 + 9.0 * fd
-             else ! longwave
-               ibr = ib - mbs
-               gg = cpir(1,ibr) + cpir(2,ibr) * fw1 + &
-               cpir(3,ibr) * fw2 + cpir(4,ibr) * fw3
-	       x1 = gg
-               x2 = x1 * gg
-               x3 = x2 * gg
-               x4 = x3 * gg
-               wwi(k,1) = 3.0 * x1
-	       wwi(k,2) = 5.0 * x2
-               wwi(k,3) = 7.0 * x3
-               wwi(k,4) = 9.0 * x4
-	     endif
-       else
-          wwi(k,:) = 0.0
-          ti(k) = 0.0
-          wi(k) = 0.0
-          gg    = 0.
-       end if
+        cwmks = pci(k)!here we don't need the factor 1000
+        if ( (cwmks .ge. 1.e-5).and.(pde(k).gt.0.)) then
+            fw1 = min(pde(k), pde_limit)
+            fw2 = fw1 * min(pde(k), pde_limit)
+            fw3 = fw2 * min(pde(k), pde_limit)
+            ti(k) = dz(k) * cwmks * ( ap(1,ib) + &
+                ap(2,ib) / fw1 + ap(3,ib) / fw2 )
+            wi(k) = 1.0 - ( bp(1,ib) + bp(2,ib) * fw1 + &
+                bp(3,ib) * fw2 + bp(4,ib) * fw3 )
+            if (wi(k).lt.0.) print*,'bad wi, ',wi(k),ib,k,bp(1,ib),bp(2,ib),bp(3,ib),bp(4,ib),fw1,fw2,fw3
+            if (ti(k).lt.0.) print*,'bad ti, ',ti(k),ib,k,cwmks,dz(k),ap(1,ib),ap(2,ib),ap(3,ib),fw1,fw2
+            if ( ib .le. mbs ) then ! shortwave
+                fd = dps(1,ib) + dps(2,ib) * fw1 + &
+                    dps(3,ib) * fw2 + dps(4,ib) * fw3
+                wf1 = cps(1,1,ib) + cps(2,1,ib) * fw1 + &
+                    cps(3,1,ib) * fw2 + cps(4,1,ib) * fw3
+                wwi(k,1) = ( 1.0 - fd ) * wf1 + 3.0 * fd
+                wf2 = cps(1,2,ib) + cps(2,2,ib) * fw1 + &
+                    cps(3,2,ib) * fw2 + cps(4,2,ib) * fw3
+                wwi(k,2) = ( 1.0 - fd ) * wf2 + 5.0 * fd
+                wf3 = cps(1,3,ib) + cps(2,3,ib) * fw1 + &
+                    cps(3,3,ib) * fw2 + cps(4,3,ib) * fw3
+                wwi(k,3) = ( 1.0 - fd ) * wf3 + 7.0 * fd
+                wf4 = cps(1,4,ib) + cps(2,4,ib) * fw1 + &
+                    cps(3,4,ib) * fw2 + cps(4,4,ib) * fw3
+                wwi(k,4) = ( 1.0 - fd ) * wf4 + 9.0 * fd
+            else ! longwave
+                ibr = ib - mbs
+                gg = cpir(1,ibr) + cpir(2,ibr) * fw1 + &
+                    cpir(3,ibr) * fw2 + cpir(4,ibr) * fw3
+                x1 = gg
+                x2 = x1 * gg
+                x3 = x2 * gg
+                x4 = x3 * gg
+                wwi(k,1) = 3.0 * x1
+                wwi(k,2) = 5.0 * x2
+                wwi(k,3) = 7.0 * x3
+                wwi(k,4) = 9.0 * x4
+            endif
+        else
+            wwi(k,:) = 0.0
+            ti(k) = 0.0
+            wi(k) = 0.0
+            gg    = 0.
+        end if
     end do
 
     return
