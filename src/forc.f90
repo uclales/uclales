@@ -24,7 +24,7 @@ module forc
   !irina
   use rad_gcss, only  : gcss_rad
   !cgils
-  use grid, only      : wfls, dthldtls, dqtdtls, sfc_albedo, lrad_ca
+  use grid, only      : wfls, dthldtls, dqtdtls, sfc_albedo, lrad_ca, zi2_bar
   use modnudge, only  : nudge, nudge_bound, lnudge_bound !LINDA 
   use stat, only : sflg
   implicit none
@@ -243,6 +243,7 @@ contains
 
     use mpi_interface, only : pecount, double_scalar_par_sum,myid, appl_abort
     use stat, only : get_zi
+    use grid, only : xm
 
     integer, intent (in):: n1,n2, n3
     real, dimension (n1), intent (in)          :: zt, dzi_t, dzi_m
@@ -375,6 +376,113 @@ contains
              enddo
           enddo
        enddo
+
+    case('blco')  !prescribed boundary layer radiative cooling
+       ! prescribe radiative cooling profile in K/day
+       do k=2,n1-2
+         if ( myid== 6) then  ! only in a limited domain
+           if (zt(k) < 300.) then
+              sf(k) =  1.5/300.*zt(k)
+           else
+             if (zt(k) < 1500.) then
+               sf(k) =  -1./2400.*zt(k) + 13./8.
+             else
+               sf(k) = 1.
+             end if
+           end if
+         else
+           if (zt(k) < 200.) then
+              sf(k) =  1.5/300.*zt(k)
+           else
+             sf(k) = 1.
+           end if
+         end if
+       end do
+       
+       do j=3,n3-2
+          do i=3,n2-2
+             do k=2,n1-2
+                !
+                ! radiative cooling
+                !
+                tt(k,i,j) = tt(k,i,j)  - sf(k)/86400.  ! in K/s
+                !
+             enddo
+          enddo
+       enddo
+
+    case('blc1d')  !prescribed boundary layer radiative cooling for 1D simulation on one processor
+       ! prescribe radiative cooling profile in K/day
+!       print *, '  zi2_bar = ', zi2_bar
+       do j=3,n3-2
+         do i=3,n2-2
+           do k=2,n1-2
+
+             if ( xm(i)>= -50000. .and. xm(i)< 50000. .and. zt(k) < zi2_bar ) then  ! only in a limited domain
+               sf(k) = 0.25
+             else
+               sf(k) = 0.00
+             end if
+
+!             if ( xm(i)>= -50000. .and. xm(i)< 50000. ) then  ! only in a limited domain
+!               if (zt(k) < 200.) then
+!                 sf(k) =  1.5/300.*zt(k)                    ! x1, x*b, x*c
+!                 !sf(k) = 1.25                              ! x1b_1.25
+!                 !sf(k) = 1.00                              ! x1b_1.00
+!               else
+!                 if (zt(k) < 300.) then                      ! x*
+!                 !if (zt(k) < 1400.) then                      ! x1_rev, x1c_top
+!                   !sf(k) =  0.25/100.*zt(k) +0.5               ! x0.5
+!                   sf(k) =   1.5/300.*zt(k)                    ! x1
+!                   !sf(k) =  0.75/100.*zt(k) -0.5               ! x1.5
+!                   !sf(k) =  0.5/1200.*zt(k) -0.5/12.*14.+1.5  ! x1_rev
+!                   !sf(k) = 1.125                             ! x0.5b
+!                   !sf(k) = 1.25                              ! x1b
+!                   !sf(k) = 1.375                             ! x1.5b
+!                   !sf(k) =  2.625                            ! x0.5c
+!                   !sf(k) =  4.25                             ! x1c
+!                   !sf(k) =  5.875                            ! x1.5c
+!                   !sf(k) =  1.                                ! x1c_top
+!                 else
+!                   if (zt(k) < 1500.) then
+!                     !sf(k) =  -0.25/1200.*zt(k) + 0.25/12.*15.+1. ! x0.5
+!                     sf(k) =   -0.5/1200.*zt(k) +  0.5/12.*15.+1. ! x1
+!                     !sf(k) =  -0.75/1200.*zt(k) + 0.75/12.*15.+1. ! x1.5
+!                     !sf(k) =  -0.5/100.*zt(k) + 0.5/1.*15.+1. ! x1_rev
+!                     !sf(k) = 1.125                                ! x0.5b
+!                     !sf(k) = 1.25                                 ! x1_rev
+!                     !sf(k) = 1.375                                ! x1.5b
+!                     !sf(k) = 1.                                   ! x*c
+!                     !sf(k) =  4.25                                 ! x1c_top
+!                   else
+!                     sf(k) = 1.
+!                   end if
+!                 end if
+!               end if
+!             else
+!               if (zt(k) < 200.) then
+!                  sf(k) =  1.5/300.*zt(k)
+!               else
+!                 !sf(k) = 1.                     ! all
+!                 if (zt(k) < 1500.) then               !y0.5, y1.5
+!                   sf(k) = 0.875
+!                   sf(k) = 1.125
+!                 else
+!                   sf(k) = 1.0
+!                 end if
+!               end if
+!             end if
+
+
+             !
+             ! radiative cooling
+             !
+             tt(k,i,j) = tt(k,i,j)  - sf(k)/86400.  ! in K/s
+             !
+           end do
+         enddo
+       enddo
+       
     case default
        if (myid == 0) print *, '  ABORTING: inproper call to radiation'
        call appl_abort(0)

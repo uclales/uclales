@@ -21,7 +21,7 @@ module stat
 
   use mpi_interface, only : myid
   use ncio, only : open_nc, define_nc
-  use grid, only : level, isfctyp, svctr, ssclr, nv1, nv2, nsmp
+  use grid, only : level, isfctyp, svctr, ssclr, nv1, nv2, nsmp, zi2_bar
   use util, only : get_avg, get_cor, get_avg3, get_cor3, get_var3, get_csum
 !irina
 !  use step, only: case_name
@@ -268,6 +268,7 @@ contains
     ssclr(1) = time
     ssclr(4) = get_zi(n1, n2, n3, 2, th, dzi_m, zt, 1.)   ! maximum gradient
     ssclr(5) = get_zi(n1, n2, n3, 3, th, thvar, zt, 1.) ! maximum variance
+    zi2_bar = ssclr(5)  !remember ssclr(5) for forcing
     !
     ! buoyancy flux statistics
     !

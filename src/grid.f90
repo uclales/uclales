@@ -67,6 +67,7 @@ module grid
 
   real, parameter   ::  rkalpha(3) = (/ 8./15., -17./60.,  3./4. /), &
                         rkbeta(3)  = (/    0.0,   5./12., -5./12./)
+  real    :: zi2_bar = 10.  ! ann kristin, for forcing
 
   integer           :: nz, nxyzp, nxyp, nstep
   real              :: dxi, dyi, dt, psrf
