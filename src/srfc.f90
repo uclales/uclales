@@ -54,7 +54,7 @@ contains
     use stat, only: sfc_stat, sflg
     use util, only : get_avg3
     use mpi_interface, only : nypg, nxpg, double_array_par_sum
-    use mpi_interface, only: myid
+    use mpi_interface, only: myid,xoffset,wrxid
 
     implicit none
 
@@ -65,6 +65,7 @@ contains
 
     real :: dtdz(nxp,nyp), drdz(nxp,nyp), usfc(nxp,nyp), vsfc(nxp,nyp) &
             ,wspd(nxp,nyp), bfct(nxp,nyp), mnflx(5), flxarr(5,nxp,nyp)
+    !real :: xx
 
     drdz(:,:)   = 0.
 
@@ -105,6 +106,13 @@ contains
        usum = 0.
        do j=3,nyp-2
          do i=3,nxp-2
+           !!use different sst in each half of the domain
+           !xx=float(xoffset(wrxid)-(nxpg-4)/2+i-3)*100.
+           !if (xx.lt.0) then
+           !  sst = 293. 
+           !else
+           !  sst = 298.
+           !end if
            dtdz(i,j) = a_theta(2,i,j) - sst*(p00/psrf)**rcp
            if(level>0) drdz(i,j) = vapor(2,i,j) - rslf(psrf,sst)
            bfct(i,j) = g*zt(2)/(a_theta(2,i,j)*wspd(i,j)**2)

@@ -24,7 +24,7 @@ module forc
   !irina
   use rad_gcss, only  : gcss_rad
   !cgils
-  use grid, only      : wfls, dthldtls, dqtdtls, sfc_albedo, lrad_ca, zi2_bar
+  use grid, only      : wfls, dthldtls, dqtdtls, sfc_albedo, lrad_ca, zi2_bar, th00
   use modnudge, only  : nudge, nudge_bound, lnudge_bound !LINDA 
   use stat, only : sflg
   implicit none
@@ -373,6 +373,30 @@ contains
                 !
                 rtt(k,i,j) = rtt(k,i,j) - ( rt(kp1,i,j) - rt(k,i,j) )*sf(k)
                 if (zt(k) < zibar) rtt(k,i,j) = rtt(k,i,j)  - 1.5e-8
+             enddo
+          enddo
+       enddo
+
+    case('seab')  !nudging to temp profile
+       
+       !print *, '  tl(3,3,3) = ', tl(3,3,3)
+       do k=2,n1-2
+           if (zt(k) < 8000.) then
+              sf(k) =  297. - th00
+           else
+              sf(k) =  1./200.*zt(k) + 257. - th00
+           end if
+       end do
+       
+       do j=3,n3-2
+          do i=3,n2-2
+             do k=2,n1-2
+                !
+                ! nudging
+                !
+                tt(k,i,j) = tt(k,i,j)  - (tl(k,i,j)-sf(k))/(24.*60.*60)  ! in K/s; one day relaxation time scale
+                !tt(k,i,j) = tt(k,i,j)  - (tl(k,i,j)-sf(k))/(30.*60)  ! in K/s; half an hour relaxation time scale
+                !
              enddo
           enddo
        enddo
