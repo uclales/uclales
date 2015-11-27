@@ -16,6 +16,11 @@ from datetime import datetime
 have_lock=False
 complvl=3
 
+if not "nanmean" in dir(np):
+  def nanmean(x, *args, **kwargs):
+    return np.nansum(x, *args, **kwargs) / np.sum( np.isfinite(x), *args, **kwargs )
+  np.nanmean = nanmean
+
 #--------------------------------------------------------------------------------------------------------------------------------
 def write_nc(basename,varname, data, dims, attributes=None):
   fname= '{0:}'.format(basename)+'.merged.nc'
