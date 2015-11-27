@@ -410,7 +410,8 @@ contains
                      a_rhailt,a_nhailt,a_nsnowt, a_ngrt,&
                      a_xt1, a_xt2, nscl, nxyzp, level, &
                      lwaterbudget, a_rct, ncld, &
-                     lcouvreux, a_cvrxt, ncvrx
+                     lcouvreux, a_cvrxt, ncvrx, &
+                     mom3, nref, a_zpt
     use util, only : azero
 
     integer, intent (in) :: nstep
@@ -429,6 +430,7 @@ contains
           a_npt =>a_xt1(:,:,:,7)
        end if
        if (lwaterbudget) a_rct =>a_xt1(:,:,:,ncld)
+       if (mom3)         a_zpt =>a_xt1(:,:,:,nref)
        if (lcouvreux)    a_cvrxt =>a_xt1(:,:,:,ncvrx)
        if (level >= 4) then
           a_ricet  =>a_xt1(:,:,:, 8)
@@ -455,6 +457,7 @@ contains
           a_npt =>a_xt2(:,:,:,7)
        end if
        if (lwaterbudget) a_rct =>a_xt2(:,:,:,ncld)
+       if (mom3)         a_zpt =>a_xt2(:,:,:,nref)
        if (lcouvreux)    a_cvrxt =>a_xt2(:,:,:,ncvrx)
        if (level >= 4) then
           a_ricet  =>a_xt2(:,:,:, 8)
@@ -481,7 +484,7 @@ contains
 !irina
     use grid, only : a_xp, a_xt1, a_xt2, a_up, a_vp, a_wp, a_sp, dzi_t, dt,  &
          nscl, nxp, nyp, nzp, newvar,level, a_rpp,a_ricep,a_nicep,a_rsnowp,a_rgrp,a_npp,rkalpha,rkbeta, &
-         a_nsnowp,a_ngrp,a_rhailp,a_nhailp,a_rp,liquid
+         a_nsnowp,a_ngrp,a_rhailp,a_nhailp,a_rp,liquid, a_zpp, mom3
     use util, only : sclrset,velset
 
     integer, intent (in) :: nstep
@@ -515,6 +518,12 @@ contains
        end where
        where (liquid < 0.)
           liquid=0.
+       end where
+    end if
+    if (mom3) then
+       a_zpp(1,:,:) = 0.
+       where (a_zpp < 0.)
+          a_zpp=0.
        end where
     end if
     if (level >= 4) then

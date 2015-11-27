@@ -89,7 +89,8 @@ contains
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
          filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype,             &
-         CCN, lwaterbudget, lcouvreux, prc_lev, isfctyp, sfc_albedo, lrad_ca
+         CCN, lwaterbudget, lcouvreux, prc_lev, isfctyp, sfc_albedo, lrad_ca, &
+         mom3
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,irsflg, iseed, hfilin,   &
          zrand,lhomrestart,mag_pert_q,mag_pert_t
     use stat, only : ssam_intvl, savg_intvl
@@ -149,8 +150,8 @@ contains
          clouddiff, &
          lpartic,lpartsgs,lrandsurf,lpartstat,lpartdump, &           ! Particles
          lpartdumpui,lpartdumpth,lpartdumpmr,frqpartdump,&           ! Particles
-         lpartdrop, ldropstart, lpartdumpp, lpartdumptau             ! Particles
-
+         lpartdrop, ldropstart, lpartdumpp, lpartdumptau, &          ! Particles
+         mom3                                   ! three moment mcrp
 
     deflev = deflate_level
     ps       = 0.

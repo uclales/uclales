@@ -54,8 +54,10 @@ module grid
   logical           :: lrad_ca = .false.   ! Perform clear air radiation calculations
   logical           :: lcouvreux = .false.  ! switch for 'radioactive' scalar
   logical           :: lwaterbudget = .false.  ! switch for liquid water budget diagnostics
+  logical           :: mom3 = .false.      ! switch for three moment warm microphysics
   integer           :: ncvrx               ! Number of Couvreux scalar
-  integer           :: ncld               ! Number of Couvreux scalar
+  integer           :: ncld                ! Number of cloud water scalar
+  integer           :: nref                ! Number of reflectivity scalar
 
   integer           :: nfpt = 10           ! number of rayleigh friction points
   real              :: distim = 300.0      ! dissipation timescale
@@ -107,7 +109,11 @@ module grid
   ! Named pointers (to 3D arrays)
   !
   real, dimension (:,:,:), pointer :: a_up, a_ut, a_vp, a_vt, a_wp, a_wt,     &
-       a_sp, a_st, a_tp, a_tt, a_rp, a_rt, a_rpp, a_rpt, a_npp, a_npt,        &
+       a_sp, a_st, a_tp, a_tt, &
+       a_rp,     a_rt,      & ! total water
+       a_rpp,    a_rpt,     & ! rain mixing ratio
+       a_npp,    a_npt,     & ! rain nubmer concentration
+       a_zpp,    a_zpt,     & ! rain reflectivity
        a_ricep , a_ricet  , & ! ice mixing ratio
        a_nicep , a_nicet  , & ! ice number concentration
        a_rsnowp, a_rsnowt , & ! snow
@@ -115,7 +121,8 @@ module grid
        a_rgrp,   a_rgrt,    & ! graupel
        a_ngrp,   a_ngrt,    &
        a_rhailp, a_rhailt,  & ! hail
-       a_nhailp, a_nhailt, a_rct, a_cld, a_cvrxp, a_cvrxt
+       a_nhailp, a_nhailt,  &
+       a_rct, a_cld, a_cvrxp, a_cvrxt
  ! linda,b, output of tendencies
   real, dimension (:,:,:), allocatable :: &
         mp_qt, mp_qr, mp_qi, mp_qs, mp_qg, mp_qh, &
@@ -260,6 +267,10 @@ contains
       nscl = nscl+1 ! additional cloud water a_cld in the tracer array
       ncld = nscl
     end if
+    if (mom3) then
+      nscl = nscl+1 ! additional zp
+      nref = nscl
+    end if
     if (lcouvreux) then
       nscl = nscl+1 ! Additional radioactive scalar
       ncvrx = nscl
@@ -300,6 +311,11 @@ contains
       cev_acc(:,:) = 0.   ! accumulated evaporation of cloud water   [kg/m2]
     else
       a_cld => NULL()
+    end if
+    if (mom3) then ! three moment microphysic: reflectivity
+      a_zpp=>a_xp(:,:,:,nref)
+    else
+      a_zpp=>NULL()
     end if
     ! ice microphysics
     if (level >= 4) then

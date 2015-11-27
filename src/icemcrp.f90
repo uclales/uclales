@@ -31,6 +31,7 @@ module mcrp
   use grid, only : dt,nstep,rkbeta,rkalpha, dxi, dyi ,dzi_t, nxp, nyp, nzp,nfpt, a_pexnr, pi0,pi1,a_rp, a_tp, th00, ccn,    &
        dn0, pi0,pi1, a_rt, a_tt,a_rpp, a_rpt, a_npp, a_npt, vapor, liquid, a_wp, zm,      &
        a_theta, a_scr1, a_scr2, a_scr7, rsi, &
+       a_zpp ,   a_zpt    , & ! rain reflectivity
        a_ricep , a_ricet  , & ! ice mixing ratio
        a_nicep , a_nicet  , & ! ice number concentration
        a_rsnowp, a_rsnowt , & ! snow mass
@@ -40,7 +41,8 @@ module mcrp
        a_rhailp, a_rhailt,  & ! hail mass
        a_nhailp, a_nhailt,  & ! hail number
        prc_c, prc_r, prc_i, prc_s, prc_g, prc_h, & 
-       lwaterbudget, prc_acc, rev_acc, a_rct, cnd_acc, cev_acc, a_cld,prc_lev, lmptend
+       lwaterbudget, prc_acc, rev_acc, a_rct, cnd_acc, cev_acc, a_cld,prc_lev, lmptend, &
+       mom3
 
   USE parallele_umgebung, ONLY: isIO,double_global_maxval,global_maxval,global_minval,global_maxval_stdout,global_sumval_stdout
   USE modcross, ONLY: calcintpath
@@ -219,8 +221,13 @@ contains
        end if
     case(3)
        if (.not.lwaterbudget) then
-          call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
-               a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r)
+          if (.not.mom3) then
+            call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
+                 a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r)
+          else
+            call mcrph(level,nzp,nxp,nyp,dn0,a_pexnr,pi0,pi1,a_tp,a_tt,a_scr1,vapor,a_scr2,liquid,prc_c,a_rpp, &
+                 a_npp,a_rt,a_rpt,a_npt,a_scr7,prc_r,zp=a_zpp,zpt=a_zpt)
+          end if
           do n =1,count(prc_lev>0)
             prc_acc(:,:,n) = prc_acc(:,:,n) + (prc_c(n,:,:)+prc_r(n,:,:)) * dt / 3.
           end do
@@ -306,7 +313,7 @@ contains
 
   subroutine mcrph(level,n1,n2,n3,dn0,exner,pi0,pi1,thl,tlt,tk,vapor,rsat,rcld,prc_c, &
        rp, np, rtt,rpt,npt,dissip, prc_r,rsati, ricet,nicet,rsnowt,rgrpt,ricep,nicep,rsnowp,rgrpp, &
-       prc_i, prc_s, prc_g, rct)
+       prc_i, prc_s, prc_g, rct, zp, zpt)
 
     integer, intent (in) :: level,n1,n2,n3
     real, dimension(n1)      , intent (in)             :: dn0,pi0,pi1  !Density and mean pressures
@@ -325,14 +332,16 @@ contains
          npt,&!rain droplet number tendency
          rct,&! cloud water tendency
          dissip, &
-         prc_r
+         prc_r, &
+         zp,&! rain reflectivity
+         zpt  ! rain reflectivity tendency   
 
     real, dimension(n1,n2,n3), intent (inout),optional :: rsati, ricet,nicet,rsnowt,rgrpt,&
          ricep,nicep,rsnowp,rgrpp
 
     real, dimension(n1,n2,n3), intent (inout),optional :: prc_i, prc_s, prc_g
 
-    real, dimension(n1) :: tl,temp,rv,rc,nrain,rrain,nice, nin_active,rice,nsnow,rsnow,ngrp,rgrp,rs,rsi,s_i,r1
+    real, dimension(n1) :: tl,temp,rv,rc,nrain,rrain,zrain,nice, nin_active,rice,nsnow,rsnow,ngrp,rgrp,rs,rsi,s_i,r1
     integer :: i, j,n
 !as    logical,save  :: firsttime = .true.
     !     real :: dtrk
@@ -343,7 +352,11 @@ contains
     if(lpartdrop .and. nstep==1) a_npauto(:,:,:) = 0.
     do j=3,n3-2
        do i=3,n2-2
-          call resetvar(rain,rp(1:n1,i,j),np(1:n1,i,j))
+          if (.not.mom3) then
+            call resetvar(rain,rp(1:n1,i,j),np(1:n1,i,j))
+          else
+            call resetvar(rain,rp(1:n1,i,j),np(1:n1,i,j),zp(1:n1,i,j))
+          end if
           tl = thl(1:n1,i,j)
           temp = tk(1:n1,i,j)
           rv = vapor(1:n1,i,j)
@@ -351,6 +364,7 @@ contains
           rs = rsat(1:n1,i,j)
           rrain = rp(1:n1,i,j)
           nrain = np(1:n1,i,j)
+          zrain = zp(1:n1,i,j)
           convliq = alvl/(cp*(pi0+pi1+exner(1:n1,i,j))/cp)
           if (level == 4) then
              rsi = rsati(1:n1,i,j)
@@ -385,19 +399,39 @@ contains
              select case(microseq(n))
              case(iwtrdff)
                 call resetvar(cldw,rc)
-                call resetvar(rain,rrain,nrain)
-                call wtr_dff_SB(n1,dn0,rrain,nrain,rc,rs,rv,tl,temp,ev=rev_acc(i,j),zm=zm)
+                if(.not.mom3) then
+                  call resetvar(rain,rrain,nrain)
+                  call wtr_dff_SB(n1,dn0,rrain,nrain,rc,rs,rv,tl,temp,ev=rev_acc(i,j),zm=zm)
+                else
+                  call resetvar(rain,rrain,nrain,zrain)
+                  call wtr_dff_SB(n1,dn0,rrain,nrain,rc,rs,rv,tl,temp,ev=rev_acc(i,j),zm=zm,zp=zrain)
+                end if
              case(iauto)
                 call resetvar(cldw,rc)
-                call resetvar(rain,rrain,nrain)
-                call auto_SB(n1,dn0,rc,rrain,nrain,tl,dissip(1:n1,i,j),i,j)
+                if(.not.mom3) then
+                  call resetvar(rain,rrain,nrain)
+                  call auto_SB(n1,dn0,rc,rrain,nrain,tl,dissip(1:n1,i,j),i,j)
+                else
+                  call resetvar(rain,rrain,nrain,zrain)
+                  call auto_SB(n1,dn0,rc,rrain,nrain,tl,dissip(1:n1,i,j),i,j,zp=zrain)
+                end if
              case(iaccr)
                 call resetvar(cldw,rc)
-                call resetvar(rain,rrain,nrain)
-                call accr_SB(n1,dn0,rc,rrain,nrain,tl,dissip(1:n1,i,j))
+                if(.not.mom3) then
+                  call resetvar(rain,rrain,nrain)
+                  call accr_SB(n1,dn0,rc,rrain,nrain,tl,dissip(1:n1,i,j))
+                else
+                  call resetvar(rain,rrain,nrain,zrain)
+                  call accr_SB(n1,dn0,rc,rrain,nrain,tl,dissip(1:n1,i,j),zp=zrain)
+                end if
              case(isedimrd)
-                call resetvar(rain,rrain,nrain)
-                call sedim_rd(n1,dt,dn0,rrain,nrain,prc_r(1:n1,i,j))
+                if(.not.mom3) then
+                  call resetvar(rain,rrain,nrain)
+                  call sedim_rd(n1,dt,dn0,rrain,nrain,prc_r(1:n1,i,j))
+                else
+                  call resetvar(rain,rrain,nrain,zrain)
+                  call sedim_rd(n1,dt,dn0,rrain,nrain,prc_r(1:n1,i,j),zp=zrain)
+                end if
              case(isedimcd)
                 call resetvar(cldw,rc)
                 call sedim_cd(n1,dt,tl,rc,prc_c(1:n1,i,j))
@@ -484,7 +518,11 @@ contains
              end select
           end do
           call resetvar(cldw,rc)
-          call resetvar(rain,rrain,nrain)
+          if(.not.mom3) then
+            call resetvar(rain,rrain,nrain)
+          else
+            call resetvar(rain,rrain,nrain,zrain)
+          end if
           if (level==4) then
              call resetvar(ice,rice,nice)
              call resetvar(snow,rsnow)
@@ -495,6 +533,9 @@ contains
           rtt(2:n1,i,j) = rtt(2:n1,i,j) +(rv(2:n1) - vapor(2:n1,i,j))/dt + (rc(2:n1) - rcld(2:n1,i,j))/dt
           rpt(2:n1,i,j) = max(rpt(2:n1,i,j) +(rrain(2:n1) - rp(2:n1,i,j))/dt,-rp(2:n1,i,j)/dt)
           npt(2:n1,i,j) = max(npt(2:n1,i,j) +(nrain(2:n1) - np(2:n1,i,j))/dt,-np(2:n1,i,j)/dt)
+          if (mom3) then
+            zpt(2:n1,i,j) = max(zpt(2:n1,i,j) +(zrain(2:n1) - zp(2:n1,i,j))/dt,-zp(2:n1,i,j)/dt)
+          end if
           
           if (present(rct)) then
 !             rct(2:n1,i,j) = (rc(2:n1) - rcld(2:n1,i,j))/dt
@@ -514,6 +555,7 @@ contains
     deallocate(convice,convliq)
     !print *,maxval(s_i),maxloc(s_i)
   end subroutine mcrph
+
   real elemental function snownr(mu, t, qsg)
     real, intent(in) :: mu, t, qsg
     real, parameter :: zn0s1 = 7.6275e6, zn0s2 = -0.107, zams = 0.038
@@ -551,7 +593,7 @@ contains
     snownr = n0s/mu
   end function snownr
 
-  subroutine wtr_dff_SB(n1,dn0,rp,np,rl,rs,rv,tl,tk,ev,zm)
+  subroutine wtr_dff_SB(n1,dn0,rp,np,rl,rs,rv,tl,tk,ev,zm,zp)
     !
     ! ---------------------------------------------------------------------
     ! WTR_DFF_SB: calculates the evolution of the both number- and
@@ -564,6 +606,7 @@ contains
     real, intent (inout) :: rp(n1), np(n1),tl(n1),rv(n1),rl(n1)
     real, intent (inout), optional :: ev
     real, intent (in),    optional :: zm(n1)
+    real, intent (inout), optional :: zp(n1)
 
     real, parameter     :: c_Nevap = 1.
     integer             :: k
@@ -666,7 +709,7 @@ contains
 
 
   end subroutine wtr_dff_SB
-  subroutine auto_SB(n1,dn0,rc,rp,np,tl,diss,i,j)
+  subroutine auto_SB(n1,dn0,rc,rp,np,tl,diss,i,j,zp)
     !
     ! ---------------------------------------------------------------------
     ! AUTO_SB:  calculates the evolution of mass- and number mxg-ratio for
@@ -679,6 +722,7 @@ contains
     integer, intent (in) :: n1,i,j
     real, intent (in)    :: dn0(n1), diss(n1)
     real, intent (inout) :: rc(n1), rp(n1), np(n1),tl(n1)
+    real, intent (inout), optional :: zp(n1)
 
     real            :: nu_c  = 0.           ! width parameter of cloud DSD
     real, parameter :: kc_0  = 9.44e+9      ! Long-Kernel
@@ -798,7 +842,7 @@ contains
     !end if
 
   end subroutine auto_SB
-  subroutine accr_SB(n1,dn0,rc,rp,np,tl,diss)
+  subroutine accr_SB(n1,dn0,rc,rp,np,tl,diss,zp)
     !
     ! ---------------------------------------------------------------------
     ! ACCR_SB calculates the evolution of mass mxng-ratio due to accretion
@@ -810,6 +854,7 @@ contains
     integer, intent (in) :: n1
     real, intent (inout)    :: rc(n1), rp(n1), np(n1),tl(n1)
     real, intent (in)    :: dn0(n1),diss(n1)
+    real, intent (inout), optional :: zp(n1)
 
     real, parameter :: k_r0 = 5.78
     real, parameter :: k_rr = 4.33
@@ -834,6 +879,7 @@ contains
              k_r = k_r*(1+(0.05*epsilon**0.25))
           end if
           if (rc(k) > 0.) then
+             ! accretion
              tau = 1.0-rc(k)/(rc(k)+rp(k)+eps0)
              tau = MIN(MAX(tau,eps0),1.)
              phi = (tau/(tau+k_1))**4
@@ -855,7 +901,7 @@ contains
              rc(k) = rc(k) - ac
              tl(k) = tl(k) + convliq(k)*ac
 
-
+             !selfcollection
              sc = k_rr * np(k) * rp(k) * (rho_0/dn0(k))**0.35 *dn0(k)
              sc = min(sc, np(k))
              np(k) = np(k) - sc
@@ -864,7 +910,7 @@ contains
     end do
 
   end subroutine accr_SB
-  subroutine sedim_rd(n1,dt,dn0,rp,np,rrate)
+  subroutine sedim_rd(n1,dt,dn0,rp,np,rrate,zp)
     !
     ! ---------------------------------------------------------------------
     ! SEDIM_RD: calculates the sedimentation of the rain drops and its
@@ -879,6 +925,7 @@ contains
     real, intent (in),    dimension(n1)       :: dn0
     real, intent (inout), dimension(n1) :: rp,np
     real, intent (out)  , dimension(n1) :: rrate
+    real, intent (inout), optional :: zp(n1)
     real, parameter :: a2 = 9.65       ! in SI [m/s]
     real, parameter :: c2 = 6e2        ! in SI [1/m]
     real, parameter :: Dv = 25.0e-6    ! in SI [m/s]
@@ -2734,10 +2781,11 @@ contains
     end do
   end subroutine shuffle
 
-  subroutine resetvar(meteor,mass,num)
+  subroutine resetvar(meteor,mass,num,refl)
     type(particle),intent(in)        :: meteor
     real, dimension(:), intent(inout) :: mass
     real, dimension(:), intent(inout), optional :: num
+    real, dimension(:), intent(inout), optional :: refl
 
  !   if (any(mass < 0.)) then
  !     print *, trim(meteor%name), 'below zero', mass
@@ -2755,6 +2803,14 @@ contains
           num = mass/meteor%x_min
        end where
     end if
+    if (present(refl)) then !restrict mu to [1,20]
+      where (refl< 1.4681*mass**2/num)
+        refl = 1.4681*mass**2/num
+      end where
+      where (refl> 8.75*mass**2/num)
+        refl = 8.75*mass**2/num
+      end where
+    end if
   end subroutine resetvar
 
   subroutine initmcrp(level,firsttime)
@@ -2766,6 +2822,8 @@ contains
     end if
 
     if (level/=3) lwaterbudget = .false.
+    if (level<3)  mom3 = .false.
+    if (level==5) mom3 = .false.
     if (level==2) then
        nprocess = 1
        microseq = isedimcd
