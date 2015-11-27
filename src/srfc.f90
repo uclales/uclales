@@ -844,6 +844,7 @@ contains
                     a_lflxu, a_lflxd, a_sflxu, a_sflxd, nstep, &
                     a_lflxu_avn, a_lflxd_avn, a_sflxu_avn, a_sflxd_avn, &
                     a_tsoil, a_phiw, a_tskin, a_Wl, a_Qnet, a_G0
+    use radiation,only : radMcICA
 
     integer  :: i, j, k
     real     :: f1, f2, f3, f4, fsoil !Correction functions for Jarvis-Stewart
@@ -879,45 +880,49 @@ contains
 
     do j = 3, nyp-2
       do i = 3, nxp-2
+          !" 1.1 - Calculate net radiation (average over nradtime)
+          if((iradtyp .eq. 4) .or. (iradtyp .eq. 6) .or. (iradtyp .eq. 7) .or. (iradtyp .eq. 5)) then
+              if(nstep == 1 .and. radMcICA) then
 
-        !" 1.1 - Calculate net radiation (average over nradtime)
-        if((iradtyp .eq. 4) .or. (iradtyp .eq. 6) .or. (iradtyp .eq. 7) .or. (iradtyp .eq. 5)) then
-          if(nstep == 1) then
+                  a_sflxd_avn(2:nradtime,i,j) = a_sflxd_avn(1:nradtime-1,i,j)
+                  a_sflxu_avn(2:nradtime,i,j) = a_sflxu_avn(1:nradtime-1,i,j)
+                  a_lflxd_avn(2:nradtime,i,j) = a_lflxd_avn(1:nradtime-1,i,j)
+                  a_lflxu_avn(2:nradtime,i,j) = a_lflxu_avn(1:nradtime-1,i,j)
 
-            a_sflxd_avn(2:nradtime,i,j) = a_sflxd_avn(1:nradtime-1,i,j)
-            a_sflxu_avn(2:nradtime,i,j) = a_sflxu_avn(1:nradtime-1,i,j)
-            a_lflxd_avn(2:nradtime,i,j) = a_lflxd_avn(1:nradtime-1,i,j)
-            a_lflxu_avn(2:nradtime,i,j) = a_lflxu_avn(1:nradtime-1,i,j)
+                  a_sflxd_avn(1,i,j) = a_sflxd(2,i,j)
+                  a_sflxu_avn(1,i,j) = a_sflxu(2,i,j)
+                  a_lflxd_avn(1,i,j) = a_lflxd(2,i,j)
+                  a_lflxu_avn(1,i,j) = a_lflxu(2,i,j)
 
-            a_sflxd_avn(1,i,j) = a_sflxd(2,i,j)
-            a_sflxu_avn(1,i,j) = a_sflxu(2,i,j)
-            a_lflxd_avn(1,i,j) = a_lflxd(2,i,j)
-            a_lflxu_avn(1,i,j) = a_lflxu(2,i,j)
+                  !Surface radiation averaged over nradtime but depends on location
+                  sflxd_av = sum(a_sflxd_avn(:,i,j))/nradtime
+                  sflxu_av = sum(a_sflxu_avn(:,i,j))/nradtime
+                  lflxd_av = sum(a_lflxd_avn(:,i,j))/nradtime
+                  lflxu_av = sum(a_lflxu_avn(:,i,j))/nradtime
+              else ! if we have full radiation computataion, just use it directly
+                  sflxd_av = a_sflxd(2,i,j)
+                  sflxu_av = a_sflxu(2,i,j)
+                  lflxd_av = a_lflxd(2,i,j)
+                  lflxu_av = a_lflxu(2,i,j)
+              end if
 
+
+              !Surface radiation averaged over domain per timestep
+              !sflxd_av = sum(a_sflxd(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+              !sflxu_av = sum(a_sflxu(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+              !lflxd_av = sum(a_lflxd(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+              !lflxu_av = sum(a_lflxu(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+
+              Qnetn(i,j) = (sflxd_av - sflxu_av + lflxd_av - lflxu_av)
+
+              !Switch between homogeneous and heterogeneous net radiation
+              !a_Qnet(:,:) = sum(Qnetm(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+              a_Qnet(i,j) = Qnetn(i,j)
+
+          else
+              !" Not using full radiation: use average radiation from Namelist
+              a_Qnet(i,j) = Qnetav
           end if
-
-          !Surface radiation averaged over nradtime but depends on location
-          sflxd_av = sum(a_sflxd_avn(:,i,j))/nradtime
-          sflxu_av = sum(a_sflxu_avn(:,i,j))/nradtime
-          lflxd_av = sum(a_lflxd_avn(:,i,j))/nradtime
-          lflxu_av = sum(a_lflxu_avn(:,i,j))/nradtime
-
-          !Surface radiation averaged over domain per timestep
-          !sflxd_av = sum(a_sflxd(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-          !sflxu_av = sum(a_sflxu(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-          !lflxd_av = sum(a_lflxd(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-          !lflxu_av = sum(a_lflxu(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-
-          Qnetn(i,j) = (sflxd_av - sflxu_av + lflxd_av - lflxu_av)
-
-          !Switch between homogeneous and heterogeneous net radiation
-          !a_Qnet(:,:) = sum(Qnetm(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-          a_Qnet(i,j) = Qnetn(i,j)
-
-        else
-          !" Not using full radiation: use average radiation from Namelist
-          a_Qnet(i,j) = Qnetav
-        end if
 
         !" 2.1 - Calculate the surface resistance with vegetation
 
@@ -1114,6 +1119,7 @@ contains
                     a_lflxu, a_lflxd, a_sflxu, a_sflxd, nstep, &
                     a_lflxu_avn, a_lflxd_avn, a_sflxu_avn, a_sflxd_avn, &
                     a_tsoil, a_phiw, a_tskin, a_Wl, a_Qnet
+    use radiation,only : radMcICA
 
     integer  :: i, j
     real     :: f1, f2, f3, f4 !Correction functions for Jarvis-Stewart
@@ -1122,6 +1128,8 @@ contains
     real     :: esat, qsat, desatdT, dqsatdT, Acoef, Bcoef
     real     :: fH, fLE
     real     :: rk3coef=0
+
+    integer, save :: nradavg=0
 
 
     thetaavg  = sum(a_theta(2,3:(nxp-2),3:(nyp-2)))/(nxp-4)/(nyp-4)
@@ -1137,38 +1145,49 @@ contains
     phitot  = 0
     phifrac = 0
 
+    i=3;j=3
+!    if(myid.eq.0) print *,a_sflxd(1,i,j) , a_sflxu(1,i,j) , a_lflxd(1,i,j) , a_lflxu(1,i,j),'::' &
+!        ,(a_sflxd(1,i,j) -a_sflxu(1,i,j) +a_lflxd(1,i,j) -a_lflxu(1,i,j)),'::',a_tskin(i,j),'::',a_tsoil(:,i,j)
+
+    if(myid.eq.0) print *,minval(a_sflxd(1,3:nxp-2,3:nyp-2) -a_sflxu(1,3:nxp-2,3:nyp-2) +a_lflxd(1,3:nxp-2,3:nyp-2) -a_lflxu(1,3:nxp-2,3:nyp-2)), maxval(a_sflxd(1,3:nxp-2,3:nyp-2)-a_sflxu(1,3:nxp-2,3:nyp-2) +a_lflxd(1,3:nxp-2,3:nyp-2) -a_lflxu(1,3:nxp-2,3:nyp-2)), &
+        minval(a_tskin(3:nxp-2,3:nyp-2)),maxval(a_tskin(3:nxp-2,3:nyp-2))
+
+
     do j = 3, nyp-2
       do i = 3, nxp-2
 
         !" 1.1 - Calculate net radiation (average over nradtime)
         if(iradtyp .ge. 4) then
-          if(nstep == 1) then
+          if(radMcICA) then
+            nradavg = min( nradtime, nradavg+1 )
 
             a_sflxd_avn(2:nradtime,i,j) = a_sflxd_avn(1:nradtime-1,i,j)
             a_sflxu_avn(2:nradtime,i,j) = a_sflxu_avn(1:nradtime-1,i,j)
             a_lflxd_avn(2:nradtime,i,j) = a_lflxd_avn(1:nradtime-1,i,j)
             a_lflxu_avn(2:nradtime,i,j) = a_lflxu_avn(1:nradtime-1,i,j)
 
-            a_sflxd_avn(1,i,j) = a_sflxd(2,i,j)
-            a_sflxu_avn(1,i,j) = a_sflxu(2,i,j)
-            a_lflxd_avn(1,i,j) = a_lflxd(2,i,j)
-            a_lflxu_avn(1,i,j) = a_lflxu(2,i,j)
+            a_sflxd_avn(1,i,j) = a_sflxd(1,i,j)/nradavg
+            a_sflxu_avn(1,i,j) = a_sflxu(1,i,j)/nradavg
+            a_lflxd_avn(1,i,j) = a_lflxd(1,i,j)/nradavg
+            a_lflxu_avn(1,i,j) = a_lflxu(1,i,j)/nradavg
 
+            !Surface radiation averaged over nradtime but depends on location
+            sflxd_av = sum(a_sflxd_avn(:,i,j))
+            sflxu_av = sum(a_sflxu_avn(:,i,j))
+            lflxd_av = sum(a_lflxd_avn(:,i,j))
+            lflxu_av = sum(a_lflxu_avn(:,i,j))
+
+            !Surface radiation averaged over domain per timestep
+            !sflxd_av = sum(a_sflxd(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+            !sflxu_av = sum(a_sflxu(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+            !lflxd_av = sum(a_lflxd(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+            !lflxu_av = sum(a_lflxu(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
+
+            Qnetn(i,j) = (sflxd_av - sflxu_av + lflxd_av - lflxu_av)
+
+          else ! no MC Spectral Integration
+            Qnetn(i,j) = (a_sflxd(1,i,j) - a_sflxu(1,i,j) + a_lflxd(1,i,j) - a_lflxu(1,i,j))
           end if
-
-          !Surface radiation averaged over nradtime but depends on location
-          sflxd_av = sum(a_sflxd_avn(:,i,j))/nradtime
-          sflxu_av = sum(a_sflxu_avn(:,i,j))/nradtime
-          lflxd_av = sum(a_lflxd_avn(:,i,j))/nradtime
-          lflxu_av = sum(a_lflxu_avn(:,i,j))/nradtime
-
-          !Surface radiation averaged over domain per timestep
-          !sflxd_av = sum(a_sflxd(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-          !sflxu_av = sum(a_sflxu(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-          !lflxd_av = sum(a_lflxd(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-          !lflxu_av = sum(a_lflxu(2,3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
-
-          Qnetn(i,j) = (sflxd_av - sflxu_av + lflxd_av - lflxu_av)
 
           !Switch between homogeneous and heterogeneous net radiation
           !a_Qnet(:,:) = sum(Qnetm(3:nxp-2,3:nyp-2))/(nxp-4)/(nyp-4)
@@ -1272,7 +1291,7 @@ contains
 
 
         !" Solve the diffusion equation for the heat transport
-        a_tsoil(:,i,j) = 0
+        a_tsoil(:,i,j) = 0 !a_tskin(i,j)
 
         !" Solve the diffusion equation for the moisture transport (closed bottom for now)
         a_phiw(:,i,j) = 0
