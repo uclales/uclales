@@ -260,7 +260,7 @@ contains
 
     use mpi_interface, only :myid
 
-    integer, parameter :: nnames = 46
+    integer, parameter :: nnames = 47
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,& !1
          'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,& !7 
@@ -269,7 +269,7 @@ contains
          'ngrp   ','rhail  ','nhail  ','rflx   ','lflxu  ','lflxd  '   ,& !25
          'shf    ','lhf    ','ustars ','a_tskin','a_qskin','tsoil  '   ,& !31
          'phiw   ','a_Qnet ','a_G0   ','mp_tlt ','mp_qt  ','mp_qr  '   ,& !37
-         'mp_qi  ','mp_qs  ','mp_qg  ','mp_qh  '/)  !43-46
+         'mp_qi  ','mp_qs  ','mp_qg  ','mp_qh  ','zr     '/)  !43-47
 
 
 
@@ -285,6 +285,7 @@ contains
     if (iradtyp > 1) nvar0 = nvar0+3
     if (isfctyp == 5) nvar0 = nvar0+9
     if (lmptend)      nvar0 = nvar0+7
+    if (mom3)        nvar0 = nvar0+1
 
     allocate (sanal(nvar0))
     sanal(1:nbase) = sbase(1:nbase)
@@ -376,6 +377,10 @@ contains
        sanal(nvar0) = sbase(45)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(46)
+    end if
+    if (mom3) then
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(47)
     end if
 
     nbeg = nvar0+1
@@ -592,6 +597,13 @@ contains
               count=icnt)
       end if
 
+      if (mom3) then
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0,sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, a_zpp(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+      end if
+
 !     if (nn /= nvar0) then
 !        if (myid == 0) print *, 'ABORTING:  Anal write error'
 !        call appl_abort(0)
@@ -745,6 +757,10 @@ contains
     case('n')
        if (itype==0) ncinfo = 'Rain-drop number mixing ratio'
        if (itype==1) ncinfo = '#/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('zr')
+       if (itype==0) ncinfo = 'Rain water reflectivity'
+       if (itype==1) ncinfo = 'dBZ'
        if (itype==2) ncinfo = 'tttt'
     case('cfl')
        if (itype==0) ncinfo = 'Courant number'
