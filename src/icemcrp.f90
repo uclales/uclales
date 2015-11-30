@@ -827,7 +827,12 @@ contains
           rp(k) = rp(k) + au
           rc(k) = rc(k) - au
           tl(k) = tl(k) + convliq(k)*au
-          np(k) = np(k) + au/cldw%x_max
+          if (.not.mom3) then
+            np(k) = np(k) + au/cldw%x_max
+          else
+            np(k) = np(k) + 2./3. / cldw%x_max*au
+            zp(k) = zp(k) +14./9. * cldw%x_max*au
+          end if
           
           ! For particles: a_npauto in #/(kg*dt)
           if(lpartdrop .and. nstep==1) a_npauto(k,i,j) = a_npauto(k,i,j) + (rkalpha(1) + rkalpha(2))* au*dn0(k)
