@@ -946,6 +946,7 @@ contains
     integer ::  k, kp1, kk, km1
     real    :: b2, Xp, Dp, Dm, mu, flxdiv, tot,sk, mini, maxi, cc, zz, cmax
     real, dimension(n1) :: nslope,rslope,dn,dr, rfl, nfl, vn, vr, cn, cr
+    real, dimension(n1) :: zslope, dzz, zfl, vz, cz
 
     logical, parameter :: oldsedimentation = .false.
 
@@ -964,24 +965,31 @@ contains
         ! Adjust Dm and mu-Dm and Dp=1/lambda following Milbrandt & Yau
         !
         Dm = ( 6. / (rowt*pi) * Xp )**(1./3.)
-        if (oldsedimentation) then
-          !mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))    !MY05 revised constants
-          mu = cmy1*tanh(cmy2*(Dp-cmy3))+cmy4       !MY05 original constants
-          !mu = 1.
+        if (.not.mom3) then
+          if (oldsedimentation) then
+            !mu = cmur1*(1.+tanh(cmur2*(Dm-cmur3)))    !MY05 revised constants
+            mu = cmy1*tanh(cmy2*(Dp-cmy3))+cmy4       !MY05 original constants
+            !mu = 1.
+          else
+            IF (Dm.LE.rain_cmu3) THEN ! see Seifert (2008)            
+               mu = rain_cmu0*TANH((4.*rain_cmu2*(Dm-rain_cmu3))**2) &
+                   & + rain_cmu4
+            ELSE
+               mu = rain_cmu1*TANH((1.*rain_cmu2*(Dm-rain_cmu3))**2) &
+                   & + rain_cmu4
+            ENDIF
+          end if
         else
-          IF (Dm.LE.rain_cmu3) THEN ! see Seifert (2008)            
-             mu = rain_cmu0*TANH((4.*rain_cmu2*(Dm-rain_cmu3))**2) &
-                 & + rain_cmu4
-          ELSE
-             mu = rain_cmu1*TANH((1.*rain_cmu2*(Dm-rain_cmu3))**2) &
-                 & + rain_cmu4
-          ENDIF
+          mu = rain_mue_z_inv(np(k), rp(k), zp(k))
         end if
         Dp = (Dm**3/((mu+3.)*(mu+2.)*(mu+1.)))**(1./3.)
         
         ! including density corrcetion
         vn(k) = (rho_0/dn0(k))**0.35 *(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
         vr(k) = (rho_0/dn0(k))**0.35 *(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
+        if (mom3) then
+          vz(k) = (rho_0/dn0(k))**0.35 *(a2 - b2*(1.+c2*Dp)**(-(7.+mu)))
+        end if
         !
         ! Set fall speeds following Khairoutdinov and Kogan
 
@@ -996,6 +1004,9 @@ contains
         end if
         vn(k) = min(max(vn(k),0.1),20.)
         vr(k) = min(max(vr(k),0.1),20.)
+        if (mom3) then
+          vz(k) = min(max(vz(k),0.1),20.)
+        end if
       end if
       
     end do
@@ -1005,6 +1016,9 @@ contains
        km1 = max(k,2)
        cn(k) = 0.25*(vn(kp1)+2.*vn(k)+vn(km1))*dzi_t(k)*dt
        cr(k) = 0.25*(vr(kp1)+2.*vr(k)+vr(km1))*dzi_t(k)*dt
+       if (mom3) then
+         cz(k) = 0.25*(vz(kp1)+2.*vz(k)+vz(km1))*dzi_t(k)*dt
+       end if
     end do
 
     !cmax = MAXVAL(cr)
@@ -1016,11 +1030,18 @@ contains
     do k=n1-1,2,-1
        dn(k) = np(k+1)-np(k)
        dr(k) = rp(k+1)-rp(k)
+       if (mom3) then
+         dzz(k) = zp(k+1)-zp(k)
+       end if
     enddo
     dn(1)  = dn(2)
     dn(n1) = dn(n1-1)
     dr(1)  = dr(2)
     dr(n1) = dr(n1-1)
+    if (mom3) then
+      dzz(1) = dzz(2)
+      dzz(n1) = dzz(n1-1)
+    end if
     do k=n1-1,2,-1
        !...slope with monotone limiter for np
        sk = 0.5 * (dn(k-1) + dn(k))
@@ -1034,10 +1055,19 @@ contains
        maxi = max(rp(k-1),rp(k),rp(k+1))
        rslope(k) = 0.5 * sign(1.,sk)*min(abs(sk), 2.*(rp(k)-mini), &
             &                                     2.*(maxi-rp(k)))
+       if (mom3) then
+         !...slope with monotone limiter for zp
+         sk = 0.5 * (dzz(k-1) + dzz(k))
+         mini = min(zp(k-1),zp(k),zp(k+1))
+         maxi = max(zp(k-1),zp(k),zp(k+1))
+         zslope(k) = 0.5 * sign(1.,sk)*min(abs(sk), 2.*(zp(k)-mini), &
+            &                                     2.*(maxi-zp(k)))
+       end if
     enddo
 
     rfl = 0.
     nfl = 0.
+    zfl = 0.
     do k=n1-2,2,-1
 
        kk = k
@@ -1066,10 +1096,29 @@ contains
        tot = min(tot,dn0(k)/dzi_t(k) * rp(k) - rfl(k+1) * dt - rthres)
        rfl(k) = -tot /dt
 
+       if (mom3) then
+         kk = k
+         tot = 0.0
+         zz  = 0.0
+         cc  = min(1.,cz(k))
+         do while (cc > 0 .and. kk <= n1-1)
+            tot = tot + dn0(kk)*(zp(kk)+zslope(kk)*(1.-cc))*cc/dzi_t(kk)
+            zz  = zz + 1./dzi_t(kk)
+            kk  = kk + 1
+            cc  = min(1.,cz(kk) - zz*dzi_t(kk))
+         enddo
+         tot = min(tot,dn0(k)/dzi_t(k) * zp(k) - zfl(k+1) * dt - rthres)
+         zfl(k) = -tot /dt
+       end if
+
        kp1=k+1
        flxdiv = (rfl(kp1)-rfl(k))*dzi_t(k)/dn0(k)
        rp(k) = rp(k)-flxdiv*dt
        np(k) = np(k)-(nfl(kp1)-nfl(k))*dzi_t(k)/dn0(k)*dt
+       if (mom3) then
+         zp(k) = zp(k)-(zfl(kp1)-zfl(k))*dzi_t(k)/dn0(k)*dt
+       end if
+
        rrate(k)    = -rfl(k)
 
     end do
@@ -1147,11 +1196,11 @@ contains
   end subroutine n_icenuc
 
 
-  real function rain_mue_z_inv(N,L,Z)  !think about the units (this is CGS!)
+  real function rain_mue_z_inv(N,L,Z)  !think about the units (this is CGS! and rho_w=1)
 
-    real*8, intent(in) :: N,L,Z
-    real*8  :: z1, rain_mue_z_inv
-    real*8  :: gg,gg1,aa0,aa1,aa2,qq,rr,dd,ss,tt
+    real, intent(in)   :: N,L,Z
+    real               :: z1
+    real               :: gg,gg1,aa0,aa1,aa2,qq,rr,dd,ss,tt
     real, dimension(4), parameter :: cc = (/0.5569344,0.03052414,-1.078084,-0.000936101/)
     logical, parameter :: Cardano = .true.
 
