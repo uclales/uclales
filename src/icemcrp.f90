@@ -1146,6 +1146,63 @@ contains
 
   end subroutine n_icenuc
 
+
+  real function rain_mue_z_inv(N,L,Z)  !think about the units (this is CGS!)
+
+    real*8, intent(in) :: N,L,Z
+    real*8  :: z1, rain_mue_z_inv
+    real*8  :: gg,gg1,aa0,aa1,aa2,qq,rr,dd,ss,tt
+    real, dimension(4), parameter :: cc = (/0.5569344,0.03052414,-1.078084,-0.000936101/)
+    logical, parameter :: Cardano = .true.
+
+    real, parameter :: gg20 = 1.4681 ! gg(mue=20)
+    real, parameter :: gg15 = 1.6299 ! gg(mue=15)
+    real, parameter :: gg01 = 8.75   ! gg(mue=1)
+
+    ! gg(mue) = (mue+6.)*(mue+5.)*(mue+4.)/((mue+3.)*(mue+2.)*(mue+1.))
+
+    if (L.gt.1e-10) then
+       gg  = N*Z/(L*L)        ! dimensionless parameter, depends only on mue         
+       if (Cardano) then
+          ! inversion of gg(mue) using Cardano's formula (cubic root)
+          ! (see e.g. http://mathworld.wolfram.com/CubicFormula.html)          
+          if (gg.gt.gg01) then
+             z1 = 1.0
+          elseif (gg.gt.gg20) then 
+             gg1 = 1.0/(gg-1.0)
+             aa0 = (6.0*gg-120.)*gg1
+             aa1 = (11.*gg-74.0)*gg1
+             aa2 = (6.0*gg-15.0)*gg1
+             qq = (3.0*aa1-aa2**2)/9.
+             rr = (9.0*aa1*aa2-27.*aa0-2.*aa2**3)/54.0
+             dd = qq*qq*qq+rr*rr
+             if (dd.gt.0) then
+                ss = (rr+sqrt(dd))**(1./3.)
+                tt = (rr-sqrt(dd))**(1./3.)         
+                z1 = -aa2/3. + (ss+tt)
+             else
+                print *, 'dd < 0 in rain_mue_z_inv, gg = ',gg
+                z1 = 1.0
+             end if
+          else
+             z1 = 20.0
+          end if
+       else
+          ! rational function fit (not much faster than Cardano's formula)
+          if (gg.gt.gg20) then
+             z1 = (gg-20.)*(cc(1)+cc(2)*gg+cc(4)*gg*gg)/(1+cc(3)*gg)
+          else
+             z1 = 20.
+          end if
+       end if
+    else
+       z1 = 5.0
+    end if      
+    rain_mue_z_inv = max(z1,1.0)
+         
+  end function rain_mue_z_inv
+
+
   subroutine ice_nucleation(n1,nin,rice,nice,s_i,tl,tk)
     integer,intent(in) :: n1
     real, intent(inout),dimension(n1) :: nin,nice, rice, tl,s_i
