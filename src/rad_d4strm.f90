@@ -428,6 +428,7 @@ contains
   ! layer thicknesses
   ! 
   subroutine thicks(pp, pt, ph, dz) 
+    use grid, only: dzi_m
 
     real, intent (in) :: pp(nv1), pt(nv), ph(nv)
     real, intent (out):: dz(nv)
@@ -435,15 +436,17 @@ contains
     integer :: i
     real    :: tv
 
-    do  i = 1, nv
+    ! todo -- hydrostatic approx. does not work and may result in even negative vertical extent 
+    !      -- this is troublesome for optical properties and solvers.
+    !      instead of using hydrostatic approx at lower levels we use dynamics grid and from there on, integrate dz.
+    do  i = 1, nv-size(dzi_m)
        tv = pt(i)*(1+0. + ep2*ph(i) )
        dz(i) = (R/g) * tv * alog( pp(i+1) / pp(i) )
     end do
 
-    !todo -- dirty fix: Fabian does not know why he would get flipped pressures from uclales --
-    !                   but as a quick fix for the radiation, lets just overwrite dz 
-    !                   -- this should however be investigated thoroughly!
-    if(dz(nv).le.dz(nv-1)) dz(nv) = dz(nv-1)
+    do i = 1,size(dzi_m)
+        dz(size(dz)-size(dzi_m)+i) = 1./dzi_m(size(dzi_m)-i+1)
+    end do
 
     if(any(dz.lt.0)) then
       do  i = 1, nv
