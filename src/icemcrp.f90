@@ -610,7 +610,7 @@ contains
 
     real, parameter     :: c_Nevap = 1.
     integer             :: k
-    real                :: Xp, Dp, G, S, cerpt, cenpt
+    real                :: Xp, Dp, G, S, cerpt, cenpt, cezpt
 
     real, parameter :: a2 = 9.65       ! in SI [m/s]
     real, parameter :: c2 = 6e2        ! in SI [1/m]
@@ -628,6 +628,9 @@ contains
 
 
     if (oldevaporation) then
+      if (mom3) then
+        print *, 'no evaporation with old sedimentation and 3 mom mcrp'
+      end if
       do k=2,n1
          if (rp(k) > 0) then
             Xp = rp(k)/ (np(k)+eps0)
@@ -659,18 +662,22 @@ contains
              Dp  = ( Xp / prw )**(1./3.)
              G = 1.0 / ( alvl**2 / (Kt * Rm * tk(k)**2) + Rm * tk(k) / (Dv * esl(tk(k))) )
 
-             if (mue_SB) then
-               IF (Dp.LE.rain_cmu3) THEN ! see Seifert (2008)            
-                  mue = rain_cmu0*TANH((4.*rain_cmu2*(Dp-rain_cmu3))**2) &
-                       & + rain_cmu4
-               ELSE
-                  mue = rain_cmu1*TANH((1.*rain_cmu2*(Dp-rain_cmu3))**2) &
-                       & + rain_cmu4
-               ENDIF
+             if (.not.mom3) then
+               if (mue_SB) then
+                 IF (Dp.LE.rain_cmu3) THEN ! see Seifert (2008)            
+                    mue = rain_cmu0*TANH((4.*rain_cmu2*(Dp-rain_cmu3))**2) &
+                         & + rain_cmu4
+                 ELSE
+                    mue = rain_cmu1*TANH((1.*rain_cmu2*(Dp-rain_cmu3))**2) &
+                         & + rain_cmu4
+                 ENDIF
+               else
+                 !mue = cmur1*(1.+tanh(cmur2*(Dp-cmur3)))   !MY05 revised constants
+                 mue = cmy1*tanh(cmy2*(Dp-cmy3))+cmy4       !MY05 original constants
+                 !mue = 1.
+               end if
              else
-               !mue = cmur1*(1.+tanh(cmur2*(Dp-cmur3)))   !MY05 revised constants
-               mue = cmy1*tanh(cmy2*(Dp-cmy3))+cmy4       !MY05 original constants
-               !mue = 1.
+               mue = rain_mue_z_inv(np(k), rp(k), zp(k))
              end if
 
              lam = (pi/6.* rowt &
@@ -696,11 +703,17 @@ contains
              cerpt = 2. * pi * G * np(k) * (mue+1.0) / lam * f_q * S * dt
              cerpt = max (cerpt, -rp(k))
              cenpt = gamma_eva * cerpt * np(k) / rp(k)
+             if (mom3) then
+               cezpt = (mue+4)/(mue+1) * cerpt * rp(k)/np(k)
+             end if
 
              np(k) = np(k) + cenpt
              rp(k) = rp(k) + cerpt
              rv(k) = rv(k) - cerpt
              tl(k) = tl(k) + convliq(k)*cerpt
+             if (mom3) then
+               zp(k) = zp(k) + cezpt
+             end if
              
              if (present(ev)) ev = ev - cerpt * (zm(k)-zm(k-1))*dn0(k) / 3.
           end if
