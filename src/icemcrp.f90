@@ -62,7 +62,7 @@ module mcrp
        iself_ice=14, icoll_ice_snow=15, icoll_ice_grp=16, icoll_snow_grp=17, &
        iriming_ice_cloud=18, iriming_snow_cloud=19, iriming_grp_cloud=20, &
        iriming_ice_rain=21, iriming_snow_rain=22,iriming_grp_rain=23
-  real, dimension(:),allocatable :: convice,convliq
+  real, dimension(:),allocatable :: convice,convliq, frho
   integer, dimension(23) :: microseq = (/1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23/)
   logical :: lrandommicro = .false.
   real :: timenuc = 60
@@ -347,7 +347,7 @@ contains
     !     real :: dtrk
     !
 !as    if(firsttime) call initmcrp(level,firsttime)
-    allocate(convice(n1),convliq(n1))
+    allocate(convice(n1),convliq(n1), frho(n1))
     if(lpartdrop .and. nstep==1) allocate(a_npauto(nzp,nxp,nyp))
     if(lpartdrop .and. nstep==1) a_npauto(:,:,:) = 0.
     do j=3,n3-2
@@ -366,6 +366,7 @@ contains
           nrain = np(1:n1,i,j)
           zrain = zp(1:n1,i,j)
           convliq = alvl/(cp*(pi0+pi1+exner(1:n1,i,j))/cp)
+          frho = (rho_0/dn0(1:n1))**0.35 * dn0(1:n1)
           if (level == 4) then
              rsi = rsati(1:n1,i,j)
              call resetvar(ice,ricep(1:n1,i,j),nicep(1:n1,i,j))
@@ -552,7 +553,7 @@ contains
        end do
     end do
 
-    deallocate(convice,convliq)
+    deallocate(convice,convliq,frho)
     !print *,maxval(s_i),maxloc(s_i)
   end subroutine mcrph
 
@@ -702,9 +703,9 @@ contains
 
              cerpt = 2. * pi * G * np(k) * (mue+1.0) / lam * f_q * S * dt
              cerpt = max (cerpt, -rp(k))
-             cenpt = gamma_eva * cerpt * np(k) / rp(k)
+             cenpt = gamma_eva * cerpt / Xp
              if (mom3) then
-               cezpt = (mue+4)/(mue+1) * cerpt * rp(k)/np(k)
+               cezpt = (mue+4)/(mue+1) * cerpt * Xp
              end if
 
              np(k) = np(k) + cenpt
@@ -840,12 +841,16 @@ contains
           rp(k) = rp(k) + au
           rc(k) = rc(k) - au
           tl(k) = tl(k) + convliq(k)*au
-          if (.not.mom3) then
-            np(k) = np(k) + au/cldw%x_max
-          else
-            np(k) = np(k) + 2./3. / cldw%x_max*au
-            zp(k) = zp(k) -14./9. * cldw%x_max*au
+          np(k) = np(k) + 2./3. / cldw%x_max*au
+          if (mom3) then
+            zp(k) = zp(k) +14./9. * cldw%x_max*au
           end if
+          !if (.not.mom3) then
+          !  np(k) = np(k) + au/cldw%x_max    !old evaporation not consistent with mom3
+          !else
+          !  np(k) = np(k) + 2./3. / cldw%x_max*au
+          !  zp(k) = zp(k) +14./9. * cldw%x_max*au
+          !end if
           
           ! For particles: a_npauto in #/(kg*dt)
           if(lpartdrop .and. nstep==1) a_npauto(k,i,j) = a_npauto(k,i,j) + (rkalpha(1) + rkalpha(2))* au*dn0(k)
@@ -897,7 +902,6 @@ contains
              k_r = k_r*(1+(0.05*epsilon**0.25))
           end if
           if (rc(k) > 0.) then
-
              ! accretion
              tau = 1.0-rc(k)/(rc(k)+rp(k)+eps0)
              tau = MIN(MAX(tau,eps0),1.)
@@ -905,9 +909,9 @@ contains
 
              ! correct??
              ! including density correction:
-             ac  = k_r * rc(k) * rp(k) * phi * (rho_0/dn0(k))**0.35 * dn0(k)
+             ac  = k_r * rc(k) * rp(k) * phi * frho(k)
              if (mom3) then
-               zac = 2.0 * k_r * rc(k) * zp(k) * phi * (rho_0/dn0(k))**0.35 * dn0(k)
+               zac = 2.0 * k_r * rc(k) * zp(k) * phi * frho(k)
              end if
              !
              ! Khairoutdinov and Kogan
@@ -925,20 +929,20 @@ contains
                zac   = zac * dt
                zp(k) = zp(k) + zac
              end if
-
-             !selfcollection
-             sc = k_rr * np(k) * rp(k) * (rho_0/dn0(k))**0.35 *dn0(k)
-             if (mom3) then  !using Long's kernel
-               zsc  = 2.* k_rr * zp(k) *np(k)* (rho_0/dn0(k))**0.35 *dn0(k)
-             end if
-
-             sc = min(sc, np(k))
-             np(k) = np(k) - sc
-             if (mom3) then
-               zp(k) = zp(k) + zsc
-             end if
-
           end if
+
+          !selfcollection
+          sc = k_rr * np(k) * rp(k) * frho(k) *dt
+          if (mom3) then  !using Long's kernel
+            zsc  = 2.* k_rr * zp(k) *np(k)* frho(k) *dt
+          end if
+
+          sc = min(sc, np(k))
+          np(k) = np(k) - sc
+          if (mom3) then
+            zp(k) = zp(k) + zsc
+          end if
+
        end if
     end do
 
@@ -1013,10 +1017,10 @@ contains
         Dp = (Dm**3/((mu+3.)*(mu+2.)*(mu+1.)))**(1./3.)
         
         ! including density corrcetion
-        vn(k) = (rho_0/dn0(k))**0.35 *(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
-        vr(k) = (rho_0/dn0(k))**0.35 *(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
+        vn(k) = frho(k)/dn0(k) *(a2 - b2*(1.+c2*Dp)**(-(1.+mu)))
+        vr(k) = frho(k)/dn0(k) *(a2 - b2*(1.+c2*Dp)**(-(4.+mu)))
         if (mom3) then
-          vz(k) = (rho_0/dn0(k))**0.35 *(a2 - b2*(1.+c2*Dp)**(-(7.+mu)))
+          vz(k) = frho(k)/dn0(k) *(a2 - b2*(1.+c2*Dp)**(-(7.+mu)))
         end if
         !
         ! Set fall speeds following Khairoutdinov and Kogan
