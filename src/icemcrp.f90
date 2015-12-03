@@ -868,7 +868,7 @@ contains
     real, parameter :: Eac = 1.15    ! accretion exponent in KK param.
 
     integer :: k
-    real    :: tau, phi, ac, sc, k_r, epsilon
+    real    :: tau, phi, ac, sc, k_r, epsilon, zac, zsc
 
     do k=2,n1-1
        if (rp(k) > 0.) then
@@ -884,6 +884,7 @@ contains
              k_r = k_r*(1+(0.05*epsilon**0.25))
           end if
           if (rc(k) > 0.) then
+
              ! accretion
              tau = 1.0-rc(k)/(rc(k)+rp(k)+eps0)
              tau = MIN(MAX(tau,eps0),1.)
@@ -892,7 +893,9 @@ contains
              ! correct??
              ! including density correction:
              ac  = k_r * rc(k) * rp(k) * phi * (rho_0/dn0(k))**0.35 * dn0(k)
-
+             if (mom3) then
+               zac = 2.0 * k_r * rc(k) * zp(k) * phi
+             end if
              !
              ! Khairoutdinov and Kogan
              !
@@ -905,11 +908,22 @@ contains
              rp(k) = rp(k) + ac
              rc(k) = rc(k) - ac
              tl(k) = tl(k) + convliq(k)*ac
+             if (mom3) then
+               zp(k) = zp(k) + zac
+             end if
 
              !selfcollection
              sc = k_rr * np(k) * rp(k) * (rho_0/dn0(k))**0.35 *dn0(k)
+             if (mom3) then  !using Long's kernel
+               zsc  = 2.* k_rr * zp(k) *np(k)
+             end if
+
              sc = min(sc, np(k))
              np(k) = np(k) - sc
+             if (mom3) then
+               zp(k) = zp(k) + zsc
+             end if
+
           end if
        end if
     end do
