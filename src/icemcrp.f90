@@ -844,7 +844,7 @@ contains
             np(k) = np(k) + au/cldw%x_max
           else
             np(k) = np(k) + 2./3. / cldw%x_max*au
-            zp(k) = zp(k) +14./9. * cldw%x_max*au
+            zp(k) = zp(k) -14./9. * cldw%x_max*au
           end if
           
           ! For particles: a_npauto in #/(kg*dt)
@@ -907,7 +907,7 @@ contains
              ! including density correction:
              ac  = k_r * rc(k) * rp(k) * phi * (rho_0/dn0(k))**0.35 * dn0(k)
              if (mom3) then
-               zac = 2.0 * k_r * rc(k) * zp(k) * phi
+               zac = 2.0 * k_r * rc(k) * zp(k) * phi * (rho_0/dn0(k))**0.35 * dn0(k)
              end if
              !
              ! Khairoutdinov and Kogan
@@ -922,13 +922,14 @@ contains
              rc(k) = rc(k) - ac
              tl(k) = tl(k) + convliq(k)*ac
              if (mom3) then
+               zac   = zac * dt
                zp(k) = zp(k) + zac
              end if
 
              !selfcollection
              sc = k_rr * np(k) * rp(k) * (rho_0/dn0(k))**0.35 *dn0(k)
              if (mom3) then  !using Long's kernel
-               zsc  = 2.* k_rr * zp(k) *np(k)
+               zsc  = 2.* k_rr * zp(k) *np(k)* (rho_0/dn0(k))**0.35 *dn0(k)
              end if
 
              sc = min(sc, np(k))
