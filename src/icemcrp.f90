@@ -356,6 +356,7 @@ contains
             call resetvar(rain,rp(1:n1,i,j),np(1:n1,i,j))
           else
             call resetvar(rain,rp(1:n1,i,j),np(1:n1,i,j),zp(1:n1,i,j))
+            zrain = zp(1:n1,i,j)
           end if
           tl = thl(1:n1,i,j)
           temp = tk(1:n1,i,j)
@@ -364,7 +365,6 @@ contains
           rs = rsat(1:n1,i,j)
           rrain = rp(1:n1,i,j)
           nrain = np(1:n1,i,j)
-          zrain = zp(1:n1,i,j)
           convliq = alvl/(cp*(pi0+pi1+exner(1:n1,i,j))/cp)
           frho = (rho_0/dn0(1:n1))**0.35 * dn0(1:n1)
           if (level == 4) then
@@ -841,16 +841,11 @@ contains
           rp(k) = rp(k) + au
           rc(k) = rc(k) - au
           tl(k) = tl(k) + convliq(k)*au
+          !np(k) = np(k) + au/cldw%x_max    !old autoconversion not consistent with mom3
           np(k) = np(k) + 2./3. / cldw%x_max*au
           if (mom3) then
             zp(k) = zp(k) +14./9. * cldw%x_max*au
           end if
-          !if (.not.mom3) then
-          !  np(k) = np(k) + au/cldw%x_max    !old evaporation not consistent with mom3
-          !else
-          !  np(k) = np(k) + 2./3. / cldw%x_max*au
-          !  zp(k) = zp(k) +14./9. * cldw%x_max*au
-          !end if
           
           ! For particles: a_npauto in #/(kg*dt)
           if(lpartdrop .and. nstep==1) a_npauto(k,i,j) = a_npauto(k,i,j) + (rkalpha(1) + rkalpha(2))* au*dn0(k)
