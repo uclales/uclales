@@ -734,8 +734,8 @@ contains
     do k=2,n1-1
        if (rp(k) > 0.) then
 
+          ! accretion
           k_r = k_r0
-
           !
           ! Simulate the effect of turbulence on the collision kernel
           ! (dissipation needs to be converted to cm^2/s^3)
@@ -764,12 +764,12 @@ contains
              rp(k) = rp(k) + ac
              rc(k) = rc(k) - ac
              tl(k) = tl(k) + convliq(k)*ac
-
-
-             sc = k_rr * np(k) * rp(k) * (rho_0/dn0(k))**0.35 *dn0(k)
-             sc = min(sc, np(k))
-             np(k) = np(k) - sc
           end if
+
+          ! selfcollection
+          sc = k_rr * np(k) * rp(k) * (rho_0/dn0(k))**0.35 *dn0(k)*dt
+          sc = min(sc, np(k))
+          np(k) = np(k) - sc
        end if
     end do
 
