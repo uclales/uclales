@@ -841,9 +841,10 @@ contains
           rp(k) = rp(k) + au
           rc(k) = rc(k) - au
           tl(k) = tl(k) + convliq(k)*au
-          !np(k) = np(k) + au/cldw%x_max    !old autoconversion not consistent with mom3
-          np(k) = np(k) + 2./3. / cldw%x_max*au
-          if (mom3) then
+          if (.not.mom3) then
+            np(k) = np(k) + au/cldw%x_max    !old autoconversion, not consistent with mom3
+          else
+            np(k) = np(k) + 2./3. / cldw%x_max*au
             zp(k) = zp(k) +14./9. * cldw%x_max*au
           end if
           
@@ -879,9 +880,12 @@ contains
     real, parameter :: k_1 = 5.e-4
     real, parameter :: Cac = 67.     ! accretion coefficient in KK param.
     real, parameter :: Eac = 1.15    ! accretion exponent in KK param.
+    real, parameter :: gam = 622.2     ! [1/m]
+    real            :: bet = 9.623     ! [m/s]
+    logical, parameter :: longkernel = .false.
 
     integer :: k
-    real    :: tau, phi, ac, sc, k_r, epsilon, zac, zsc
+    real    :: tau, phi, ac, sc, k_r, epsilon, zac, zsc, mue, lam, x_r, d_r, cscn, cscz
 
     do k=2,n1-1
        if (rp(k) > 0.) then
@@ -928,10 +932,28 @@ contains
 
           !selfcollection
           sc = k_rr * np(k) * rp(k) * frho(k) *dt
-          if (mom3) then  !using Long's kernel
-            zsc  = 2.* k_rr * zp(k) *np(k)* frho(k) *dt
+          if (mom3) then 
+            if (longkernel) then !using Long's kernel
+              zsc  = 2.* k_rr * zp(k) *np(k)* frho(k) *dt
+            else ! using variance approximation
+              mue = rain_mue_z_inv(np(k), rp(k), zp(k))
+              x_r = rp(k)/(np(k)+eps0) 
+              d_r = ( X_r / prw )**(1./3.)
+              
+              cscn = (mue+1.)*((mue+1.)+(mue+2.))  ! + oder -? In der Dokumentation Eq(28) steht minus.
+              cscz = (mue+4.)*(mue+3.)*(mue+2.)*(mue+1.)/(mue+6.)/(mue+5.) * (1.0+(mue+5.)/(mue+4.))  !+ oder -? In der Dokumentation Eq(29) steht minus.
+              lam  = (prw*(mue+3.)*(mue+2.)*(mue+1.)/x_r)**(1./3.)
+                    
+              sc = pi/sqrt(8.0)*cscn*bet*np(k)*np(k)/lam**2 & 
+                         *( 1./(1. + 2.*gam/lam)**(1.0*(mue+3.0)) & 
+                          - 1./(1. + 1.*gam/lam)**(2.0*(mue+3.0)) )**0.5 ! wo ist e_coal?
+              zsc = pi/sqrt(2.0)*cscz*bet*np(k)*zp(k)/lam**2 & 
+                         *( 1./(1. + 2.*gam/lam)**(1.0*(mue+6.0)) &    !+6, warum nicht +9?
+                          - 1./(1. + 1.*gam/lam)**(2.0*(mue+6.0)) )**0.5 & 
+                         * min(max(0.53*(1.-0.69e3*d_r),0.0),0.5)
+            end if
           end if
-
+          
           sc = min(sc, np(k))
           np(k) = np(k) - sc
           if (mom3) then
@@ -1223,7 +1245,7 @@ contains
   end subroutine n_icenuc
 
 
-  real function rain_mue_z_inv(N,L,Z)  !think about the units (this is CGS! and rho_w=1)
+  real function rain_mue_z_inv(N,L,Z) 
 
     real, intent(in)   :: N,L,Z
     real               :: z1
