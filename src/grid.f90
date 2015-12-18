@@ -794,16 +794,19 @@ contains
        end if
        !End Malte
 
-       !do n=1,nscl
-       do n=1,nscl-1  !-1 only for 3mom if a_zpp is not in history file
-          call newvar(n)
-          if (n <= nsclx) read (10) a_sp
-       end do
-       !only for 3mom if a_zpp is not in history file
-       ! set a_zp to smallest value: 1.4681* L**2/ N
-       call newvar(nref)
-       a_sp(:,:,:) = 0. !1.4681* a_xp(:,:,:,nscl-1)*a_xp(:,:,:,nscl-1)/a_xp(:,:,:,nscl-2)
-       ! End 3mom
+       if (.not.mom3) then
+          do n=1,nscl
+             call newvar(n)
+             if (n <= nsclx) read (10) a_sp
+          end do
+       else        ! only for 3mom if a_zpp is not in history file
+          do n=1,nscl-1
+             call newvar(n)
+             if (n <= nsclx) read (10) a_sp
+          end do
+          call newvar(nref)
+          a_sp(:,:,:) = 0. 
+       end if
        do n=nscl+1,nsclx
           read (10)
        end do

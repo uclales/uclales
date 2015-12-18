@@ -699,7 +699,11 @@ contains
                   &      - 5./127.* (b2/a2)**4 * (lam/(4.*c2+lam))**(mue+5.0/2.0) &
                   &      )
 
-             gamma_eva = (1.1e-3/Dp) * EXP(-0.2*mue)
+             if (.not.mom3) then
+               gamma_eva = (1.1e-3/Dp) * EXP(-0.2*mue)
+             else
+               gamma_eva = EXP(-0.1*mue) 
+             end if 
 
              cerpt = 2. * pi * G * np(k) * (mue+1.0) / lam * f_q * S * dt
              cerpt = max (cerpt, -rp(k))
@@ -880,8 +884,8 @@ contains
     real, parameter :: k_1 = 5.e-4
     real, parameter :: Cac = 67.     ! accretion coefficient in KK param.
     real, parameter :: Eac = 1.15    ! accretion exponent in KK param.
-    real, parameter :: gam = 622.2     ! [1/m]
-    real            :: bet = 9.623     ! [m/s]
+    real, parameter :: gam = 6e2     ! [1/m]
+    real, parameter :: bet = 9.65     ! [m/s]
     logical, parameter :: longkernel = .false.
 
     integer :: k
@@ -933,24 +937,24 @@ contains
           !selfcollection
           sc = k_rr * np(k) * rp(k) * frho(k) *dt
           if (mom3) then 
-            if (longkernel) then !using Long's kernel
+            if (longkernel) then        ! using Long's kernel
               zsc  = 2.* k_rr * zp(k) *np(k)* frho(k) *dt
-            else ! using variance approximation
+            else                        ! using variance approximation
               mue = rain_mue_z_inv(np(k), rp(k), zp(k))
               x_r = rp(k)/(np(k)+eps0) 
-              d_r = ( X_r / prw )**(1./3.)
+              d_r = ( x_r / prw )**(1./3.)
               
-              cscn = (mue+1.)*((mue+1.)+(mue+2.))  ! + oder -? In der Dokumentation Eq(28) steht minus.
-              cscz = (mue+4.)*(mue+3.)*(mue+2.)*(mue+1.)/(mue+6.)/(mue+5.) * (1.0+(mue+5.)/(mue+4.))  !+ oder -? In der Dokumentation Eq(29) steht minus.
+              cscn = (mue+1.)*((mue+1.)+(mue+2.)) 
+              cscz = (mue+4.)*(mue+3.)*(mue+2.)*(mue+1.)/(mue+6.)/(mue+5.) * (1.0+(mue+5.)/(mue+4.))
               lam  = (prw*(mue+3.)*(mue+2.)*(mue+1.)/x_r)**(1./3.)
                     
               sc = pi/sqrt(8.0)*cscn*bet*np(k)*np(k)/lam**2 & 
                          *( 1./(1. + 2.*gam/lam)**(1.0*(mue+3.0)) & 
-                          - 1./(1. + 1.*gam/lam)**(2.0*(mue+3.0)) )**0.5 ! wo ist e_coal?
+                          - 1./(1. + 1.*gam/lam)**(2.0*(mue+3.0)) )**0.5 *dt
               zsc = pi/sqrt(2.0)*cscz*bet*np(k)*zp(k)/lam**2 & 
-                         *( 1./(1. + 2.*gam/lam)**(1.0*(mue+6.0)) &    !+6, warum nicht +9?
+                         *( 1./(1. + 2.*gam/lam)**(1.0*(mue+6.0)) & 
                           - 1./(1. + 1.*gam/lam)**(2.0*(mue+6.0)) )**0.5 & 
-                         * min(max(0.53*(1.-0.69e3*d_r),0.0),0.5)
+                         * min(max(0.53*(1.-0.69e3*d_r),0.0),0.5) *dt
             end if
           end if
           
@@ -1296,7 +1300,7 @@ contains
     else
        z1 = 5.0
     end if      
-    rain_mue_z_inv = max(z1,1.0)
+    rain_mue_z_inv = max(z1,0.0)
          
   end function rain_mue_z_inv
 
@@ -2963,12 +2967,12 @@ contains
           num = mass/meteor%x_min
        end where
     end if
-    if (present(refl)) then !restrict mu to [1,20]
+    if (present(refl)) then !restrict mu to [0,20]
       where (refl< 1.4681*mass**2/num)
         refl = 1.4681*mass**2/num
       end where
-      where (refl> 8.75*mass**2/num)
-        refl = 8.75*mass**2/num
+      where (refl> 20.*mass**2/num)
+        refl = 20.*mass**2/num
       end where
     end if
   end subroutine resetvar
