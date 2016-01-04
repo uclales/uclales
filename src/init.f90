@@ -225,6 +225,47 @@ contains
           end do
         end do
       end do
+    elseif (case_name == 'bubdis3') then
+      xc = 2e3 
+      zc = 500
+      do j=1,nyp
+        do i=1,nxp
+          do k=1,nzp
+            if (zt(k)>0 .and. zt(k)< 2 * zc) then
+              dist = (xt(i)**2 + yt(j)**2)/xc**2 + (zt(k) - zc)**2/zc**2
+              a_tp(k,i,j) = a_tp(k,i,j) + .3 *max(0.,(1-dist))
+            end if
+          end do
+        end do
+      end do
+    elseif (case_name == 'bubdis10') then
+      print *,'bubdis10'
+      xc = 3e3 
+      zc = 250
+      do j=1,nyp
+        do i=1,nxp
+          do k=1,nzp
+            if (zt(k)>0 .and. zt(k)< 2 * zc) then
+              dist = (xt(i)**2 + yt(j)**2)/xc**2 + (zt(k) - zc)**2/zc**2
+              a_tp(k,i,j) = a_tp(k,i,j) + 1.0 *max(0.,(1-dist))
+            end if
+          end do
+        end do
+      end do
+    elseif (case_name == 'bubdis5') then
+      print *,'bubdis10'
+      xc = 2e3 
+      zc = 1200
+      do j=1,nyp
+        do i=1,nxp
+          do k=1,nzp
+            if (zt(k)>0 .and. zt(k)< 2 * zc) then
+              dist = (xt(i)**2 + yt(j)**2)/xc**2 + (zt(k) - zc)**2/zc**2
+              a_tp(k,i,j) = a_tp(k,i,j) + .5 *max(0.,(1-dist))
+            end if
+          end do
+        end do
+      end do
 ! LINDA, b
     elseif (case_name == 'squall') then
 
