@@ -6,37 +6,11 @@ import numpy as np
 from netCDF4 import Dataset
 from glob import glob
 import os
-<<<<<<< HEAD
-from time import sleep
-from datetime import datetime
-
-#try:
-#    from filelock import FileLock
-#    have_lock=True
-#except Exception,e:
-#    print 'Couldnt import FileLock:',e
-have_lock=False
-complvl=3
 
 if not "nanmean" in dir(np):
   def nanmean(x, *args, **kwargs):
     return np.nansum(x, *args, **kwargs) / np.sum( np.isfinite(x), *args, **kwargs )
   np.nanmean = nanmean
-
-#--------------------------------------------------------------------------------------------------------------------------------
-def write_nc(basename,varname, data, dims, attributes=None):
-  fname= '{0:}'.format(basename)+'.merged.nc'
-  try:
-  
-    if have_lock:
-        start = datetime.now()
-        lock = FileLock(fname+'.lock')
-        lock.acquire() # wait until file is ready for opening
-        print("Lock acquired. waited :: {}".format(datetime.now()-start) )
-
-    if os.path.exists(fname):
-      fmode='a'
-=======
 from contextlib import closing
 
 REDUCTION_FUNCTIONS = [
@@ -84,7 +58,6 @@ def valid(array_like):
     """
     if isinstance(array_like, np.ma.core.MaskedArray):
         return np.where(array_like.mask, np.NaN, array_like.data)
->>>>>>> ec43581d99167860b6d9da50c0bd550bcf7bf905
     else:
         return array_like
 
