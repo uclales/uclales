@@ -143,7 +143,7 @@ contains
       end if
 
 
-       case (6:8)
+       case (6:9)
          if (present(time_in) .and. present(cntlat) .and. present(sst)) then
            select case (level)
            case(3)

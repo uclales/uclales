@@ -25,6 +25,8 @@
 ! The 3D interface can be called with iradtype:
 ! 6 -- 1D original delta 4 stream solver
 ! 7 -- thermal and solar tenstream solver
+! 8 -- NCA
+! 9 -- tenstream solver with pixel mcsi
 ! The copying of the optical properties fields results in a performance penalty 
 ! -- hence if you do not use a 3D solver, please use the 1D interface with iradtype=4
 
@@ -157,7 +159,6 @@ contains
       !TODO here the loop was truncated to 'nzp-3' in the original code -- why not use heating rate in every layer?!?
       do k=2,nzp-3
         tt(k,is:ie, js:je) = tt(k, is:ie, js:je) + a_rhl(k,is:ie,js:je) + a_rhs(k,is:ie,js:je)
-#ifndef _XLF
         if(ldebug) then
           if(any(isnan(rflx     (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency rflx  ',k,rflx    (k,:,:), any(isnan(sflx)),any(isnan(sflxu)),any(isnan(sflxd)),any(isnan(lflxu)),any(isnan(lflxd))
           if(any(isnan(fdiv_sol (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency divsol',k,fdiv_sol(k,:,:)
@@ -168,7 +169,6 @@ contains
           if(any(isnan(tt       (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency tt',k,tt(k,:,:)
           if(any(isnan([hr_factor(k,:,:),a_rhl(k,:,:),a_rhs(k,:,:),tt(k,:,:),fdiv_sol (k,:,:),fdiv_th  (k,:,:),rflx     (k,:,:)]))) call exit(1)
         endif
-#endif
       end do
 
       if(myid.eq.0.and.ldebug) print *,'calculate radiation ... done'
@@ -251,7 +251,7 @@ contains
             do igpt = 1, nrgpts
 
               if(radMcICA) then
-                if(iradtyp.eq.7 .or. iradtyp.eq.8) then
+                if((iradtyp.eq.7) .or. (iradtyp.eq.8)) then
                   ! tenstream -- only use one random band.... due to
                   ! horizontal correlations, it does not make sense to have
                   !different spectral intervals horizontally
@@ -295,10 +295,10 @@ contains
 
                   if(radMcICA) then
                     select case(iradtyp)
-                    case (6) ! d4stream with 3d interface
+                    case (6,9) ! d4stream with 3d interface
                       ib = ibandloop(i,j)
                       ig = ibandg   (i,j)
-                    case (7) ! tenstream -- only use one random band.... due to
+                    case (7,8) ! tenstream -- only use one random band.... due to
                       ! horizontal correlations, it does not make sense to have
                       !different spectral intervals horizontally
                       ib = ibandloop(is,js)
@@ -384,7 +384,7 @@ contains
                 endif
 
 
-              case (7) !tenstr
+              case (7,9) !tenstr
 #ifdef HAVE_TENSTREAM
                 call tenstream_wrapper(.False., nxp,nyp,nv,deltax,deltay,dz, -one,-one, one-ee,zero, tau, w0, phasefct,bf, fd3d,fu3d,fdiv3d)
 #else
@@ -440,6 +440,11 @@ contains
           real(ireals),dimension(:,:,:),allocatable :: abso
           integer :: ierr
 #endif
+
+          if(iradtyp.eq.8) then
+              print *,'NCA does not support solar radiative transfer.. exiting!'
+              stop 'wrong iradtyp error'
+          endif
 
           fus      = zero
           fds      = zero
@@ -515,7 +520,7 @@ contains
 
                   if(radMcICA) then
                     select case(iradtyp)
-                    case (6) ! d4stream with 3d interface
+                    case (6,9) ! d4stream with 3d interface
                       ib = ibandloop(i,j)
                       ig = ibandg   (i,j)
                     case (7) ! tenstream -- only use one random band.... due to
@@ -580,7 +585,7 @@ contains
                   end do ! i
                 end do ! j
 
-              case (7,8) !tenstr
+              case (7,9) !tenstr
                 if (radMcICA) then
                   ib = ibandloop(is,js)
                   ig = ibandg   (is,js)
@@ -603,7 +608,6 @@ contains
               fdiv_sol= fdiv_sol + fdiv3d
 
 
-#ifndef _XLF
               if(ldebug) then
                 do k=1,nv1
                   if(any(isnan( fds     (k,:,:)))) print *,myid,'nan in radiation tendency fds     ',k,fds     (k,:,:)
@@ -613,7 +617,6 @@ contains
                   if(any(isnan([fds     (k,:,:),fus     (k,:,:),fdiv_sol(k,:,:),fdiv3d  (k,:,:)]))) call exit(1)
                 enddo
               endif
-#endif
 
             enddo !igpt
           enddo !iband
@@ -841,7 +844,6 @@ contains
       call gases (ir_bands(ib), ig, pp, pt, ph, po, tg )
       call combineOpticalProperties(tau, w, pf, tg)
 
-#ifndef _XLF
       if(ldebug) then
         if(any(isnan([tau, w, pf]))) then
           do k=1,size(pt)
@@ -850,7 +852,6 @@ contains
           call exit(-1)
         endif
       endif
-#endif
   end subroutine
   !calc of optprop extracted from rad_vis:
   subroutine optprop_rad_vis( ibandloop, ibandg, pp, pt, ph, po, tau, w, pf, dz, plwc, pre, piwc, pde, pgwc)
@@ -1207,9 +1208,7 @@ contains
   
     fdiv(nv+1-nzp:nv,:,:) = heat(1:nzp,3:nxp-2,3:nyp-2)
     
-#ifndef _XLF
     if(any(isnan(fdiv))) print *, 'fdiv 2 shows nan', fdiv
-#endif
     
   end subroutine nca_wrapper
 
