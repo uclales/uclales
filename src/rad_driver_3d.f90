@@ -68,6 +68,8 @@ module radiation_3d
   logical,parameter :: ldebug=.False.
 !  logical,parameter :: ldebug=.True.
 
+  logical,parameter :: lavghr=.False. ! horizontally homogenize heating rates
+
 #ifdef HAVE_TENSTREAM
   integer(iintegers) :: solution_uid    ! is solution uid, each subband has one
   real(ireals)       :: solution_time   ! is set to the approximate time of each solve
@@ -158,6 +160,10 @@ contains
       end if
       !TODO here the loop was truncated to 'nzp-3' in the original code -- why not use heating rate in every layer?!?
       do k=2,nzp-3
+        if(lavghr) then
+            call homogenize_horizontally(a_rhl(k,is:ie,js:je))
+            call homogenize_horizontally(a_rhs(k,is:ie,js:je))
+        endif
         tt(k,is:ie, js:je) = tt(k, is:ie, js:je) + a_rhl(k,is:ie,js:je) + a_rhs(k,is:ie,js:je)
         if(ldebug) then
           if(any(isnan(rflx     (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency rflx  ',k,rflx    (k,:,:), any(isnan(sflx)),any(isnan(sflxu)),any(isnan(sflxd)),any(isnan(lflxu)),any(isnan(lflxd))
@@ -173,6 +179,26 @@ contains
 
       if(myid.eq.0.and.ldebug) print *,'calculate radiation ... done'
     contains
+      subroutine homogenize_horizontally(local)
+          use mpi_interface, only : MY_SIZE
+          use mpi
+          real, dimension(:,:),intent(inout) :: local
+          real :: local_avg, global_sum
+
+          integer :: commsize, mpierr
+
+          local_avg = sum(local)/size(local)
+
+          call MPI_Comm_size( MPI_COMM_WORLD, commsize, mpierr)
+          if(commsize.le.1) then
+            local(:,:) = local_avg
+            return
+          endif
+
+          call mpi_allreduce(local_avg, global_sum, 1, MY_SIZE, MPI_SUM, MPI_COMM_WORLD, mpierr)
+          local(:,:) = global_sum/commsize
+      end subroutine
+
       subroutine thermal_rad()
           use grid, only       : iradtyp, a_tskin
           use ckd   , only: llimit, rlimit
