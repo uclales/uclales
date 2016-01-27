@@ -69,6 +69,8 @@ module radiation_3d
 !  logical,parameter :: ldebug=.True.
 
   logical,parameter :: lavghr=.False. ! horizontally homogenize heating rates
+  logical,parameter :: lcollapse=.True. ! if true, try to collapse the upper layers to one single layer and therefore omit heating rate calculations outside of the dynamics grid.
+  !logical,parameter :: lcollapse=.False.! if true, try to collapse the upper layers to one single layer and therefore omit heating rate calculations outside of the dynamics grid.
 
 #ifdef HAVE_TENSTREAM
   integer(iintegers) :: solution_uid    ! is solution uid, each subband has one
@@ -100,7 +102,6 @@ contains
 #ifdef HAVE_TENSTREAM
       !if(.not.radMcICA.and.nstep.ne.1) return
 #endif
-
       call init_rad_3d()
 
       if(u0.ge.minSolarZenithCosForVis) &
@@ -1054,7 +1055,12 @@ contains
           if(any(isnan(g   ))) print *,myid,'tenstream_wrapper :: corrupt g   ',g   ,'::',pf (:,1,:,:)                                      
         endif
 
-        call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxproc, nyproc=nyproc,  dz3d=deltaz)
+        if(lcollapse) then
+            if(ldebug .and. myid.eq.0) print *,'Collapsing:',nv,nzp,nv-nzp-1
+            call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxproc, nyproc=nyproc, dz3d=deltaz, collapseindex=nv-nzp+1)
+        else
+            call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxproc, nyproc=nyproc,  dz3d=deltaz)
+        endif
         if(lsolar) then
           call set_optical_properties( kabs, ksca, g )
         else
