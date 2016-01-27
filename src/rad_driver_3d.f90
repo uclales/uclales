@@ -167,14 +167,14 @@ contains
         endif
         tt(k,is:ie, js:je) = tt(k, is:ie, js:je) + a_rhl(k,is:ie,js:je) + a_rhs(k,is:ie,js:je)
         if(ldebug) then
-          if(any(isnan(rflx     (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency rflx  ',k,rflx    (k,:,:), any(isnan(sflx)),any(isnan(sflxu)),any(isnan(sflxd)),any(isnan(lflxu)),any(isnan(lflxd))
-          if(any(isnan(fdiv_sol (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency divsol',k,fdiv_sol(k,:,:)
-          if(any(isnan(fdiv_th  (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency divth ',k,fdiv_th (k,:,:)
-          if(any(isnan(hr_factor(k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency hrf',k,hr_factor(k,:,:)
-          if(any(isnan(a_rhl    (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency rhl',k,a_rhl(k,:,:)
-          if(any(isnan(a_rhs    (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency rhs',k,a_rhs(k,:,:)
-          if(any(isnan(tt       (k,:,:)))) print *,myid,'rad3d :: nan in radiation tendency tt',k,tt(k,:,:)
-          if(any(isnan([hr_factor(k,:,:),a_rhl(k,:,:),a_rhs(k,:,:),tt(k,:,:),fdiv_sol (k,:,:),fdiv_th  (k,:,:),rflx     (k,:,:)]))) call exit(1)
+          if(any(isnan(rflx     (k,is:ie, js:je)))) print *,myid,'rad3d :: nan in radiation tendency rflx  ',k,rflx    (k,is:ie, js:je), any(isnan(sflx)),any(isnan(sflxu)),any(isnan(sflxd)),any(isnan(lflxu)),any(isnan(lflxd))
+          if(any(isnan(fdiv_sol (k,is:ie, js:je)))) print *,myid,'rad3d :: nan in radiation tendency divsol',k,fdiv_sol(k,is:ie, js:je)
+          if(any(isnan(fdiv_th  (k,is:ie, js:je)))) print *,myid,'rad3d :: nan in radiation tendency divth ',k,fdiv_th (k,is:ie, js:je)
+          if(any(isnan(hr_factor(k,is:ie, js:je)))) print *,myid,'rad3d :: nan in radiation tendency hrf',k,hr_factor(k,is:ie, js:je)
+          if(any(isnan(a_rhl    (k,is:ie, js:je)))) print *,myid,'rad3d :: nan in radiation tendency rhl',k,a_rhl(k,is:ie, js:je)
+          if(any(isnan(a_rhs    (k,is:ie, js:je)))) print *,myid,'rad3d :: nan in radiation tendency rhs',k,a_rhs(k,is:ie, js:je)
+          if(any(isnan(tt       (k,is:ie, js:je)))) print *,myid,'rad3d :: nan in radiation tendency tt',k,tt(k,is:ie, js:je)
+          if(any(isnan([hr_factor(k,is:ie, js:je),a_rhl(k,is:ie, js:je),a_rhs(k,is:ie, js:je),tt(k,is:ie, js:je),fdiv_sol (k,is:ie, js:je),fdiv_th  (k,is:ie, js:je),rflx     (k,is:ie, js:je)]))) call exit(1)
         endif
       end do
 
