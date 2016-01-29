@@ -69,8 +69,8 @@ module radiation_3d
 !  logical,parameter :: ldebug=.True.
 
   logical,parameter :: lavghr=.False. ! horizontally homogenize heating rates
-  logical,parameter :: lcollapse=.True. ! if true, try to collapse the upper layers to one single layer and therefore omit heating rate calculations outside of the dynamics grid.
-  !logical,parameter :: lcollapse=.False.! if true, try to collapse the upper layers to one single layer and therefore omit heating rate calculations outside of the dynamics grid.
+  !logical,parameter :: lcollapse=.True. ! if true, try to collapse the upper layers to one single layer and therefore omit heating rate calculations outside of the dynamics grid.
+  logical,parameter :: lcollapse=.False.! if true, try to collapse the upper layers to one single layer and therefore omit heating rate calculations outside of the dynamics grid.
 
 #ifdef HAVE_TENSTREAM
   integer(iintegers) :: solution_uid    ! is solution uid, each subband has one
