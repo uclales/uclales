@@ -245,21 +245,23 @@ class NetCDFCollector(object):
         var_info = self.variables[varname]
         intermediate_shape = self.subdomain_shape + var_info["shape"]
         temp = np.zeros(intermediate_shape, dtype=var_info["dtype"])
+
         decomposition_dimensions = self.find_decomposition_dimenstions(
             var_info["dimensions"])
-        print intermediate_shape
 
-        for pos, values in data.items():
-            temp[pos] = values
+        for pos in data.keys():
+            temp[pos] = data.pop(pos) # immediately remove data to save some much needed mem
 
         temp = temp.transpose(
             calculate_transposition_rule(decomposition_dimensions,
                                          var_info["dimensions"]))
-        temp = temp.reshape(
-            calculate_concatenated_shape(decomposition_dimensions,
-                                         self.subdomain_shape,
-                                         var_info["dimensions"],
-                                         var_info["shape"]))
+
+        new_shape =  calculate_concatenated_shape(decomposition_dimensions,
+                                                  self.subdomain_shape,
+                                                  var_info["dimensions"],
+                                                  var_info["shape"])
+        temp = temp.reshape(new_shape)
+
         return temp
 
     def collect_variable(self,
