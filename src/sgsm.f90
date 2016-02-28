@@ -67,7 +67,8 @@ contains
          ,a_rp, a_tp, a_sp, a_st, vapor, a_pexnr, a_theta                    &
          , a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7, nscl, nxp, nyp    &
          , nzp, nxyp, nxyzp, zm, dxi, dyi, dzi_t, dzi_m, dt, th00, dn0           &
-         , pi0, pi1, level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,liquid
+         , pi0, pi1, level, uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc,liquid,levset &
+         , diffsclrs, ls_q1, ls_q0, a_alpha, a_betabar, gkmin, gkmax
 
     use util, only         : atob, azero, get_avg3
     use mpi_interface, only: cyclics, cyclicc
@@ -131,32 +132,41 @@ contains
     !
     ! Diffuse scalars
     !
-    do n=4,nscl
-       call newvar(n,istep=nstep)
-       call azero(nxyp,sxy1)
-       call azero(nxyp,sxy2)
-       if ( associated(a_tp,a_sp) ) call atob(nxyp,wt_sfc,sxy1)
-       if ( associated(a_rp,a_sp) ) call atob(nxyp,wq_sfc,sxy1)
+    if (diffsclrs==1) then
+       do n=4,nscl
+          call newvar(n,istep=nstep)
+          call azero(nxyp,sxy1)
+          call azero(nxyp,sxy2)
+          if ( associated(a_tp,a_sp) ) call atob(nxyp,wt_sfc,sxy1)
+          if ( associated(a_rp,a_sp) ) call atob(nxyp,wq_sfc,sxy1)
+       
+          if (sflg) call azero(nxyzp,a_scr1)
 
-       if (sflg) call azero(nxyzp,a_scr1)
+          if (levset>=1) then
+             call diffsclr_ls(nzp,nxp,nyp,dt,dxi,dyi,dzi_m,dzi_t,dn0,sxy1,sxy2, &
+                a_scr2,a_st,a_scr1,a_alpha,a_betabar,ls_q1,ls_q0, &
+                nscl, n, gkmin, gkmax)
+          else
+             call diffsclr(nzp,nxp,nyp,dt,dxi,dyi,dzi_m,dzi_t,dn0,sxy1,sxy2   &
+                ,a_sp,a_scr2,a_st,a_scr1)
+          end if
 
-       call diffsclr(nzp,nxp,nyp,dt,dxi,dyi,dzi_m,dzi_t,dn0,sxy1,sxy2   &
-            ,a_sp,a_scr2,a_st,a_scr1)
-
-       if (sflg) then
-
-          call get_avg3(nzp,nxp,nyp,a_scr1,sz1)
-
-          call updtst(nzp,'sgs',n-3,sz1,1)
-          if (associated(a_sp,a_tp))                                          &
-             call sgsflxs(nzp,nxp,nyp,level,liquid,vapor,a_theta,a_scr1,'tl')
-          if (associated(a_sp,a_rp))                                          &
-             call sgsflxs(nzp,nxp,nyp,level,liquid,vapor,a_theta,a_scr1,'rt')
-
-       endif
-       call cyclics(nzp,nxp,nyp,a_st,req)
-       call cyclicc(nzp,nxp,nyp,a_st,req)
-    enddo
+          if (sflg) then
+       
+             call get_avg3(nzp,nxp,nyp,a_scr1,sz1)
+       
+             call updtst(nzp,'sgs',n-3,sz1,1)
+             if (associated(a_sp,a_tp))                                          &
+                call sgsflxs(nzp,nxp,nyp,level,liquid,vapor,a_theta,a_scr1,dn0,'tl')
+             if (associated(a_sp,a_rp))                                          &
+                call sgsflxs(nzp,nxp,nyp,level,liquid,vapor,a_theta,a_scr1,dn0,'rt')
+       
+          !endif
+          call cyclics(nzp,nxp,nyp,a_st,req)
+          call cyclicc(nzp,nxp,nyp,a_st,req)
+          end if
+       enddo
+    end if
 
   end subroutine diffuse
   !
@@ -653,6 +663,7 @@ contains
     do j=3,n3-2
        do i=2,n2-2
           do k=2,n1-1
+             ! diffusive flux in x
              szx1(k,i)=-(scp(k,i+1,j)-scp(k,i,j))*dxi*.25*(xkh(k,i,j)  +     &
                   xkh(k,i+1,j)+xkh(k-1,i,j)+xkh(k-1,i+1,j)) 
           enddo
@@ -664,11 +675,14 @@ contains
        do i=3,n2-2
           indh=indh+1
           do k=2,n1-1
+             ! This makes sure sz7(n1-1) remains 0. sz7(1) remains zero, too,
+             ! since it it never touched.
+             ! => sz7(n1-1) = sz7(1) = 0
              if (k < n1-1) sz7(k)=dt*dzi_m(k)*xkh(k,i,j)
-             sxz1(indh,k)=-dzi_t(k)*sz7(k-1)
-             sxz2(indh,k)=-dzi_t(k)*sz7(k)
-             sxz3(indh,k)=dn0(k)-sxz1(indh,k)-sxz2(indh,k)
-             sxz4(indh,k)=scp(k,i,j)*dn0(k)
+             sxz1(indh,k)=-dzi_t(k)*sz7(k-1)               ! a
+             sxz2(indh,k)=-dzi_t(k)*sz7(k)                 ! c
+             sxz3(indh,k)=dn0(k)-sxz1(indh,k)-sxz2(indh,k) ! b
+             sxz4(indh,k)=scp(k,i,j)*dn0(k)                ! d
           enddo
           sxz4(indh,2)=scp(2,i,j)*dn0(2)                                     &
                + sflx(i,j)*(dn0(1)+dn0(2))     *.5 *dt*dzi_t(2)
@@ -677,6 +691,7 @@ contains
        enddo
 
        call tridiff(n2,n1-1,indh,sxz1,sxz3,sxz2,sxz4,sxz5,sxz6)
+       !    tridiff(nh,n1,  nhdo,cin1,ci,  cip1,rhs, cj,  cjp1)
        !
        ! compute scalar tendency in addition to vertical flux
        !
@@ -687,12 +702,16 @@ contains
           flx(n1,i,j)  =0.
           indh=indh+1
           do k=2,n1-1
-             sct(k,i,j)= sct(k,i,j) + dti*(sxz5(indh,k)-scp(k,i,j))           &
-                  -((szx1(k,i)-szx1(k,i-1))                                   &
-                  *dxi + (-(scp(k,i,j+1)-scp(k,i,j))*dyi*0.25*(xkh(k,i,j)     &
-                  +xkh(k,i,j+1)+xkh(k-1,i,j)+xkh(k-1,i,j+1))+(scp(k,i,j)      &
-                  -scp(k,i,j-1))*dyi*0.25*(xkh(k,i,j-1)+xkh(k,i,j)            &
-                  +xkh(k-1,i,j-1)+xkh(k-1,i,j)))*dyi) /dn0(k)
+             sct(k,i,j) = sct(k,i,j) &
+                        ! tendency due to implicit vertical diffusion
+                        + dti * (sxz5(indh,k) - scp(k,i,j)) &
+                        ! differencing x fluxes
+                        - ( (szx1(k,i) - szx1(k,i-1)) * dxi & 
+                        ! differencing y fluxes
+                          + (-(scp(k,i,j+1)-scp(k,i,j))  *dyi*0.25*(xkh(k,i,j)+xkh(k,i,j+1)+xkh(k-1,i,j)  +xkh(k-1,i,j+1)) &
+                             +(scp(k,i,j)  -scp(k,i,j-1))*dyi*0.25*(xkh(k,i,j-1)+xkh(k,i,j)+xkh(k-1,i,j-1)+xkh(k-1,i,j))   &
+                            ) * dyi &
+                          ) /dn0(k)
              if (k<n1-1) flx(k,i,j)=-xkh(k,i,j)*(sxz5(indh,k+1)-sxz5(indh,k)) &
                   *dzi_m(k)
           end do
@@ -700,6 +719,186 @@ contains
     enddo
 
   end subroutine diffsclr
+
+  subroutine diffsclr_ls(n1,n2,n3,dt,dxi,dyi,dzi_m,dzi_t,dn0,sflx,tflx,xkh, &
+      sct, flx, alpha, betabar, q1, q0, nscl, n, gkmin, gkmax)
+    use grid, only : a_xp, write_anal
+
+    integer, intent(in) :: n1,n2,n3,nscl,gkmin,gkmax,n !n = index of current scalar in the ghost fluid arrays
+    real, intent(in)    :: xkh(n1,n2,n3)
+    real, intent(in)    :: sflx(n2,n3),tflx(n2,n3),dn0(n1)
+    real, intent(in)    :: dxi,dyi,dzi_m(n1),dzi_t(n1),dt
+    real, intent(in), dimension(n1,n2,n3)   :: alpha
+    real, intent(in), dimension(n1,n2,n3,3) :: betabar
+    real, intent(in), target, dimension(n1,n2,n3,nscl) :: q1, q0
+    real, intent(inout) :: flx(n1,n2,n3),sct(n1,n2,n3)
+
+    integer :: lstep, k0, k1, kk, nk, k00, k11
+    real, pointer :: q(:,:,:)
+    real, parameter :: a(2) = (/ 0.0,  1.0 /),&
+                       b(2) = (/ 1.0, -1.0 /)
+    !
+    ! compute vertical diffusion matrix coefficients for scalars,
+    ! coefficients need only be calculated once and can be used repeatedly
+    ! for other scalars
+    !
+
+    dti = 1.0/dt
+    do k=1,n1
+       sz7(k)   = 0.
+    end do
+
+    do j=3,n3-2
+
+       do lstep = 1, 2
+
+       select case(lstep)
+       case(1)
+          q => q1 (:,:,:,n) ! laminar, dry first
+       case(2)
+          q => q0 (:,:,:,n)
+       case default
+          stop('  diffsclrs_ls: wrong lstep')
+       end select
+       
+       do i=2,n2-2
+          do k=2,n1-1
+             ! diffusive flux in x
+             szx1(k,i) = - (a(lstep) + b(lstep) * betabar(k,i,j,2)) &
+                       * ( q(k,i+1,j) - q(k,i,j) )                  &
+                       * dxi*.25*(  xkh(k,i,j)   + xkh(k,i+1,j)     &
+                                  + xkh(k-1,i,j) + xkh(k-1,i+1,j) ) 
+          enddo
+       enddo
+
+       !
+       ! Set up Tri-diagonal Matrix
+       !
+       sxz1(:,:) = 0.0
+       sxz2(:,:) = 0.0
+       sxz3(:,:) = 0.0
+       sxz4(:,:) = 0.0
+       sxz5(:,:) = 0.0
+
+       indh=0
+       do i=3,n2-2
+          indh=indh+1
+          
+          ! identify range of the problem
+          call get_diffusion_k_range(a(lstep) + b(lstep)*alpha(:,i,j), &
+                                     lstep, n1, gkmin, gkmax, k0, k1)
+
+          sz7(:) = 0.0
+          nk = 2 + (k1 - k0)
+          do kk = 2, nk
+             k = k0 + kk - 2
+             if (kk < nk) sz7(kk) = dt * dzi_m(k) * xkh(k,i,j) * (a(lstep) + b(lstep)*betabar(k,i,j,1))
+             sxz1(indh,kk) = - dzi_t(k) * sz7(kk-1)                     !a
+             sxz2(indh,kk) = - dzi_t(k) * sz7(kk)                       !c
+             sxz3(indh,kk) = dn0(k)*(a(lstep) + b(lstep)*alpha(k,i,j)) - sxz1(indh,kk) - sxz2(indh,kk)     !b
+             sxz4(indh,kk) = q(k,i,j)*dn0(k)*(a(lstep) + b(lstep)*alpha(k,i,j) ) !d, rhs
+          enddo
+
+          select case(lstep)
+              case default
+                  stop('diffsclr_ls: Stopping. lstep not in {1,2}.')
+              case(1)
+                  sxz4(indh, nk) = q(n1-1,i,j) * dn0(n1-1)                       &
+                     - tflx(i,j) * (dn0(n1-1)+dn0(n1)) *.5 *dt*dzi_t(n1-1)
+              case(2)
+                  sxz4(indh,2) = q(2,i,j) * dn0(2)                              &
+                     + sflx(i,j) * (dn0(1)+dn0(2))     *.5 *dt*dzi_t(2)
+          end select
+
+          ! Calling tridiff for every column, instead of for entire j plane,
+          ! because columns have different problem sizes.
+          ! -> two calls per column (i,j), for two ghost fluids
+          ! -> sxz5 is the solution vecotor
+          ! tridiff solves on k = 2, <second arg>=n1-1
+          call tridiff(1,nk,1,sxz1(indh,:),sxz3(indh,:),sxz2(indh,:), &
+                       sxz4(indh,:),sxz5(indh,:),sxz6(indh,:))
+       enddo
+
+       !
+       ! compute scalar tendency in addition to vertical flux
+       !
+       indh=0
+       do i=3,n2-2
+          call get_diffusion_k_range(a(lstep) + b(lstep)*alpha(:,i,j), &
+                                     lstep, n1, gkmin, gkmax, k0, k1)
+          flx(1,i,j)    = (a(lstep) + b(lstep)*betabar(1,i,j,1)) &
+                        * sflx(i,j)*(dn0(1)+dn0(2))*.5
+          flx(n1-1,i,j) = (a(lstep) + b(lstep)*betabar(n1-1,i,j,1)) &
+                        * tflx(i,j)*(dn0(n1)+dn0(n1-1))*.5
+          flx(n1,i,j)   = 0.
+          indh=indh+1
+
+          kk = 1
+          do k = k0, k1
+             kk = kk+1
+             sct(k,i,j) = sct(k,i,j) &
+                        ! tendency due to implicit vertical diffusion
+                        + dti * (a(lstep) + b(lstep)*alpha(k,i,j)) * (sxz5(indh,kk) - q(k,i,j)) &
+                        ! differencing x fluxes (these are already net fluxes, no superposition required)
+                        - ( (szx1(k,i) - szx1(k,i-1)) * dxi &
+                        ! differencing y fluxes
+                          + (-(a(lstep) + b(lstep)*betabar(k,i,j,3))   * (q(k,i,j+1)-q(k,i,j)) & 
+                          *dyi*0.25*(xkh(k,i,j)+xkh(k,i,j+1)+xkh(k-1,i,j)  +xkh(k-1,i,j+1)) &
+                             +(a(lstep) + b(lstep)*betabar(k,i,j-1,3)) * (q(k,i,j)  -q(k,i,j-1)) &
+                          *dyi*0.25*(xkh(k,i,j-1)+xkh(k,i,j)+xkh(k-1,i,j-1)+xkh(k-1,i,j))   &
+                            ) * dyi &
+                          ) /dn0(k)
+             if (k<n1-1) flx(k,i,j) = flx(k,i,j) &
+                                    - (a(lstep) + b(lstep)*betabar(k,i,j,1)) &
+                                    * xkh(k,i,j)*(sxz5(indh,kk+1)-sxz5(indh,kk)) &
+                                    * dzi_m(k)
+          ! End of k loop
+          end do
+       ! End of i loop
+       end do
+       ! End of loop through ghost fluids
+       end do
+    ! End of loop over j planes
+    end do
+  end subroutine diffsclr_ls
+
+  !
+  ! get_diffusion_k_range: Returns the k index range of the given column of
+  !     alpha values on which diffusion is to be applied based on the given
+  !     'lstep'.
+  !
+  !     lstep = 1 corresponds to diffusion of the upper layer (free atmosphere).
+  !     lstep = 2 corresponds to diffusion of the lower layer (boundary layer).
+  !
+  !     The index ranges each include the last cell where alpha > alpha_crit,
+  !     where alpha is the volume fraction associated with the current lstep/
+  !     fluid.
+  !
+  subroutine get_diffusion_k_range(alpha, lstep, nzp, gkmin, gkmax, k0, k1)
+  real, intent(in)    :: alpha(nzp)
+  integer, intent(in) :: lstep, nzp, gkmin, gkmax
+  integer, intent(out) :: k0, k1
+  integer :: k
+  real, parameter :: alpha_crit = 1e-6
+
+  select case(lstep)
+      case default
+          stop('  get_index_range: Stopping. lstep not in {1,2}.')
+      case(1) ! lstep==1 -> free atmosphere fluid
+         k1 = nzp - 1
+         k0 = gkmax
+         do while (k0 > gkmin .and. alpha(k0-1) > alpha_crit)
+             k0 = k0 - 1
+         end do
+      case(2)
+         k0 = 2
+         k1 = gkmin
+         do while (k1 < gkmax .and. alpha(k1+1) > alpha_crit)
+             k1 = k1 + 1
+         end do
+  end select
+
+  end subroutine get_diffusion_k_range
 
 end module sgsm
 

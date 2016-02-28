@@ -24,8 +24,8 @@ module srfc
  ! real    :: sst = 292.
   real    :: zrough =  0.1
   real    :: ubmin  =  0.20
-  real    :: dthcon = 100.0
-  real    :: drtcon = 0.0
+  real    :: dthcon = 15.0
+  real    :: drtcon = 115.0
 
 contains 
   !

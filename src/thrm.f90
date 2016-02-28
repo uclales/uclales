@@ -243,7 +243,7 @@ contains
 
   ! esl=612.2*exp(17.67*x/(t-29.65)) 
   esl=c0+x*(c1+x*(c2+x*(c3+x*(c4+x*(c5+x*(c6+x*(c7+x*c8)))))))
-  rslf=.622*esl/(p-esl)
+  rslf=.622*esl/(p-esl) !eckhard: The factor .622 is R_v/R_d = 287.0 J/kg/K / 461.5 J/kg/K .
 
   end function rslf
 ! 

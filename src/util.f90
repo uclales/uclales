@@ -19,12 +19,82 @@
 !
 module util
 
-  use mpi_interface, only : cyclics, cyclicc
+  use mpi_interface, only : cyclics, cyclicc, intcyclics, intcyclicc
   implicit none
 
   integer, save :: fftinix=0, fftiniy=0
 
 contains
+  !
+  ! ----------------------------------------------------------------------
+  ! PHISET:  Set boundary conditions for level set function
+  !
+  subroutine phiset(n1,n2,n3,gkmin,gkmax,phi)
+
+    logical, parameter  :: cyclic = .true.
+    integer, intent(in) :: n1,n2,n3,gkmin,gkmax
+    real, intent(inout) :: phi(n1,n2,n3)
+    integer :: i, j, k, req(16)
+
+    if (cyclic) then
+      !
+      ! Boundary conditions
+      !
+      do j=3,n3-2
+          do i=3,n2-2
+             phi(gkmin+1,i,j) = 2*phi(gkmin+2,i,j) - phi(gkmin+3,i,j)
+             phi(gkmin  ,i,j) = 2*phi(gkmin+1,i,j) - phi(gkmin+2,i,j)
+             do k = 1, max(gkmin-1, 1)
+                 phi(k,i,j) = phi(gkmin,i,j)
+             end do
+
+             phi(gkmax-1,i,j) = 2*phi(gkmax-2,i,j) - phi(gkmax-3,i,j)
+             phi(gkmax,i,j)   = 3*phi(gkmax-2,i,j) - 2*phi(gkmax-3,i,j)
+             do k = min(gkmax+1, n1), n1
+                 phi(k,i,j) = phi(gkmax,i,j)
+             end do
+          end do
+      end do
+      call cyclics(n1,n2,n3,phi,req)
+      call cyclicc(n1,n2,n3,phi,req)
+    else
+      call cyclics (n1,n2,n3,phi,req)
+      call cyclicc (n1,n2,n3,phi,req)
+      do i=3,n2
+          do j=1,n3
+              phi(1,i,j) = 3*phi(3,i,j) - 2*phi(4,i,j)
+              phi(n1,i,j)   = 3*phi(n1-2,i,j) - 2*phi(n1-3,i,j)
+          end do
+      end do
+      do k = 1,n1
+        do j = 1,n3
+          !
+          ! -x face of domain
+          !
+          phi(k,2,j) = 2*phi(k,3,j) -   phi(k,4,j)
+          phi(k,1,j) = 3*phi(k,3,j) - 2*phi(k,4,j)
+          !
+          ! +x face of domain
+          !
+          phi(k,n2-1,j) = 2*phi(k,n2-2,j) -   phi(k,n2-3,j)
+          phi(k,n2  ,j) = 3*phi(k,n2-2,j) - 2*phi(k,n2-3,j)
+        end do
+        do  i = 1,n2
+          !
+          ! -y face of domain
+          !
+          phi(k,i,2) = 2*phi(k,i,3) -   phi(k,i,4)
+          phi(k,i,1) = 3*phi(k,i,3) - 2*phi(k,i,4)
+          !
+          ! +y face of domain
+          !
+          phi(k,i,n3) = 2*phi(k,i,n3-2) -   phi(k,i,n3-3)
+          phi(k,i,n3) = 3*phi(k,i,n3-2) - 2*phi(k,i,n3-3)
+        end do
+      end do
+    end if
+
+  end subroutine phiset
   ! ----------------------------------------------------------------------
   ! Subroutine sclrset: Sets upper and lower boundaries to a constant
   ! gradient via extrapolation, or a zero-gradient condition depending
@@ -67,6 +137,28 @@ contains
     call cyclicc(n1,n2,n3,a,req)
 
   end subroutine sclrset
+  !
+  !
+  !
+  subroutine markerset(n1,n2,n3,a)
+
+    use mpi_interface, only : myid, appl_abort
+
+    integer, intent(in)    :: n1,n2,n3
+    integer, intent(inout) :: a(n1,n2,n3)
+
+    integer :: i,j,req(16)
+    do j=1,n3
+       do i=1,n2
+          a(1,i,j)  = a(2,i,j)
+          a(n1,i,j) = a(n1-1,i,j)
+       end do
+    end do
+
+    call intcyclics(n1,n2,n3,a,req)
+    call intcyclicc(n1,n2,n3,a,req)
+
+  end subroutine markerset
   !
   ! ----------------------------------------------------------------------
   ! VELSET:  Sets boundary conditions for velocity
@@ -307,7 +399,7 @@ contains
   ! subroutine tridiff: standard tri-diagonal solver for nh columns
   ! uses the LU decomposition of the equation 
   !
-  !     cin1(k)*x(k-1)+ci(k)*x(k)+cip1(k)*x(k+1) = b(k)
+  !     cin1(k) * x(k-1) + ci(k)*x(k) + cip1(k)*x(k+1) = b(k)
   !
   ! such that
   !
@@ -318,6 +410,7 @@ contains
   !         |  0   0   0   0   0 ... 1 | | 0   0   0   0   0   0  ... unn |
   !
   ! where aik =cip1(k) (i=k-1), =cin1(k) i=k+1
+  !
   !    u(1,1)   = a(1,1)
   !    l(i,i-1) = a(i,i-1)/u(i-1,i-1)
   !    u(i,i)   = a(i,i1)-l(i,i-1)*a(i-1,i)
@@ -326,6 +419,8 @@ contains
   ! y(k) = b(k) -l(k)y(k-1)
   !
   subroutine tridiff(nh,n1,nhdo,cin1,ci,cip1,rhs,cj,cjp1)
+  ! nh only needed for 'dimensions' in variable declarations
+  ! n1 : size of the individual problem
 
     integer, intent(in) :: nh,n1,nhdo
     real, intent(in)    :: cin1(nh,n1),ci(nh,n1),cip1(nh,n1)
@@ -337,10 +432,11 @@ contains
     eps=sqrt(tiny(1.))
 
     do i=1,nhdo
+       if (ci(i,2)==0.0) print *, ci(i,2)
        cjp1(i,2)=cip1(i,2)/ci(i,2)
        rhs(i,2)=rhs(i,2)/ci(i,2)
        do k=3,n1
-          cj(i,k)=ci(i,k)-cin1(i,k)*cjp1(i,k-1)+eps
+          cj(i,k)=ci(i,k)-cin1(i,k)*cjp1(i,k-1)
           cjp1(i,k)=cip1(i,k)/cj(i,k)
           rhs(i,k)=(rhs(i,k)-cin1(i,k)*rhs(i,k-1))/cj(i,k)
        enddo

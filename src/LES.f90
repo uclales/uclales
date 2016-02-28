@@ -86,7 +86,8 @@ contains
          case_name,lsvarflg, sst, div                                   !irina
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
-         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype, CCN
+         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype, CCN, levset,&
+         bandw,fdmthd,rimthd,euler,prescrbuoy,diffsclrs,entmodl
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,iseed, hfilin,   &
          zrand
     use stat, only : ssam_intvl, savg_intvl
@@ -120,7 +121,15 @@ contains
          umean  , vmean  , th00  ,  & ! gallilean E/W wind, basic state
          case_name,                 & !irina:name of the case, i.e. astex, rico, etc  
          lsvarflg,                  & !irina:flag for time bvarying large scale forcing  
-         div                          !irina: divergence  
+         div,                       & !irina: divergence  
+         levset,                    & !eckhard: level set flag
+         bandw,                     & !eckhard: confine level set to band around interface
+         fdmthd,                    & !eckhard: method for level set transport
+         rimthd,                    & !eckhard: reinitialization method
+         euler,                     & !eckhard: RK3 or Euler-forward time integration
+         prescrbuoy,                & !eckhard: thermodynamics-based or prescribed buoyancy
+         diffsclrs,                 & !eckhard: turn scalar diffusion on(1)/off(0)
+         entmodl                      !eckhard: level set entrainment model
 
     ps       = 0.
     ts       = th00

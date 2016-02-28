@@ -20,7 +20,7 @@
 module stat
 
   use ncio, only : open_nc, define_nc
-  use grid, only : level
+  use grid, only : level, levset
   use util, only : get_avg, get_cor, get_avg3, get_cor3, get_var3, get_csum
 !irina
 !  use step, only: case_name
@@ -119,6 +119,15 @@ contains
        nv2 = nvar2
     end select
 
+    if (levset>=1) then
+        nv1 = nv1 + 1
+        s1(nv1) = 'en_chg'
+        nv1 = nv1 + 1
+        s1(nv1) = 'mt_chg'
+        nv1 = nv1 + 1
+        s1(nv1) = 'zi4_bar'
+    end if 
+
     fname =  trim(filprf)//'.ts'
     if(myid == 0) print                                                  &
          "(//' ',49('-')/,' ',/,'  Initializing: ',A20)",trim(fname)
@@ -147,7 +156,7 @@ contains
     use grid, only : a_up, a_vp, a_wp, liquid, a_theta, a_scr1, a_scr2       &
          , a_rp, a_tp, press, nxp, nyp, nzp, dzi_m, dzi_t, zm, zt, th00, umean &
          , vmean, dn0, precip, a_rpp, a_npp, albedo, CCN, iradtyp, a_rflx    &
-         , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd
+         , a_sflx, albedo, a_lflxu,a_lflxd,a_sflxu,a_sflxd, a_phi, gkmin, gkmax
 
     real, intent (in) :: time
 
@@ -178,7 +187,8 @@ contains
     !
     ! scalar statistics
     !
-    call set_ts(nzp, nxp, nyp, a_wp, a_theta, dn0, zt,zm,dzi_t,dzi_m,th00,time)
+    call set_ts(nzp, nxp, nyp, a_wp, a_theta, dn0, zt,zm,dzi_t,dzi_m,th00,time, &
+        a_phi, gkmin, gkmax)
     if (level >=1) call ts_lvl1(nzp, nxp, nyp, dn0, zt, dzi_m, a_rp)
     if (level >=2) call ts_lvl2(nzp, nxp, nyp, a_rp, a_scr2, zt)
 
@@ -189,12 +199,13 @@ contains
   ! -----------------------------------------------------------------------
   ! subroutine set_ts: computes and writes time sequence stats
   !
-  subroutine set_ts(n1,n2,n3,w,th,dn0,zt,zm,dzi_t,dzi_m,th00,time)
+  subroutine set_ts(n1,n2,n3,w,th,dn0,zt,zm,dzi_t,dzi_m,th00,time,phi,gkmin,gkmax)
 
-    use defs, only : cp
+    use defs, only : cp, g
+    use grid, only : th_change, qt_change, MPI_partition_area
 
-    integer, intent(in) :: n1,n2,n3
-    real, intent(in)    :: w(n1,n2,n3),th(n1,n2,n3)
+    integer, intent(in) :: n1,n2,n3,gkmin,gkmax
+    real, intent(in)    :: w(n1,n2,n3),th(n1,n2,n3),phi(n1,n2,n3)
     real, intent(in)    :: dn0(n1),zt(n1),zm(n1),dzi_t(n1),dzi_m(n1),th00,time
 
     integer :: k
@@ -203,6 +214,13 @@ contains
     ssclr(1) = time
     ssclr(4) = get_zi(n1, n2, n3, 2, th, dzi_m, zt, 1.)   ! maximum gradient
     ssclr(5) = get_zi(n1, n2, n3, 3, th, thvar, zt, 1.) ! maximum variance
+    if (levset>=1) then
+       ! The hard-coded values are the vertical integrals of the initial DYCOMS
+       ! RF01 profiles of (dn0 . theta_l) and (dn0 . q_t), respectively.
+       ssclr(nv1-2) = 100. * th_change / (MPI_partition_area * 5.073036250000000e+05)
+       ssclr(nv1-1) = 100. * qt_change / (MPI_partition_area * 1.005107879638672e+01)
+       ssclr(nv1) = get_ls_zi(n1,n2,n3, gkmin, gkmax, phi, zm)
+    end if
     ! 
     ! buoyancy flux statistics
     ! 
@@ -214,7 +232,7 @@ contains
        ssclr(7) = ssclr(7) + (tke_res(k)+tke_sgs(k))*dn0(k)/dzi_t(k)
   !irina
        ssclr(30) = ssclr(30) + (tke_res(k)+tke_sgs(k))/dzi_t(k)
-       svctr(k,33) = svctr(k,33) + wtv_sgs(k)*9.8/th00
+       svctr(k,33) = svctr(k,33) + wtv_sgs(k)*g/th00
     end do
     ssclr(6) = get_zi(n1, n2, n3, 4, th, bf, zm, 1.) ! minimum buoyancy flux
 
@@ -238,7 +256,7 @@ contains
     real, intent(in)    :: dn0(n1),zt(n1),dzi_m(n1)
 
     ssclr(13) = ssclr(13)*alvl*(dn0(1)+dn0(2))*0.5
-    ssclr(14) = get_zi(n1, n2, n3, 1, q, dzi_m, zt, 0.5e-3)
+    ssclr(14) = get_zi(n1, n2, n3, 1, q, dzi_m, zt, 8e-3)
 
   end subroutine ts_lvl1
   ! 
@@ -775,8 +793,8 @@ contains
     end do
     call get_cor3(n1,n2,n3,b,w,wtv_res)
     do k=1,n1
-       svctr(k,35) = svctr(k,35) + wtv_res(k)
-       wtv_res(k) = wtv_res(k) * th00/g
+       svctr(k,35) = svctr(k,35) + wtv_res(k) !'boy_prd' = <w b>  =    [m^2/s^3]
+       wtv_res(k) = wtv_res(k) * th00/g       ! w_tv_res = <w th_v'> = [m K/s]
     end do
 
   end subroutine get_buoyancy
@@ -967,24 +985,30 @@ contains
   ! SGSFLXS: estimates the sgs rl and tv flux from the sgs theta_l and sgs r_t 
   ! fluxes
   !
-  subroutine sgsflxs(n1,n2,n3,level,rl,rv,th,flx,type)
+  subroutine sgsflxs(n1,n2,n3,level,rl,rv,th,flx,dn0,type)
 
     use defs, only : alvl, cp, rm, ep2
 
     integer, intent(in) :: n1,n2,n3,level
     real, intent(in)    :: rl(n1,n2,n3),rv(n1,n2,n3)
-    real, intent(in)    :: th(n1,n2,n3),flx(n1,n2,n3)
+    real, intent(in)    :: th(n1,n2,n3),flx(n1,n2,n3),dn0(n1)
     character (len=2)   :: type
 
     integer :: k,i,j
     real    :: rnpts      ! reciprical of number of points and
     real    :: fctl, fctt ! factors for liquid (l) and tv (t) fluxes
+    real    :: dn0i(n1)
 
     if (type == 'tl') then
        wrl_sgs(:) = 0.
        wtv_sgs(:) = 0.
     end if
     rnpts = 1./real((n2-4)*(n3-4))
+
+    do k = 1, n1-1
+        dn0i(k) = 2. / (dn0(k) + dn0(k+1))
+    end do
+    dn0i(n1) = 1. / dn0(n1)
     !
     ! calculate fluxes assuming the possibility of liquid water.  if liquid
     ! water does not exist sgs_rl = 0.
@@ -1004,8 +1028,8 @@ contains
                       fctl =rnpts/(1.+(rv(k,i,j)*alvl**2)/(cp*rm*th(k,i,j)**2))
                       fctt = (alvl*fctt/cp - th(k,i,j)*rnpts)
                    end select
-                   wrl_sgs(k) = wrl_sgs(k) + fctl*flx(k,i,j)
-                   wtv_sgs(k) = wtv_sgs(k) + fctt*flx(k,i,j)
+                   wrl_sgs(k) = wrl_sgs(k) + fctl*flx(k,i,j)*dn0i(k)
+                   wtv_sgs(k) = wtv_sgs(k) + fctt*flx(k,i,j)*dn0i(k)
                 else
                    select case (type)
                    case ('tl')
@@ -1013,7 +1037,7 @@ contains
                    case ('rt')
                       fctt = rnpts*(ep2*th(k,i,j))
                    end select
-                   wtv_sgs(k) = wtv_sgs(k) + fctt*flx(k,i,j)
+                   wtv_sgs(k) = wtv_sgs(k) + fctt*flx(k,i,j)*dn0i(k)
                 end if
              end do
           end do
@@ -1039,7 +1063,7 @@ contains
                 else
                    fctt = rnpts 
                 end if
-                wtv_sgs(k) = wtv_sgs(k) + fctt*flx(k,i,j)
+                wtv_sgs(k) = wtv_sgs(k) + fctt*flx(k,i,j)*dn0i(k)
              end do
           end do
        end do
@@ -1268,6 +1292,37 @@ contains
 
   end function get_zi
 
+
+  real function get_ls_zi(n1, n2, n3, gkmin, gkmax, phi, zm)
+
+    integer, intent (in) :: n1, n2, n3, gkmin, gkmax
+    real, intent(in)     :: phi(n1,n2,n3), zm(n1)
+
+    integer :: i, j, k, kk
+    real    :: scr(n2,n3)
+
+    get_ls_zi = -999.
+    scr = -999.
+    do j=3,n3-2
+    do i=3,n2-2
+        k=gkmin+1
+        do while (k<gkmax)
+            if (phi(k-1,i,j) * phi(k,i,j) < 0) then
+                k = gkmax
+                scr(i,j) = - phi(k-1,i,j) / (phi(k,i,j) - phi(k-1,i,j)) &
+                         * (zm(k) - zm(k-1)) + zm(k-1)
+            else
+                k = k+1
+            end if
+        end do
+        if(scr(i,j) < 0.0) then
+            stop '  [get_ls_zi] No interface found. Stopping.' 
+        end if
+    end do
+    end do
+    get_ls_zi = get_avg(1,n2,n3,1,scr)
+
+  end function get_ls_zi
 end module stat
 
 
