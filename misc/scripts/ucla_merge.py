@@ -153,7 +153,7 @@ class NetCDFCollector(object):
 
         self.mintime = mintime
         if len(ntimes) > 0:
-            self.maxtime = np.minimum(min(ntimes), maxtime)
+            self.maxtime = np.minimum(min(ntimes), maxtime) if maxtime!=None else min(ntimes)
         else:
             self.maxtime = None
 
@@ -246,30 +246,32 @@ class NetCDFCollector(object):
             concatenated into an additional zeroth axis.
         """
         var_info = self.variables[varname]
-        intermediate_shape = self.subdomain_shape + var_info["shape"]
+
+        tmp_shape = list(var_info["shape"])
+        for i,dimname in enumerate(var_info["dimensions"]):
+            if dimname=='time':
+                start = 0 if self.mintime==None else self.mintime
+                tmp_shape[i] = self.maxtime - start
+        tmp_shape = tuple(tmp_shape)
+
+        intermediate_shape = self.subdomain_shape + tmp_shape
+        print 'intermediate shape',intermediate_shape
         temp = np.zeros(intermediate_shape, dtype=var_info["dtype"])
 
         decomposition_dimensions = self.find_decomposition_dimenstions(
             var_info["dimensions"])
 
         for pos in data.keys():
-            print 'shape temp',np.shape(temp[pos]),'::',np.shape(data[pos])
-            print var_info
-            tmp_slices = [slice(None,None,None)]*len(var_info['dimensions'])
-            for i,dimname in enumerate(var_info["dimensions"]):
-                if dimname=='time':
-                    tmp_slices[i] = slice(self.mintime, self.maxtime, None)
-
-            temp[pos][tmp_slices] = data.pop(pos) # immediately remove data to save some much needed mem
+            temp[pos] = data.pop(pos) # immediately remove data to save some much needed mem
 
         temp = temp.transpose(
             calculate_transposition_rule(decomposition_dimensions,
                                          var_info["dimensions"]))
 
-        new_shape =  calculate_concatenated_shape(decomposition_dimensions,
+        new_shape = calculate_concatenated_shape(decomposition_dimensions,
                                                   self.subdomain_shape,
                                                   var_info["dimensions"],
-                                                  var_info["shape"])
+                                                  tmp_shape)
         temp = temp.reshape(new_shape)
 
         return temp
@@ -277,7 +279,7 @@ class NetCDFCollector(object):
     def collect_variable(self,
                          varname,
                          reduction_function=None,
-                         skip_if_already_there=True):
+                         skip_if_already_there=False):
         """
         Collects one variable ``varname`` from all netCDF-Files available.
         """
@@ -312,7 +314,15 @@ class NetCDFCollector(object):
                     continue
                 setattr(var, attr_name, attr_value)
             data[np.isnan(data)] = fillvalue
-            var[:] = data
+
+            # Get slice considering mintime and maxtime
+            var_info = self.variables[varname]
+            tmp_slices = [slice(None,None,None)]*len(var_info['dimensions'])
+            for i,dimname in enumerate(var_info["dimensions"]):
+                if dimname=='time': 
+                    tmp_slices[i] = slice(self.mintime, self.maxtime, None)
+
+            var[tmp_slices] = data
 
 
         print "done collecting variable %s" % varname
