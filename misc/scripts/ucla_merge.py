@@ -131,7 +131,7 @@ class NetCDFCollector(object):
         ('xm', 'ym')]
     subdomain_id_size = 4
 
-    def __init__(self, basename, complevel=3):
+    def __init__(self, basename, complevel=3, mintime=None, maxtime=None):
         self.basename = basename
         self.complevel = complevel
         self.files = sorted(glob(basename + '.0*.nc'))
@@ -150,11 +150,14 @@ class NetCDFCollector(object):
                     ntimes.append(len(dataset.variables['time']))
                 except KeyError:
                     pass
+
+        self.mintime = mintime
         if len(ntimes) > 0:
-            self.maxtime = min(ntimes)
+            self.maxtime = np.minimum(min(ntimes), maxtime)
         else:
             self.maxtime = None
-        print 'maxtime is', self.maxtime
+
+        print 'time slice is from', self.mintime, 'to', self.maxtime
 
         subdomain_size = {dim: size
                           for dims in self.decomposition_dimensions
@@ -221,7 +224,7 @@ class NetCDFCollector(object):
         dimensions = self.variables[varname]['dimensions'] # list of dim names
         slices = [ slice(None) for _ in dimensions ]       # create list of slices as [:,:,...]
         try:
-            slices[dimensions.index("time")] = slice(None, self.maxtime, None) # restrict time slice to maxtime
+            slices[dimensions.index("time")] = slice(self.mintime, self.maxtime, None) # restrict time slice to maxtime
         except ValueError: # dont have time axis, e.g. axis variables
             pass
         slices = tuple(slices)
@@ -250,7 +253,14 @@ class NetCDFCollector(object):
             var_info["dimensions"])
 
         for pos in data.keys():
-            temp[pos] = data.pop(pos) # immediately remove data to save some much needed mem
+            print 'shape temp',np.shape(temp[pos]),'::',np.shape(data[pos])
+            print var_info
+            tmp_slices = [slice(None,None,None)]*len(var_info['dimensions'])
+            for i,dimname in enumerate(var_info["dimensions"]):
+                if dimname=='time':
+                    tmp_slices[i] = slice(self.mintime, self.maxtime, None)
+
+            temp[pos][tmp_slices] = data.pop(pos) # immediately remove data to save some much needed mem
 
         temp = temp.transpose(
             calculate_transposition_rule(decomposition_dimensions,
@@ -351,9 +361,13 @@ def _main():
                         help='basename of the netCDF files')
     parser.add_argument('variables', type=str, nargs='+',
                         help='variables to extract (all: all of them)')
+    parser.add_argument('-mintime', type=int, default=None,
+                        help='minimum time index that is being loaded')
+    parser.add_argument('-maxtime', type=int, default=None,
+                        help='maximum time index that is being loaded')
     args = parser.parse_args()
 
-    collector = NetCDFCollector(args.basename)
+    collector = NetCDFCollector(args.basename, mintime=args.mintime, maxtime=args.maxtime)
     selected_variables = set(args.variables)
     if 'all' in selected_variables:
         collector.collect()
