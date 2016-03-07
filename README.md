@@ -9,6 +9,8 @@ This version of the UCLA-LES uses level-set-based front tracking to accurately r
 
 This document describes how the code was set up and where the varied parameters can be set in order to reproduce the results.
 
+An newer version of this code, configured to simulate the stratocumulus-topped atmospheric boundary layer, can be found in the [level-set-stbl](https://github.com/uclales/uclales/tree/level-set-stbl) branch.
+
 For a more detailed description of how to use the UCLA-LES, please refer to the user documentation in ./doc/les_doc.pdf.
 
 [1] Bretherton, C. S. et al. (1999). An intercomparison of radiatively-driven entrainment and turbulence in a smoke cloud, as simulated by different numerical models. *Quarterly Journal of the Royal Meteorological Society*, 125(554), 391–423.  doi:10.1002/qj.49712555402
