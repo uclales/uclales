@@ -175,6 +175,9 @@ contains
 ! LINDA, b
     real    :: qv, rh
     real, allocatable :: f_xyz_3d(:,:,:)
+
+    real :: rnd_number
+
     allocate(f_xyz_3d(nzp,nxp,nyp))
     f_xyz_3d = 0.0
 ! LINDA, e
@@ -234,6 +237,24 @@ contains
             if (zt(k)>0 .and. zt(k)< 2 * zc) then
               dist = (xt(i)**2 + yt(j)**2)/xc**2 + (zt(k) - zc)**2/zc**2
               a_tp(k,i,j) = a_tp(k,i,j) + .3 *max(0.,(1-dist))
+            end if
+          end do
+        end do
+      end do
+    elseif (case_name == 'bubdis3p') then
+      xc = 2e3 
+      zc = 500
+      do j=1,nyp
+        do i=1,nxp
+          do k=1,nzp
+            if (zt(k)>0 .and. zt(k)< 2 * zc) then
+              dist = (xt(i)**2 + yt(j)**2)/xc**2 + (zt(k) - zc)**2/zc**2
+              dist = .3 *max(0.,(1-dist)) ! .3 K perturbation
+
+              call random_number(rnd_number)
+              dist = dist * ( 1 + (rnd_number*2-1)*1.0) ! 100 percent perturbation on initial   perturbation
+
+              a_tp(k,i,j) = a_tp(k,i,j) + dist
             end if
           end do
         end do
