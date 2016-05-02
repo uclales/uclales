@@ -90,7 +90,7 @@ contains
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
          filprf, expnme, iradtyp, igrdtyp, nfpt, distim, lspongeinit, runtype,             &
          CCN, lwaterbudget, lcouvreux, prc_lev, isfctyp, sfc_albedo, lrad_ca, &
-	 w0, Qrate, iradbel !RV
+	 w0, Qrate, iradbel, wtgbel !RV
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,irsflg, iseed, hfilin,   &
          zrand,lhomrestart,mag_pert_q,mag_pert_t
     use stat, only : ssam_intvl, savg_intvl
@@ -151,7 +151,7 @@ contains
          lpartic,lpartsgs,lrandsurf,lpartstat,lpartdump, &           ! Particles
          lpartdumpui,lpartdumpth,lpartdumpmr,frqpartdump,&           ! Particles
          lpartdrop, ldropstart, &                                    ! Particles
-	 w0, Qrate, iradbel                                    !RV: parameters for large-scale forcings in bellon_rad
+	 w0, Qrate, iradbel, wtgbel                                    !RV: parameters for large-scale forcings in bellon_rad
 
 
     deflev = deflate_level

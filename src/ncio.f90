@@ -1653,6 +1653,10 @@ contains
        if (itype==0) ncinfo = 'shortwave radiative tnd'
        if (itype==1) ncinfo = 'K/s'
        if (itype==2) ncinfo = 'tttt'
+    case('omg')    
+       if (itype==0) ncinfo = 'large-scale omega from WTG'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'tttt'
    case default
        if (myid==0) print *, 'ABORTING: variable not found in ncinfo, ',trim(short_name)
        call appl_abort(0)

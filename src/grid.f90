@@ -129,6 +129,7 @@ module grid
   real  :: w0 = 7.5e-3
   real  :: Qrate = 2.5/86400. !
   logical  :: iradbel = .false. !rv, .true. for interactive radiation with bellon case; d4stream (use iradtyp=4)
+  logical  :: wtgbel = .false. !rv, .true. for WTG approximation, in combination with interactive radiation for bellon case
 
 
   character(40)      :: zname      = 'zt'

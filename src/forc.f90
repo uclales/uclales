@@ -25,7 +25,7 @@ module forc
   use rad_gcss, only  : gcss_rad
   !cgils
   use grid, only      : wfls, dthldtls, dqtdtls, sfc_albedo, outtend, wtendt, wtendr, & 	
-		        nstep,rkalpha,rkbeta, dt, lrad_ca, w0, Qrate, iradbel,totradt,swradt !RV
+		        nstep,rkalpha,rkbeta, dt, lrad_ca, w0, Qrate, iradbel,totradt,swradt, wtgbel !RV
   use modnudge, only  : nudge, nudge_bound, lnudge_bound !LINDA 
   use stat, only      : sflg, updtst  !rv
   use util, only      : get_avg3
@@ -105,8 +105,13 @@ contains
           case(3)
              !RV, call interactive radiation here. (adapted from Axel)
              if (iradbel) then
-                call bellon(nzp, nxp, nyp, zt, dzi_t, dzi_m, a_tt, a_tp &
+                if (wtgbel .and. time_in_2.ge.3600) then
+                   call bellon(nzp, nxp, nyp, zt, dzi_t, dzi_m, a_tt, a_tp &
+             		,a_rt, a_rp, a_ut, a_up, a_vt, a_vp,iradtyp,rk,wtgbel)
+                else
+                   call bellon(nzp, nxp, nyp, zt, dzi_t, dzi_m, a_tt, a_tp &
              		,a_rt, a_rp, a_ut, a_up, a_vt, a_vp,iradtyp,rk)
+                end if
              end if
              if (iradbel.and.time_in_2.lt.3600) then
                ! no explicit radiation, to avoid spinup problems
@@ -124,7 +129,7 @@ contains
                    enddo
                  enddo
                enddo
-             else
+            else
 	       if (outtend) then
                	  call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,   &
                      dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt,&
@@ -434,7 +439,7 @@ contains
   ! -------------------------------------------------------------------
   ! subroutine bellon_rad:  call simple radiative parameterization
   !
-  subroutine bellon(n1,n2,n3,zt,dzi_t,dzi_m,tt,tl,rtt,rt, ut,u,vt,v,iradtyp, rk)
+  subroutine bellon(n1,n2,n3,zt,dzi_t,dzi_m,tt,tl,rtt,rt, ut,u,vt,v,iradtyp,rk,wtg)
 
     integer, intent (in) :: n1,n2, n3, iradtyp
     real, optional, intent (in)	 :: rk
@@ -446,6 +451,35 @@ contains
     integer :: i,j,k,kp1
     real    :: grad,wk
     real,dimension(n1) :: res,res1
+    logical,optional :: wtg
+    logical :: firsttime1 = .true.
+    real, dimension(:), allocatable :: omg, drft, tavg, tref
+
+
+    if (wtg) then !RV, Weak temperature gradient approximation. Derive omega.
+       if (firsttime1) then
+          firsttime1 = .false.
+          allocate(omg(n1))
+          allocate(drft(n1))
+          allocate(tavg(n1))
+          allocate(tref(n1))
+
+          open(2112,file='wtg_in')
+          do k=1,n1
+             read(2112,*,end=21) tref(k)
+          end do
+          close(2112)
+21        continue
+       end if
+
+       call get_avg3(n1,n2,n3,tl,tavg)
+
+       do k=2,n1-2
+          kp1 = k+1
+          drft(k) = 1./dt*(1.-exp(-zt(k)/H))*(tavg(k)-tref(k))
+          omg(k) = drft(k)/((tavg(kp1)-tavg(k))*dzi_t(k))
+       end do
+    end if
 
     do j=3,n3-2
        do i=3,n2-2
@@ -454,8 +488,13 @@ contains
           !
           do k=2,n1-2
              kp1 = k+1
-             wk = w0*(1.-exp(-zt(k)/H))
+             if (wtg) then
+                wk = omg(k)
+             else
+                wk = w0*(1.-exp(-zt(k)/H))
+             end if
 	     if(iradtyp.eq.4) then
+                !tt(k,i,j) = tt(k,i,j)  - 0.75/86400. !dry.cool case used 0.75 Kd-1 adv. cooling
                 tt(k,i,j) = tt(k,i,j) + wk*(tl(kp1,i,j)-tl(k,i,j))*dzi_t(k)
 	     else 
                 tt(k,i,j) = tt(k,i,j) + wk*(tl(kp1,i,j)-tl(k,i,j))*dzi_t(k) - Qrate
@@ -479,6 +518,9 @@ contains
        call updtst(n1,'tnd',1,res,1) !call updtst(n1,'tnd',1,res/acumtime,1)
        call get_avg3(n1,n2,n3,wtendr,res1)
        call updtst(n1,'tnd',2,res1,1)!rm /acumtime
+       if (wtg) then
+          call updtst(n1,'tnd',11,omg,1)
+       end if
     end if !rv
 
   end subroutine bellon

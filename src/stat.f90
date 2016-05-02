@@ -32,7 +32,7 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 68, nvar2 = 133 ! number of time series and profiles
+  integer, parameter :: nvar1 = 68, nvar2 = 134 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2
   real, save         :: fsttm, lsttm
 
@@ -78,7 +78,7 @@ module stat
        'lwuca  ','lwdca  ','swuca  ','swdca  ','wtendt ','wtendr ', & !115
        'sgtendt','sgtendr','adtendt','adtendr','turtent','turtenr', & !121
        'dtdt   ','dqdt   ','prect  ','precr  ','totradt','swradt ', & !127
-       'cs1_2  '/)                                                    !133
+       'cs1_2  ','omg    '/)                                          !134
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:)
@@ -1549,6 +1549,8 @@ contains
 	  nn=131   !totradt
        case(10)
 	  nn=132   !swradt
+       case(11)    
+          nn=134   !omg (LS omega from WTG)
        case default
 	  nn = 0
        end select
