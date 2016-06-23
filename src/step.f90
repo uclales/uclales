@@ -373,6 +373,8 @@ contains
           end if
           call forcings(xtime,cntlat,sst,div,case_name,time)
           call micro(level,istp)
+       else
+          call forcings(xtime,cntlat,sst,div,case_name,time)
        end if
 
        call corlos

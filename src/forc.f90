@@ -70,7 +70,12 @@ contains
 
     select case(iradtyp)
     case (1)
-        call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt)
+       select case(level)
+       case(0)
+        call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_tt)
+       case default
+        call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_tt,a_rp,a_rt)
+       end select
     case (2)
        select case(level)
        case(1)
@@ -239,7 +244,7 @@ contains
   ! subroutine case_forcing: adjusts tendencies according to a specified
   ! large scale forcing.  Normally case (run) specific.
   !
-  subroutine case_forcing(n1,n2,n3,case_name,zt,dzi_t,dzi_m,tl,rt,tt,rtt)
+  subroutine case_forcing(n1,n2,n3,case_name,zt,dzi_t,dzi_m,tl,tt,rt,rtt)
 
     use mpi_interface, only : pecount, double_scalar_par_sum,myid, appl_abort
     use stat, only : get_zi
@@ -247,8 +252,10 @@ contains
 
     integer, intent (in):: n1,n2, n3
     real, dimension (n1), intent (in)          :: zt, dzi_t, dzi_m
-    real, dimension (n1,n2,n3), intent (in)    :: tl, rt
-    real, dimension (n1,n2,n3), intent (inout) :: tt, rtt
+    real, dimension (n1,n2,n3), intent (in)    :: tl
+    real, dimension (n1,n2,n3), intent (in), optional    :: rt
+    real, dimension (n1,n2,n3), intent (inout) :: tt
+    real, dimension (n1,n2,n3), intent (inout), optional :: rtt
     character (len=5), intent (in) :: case_name
 
     integer :: i,j,k,kp1
@@ -256,7 +263,7 @@ contains
     real, parameter :: zmx_sub = 2260. ! originally 2260.
 
     real (kind=8) :: zig, zil
-    real          :: zibar
+    real          :: zibar, q_FT, q_BL, gam
 
     select case (trim(case_name))
     case('rico')
@@ -431,6 +438,28 @@ contains
                 !
                 tt(k,i,j) = tt(k,i,j)  - sf(k)/86400.  ! in K/s
                 !
+             enddo
+          enddo
+       enddo
+
+    case('homco')  !prescribed radiative cooling balanced by subsidence warming above the BL
+       !print *, 'homco'
+       ! prescribe radiative cooling rates and FT temperature gradient
+       q_BL = -6./86400.   ! K/s
+       q_FT = -1./86400.   ! K/s
+       gam  = 5./1000.     ! K/m
+       
+       do j=3,n3-2
+          do i=3,n2-2
+             do k=2,n1-2
+         
+                kp1 = k+1
+                if (zt(k) > zi2_bar) then     ! FT
+                   tt(k,i,j) = tt(k,i,j)  + q_FT - q_FT / gam             * (tl(kp1,i,j)-tl(k,i,j))*dzi_t(k)
+                else                          ! BL
+                   tt(k,i,j) = tt(k,i,j)  + q_BL - q_FT/gam/zi2_bar*zt(k) * (tl(kp1,i,j)-tl(k,i,j))*dzi_t(k)
+                end if
+
              enddo
           enddo
        enddo

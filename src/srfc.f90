@@ -155,7 +155,10 @@ contains
              a_tstar(i,j) =  drag*dtdz(i,j)/a_ustar(i,j)
              if(level>0) a_rstar(i,j) =  drag*drdz(i,j)/a_ustar(i,j)
            else
-             a_tstar(i,j) =  dthcon * wspd(i,j)*dtdz(i,j)/a_ustar(i,j)
+             !a_tstar(i,j) =  dthcon * wspd(i,j)*dtdz(i,j)/a_ustar(i,j)
+             ! hack AKN for homco simulation
+             dtdz(i,j) = a_theta(2,i,j) - sst
+             a_tstar(i,j) =  0.005*dtdz(i,j)/a_ustar(i,j)
              if(level>0) a_rstar(i,j) =  drtcon * wspd(i,j)*drdz(i,j)/a_ustar(i,j)
            endif
 
