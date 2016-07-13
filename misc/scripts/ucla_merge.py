@@ -2,16 +2,18 @@
 """
 Collects ucla-LES output data from multiple netCDF files
 """
+
 import numpy as np
 from netCDF4 import Dataset
 from glob import glob
 import os
-
-if not "nanmean" in dir(np):
-  def nanmean(x, *args, **kwargs):
-    return np.nansum(x, *args, **kwargs) / np.sum( np.isfinite(x), *args, **kwargs )
-  np.nanmean = nanmean
 from contextlib import closing
+
+if "nanmean" not in dir(np):
+    def nanmean(arr, *args, **kwargs):
+        """ compute mean value ignoring nan entries """
+        return np.nansum(arr, *args, **kwargs) / np.sum(np.isfinite(arr), *args, **kwargs)
+    np.nanmean = nanmean
 
 REDUCTION_FUNCTIONS = [
     (np.nanmax, ['cfl', 'lmax', 'maxdiv', 'wmax', 'zc']),
