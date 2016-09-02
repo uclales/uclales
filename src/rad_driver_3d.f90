@@ -40,7 +40,7 @@ module radiation_3d
 
 #ifdef HAVE_TENSTREAM
   use mpi_interface, only: nxpa,nypa
-  use m_tenstream, only: init_tenstream,set_optical_properties,solve_tenstream, destroy_tenstream, tenstream_get_result, need_new_solution
+  use m_tenstream, only: init_tenstream, set_angles, set_optical_properties,solve_tenstream, destroy_tenstream, tenstream_get_result, need_new_solution
   use m_data_parameters, only : ireals,iintegers
   use grid, only : dt,nstep
 #endif      
@@ -1018,13 +1018,15 @@ contains
       real(ireals)       :: theta0,incSolar
 
       real :: max_g = .99999
+      logical, save :: ltenstr_initialized = .False.
+      real(ireals), save :: last_phi=0, last_mu=1  ! remember last times phi an theta and only call set_angles on tenstream solver if it changed
 
       nxp=in_nxp; nyp=in_nyp; nv=in_nv
       dx=in_dx; dy=in_dy
       phi0=in_phi0; u0=in_u0; albedo=in_albedo
       nxproc=nxpa; nyproc=nypa
 
-      if(ldebug.and.myid.eq.0) print *,'Tenstrwrapper lsol',lsolar,'nx/y',nxp,nyp,nv,'uid',solution_uid,solution_time,' shapes::',shape(dz),shape(fdn),shape(fup),shape(fdiv)
+      if(ldebug.and.myid.eq.0) print *,'Tenstrwrapper lsol',lsolar,'nx/y',nxp,nyp,nv,'uid',solution_uid,solution_time,' angles',phi0,u0,'::',last_phi,last_mu
 
       if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
         theta0=acos(u0)*180._ireals/3.141592653589793_ireals !rad2deg
@@ -1055,11 +1057,21 @@ contains
           if(any(isnan(g   ))) print *,myid,'tenstream_wrapper :: corrupt g   ',g   ,'::',pf (:,1,:,:)                                      
         endif
 
-        if(lcollapse) then
-            if(ldebug .and. myid.eq.0) print *,'Collapsing:',nv,nzp,nv-nzp-1
-            call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxproc, nyproc=nyproc, dz3d=deltaz, collapseindex=nv-nzp+1)
+        if(.not.ltenstr_initialized) then
+            if(lcollapse) then
+                if(ldebug .and. myid.eq.0) print *,'Collapsing:',nv,nzp,nv-nzp-1
+                call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxproc, nyproc=nyproc, dz3d=deltaz, collapseindex=nv-nzp+1)
+            else
+                call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxproc, nyproc=nyproc,  dz3d=deltaz)
+            endif
+            ltenstr_initialized = .True.
         else
-            call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxproc, nyproc=nyproc,  dz3d=deltaz)
+            if(lsolar .and. (phi0.ne.last_phi .or. u0.ne.last_mu)) then
+                if(ldebug.and.myid.eq.0) print *,'updating angles',phi0, theta0
+                call set_angles(phi0, theta0)
+                last_phi = phi0
+                last_mu = u0
+            endif
         endif
         if(lsolar) then
           call set_optical_properties( kabs, ksca, g )
@@ -1073,7 +1085,23 @@ contains
 
 #else 
 
-        call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxproc, nyproc=nyproc,  dz3d=dz)
+        if(.not.ltenstr_initialized) then
+            if(lcollapse) then
+                if(ldebug .and. myid.eq.0) print *,'Collapsing:',nv,nzp,nv-nzp-1
+                call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxproc, nyproc=nyproc, dz3d=dz, collapseindex=nv-nzp+1)
+            else
+                call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxproc, nyproc=nyproc,  dz3d=dz)
+            endif
+            ltenstr_initialized = .True.
+        else
+            if(lsolar .and. (phi0.ne.last_phi .or. u0.ne.last_mu)) then
+                if(ldebug.and.myid.eq.0) print *,'updating angles',phi0, theta0
+                call set_angles(phi0, theta0)
+                last_phi = phi0
+                last_mu = u0
+            endif
+        endif
+
         if(lsolar) then
           call set_optical_properties( max(epsilon(tau), tau * (one - w0) / dz ), max(epsilon(tau), tau *       w0  / dz ), min(max_g, pf (:,1,:,:)/3._ireals) )
         else
