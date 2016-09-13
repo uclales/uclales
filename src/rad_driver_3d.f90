@@ -413,7 +413,7 @@ contains
 
               case (7,9) !tenstr
 #ifdef HAVE_TENSTREAM
-                call tenstream_wrapper(.False., nxp,nyp,nv,deltax,deltay,dz, -one,-one, one-ee,zero, tau, w0, phasefct,bf, fd3d,fu3d,fdiv3d)
+                call tenstream_wrapper(.False., nxp,nyp,nv,deltax,deltay,dz, 180., u0, one-ee,zero, tau, w0, phasefct,bf, fd3d,fu3d,fdiv3d)
 #else
                 print *,'This build does not support the tenstream solver ... exiting!'
                 call exit(1)
@@ -428,6 +428,10 @@ contains
                 fdir = fdir       + fd3d  *xir_norm
                 fuir = fuir       + fu3d  *xir_norm
                 fdiv_th = fdiv_th + fdiv3d*xir_norm
+                if(myid.eq.0 .and. ldebug) then
+                  print *,myid,'therm rad_tenstream_solution fdn ::',xir_norm,'::',fdir (:,is,js)
+                  print *,myid,'therm rad_tenstream_solution fup ::',xir_norm,'::',fuir (:,is,js)
+                endif
               end select
 
             enddo !igpt
@@ -1028,12 +1032,11 @@ contains
 
       if(ldebug.and.myid.eq.0) print *,'Tenstrwrapper lsol',lsolar,'nx/y',nxp,nyp,nv,'uid',solution_uid,solution_time,' angles',phi0,u0,'::',last_phi,last_mu
 
+      theta0 = acos(u0) * 180._ireals / 3.141592653589793_ireals !rad2deg
       if(lsolar .and. u0.gt.minSolarZenithCosForVis) then
-        theta0=acos(u0)*180._ireals/3.141592653589793_ireals !rad2deg
         incSolar = in_incSolar
       else
-        theta0=0
-        incSolar=0
+        incSolar = -1
       endif
 
 #ifdef TENSTREAM_SINGLE
@@ -1060,10 +1063,12 @@ contains
         if(.not.ltenstr_initialized) then
             if(lcollapse) then
                 if(ldebug .and. myid.eq.0) print *,'Collapsing:',nv,nzp,nv-nzp-1
-                call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxproc, nyproc=nyproc, dz3d=deltaz, collapseindex=nv-nzp+1)
+                call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, nxproc=nxproc, nyproc=nyproc, dz3d=deltaz, collapseindex=nv-nzp+1)
             else
-                call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxproc, nyproc=nyproc,  dz3d=deltaz)
+                call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, nxproc=nxproc, nyproc=nyproc,  dz3d=deltaz)
             endif
+            last_phi = phi0
+            last_mu = u0
             ltenstr_initialized = .True.
         else
             if(lsolar .and. (phi0.ne.last_phi .or. u0.ne.last_mu)) then
@@ -1073,10 +1078,11 @@ contains
                 last_mu = u0
             endif
         endif
+
         if(lsolar) then
-          call set_optical_properties( kabs, ksca, g )
+          call set_optical_properties(albedo, kabs, ksca, g )
         else
-          call set_optical_properties( kabs, ksca, g, planck)
+          call set_optical_properties(albedo, kabs, ksca, g, planck)
         endif
 
         call solve_tenstream(incSolar,solution_uid,solution_time)
@@ -1088,9 +1094,9 @@ contains
         if(.not.ltenstr_initialized) then
             if(lcollapse) then
                 if(ldebug .and. myid.eq.0) print *,'Collapsing:',nv,nzp,nv-nzp-1
-                call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxproc, nyproc=nyproc, dz3d=dz, collapseindex=nv-nzp+1)
+                call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, nxproc=nxproc, nyproc=nyproc, dz3d=dz, collapseindex=nv-nzp+1)
             else
-                call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, albedo, nxproc=nxproc, nyproc=nyproc,  dz3d=dz)
+                call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, nxproc=nxproc, nyproc=nyproc,  dz3d=dz)
             endif
             ltenstr_initialized = .True.
         else
@@ -1103,9 +1109,9 @@ contains
         endif
 
         if(lsolar) then
-          call set_optical_properties( max(epsilon(tau), tau * (one - w0) / dz ), max(epsilon(tau), tau *       w0  / dz ), min(max_g, pf (:,1,:,:)/3._ireals) )
+          call set_optical_properties(in_albedo, max(epsilon(tau), tau * (one - w0) / dz ), max(epsilon(tau), tau *       w0  / dz ), min(max_g, pf (:,1,:,:)/3._ireals) )
         else
-          call set_optical_properties( max(epsilon(tau), tau * (one - w0) / dz ), max(epsilon(tau), tau *       w0  / dz ), min(max_g, pf (:,1,:,:)/3._ireals), bf )
+          call set_optical_properties(in_albedo, max(epsilon(tau), tau * (one - w0) / dz ), max(epsilon(tau), tau *       w0  / dz ), min(max_g, pf (:,1,:,:)/3._ireals), bf )
         endif
 
         call solve_tenstream(incSolar,solution_uid,solution_time)
@@ -1134,7 +1140,6 @@ contains
             call exit(-1)
           endif
         endif
-
   end subroutine
   subroutine load_tenstream_solution(lsolar,dz,u0,uid,fdn,fup,fdiv)
       logical ,intent(in) :: lsolar
@@ -1199,11 +1204,13 @@ contains
 !        print *,'Found values smaller than 0 in divergence:',minval(fdiv)
 !        call exit()
 !      endif
-!      print *,myid,'load_tenstream_solution edn ::',edn (is,js,:)
-!      print *,myid,'load_tenstream_solution eup ::',eup (is,js,:)
-!      print *,myid,'load_tenstream_solution  dz ::',dz  (is,js,:)
-!      print *,myid,'load_tenstream_solution fdn ::',fdn (:,is,js)
-!      print *,myid,'load_tenstream_solution fup ::',fup (:,is,js)
+      if(myid.eq.0 .and. ldebug) then
+ !       print *,myid,'load_tenstream_solution edn ::',edn (:,is,js)
+ !       print *,myid,'load_tenstream_solution eup ::',eup (:,is,js)
+ !       print *,myid,'load_tenstream_solution  dz ::',dz  (:,is,js)
+         print *,myid,'load_tenstream_solution fdn ::',fdn (:,is,js)
+         print *,myid,'load_tenstream_solution fup ::',fup (:,is,js)
+      endif
   end subroutine
 #endif
 

@@ -53,9 +53,6 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different ${mpifile} ${CMAKE
 
 get_filename_component (Fortran_COMPILER_NAME ${CMAKE_Fortran_COMPILER_ID} NAME)
 
-if (NOT ${Fortran_COMPILER_WRAPPER}  STREQUAL "")
-  CMAKE_FORCE_Fortran_COMPILER(${Fortran_COMPILER_WRAPPER} ${Fortran_COMPILER_NAME})
-endif ()
 MESSAGE(STATUS "Fortran Compiler " ${CMAKE_Fortran_COMPILER})
 
 set(CMAKE_Fortran_FLAGS ${USER_Fortran_FLAGS} )

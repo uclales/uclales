@@ -65,7 +65,7 @@ set(CMAKE_CXX_COMPILER     "$ENV{MYmpicxx}")
 set(CMAKE_Fortran_COMPILER "$ENV{MYmpif90}")
 
 set(USER_C_FLAGS "-std=c99 ")
-set(USER_Fortran_FLAGS "-fpp -traceback -r8 -ftz -extend_source -g ")
+set(USER_Fortran_FLAGS "-fpp -traceback -r8 -ftz -extend_source -g -no-wrap-margin")
 set(USER_Fortran_FLAGS_RELEASE " -O3 -xCORE-AVX2 -fp-model source ")
 set(USER_Fortran_FLAGS_DEBUG "-fpe0 -O0 -g -check all -check nopointers -check noarg_temp_created")
 
