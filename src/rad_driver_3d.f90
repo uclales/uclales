@@ -1067,6 +1067,8 @@ contains
             else
                 call init_tenstream(MPI_COMM_WORLD, nv, nxp-4,nyp-4, dx,dy,phi0, theta0, nxproc=nxproc, nyproc=nyproc,  dz3d=deltaz)
             endif
+            last_phi = phi0
+            last_mu = u0
             ltenstr_initialized = .True.
         else
             if(lsolar .and. (phi0.ne.last_phi .or. u0.ne.last_mu)) then
@@ -1076,10 +1078,10 @@ contains
                 last_mu = u0
             endif
         endif
+
         if(lsolar) then
           call set_optical_properties(albedo, kabs, ksca, g )
         else
-          if(ldebug.and.myid.eq.0) print *,'thermal emission in wrapper:', planck(:,3,3)
           call set_optical_properties(albedo, kabs, ksca, g, planck)
         endif
 
@@ -1138,7 +1140,6 @@ contains
             call exit(-1)
           endif
         endif
-
   end subroutine
   subroutine load_tenstream_solution(lsolar,dz,u0,uid,fdn,fup,fdiv)
       logical ,intent(in) :: lsolar
