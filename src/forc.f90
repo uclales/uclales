@@ -446,7 +446,7 @@ contains
        !print *, 'homco'
        ! prescribe radiative cooling rates and FT temperature gradient
        q_BL = -6./86400.   ! K/s
-       q_FT = -1./86400.   ! K/s
+       q_FT = -2./86400.   ! K/s
        gam  = 5./1000.     ! K/m
        
        do j=3,n3-2

@@ -349,7 +349,7 @@ contains
        end if
 
        xtime = xtime - strtim
-       call surface(sst,xtime)
+       call surface(sst,xtime,case_name)
        xtime = xtime + strtim
 
        call diffuse(time)

@@ -43,7 +43,7 @@ contains
   !   isfctyp=4: regulate surface temperature to yield a constant surface buoyancy flux
   !   isfctyp=5: surface temperature and humidity determined using LSM (van Heerwaarden)
   !
-  subroutine surface(sst,time_in)
+  subroutine surface(sst,time_in,case_name)
 
     use defs, only: vonk, p00, rcp, g, cp, alvl, ep2
     use grid, only: nzp, nxp, nyp, a_up, a_vp, a_theta, vapor, zt, psrf,   &
@@ -59,6 +59,7 @@ contains
     implicit none
 
     real, optional, intent (inout) :: sst, time_in
+    character (len=8), optional, intent(in) :: case_name
     integer :: i, j, iterate 
     real :: zs, bflx, ffact, sst1, bflx1, Vbulk, Vzt, usum
     real (kind=8) :: bfl(2), bfg(2)
@@ -155,10 +156,12 @@ contains
              a_tstar(i,j) =  drag*dtdz(i,j)/a_ustar(i,j)
              if(level>0) a_rstar(i,j) =  drag*drdz(i,j)/a_ustar(i,j)
            else
-             !a_tstar(i,j) =  dthcon * wspd(i,j)*dtdz(i,j)/a_ustar(i,j)
-             ! hack AKN for homco simulation
-             dtdz(i,j) = a_theta(2,i,j) - sst
-             a_tstar(i,j) =  0.005*dtdz(i,j)/a_ustar(i,j)
+             a_tstar(i,j) =  dthcon * wspd(i,j)*dtdz(i,j)/a_ustar(i,j)
+             if (case_name == 'homco') then
+               ! AKN: overwrite only for homco simulation to match bulk model
+               dtdz(i,j) = a_theta(2,i,j) - sst
+               a_tstar(i,j) =  0.005*dtdz(i,j)/a_ustar(i,j)
+             end if
              if(level>0) a_rstar(i,j) =  drtcon * wspd(i,j)*drdz(i,j)/a_ustar(i,j)
            endif
 
