@@ -281,11 +281,12 @@ class NetCDFCollector(object):
     def collect_variable(self,
                          varname,
                          reduction_function=None,
-                         skip_if_already_there=False):
+                         skip_if_existent=False):
         """
         Collects one variable ``varname`` from all netCDF-Files available.
         """
-        if skip_if_already_there and self.variable_exists(varname):
+        if skip_if_existent and self.variable_exists(varname):
+            print('Skipping {} bc. already exists'.format(varname))
             return
         print "collecting variable %s" % varname
         data = self.load_variable(varname)
@@ -344,7 +345,7 @@ class NetCDFCollector(object):
         # data = renormalize_cs(data, longname, 'cs1', basename)
         # data = renormalize_cs(data, longname, 'cs2', basename)
 
-    def collect(self, variables=None):
+    def collect(self, variables=None, skip_if_existent=False):
         """
         Collect all or selected ``variables``.
         """
@@ -360,9 +361,9 @@ class NetCDFCollector(object):
                 raise ValueError('the following variables are missing: %s',
                                  str(missing_variables))
 
-        map(self.collect_variable,
+        map( lambda x: self.collect_variable(x, skip_if_existent=skip_if_existent),
             sorted(selected_variables,
-                   key=lambda x: len(self.variables[x]["shape"])))
+                key=lambda x: len(self.variables[x]["shape"])))
 
 
 def _main():
@@ -377,14 +378,16 @@ def _main():
                         help='minimum time index that is being loaded')
     parser.add_argument('-maxtime', type=int, default=None,
                         help='maximum time index that is being loaded')
+    parser.add_argument('--skip_existent', action='store_true', default=False,
+                        help='skip variable if it already exists in outfile')
     args = parser.parse_args()
 
     collector = NetCDFCollector(args.basename, mintime=args.mintime, maxtime=args.maxtime)
     selected_variables = set(args.variables)
     if 'all' in selected_variables:
-        collector.collect()
+        collector.collect(skip_if_existent=args.skip_existent)
     else:
-        collector.collect(selected_variables)
+        collector.collect(selected_variables, skip_if_existent=args.skip_existent)
 
 if __name__ == '__main__':
     _main()
