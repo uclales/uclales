@@ -1645,6 +1645,10 @@ contains
        if (itype==0) ncinfo = 'precip tnd of qt'
        if (itype==1) ncinfo = 'kg/kg/s'
        if (itype==2) ncinfo = 'tttt'
+    case('ntendr')    
+       if (itype==0) ncinfo = 'nudging tnd of qt'
+       if (itype==1) ncinfo = 'kg/kg/s'
+       if (itype==2) ncinfo = 'tttt'
     case('totradt')    
        if (itype==0) ncinfo = 'total radiative tnd'
        if (itype==1) ncinfo = 'K/s'

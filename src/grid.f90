@@ -125,7 +125,8 @@ module grid
 ! linda, e 
 
  !RV: ls tendencies due to subsidence, sgs diff & advection
-  real, dimension (:,:,:), allocatable  :: wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt, precr, prect, totradt, swradt !add radiation tendencies.
+  real, dimension (:,:,:), allocatable  :: wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt, precr, prect, totradt, swradt 
+  real, dimension (:), allocatable :: ntendr
   real  :: w0 = 7.5e-3
   real  :: Qrate = 2.5/86400. !
   logical  :: iradbel = .false. !rv, .true. for interactive radiation with bellon case; d4stream (use iradtyp=4)
@@ -457,8 +458,9 @@ contains
        allocate(prect(nzp,nxp,nyp))
        allocate(totradt(nzp,nxp,nyp))
        allocate(swradt(nzp,nxp,nyp))
+       allocate(ntendr(nzp))
 
-       memsize = memsize + 12*nxyzp
+       memsize = memsize + 13*nxyzp
 
        wtendt(:,:,:) = 0.            
        wtendr(:,:,:) = 0.
@@ -469,6 +471,7 @@ contains
        dtdt(:,:,:) = 0.            
        dqdt(:,:,:) = 0.
        precr(:,:,:) = 0.            
+       ntendr(:) = 0.            
        prect(:,:,:) = 0.
        totradt(:,:,:) = 0.            
        swradt(:,:,:) = 0.
@@ -753,7 +756,7 @@ contains
 
     !RV: write accumulated tendencies
     if (outtend) then
-       write(10) wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt, precr, prect, totradt, swradt
+       write(10) wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt, precr, prect, totradt, swradt, ntendr
     end if !rv
     close(10)
 
@@ -844,7 +847,7 @@ contains
 
        !RV: read accumulated tendencies
        if (outtend) then
-          read(10) wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt, precr, prect, totradt, swradt
+          read(10) wtendt, wtendr, sgtendt, sgtendr, adtendt, adtendr, dtdt, dqdt, precr, prect, totradt, swradt, ntendr
        end if !rv
 
        close(10)

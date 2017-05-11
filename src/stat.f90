@@ -1,4 +1,4 @@
-!----------------------------------------------------------------------------
+!——————————————————————————————————————
 ! This file is part of UCLALES.
 !
 ! UCLALES is free software; you can redistribute it and/or modify
@@ -32,7 +32,7 @@ module stat
 
 !irina
   ! axel, me too!
-  integer, parameter :: nvar1 = 68, nvar2 = 134 ! number of time series and profiles
+  integer, parameter :: nvar1 = 68, nvar2 = 135 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2
   real, save         :: fsttm, lsttm
 
@@ -78,7 +78,7 @@ module stat
        'lwuca  ','lwdca  ','swuca  ','swdca  ','wtendt ','wtendr ', & !115
        'sgtendt','sgtendr','adtendt','adtendr','turtent','turtenr', & !121
        'dtdt   ','dqdt   ','prect  ','precr  ','totradt','swradt ', & !127
-       'cs1_2  ','omg    '/)                                          !134
+       'cs1_2  ','omg    ','ntendr '/)                                !133
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:)
@@ -227,12 +227,12 @@ contains
     if (debug) WRITE (0,*) 'statistics: micro2 ok    myid=',myid
 
     if (level >=3) call accum_lvl3(nzp, nxp, nyp, dn0, zm, liquid, a_rpp,    &
-         a_npp, prc_r, CCN)
+         a_npp, prc_r, CCN,vapor)
     if (debug) WRITE (0,*) 'statistics: micro3 ok    myid=',myid
 
-    if (level ==4) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp,a_nicep,prc_i,prc_s,prc_g)
+    if (level ==4) call accum_lvl4(nzp, nxp, nyp, dn0, zm, a_ricep, a_rsnowp, a_rgrp,a_nicep,prc_i,prc_s,prc_g)
 
-    if (level ==5) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp,a_nicep,prc_i,prc_s,prc_g,a_rhailp,prc_h)
+    if (level ==5) call accum_lvl4(nzp, nxp, nyp, dn0, zm, a_ricep, a_rsnowp, a_rgrp,a_nicep,prc_i,prc_s,prc_g,a_rhailp,prc_h)
 
     if (debug) WRITE (0,*) 'statistics: micro ok    myid=',myid
 
@@ -777,7 +777,7 @@ contains
   ! SUBROUTINE ACCUM_LVL3: Accumulates specialized statistics that depend
   ! on level 3 variables.
   !
-  subroutine accum_lvl3(n1, n2, n3, dn0, zm, rc, rr, nr, rrate, CCN)
+  subroutine accum_lvl3(n1, n2, n3, dn0, zm, rc, rr, nr, rrate, CCN,rv)
 
     use grid, only : a_pexnr,pi0,pi1,prect,precr, outtend
     use defs, only : alvl,cp
@@ -785,14 +785,14 @@ contains
     integer, intent (in) :: n1,n2,n3
     real, intent (in)                      :: CCN
     real, intent (in), dimension(n1)       :: zm, dn0
-    real, intent (in), dimension(n1,n2,n3) :: rc, rr, nr, rrate
+    real, intent (in), dimension(n1,n2,n3) :: rc, rr, nr, rrate, rv
 
     integer                :: k, i, j, km1
     real                   :: nrsum, nrcnt, rrsum, rrcnt, xrain, xaqua,convliq
     real                   :: unit
     real                   :: rmax, rmin
     real, dimension(n1)    :: a1
-    real, dimension(n2,n3) :: scr1,scr2
+    real, dimension(n2,n3) :: scr1,scr2,scr3
     logical                :: aflg
 
     !
@@ -872,15 +872,18 @@ contains
        do i=3,n2-2
           scr1(i,j) = 0.
           scr2(i,j) = 0.
+          scr3(i,j) = 0.
           do k=1,n1
              km1=max(1,k-1)
              xrain = max(0.,rr(k,i,j))
-             !irina
-             !xaqua = max(0.,rc(k,i,j))
+             !irina... & Raphaela
+             xaqua = max(0.,rc(k,i,j))
              !old
-             xaqua = max(xrain,rc(k,i,j))
+             !xaqua = max(xrain,rc(k,i,j))
              scr1(i,j)=scr1(i,j)+xaqua*dn0(k)*(zm(k)-zm(km1))*1000.
              scr2(i,j)=scr2(i,j)+xrain*dn0(k)*(zm(k)-zm(km1))*1000.
+             !Watervaporpath !RV, previously in accum_lvl4...
+             scr3(i,j)=scr3(i,j)+rv(k,i,j)*dn0(k)*(zm(k)-zm(km1))*1000.
           enddo
        end do
     end do
@@ -891,7 +894,9 @@ contains
     ssclr(25) = CCN*1.e-6 ! approximately per cc (but actually #/kg * 10^-6)
     ssclr(26) = nrsum ! Nr in dm^-3 (1/liter)
     ssclr(27) = nrcnt
-
+    ssclr(36) = get_avg(1,n2,n3,1,scr3)
+    ssclr(37) = get_cor(1,n2,n3,1,scr3,scr3)
+    
     if (outtend) then !RV
       call get_avg3(n1,n2,n3,prect,a1)
       svctr(:,129)=svctr(:,129)+a1
@@ -905,12 +910,12 @@ contains
   ! SUBROUTINE ACCUM_LVL4: Accumulates specialized statistics that depend
   ! on level 4 variables.
   !
-  subroutine accum_lvl4(n1, n2, n3,  dn0, zm, rv,rice, rsnow, rgrp,nice, rrate_i, rrate_s, rrate_g,rhail,rrate_h)
+  subroutine accum_lvl4(n1, n2, n3,  dn0, zm, rice, rsnow, rgrp,nice, rrate_i, rrate_s, rrate_g,rhail,rrate_h)
     use grid, only : a_pexnr,pi0,pi1
     use defs, only : alvi,cp
     integer, intent (in) :: n1,n2,n3
     real, intent (in), dimension(n1)        :: zm, dn0
-    real, intent (in), dimension(n1,n2,n3)  :: rv,rice,rsnow,rgrp,nice, rrate_i, rrate_s, rrate_g
+    real, intent (in), dimension(n1,n2,n3)  :: rice,rsnow,rgrp,nice, rrate_i, rrate_s, rrate_g
     real, intent (in), dimension(n1,n2,n3), optional  :: rhail, rrate_h
     integer                   :: k, i, j, km1
     real, dimension(n2,n3)    :: scr
@@ -945,19 +950,20 @@ contains
       svctr(:,109)=svctr(:,109) + a1(:)*1000.
     end if
 
-!Watervaporpath
-    do j=3,n3-2
-       do i=3,n2-2
-          scr(i,j) = 0.
-          do k=1,n1
-             km1=max(1,k-1)
-             scr(i,j)=scr(i,j)+rv(k,i,j)*dn0(k)*(zm(k)-zm(km1))*1000.
-          end do
-       end do
-    end do
-    ssclr(36) = get_avg(1,n2,n3,1,scr)
-    ssclr(37) = get_cor(1,n2,n3,1,scr,scr)
-!Cloud ice path
+    ! !Watervaporpath !RV, now in accum_lvl3 (where it belongs)
+    !     do j=3,n3-2
+    !        do i=3,n2-2
+    !           scr(i,j) = 0.
+    !           do k=1,n1
+    !              km1=max(1,k-1)
+    !              scr(i,j)=scr(i,j)+rv(k,i,j)*dn0(k)*(zm(k)-zm(km1))*1000.
+    !           end do
+    !        end do
+    !     end do
+    !     ssclr(36) = get_avg(1,n2,n3,1,scr)
+    !     ssclr(37) = get_cor(1,n2,n3,1,scr,scr)
+    
+    !Cloud ice path
        do j=3,n3-2
        do i=3,n2-2
           scr(i,j) = 0.
@@ -1551,6 +1557,8 @@ contains
 	  nn=132   !swradt
        case(11)    
           nn=134   !omg (LS omega from WTG)
+       case(12)    
+          nn=135   !ntendr (qt-tnd from nudging)
        case default
 	  nn = 0
        end select

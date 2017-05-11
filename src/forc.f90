@@ -105,16 +105,11 @@ contains
           case(3)
              !RV, call interactive radiation here. (adapted from Axel)
              if (iradbel) then
-                if (wtgbel .and. time_in_2.ge.3600) then
-                   call bellon(nzp, nxp, nyp, zt, dzi_t, dzi_m, a_tt, a_tp &
-             		,a_rt, a_rp, a_ut, a_up, a_vt, a_vp,iradtyp,rk,wtgbel)
-                else
-                   call bellon(nzp, nxp, nyp, zt, dzi_t, dzi_m, a_tt, a_tp &
-             		,a_rt, a_rp, a_ut, a_up, a_vt, a_vp,iradtyp,rk)
-                end if
+                call bellon(nzp, nxp, nyp, zt, dzi_t, dzi_m, a_tt, a_tp &
+             		,a_rt, a_rp, a_ut, a_up, a_vt, a_vp,iradtyp,rk,time_in_2)
              end if
              if (iradbel.and.time_in_2.lt.3600) then
-               ! no explicit radiation, to avoid spinup problems
+               ! no interactive radiation, to avoid spinup problems
                do j=3,nyp-2
                  do i=3,nxp-2
                    do k=2,nzp-2
@@ -439,48 +434,80 @@ contains
   ! -------------------------------------------------------------------
   ! subroutine bellon_rad:  call simple radiative parameterization
   !
-  subroutine bellon(n1,n2,n3,zt,dzi_t,dzi_m,tt,tl,rtt,rt, ut,u,vt,v,iradtyp,rk,wtg)
+  subroutine bellon(n1,n2,n3,zt,dzi_t,dzi_m,tt,tl,rtt,rt, ut,u,vt,v,iradtyp,rk,time_wtg)
 
+    use grid, only : th00
+    use mpi_interface, only : myid
+    !use defs, only : pi
+    
     integer, intent (in) :: n1,n2, n3, iradtyp
     real, optional, intent (in)	 :: rk
 
     real, dimension (n1), intent (in)            :: zt, dzi_t, dzi_m
     real, dimension (n1, n2, n3), intent (inout) :: tt, tl, rtt, rt, ut,u,vt,v
-    real, parameter  :: H=1000.
+    real, parameter  :: H=1000., zint = 4000.
+    integer, save, dimension(2)  :: kint
+    real(kind=8)  :: wtg0
 
     integer :: i,j,k,kp1
     real    :: grad,wk
     real,dimension(n1) :: res,res1
-    logical,optional :: wtg
-    logical :: firsttime1 = .true.
-    real, dimension(:), allocatable :: omg, drft, tavg, tref
+    logical, save :: firsttime1 = .true.
+    real, dimension(n1) :: omg, drft, tavg
+    real, save, allocatable :: tref(:)
+    real, optional, intent (in) :: time_wtg
 
-
-    if (wtg) then !RV, Weak temperature gradient approximation. Derive omega.
+    if (wtgbel) then !RV, Weak temperature gradient approximation. Derive omega.
        if (firsttime1) then
           firsttime1 = .false.
-          allocate(omg(n1))
-          allocate(drft(n1))
-          allocate(tavg(n1))
+          
           allocate(tref(n1))
-
+          
           open(2112,file='wtg_in')
           do k=1,n1
-             read(2112,*,end=21) tref(k)
+             read(2112,*) tref(k)
           end do
           close(2112)
-21        continue
+          
+          if (myid == 0) print *, '---- WTG: tref ----', tref
+
+          kint(1) = minloc(zt, dim=1, mask=(zt > zint-1000))
+          kint(2) = minloc(zt, dim=1, mask=(zt > zint+1000))
+          
+          if (myid == 0) print *, '---- WTG: kint & zt(kint) ----', kint, zt(kint)
+          
        end if
 
-       call get_avg3(n1,n2,n3,tl,tavg)
+       if(time_wtg.lt.3600) then
+          do k=2,n1-2
+             omg(k) = w0*(1.-exp(-zt(k)/H))
+          end do
+       else
+          !do the WTG approximation
+          call get_avg3(n1,n2,n3,tl,tavg)
 
-       do k=2,n1-2
-          kp1 = k+1
-          drft(k) = 1./dt*(1.-exp(-zt(k)/H))*(tavg(k)-tref(k))
-          omg(k) = drft(k)/((tavg(kp1)-tavg(k))*dzi_t(k))
-       end do
+          do k=kint(1),n1-2
+             kp1 = k+1
+             drft(k) = (1./7200)*(1.-exp(-zt(k)/H))*((tavg(k)+th00)-tref(k)) !exp prof from bellon.
+             omg(k) = -drft(k)/((tavg(kp1)-tavg(k))*dzi_t(k))
+          end do
+
+          wtg0 = 1./(kint(2)-kint(1)+1)*(sum(omg(kint(1):kint(2))/(1.-exp(-zt(kint(1):kint(2))/H)))) 
+          !wtg0 = 1./(kint(2)-(kint(1)+5)+1)*(sum(omg((kint(1)+5):kint(2))/(1.-exp(-zt((kint(1)+5):kint(2))/H))))!only start from 5 levels above lowest level of 'nudging', to avoid peaks related to a ~3km deep boundary layer.
+                    
+          do k=kint(1),kint(2)
+             omg(k) = omg(k) - ((-1./(zt(kint(2))-zt(kint(1)))*(zt(k)-zt(kint(2)))) * (omg(k)-wtg0*(1.-exp(-zt(k)/H)))) !RV, linear function to transition from pure WTG (>zt(kint(2))) to pure interpolation with wtg0 (<zt(kint(1)))
+          end do
+
+          do k=2,kint(1)-1
+             omg(k) = wtg0*(1.-exp(-zt(k)/H))             
+          end do
+
+          omg((n1-1):n1) = 0.
+          
+       end if
     end if
-
+    
     do j=3,n3-2
        do i=3,n2-2
           !
@@ -488,7 +515,7 @@ contains
           !
           do k=2,n1-2
              kp1 = k+1
-             if (wtg) then
+             if (wtgbel) then
                 wk = omg(k)
              else
                 wk = w0*(1.-exp(-zt(k)/H))
@@ -496,34 +523,34 @@ contains
 	     if(iradtyp.eq.4) then
                 !tt(k,i,j) = tt(k,i,j)  - 0.75/86400. !dry.cool case used 0.75 Kd-1 adv. cooling
                 tt(k,i,j) = tt(k,i,j) + wk*(tl(kp1,i,j)-tl(k,i,j))*dzi_t(k)
-	     else 
+             else 
                 tt(k,i,j) = tt(k,i,j) + wk*(tl(kp1,i,j)-tl(k,i,j))*dzi_t(k) - Qrate
-	     end if
-
-	     rtt(k,i,j)= rtt(k,i,j) + wk*(rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)
-
-	     if(outtend) then !RV
-	     	wtendt(k,i,j) = wtendt(k,i,j) + wk*dzi_t(k)*rk*dt*(tl(kp1,i,j)-tl(k,i,j))  
-             	wtendr(k,i,j) = wtendr(k,i,j) + wk*dzi_t(k)*rk*dt*(rt(kp1,i,j)-rt(k,i,j)) 
-	     end if   !rv
-
+             end if
+             
+             rtt(k,i,j)= rtt(k,i,j) + wk*(rt(kp1,i,j)-rt(k,i,j))*dzi_t(k)
+             
+             if(outtend) then !RV
+                wtendt(k,i,j) = wtendt(k,i,j) + wk*dzi_t(k)*rk*dt*(tl(kp1,i,j)-tl(k,i,j))  
+                wtendr(k,i,j) = wtendr(k,i,j) + wk*dzi_t(k)*rk*dt*(rt(kp1,i,j)-rt(k,i,j)) 
+             end if   !rv
+          
              ut(k,i,j) =  ut(k,i,j) + wk*(u(kp1,i,j)-u(k,i,j))*dzi_m(k)
              vt(k,i,j) =  vt(k,i,j) + wk*(v(kp1,i,j)-v(k,i,j))*dzi_m(k)
           end do
        enddo
     enddo
-
+ 
     if (sflg .and. outtend) then !RV
        call get_avg3(n1,n2,n3,wtendt,res)
        call updtst(n1,'tnd',1,res,1) !call updtst(n1,'tnd',1,res/acumtime,1)
        call get_avg3(n1,n2,n3,wtendr,res1)
        call updtst(n1,'tnd',2,res1,1)!rm /acumtime
-       if (wtg) then
+       if (wtgbel) then
           call updtst(n1,'tnd',11,omg,1)
        end if
     end if !rv
 
   end subroutine bellon
-
-
+  
+  
 end module forc

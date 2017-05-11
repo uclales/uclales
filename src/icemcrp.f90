@@ -789,7 +789,7 @@ contains
              tl(k) = tl(k) + convliq(k)*ac
 
 
-             sc = k_rr * np(k) * rp(k) * sqrt(rho_0*dn0(k))
+             sc = k_rr * np(k) * rp(k) * sqrt(rho_0*dn0(k))*dt !aus der schleife rausnehmen (siehe commit 370af9c von Ann Kristin)
              sc = min(sc, np(k))
              np(k) = np(k) - sc
           end if

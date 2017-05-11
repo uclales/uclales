@@ -37,9 +37,9 @@ PUBLIC :: nudge,lnudge,tnudgefac, qfloor, zfloor, znudgemin, znudgeplus, nudge_b
 SAVE
   real, dimension(:,:), allocatable :: tnudge,unudge,vnudge,wnudge,thlnudge,qtnudge
   real, dimension(:)  , allocatable :: timenudge
-  real :: tnudgefac = 1., qfloor = -1.,  zfloor = 1200., znudgemin = -1., znudgeplus = -1.
+  real :: tnudgefac = 21600., qfloor = -1.,  zfloor = 1., znudgemin = 1., znudgeplus = 10000.
   logical :: lnudge,lunudge,lvnudge,lwnudge,lthlnudge,lqtnudge
-  integer :: ntnudge = 100
+  integer :: ntnudge = 2
   logical :: firsttime = .true.
 ! LINDA, b
   ! arrays for nuding
@@ -60,7 +60,7 @@ contains
     use mpi_interface, only : myid
     use defs, only : pi
     implicit none
-
+    
     integer :: ierr,k,t,ifinput = 19
     real,allocatable,dimension(:) :: height
     real, intent(in) :: time
@@ -68,102 +68,108 @@ contains
     real :: highheight,highqtnudge,highthlnudge,highunudge,highvnudge,highwnudge,hightnudge
     real :: lowheight,lowqtnudge,lowthlnudge,lowunudge,lowvnudge,lowwnudge,lowtnudge
     real :: fac
-    allocate(tnudge(nzp,ntnudge),unudge(nzp,ntnudge),vnudge(nzp,ntnudge),wnudge(nzp,ntnudge),thlnudge(nzp,ntnudge),qtnudge(nzp,ntnudge))
+    allocate(tnudge(nzp,ntnudge),qtnudge(nzp,ntnudge))!RV rm: unudge(nzp,ntnudge),vnudge(nzp,ntnudge),wnudge(nzp,ntnudge),thlnudge(nzp,ntnudge),
     allocate(timenudge(0:ntnudge), height(nzp))
     tnudge = 0
-    unudge=0
-    vnudge=0
-    wnudge=0
-    thlnudge=0
+    ! unudge=0
+    ! vnudge=0
+    ! wnudge=0
+    ! thlnudge=0
     qtnudge=0
     timenudge=0
     height = 0.
 
-
+    
     if (.not. lnudge) return
-      t = 0
-      open (ifinput,file='nudge_in')
-      ierr = 0
-      readloop: do
-        t = t + 1
-        chmess1 = "#"
-        ierr = 1 ! not zero
-        do while (.not.(chmess1 == "#" .and. ierr ==0)) !search for the next line consisting of "# time", from there onwards the profiles will be read
+    t = 0
+    open (ifinput,file='nudge_in')
+    ierr = 0
+    readloop: do
+       t = t + 1
+       chmess1 = "#"
+       ierr = 1 ! not zero
+       do while (.not.(chmess1 == "#" .and. ierr ==0)) !search for the next line consisting of "# time", from there onwards the profiles will be read
           read(ifinput,*,iostat=ierr) chmess1,timenudge(t)
           if (ierr < 0) exit readloop
-
-        end do
-        write(6,*) ' height    t_nudge    u_nudge    v_nudge    w_nudge    thl_nudge    qt_nudge'
-        read (ifinput,*)  lowheight , lowtnudge ,  lowunudge , lowvnudge , lowwnudge , lowthlnudge, lowqtnudge
-        read (ifinput,*)  highheight , hightnudge ,  highunudge , highvnudge , highwnudge , highthlnudge, highqtnudge
-        do  k=2,nzp-1
+          
+       end do
+       if (myid == 0) write(6,*) ' height    t_nudge    qt_nudge' !RV rm: u_nudge    v_nudge    w_nudge    thl_nudge    
+       read (ifinput,*)  lowheight , lowtnudge , lowqtnudge !RV rm: ,  lowunudge , lowvnudge , lowwnudge , lowthlnudge
+       read (ifinput,*)  highheight , hightnudge , highqtnudge !RV rm: ,  highunudge , highvnudge , highwnudge , highthlnudge
+       do  k=2,nzp !up to nzp
           if (highheight<zt(k)) then
-            lowheight = highheight
-            lowtnudge = hightnudge
-            lowunudge = highunudge
-            lowvnudge = highvnudge
-            lowwnudge = highwnudge
-            lowthlnudge= highthlnudge
-            lowqtnudge=highqtnudge
-            read (ifinput,*)  highheight , hightnudge ,  highunudge , highvnudge , highwnudge , highthlnudge, highqtnudge
+             lowheight = highheight
+             lowtnudge = hightnudge
+             ! lowunudge = highunudge
+             ! lowvnudge = highvnudge
+             ! lowwnudge = highwnudge
+             ! lowthlnudge= highthlnudge
+             lowqtnudge=highqtnudge
+             read (ifinput,*)  highheight , hightnudge , highqtnudge !RV rm: ,  highunudge , highvnudge , highwnudge , highthlnudge
           end if
           fac = (highheight-zt(k))/(highheight - lowheight)
           tnudge(k,t) = fac*lowtnudge + (1-fac)*hightnudge
-          unudge(k,t) = fac*lowunudge + (1-fac)*highunudge
-          vnudge(k,t) = fac*lowvnudge + (1-fac)*highvnudge
-          wnudge(k,t) = fac*lowwnudge + (1-fac)*highwnudge
-          thlnudge(k,t) = fac*lowthlnudge + (1-fac)*highthlnudge
-          qtnudge(k,t) = fac*lowqtnudge + (1-fac)*highqtnudge
-        end do
-        if (myid == 0) then
+          ! unudge(k,t) = fac*lowunudge + (1-fac)*highunudge
+          ! vnudge(k,t) = fac*lowvnudge + (1-fac)*highvnudge
+          ! wnudge(k,t) = fac*lowwnudge + (1-fac)*highwnudge
+          ! thlnudge(k,t) = fac*lowthlnudge + (1-fac)*highthlnudge
+          qtnudge(k,t) = fac*lowqtnudge/1000 + (1-fac)*highqtnudge/1000  !divide by 1000 because input qt in g/kg
+       end do
+       if (myid == 0) then
           do k=nzp-1,1,-1
-            write (6,'(2f10.1,6e12.4)') &
+             write (6,'(2f10.1,6e12.4)') &
                   zt (k), &
                   height (k), &
                   tnudge (k,t), &
-                  unudge (k,t), &
-                  vnudge (k,t), &
-                  wnudge (k,t), &
-                  thlnudge(k,t), &
+                  ! unudge (k,t), &
+                  ! vnudge (k,t), &
+                  ! wnudge (k,t), &
+                  ! thlnudge(k,t), &
                   qtnudge(k,t)
           end do
-        end if
-      end do readloop
-      close(ifinput)
-      if (znudgemin>0) then
-        do k = 1,nzp-1
+       end if
+    end do readloop
+    close(ifinput)
+    if (znudgemin>0) then
+       do k = 1,nzp-1
           if (zt(k)<=znudgemin) then
-            tnudge(k,:) = 1e10
+             tnudge(k,:) = 1e10
           else if (zt(k)<=znudgeplus) then
-            tnudge(k,:)  = 2.*tnudgefac/(1-cos(pi*(zt(k)-znudgemin)/(znudgeplus-znudgemin)))
+             tnudge(k,:)  = tnudgefac/(0.5+0.5*-(ERF((3500-zt(k))/750))) !RV: use error function similar to Linda's Relaxation for Diss, with z0=3500km and b=750m
+             !tnudge(k,:)  = tnudgefac/sin((pi*zt(k))/15000.) !RV: use simple sin function with scale height 15 km (~Tropopause)
           else
-            tnudge(k,:) = tnudgefac
+             tnudge(k,:) = tnudgefac
           end if
-        end do
-      else
-        tnudge  = tnudgefac*tnudge
-      end if
-      thlnudge = thlnudge - th00
-      unudge = unudge - umean
-      vnudge = vnudge - vmean
-    lunudge = any(abs(unudge)>1e-8)
-    lvnudge = any(abs(vnudge)>1e-8)
-    lwnudge = any(abs(wnudge)>1e-8)
-    lthlnudge = any(abs(thlnudge)>1e-8)
+       end do
+       tnudge(nzp,:) = 60/(0.5+0.5*-(ERF((3500-zt(nzp))/750)))! nudge highest level very strongly!
+    else
+       tnudge  = tnudgefac*tnudge
+    end if
+    !   thlnudge = thlnudge - th00
+    !   unudge = unudge - umean
+    !   vnudge = vnudge - vmean
+    ! lunudge = any(abs(unudge)>1e-8)
+    ! lvnudge = any(abs(vnudge)>1e-8)
+    ! lwnudge = any(abs(wnudge)>1e-8)
+    ! lthlnudge = any(abs(thlnudge)>1e-8)
     lqtnudge  = any(abs(qtnudge)>1e-8)
 
+    if (myid==0) print *, 'qtnudge = ',qtnudge(:,1)
+    if (myid==0) print *, '----------------- initnudge finished --------------'
+    
   end subroutine initnudge
-
+  
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+  
   subroutine nudge(timein)
-    use grid, only : dt, nxp, nyp, nzp, a_ut, a_vt, a_wt, a_tt, a_rt, a_up,a_vp,a_tp,a_rp,zt,a_wp
+    use grid, only : dt, nxp, nyp, nzp, a_rt, a_rp,zt, rkalpha,rkbeta,nstep, ntendr, outtend !RV rm: a_ut, a_vt, a_wt, a_tt, a_up,a_vp,a_tp,a_wp
     use util, only : get_avg3
+    use stat, only : sflg, updtst  !rv
     implicit none
     real, intent (in) :: timein
     integer k,t,i,j
-    real :: dtm,dtp,currtnudge, nudgefac
-    real, dimension(nzp) :: uav, vav, tav, qav
+    real :: dtm,dtp,currtnudge, nudgefac, rk
+    real, dimension(nzp) :: qav !RV rm: uav, vav, tav, 
 
     if (firsttime) then
       firsttime = .false.
@@ -171,54 +177,72 @@ contains
     end if
     if (.not.(lnudge)) return
 
-    t=1
-    do while(timein>timenudge(t))
-      t=t+1
-    end do
-    if (timein/=timenudge(1)) then
-      t=t-1
-    end if
+    t=1 !RV: no need to read to different nudging arrays, qt_nudge constant.
+    ! do while(timein>timenudge(t))
+    !   t=t+1
+    ! end do
+    ! if (timein/=timenudge(1)) then
+    !   t=t-1
+    ! end if
 
-    dtm = ( timein-timenudge(t) ) / ( timenudge(t+1)-timenudge(t) )
-    dtp = ( timenudge(t+1)-timein)/ ( timenudge(t+1)-timenudge(t) )
-
-    call get_avg3(nzp, nxp, nyp,a_up,uav)
-    call get_avg3(nzp, nxp, nyp,a_vp,vav)
-    call get_avg3(nzp, nxp, nyp,a_tp,tav)
+    ! dtm = ( timein-timenudge(t) ) / ( timenudge(t+1)-timenudge(t) )
+    ! dtp = ( timenudge(t+1)-timein)/ ( timenudge(t+1)-timenudge(t) )
+    
+    ! call get_avg3(nzp, nxp, nyp,a_up,uav)
+    ! call get_avg3(nzp, nxp, nyp,a_vp,vav)
+    ! call get_avg3(nzp, nxp, nyp,a_tp,tav)
     call get_avg3(nzp, nxp, nyp,a_rp,qav)
+    
+    if(outtend) then !RV
+       if(nstep==1) rk = rkalpha(1)+rkalpha(2)!then 
+       if(nstep==2) rk = rkbeta(2)+rkbeta(3)
+       if(nstep==3) rk = rkalpha(3)
+    end if   !rv
+    
+    
+    ! do j=3,nyp-2
+    ! do i=3,nxp-2
+    ! do k=2,nzp-1
+    !   currtnudge = max(dt,tnudge(k,t)*dtp+tnudge(k,t+1)*dtm)
+    !   if(lunudge  ) a_ut(k,i,j)=a_ut(k,i,j)-&
+    !       (uav(k)-(unudge  (k,t)*dtp+unudge  (k,t+1)*dtm))/currtnudge
+    !   if(lvnudge  ) a_vt(k,i,j)=a_vt(k,i,j)-&
+    !       (vav(k)-(vnudge  (k,t)*dtp+vnudge  (k,t+1)*dtm))/currtnudge
+    ! end do
+    ! end do
+    ! end do
+    do k=2,nzp !RV: UP TO THE HIGHEST LEVEL!
+       currtnudge = max(dt,tnudge(k,t)) !,t)*dtp+tnudge(k,t+1)*dtm)
+       if(outtend) ntendr(k) = ntendr(k) - rk*dt*(qav(k)- qtnudge(k,t))/currtnudge  !rv
 
-    do j=3,nyp-2
-    do i=3,nxp-2
-    do k=2,nzp-1
-      currtnudge = max(dt,tnudge(k,t)*dtp+tnudge(k,t+1)*dtm)
-      if(lunudge  ) a_ut(k,i,j)=a_ut(k,i,j)-&
-          (uav(k)-(unudge  (k,t)*dtp+unudge  (k,t+1)*dtm))/currtnudge
-      if(lvnudge  ) a_vt(k,i,j)=a_vt(k,i,j)-&
-          (vav(k)-(vnudge  (k,t)*dtp+vnudge  (k,t+1)*dtm))/currtnudge
+       do j=3,nyp-2
+          do i=3,nxp-2
+             a_rt(k,i,j) = a_rt(k,i,j) - (qav(k)- qtnudge(k,t))/currtnudge
+          end do
+       end do
+      
+       ! do j=3,nyp-2
+       !    do i=3,nxp-2
+       !       if(k .eq. 100:103) print *, 'k, currtnudge:', k, currtnudge
+       !       ! if(lthlnudge  ) a_tt(k,i,j)=a_tt(k,i,j)-&
+       !       !     (tav(k) - (thlnudge  (k,t)*dtp+thlnudge  (k,t+1)*dtm))/currtnudge
+       !       if(lqtnudge) !then
+       !       !   if (qav(k) < qfloor .and. zt(k) < zfloor) then
+       !       !           nudgefac = qfloor
+       !       !           currtnudge = 3600.
+       !       !         else
+       !       !   nudgefac = qtnudge  (k,t)*dtp+qtnudge  (k,t+1)*dtm
+       !       ! end if
+       !       a_rt(k,i,j)= a_rt(k,i,j) - (qav(k)- qtnudge(k,t)*dtp+qtnudge(k,t+1)*dtm)/currtnudge     
+       !    end do
+       ! end do
+       
     end do
-    end do
-    end do
-    do j=3,nyp-2
-    do i=3,nxp-2
-    do k=2,nzp-1
-      currtnudge = max(dt,tnudge(k,t)*dtp+tnudge(k,t+1)*dtm)
-      if(lthlnudge  ) a_tt(k,i,j)=a_tt(k,i,j)-&
-          (tav(k) - (thlnudge  (k,t)*dtp+thlnudge  (k,t+1)*dtm))/currtnudge
-      if(lqtnudge  ) then
-        if (qav(k) < qfloor .and. zt(k) < zfloor) then
-          nudgefac = qfloor
-!           currtnudge = 3600.
-        else
-          nudgefac = qtnudge  (k,t)*dtp+qtnudge  (k,t+1)*dtm
-        end if
-        a_rt(k,i,j)= a_rt(k,i,j) - (qav(k)-nudgefac)/currtnudge
-      end if
-    end do
-    end do
-    end do
-
+    
+    if (sflg .and. outtend) call updtst(nzp,'tnd',12,ntendr,1) !RV       
+    
   end subroutine nudge
-
+  
 ! LINDA, b
 !--------------------------------------------------------------------------!
 !This routine nudges simulated values of temperature, humidity             !
