@@ -46,7 +46,7 @@ contains
   ! -------------------------------------------------------------------
   ! subroutine forcings:  calls the appropriate large-scale forcings
   !irina
-  subroutine forcings(time_in, cntlat, sst, div, case_name,time_in_2)
+  subroutine forcings(time_in, cntlat, sst, div, case_name, time_in_2)
 
 !irina
     use grid, only: nxp, nyp, nzp, zm, zt, dzi_t, dzi_m, dn0, iradtyp, isfctyp, liquid  &
@@ -70,7 +70,7 @@ contains
 
     select case(iradtyp)
     case (1)
-        call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt)
+        call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt,iradtyp)
     case (2)
        select case(level)
        case(1)
@@ -91,11 +91,25 @@ contains
           !a_scr1 = a_theta/a_pexnr
           select case (level)
           case(3)
-             call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,   &
+             if (trim(case_name).eq.'rico') then
+                call case_forcing(nzp,nxp,nyp,case_name,zt,dzi_t,dzi_m,a_tp,a_rp,a_tt,a_rt,iradtyp)
+             end if
+             if (trim(case_name).eq.'rico'.and.time_in_2.lt.3600) then
+               ! no explicit radiation, to avoid spinup problems
+               do j=3,nyp-2
+                 do i=3,nxp-2
+                   do k=2,nzp-2
+                     a_tt(k,i,j) = a_tt(k,i,j)  - 2.0/86400.
+                   enddo
+                 enddo
+               enddo
+             else
+               call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,   &
                   dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt,&
                   a_rflx, a_sflx, a_lflxu, a_lflxd,a_sflxu,a_sflxd, albedo, &
                   rr=a_rpp,sflxu_toa=sflxu_toa,sflxd_toa=sflxd_toa,&
                   lflxu_toa=lflxu_toa,lflxd_toa=lflxd_toa)
+             end if
           case(4,5)
              call d4stream(nzp, nxp, nyp, cntlat, time_in, sst, sfc_albedo, CCN,   &
                   dn0, pi0, pi1, dzi_t, a_pexnr, a_theta, vapor, liquid, a_tt,&
@@ -238,12 +252,12 @@ contains
   ! subroutine case_forcing: adjusts tendencies according to a specified
   ! large scale forcing.  Normally case (run) specific.
   !
-  subroutine case_forcing(n1,n2,n3,case_name,zt,dzi_t,dzi_m,tl,rt,tt,rtt)
+  subroutine case_forcing(n1,n2,n3,case_name,zt,dzi_t,dzi_m,tl,rt,tt,rtt,iradtyp)
 
     use mpi_interface, only : pecount, double_scalar_par_sum,myid, appl_abort
     use stat, only : get_zi
 
-    integer, intent (in):: n1,n2, n3
+    integer, intent (in):: n1,n2, n3, iradtyp
     real, dimension (n1), intent (in)          :: zt, dzi_t, dzi_m
     real, dimension (n1,n2,n3), intent (in)    :: tl, rt
     real, dimension (n1,n2,n3), intent (inout) :: tt, rtt
@@ -283,7 +297,15 @@ contains
                 !
                 ! temperature advection and radiative cooling
                 !
-                tt(k,i,j) = tt(k,i,j)  - 2.5/86400.
+                ! only 1 K/d for runs with interactive radiation
+                ! which represents advective cooling
+                ! use 2.5 K/d for runs without interactive radiation
+                if (iradtyp.eq.4) then
+                  tt(k,i,j) = tt(k,i,j)  - 0.5/86400. ! first set of irad-runs used 0.5 K per day
+                  !tt(k,i,j) = tt(k,i,j)  - 0.0/86400.  ! irad2 simulations
+                else
+                  tt(k,i,j) = tt(k,i,j)  - 2.5/86400.
+                end if
                 !
                 ! moisture advection
                 !

@@ -20,6 +20,7 @@ module modcross
 implicit none
 
   logical            :: lcross = .false., ldocross, lxy = .false., lxz = .false., lyz = .false.
+  logical            :: lreducedOutput = .true.
   real               :: dtcross = 60, xcross = 0., ycross = 0., zcross(10) = 0.
   integer            :: icross,jcross,kcross(10) = 0, nkcross
   real               :: threstracer = 2
@@ -29,7 +30,7 @@ implicit none
   character(len=7),  dimension(10) :: hname
   character(len=80), dimension(10) :: hlname
   character(len=7) :: hname_prc
-  integer, parameter :: nvar_all = 49
+  integer, parameter :: nvar_all = 52
   character (len=7), dimension(nvar_all)  :: crossvars =  (/ &
          'u      ','v      ','w      ','t      ','r      ', & !1-5
          'l      ','rp     ','np     ','tv     ','ricep  ', & !6-10
@@ -40,7 +41,8 @@ implicit none
          'rwptop ','tracer ','trcpath','trcbase','trctop ', & !31-35
          'wdev_cl','wdev_sc','w_cld  ','tdev_cl','tdev_sc', & !36-40
          't_cld  ','qdev_cl','qdev_sc','q_cld  ','tv_cl  ', & !41-45
-         'tv_sc  ','tv_cld ','core   ','th_e   '/)            !46-49
+         'tv_sc  ','tv_cld ','core   ','th_e   ','aut_acc', & !46-49
+         'acc_acc','eps_max'/)                                !50
   integer :: nccrossxzid,nccrossyzid,nccrossxyid, nccrossrec, nvar
 
   interface writecross
@@ -143,7 +145,7 @@ contains
                             xname, xlongname, xunit, &
                             yname, ylongname, yunit, &
                             tname, tlongname, tunit, &
-                            lwaterbudget, lcouvreux, prc_lev
+                            lcouvreux, prc_lev
 
     character (*), intent(in)     :: name
     character (40), dimension(3) :: dimname, dimlongname, dimunit
@@ -164,7 +166,7 @@ contains
         longname =  'Zonal wind'
         unit = 'm/s'
         iscross = .true.
-     case('v')
+      case('v')
         loc = (/ictr, ictr, ihlf/)
         longname =  'Meridional wind'
         unit = 'm/s'
@@ -268,13 +270,25 @@ contains
         longname = 'acc. precip'
         unit = 'kg/m2'
       case ('cnd_acc')
-        if (.not.lwaterbudget) return
+        return
         longname = 'acc. condensation'
         unit = 'kg/m2'
       case ('cev_acc')
-        if (.not.lwaterbudget) return
+        return
         longname = 'acc. evaporation of cloud water'
         unit = 'kg/m2'
+      case ('aut_acc')
+        if (level < 3) return
+        longname = 'autoconversion'
+        unit = 'kg/m2'
+      case ('acc_acc')
+        if (level < 3) return
+        longname = 'accretion'
+        unit = 'kg/m2'
+      case ('eps_max')
+        return
+        longname = 'column-maximum dissipation rate'
+        unit = 'm3/s2'
       case ('rev_acc')
         if (level < 3) return
         longname = 'acc. evaporation of rain water'
@@ -295,6 +309,7 @@ contains
         longname = 'SubCloud layer vertical velocity'
         unit = 'm/s'
       case ('t_cld')
+        if (lreducedOutput) return
         if (level < 2) return
         longname = 'Av. In cloud temperature deviation'
         unit = 'K'
@@ -307,18 +322,22 @@ contains
         longname = 'SubCloud layer temperature deviation'
         unit = 'K'
       case ('tv_cld')
+        if (lreducedOutput) return
         if (level < 2) return
         longname = 'Av. In cloud virt. pot. temperature deviation'
         unit = 'K'
       case ('tvdev_cl')
+        if (lreducedOutput) return
         if (level < 2) return
         longname = 'Av. Cloud layer virt. temperature deviation'
         unit = 'K'
       case ('tvdev_sc')
+        if (lreducedOutput) return
         if (level < 2) return
         longname = 'SubCloud layer virt. temperature deviation'
         unit = 'K'
       case ('q_cld')
+        if (lreducedOutput) return
         if (level < 2) return
         longname = 'Av. In cloud humidity deviation'
         unit = 'kg/kg'
@@ -363,6 +382,10 @@ contains
         longname = 'equivalent potential temperature'
         unit = 'K'
         iscross = .true.
+      case('mse')
+        if (level < 2) return
+        longname = 'moist static energy (vert. integral)'
+        unit = 'J/m2'
       case default
         return
       end select
@@ -428,8 +451,9 @@ contains
           dimname(2)            = yname
           dimlongname(2)        = ylongname
           do n = 1, nkcross
-            call addvar_nc(nccrossxyid, trim(name)//trim(hname(n)), 'xy crosssection of '//trim(longname)//' at '//trim(hlname(n)), &
-            unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
+            call addvar_nc(nccrossxyid, trim(name)//trim(hname(n)), &
+                           'xy crosssection of '//trim(longname)//' at '//trim(hlname(n)), &
+                           unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
           end do
           crossname(ncross) = name
         end if
@@ -468,8 +492,9 @@ contains
 
   subroutine triggercross(rtimee)
     use grid,      only : level,nxp, nyp, nzp, tname, zt, zm, dzi_m, dzi_t, a_up, a_vp, a_wp, a_tp, a_rp, liquid, a_rpp, a_npp, &
-       a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, &
-       prc_acc, cnd_acc, cev_acc, rev_acc, a_cvrxp, lcouvreux, a_theta, pi0, pi1, a_pexnr, prc_lev, umean, vmean, th00
+       a_ricep, a_nicep, a_rsnowp, a_nsnowp, a_rgrp, a_ngrp, a_rhailp, a_nhailp, a_scr1, &
+       prc_acc, cnd_acc, cev_acc, aut_acc, acc_acc, rev_acc, eps_max, a_cvrxp, lcouvreux, a_theta, &
+       pi0, pi1, a_pexnr, prc_lev, umean, vmean, th00
     use modnetcdf, only : writevar_nc, fillvalue_double
     use util,      only : get_avg3, get_var3, calclevel
     use defs,      only : ep2,cp,cpr, p00
@@ -524,7 +549,8 @@ contains
              p(k,i,j) = p00 * (exner)**cpr
              tk=a_theta(k,i,j)*exner
              tstar = 1./(1./(tk-55.)-log(a_rp(k,i,j)/rslf(p(k,i,j),tk))/2840.)+55.
-             th_e(k,i,j) = tk*(p00/p(k,i,j))**(0.2854*(1.-0.28*a_rp(k,i,j)))*exp(a_rp(k,i,j)*(1.+0.81*a_rp(k,i,j))*(3376./tstar-2.54))
+             th_e(k,i,j) = tk*(p00/p(k,i,j))**(0.2854*(1.-0.28*a_rp(k,i,j))) &
+                             *exp(a_rp(k,i,j)*(1.+0.81*a_rp(k,i,j))*(3376./tstar-2.54))
           end do
        end do
       end do
@@ -674,6 +700,18 @@ contains
         tmp = cev_acc(3:nxp-2, 3:nyp-2)
         call writecross(crossname(n), tmp)
         cev_acc = 0.
+      case('aut_acc')
+        tmp = aut_acc(3:nxp-2, 3:nyp-2)
+        call writecross(crossname(n), tmp)
+        aut_acc = 0.
+      case('acc_acc')
+        tmp = acc_acc(3:nxp-2, 3:nyp-2)
+        call writecross(crossname(n), tmp)
+        acc_acc = 0.
+      case('eps_max')
+        tmp = eps_max(3:nxp-2, 3:nyp-2)
+        call writecross(crossname(n), tmp)
+        eps_max = 0.
       case('rev_acc')
         tmp = rev_acc(3:nxp-2, 3:nyp-2)
         call writecross(crossname(n), tmp)
@@ -746,6 +784,9 @@ contains
         call writecross(crossname(n), tmp)
       case ('core')
         call calcmax(tv, liquid, tmp)
+        call writecross(crossname(n), tmp)
+      case ('mse')
+        call calcmse(a_scr1, liquid, a_rp, tmp)
         call writecross(crossname(n), tmp)
       end select
     end do
@@ -1098,6 +1139,26 @@ contains
     end do
   end subroutine scalexcess
 
+  subroutine calcmse(tk, rt, rl, varout)
+    use modnetcdf, only : fillvalue_double
+    use grid, only : nzp, nxp, nyp, dn0, zm
+    use defs, only : cp, g, alvl
+    real, intent(in), dimension(:,:,:)  :: tk, rt, rl
+    real, intent(out), dimension(3:,3:) :: varout
+    integer :: i, j, k, km1
+    real :: thres
+    varout = 0.
+    do j=3,nyp-2
+      do i=3,nxp-2
+        do k=2,nzp-1
+           km1=max(1,k-1)
+           varout(i,j) = varout(i,j)  &
+                &   + ( cp*tk(k,i,j) + g*zm(k) + alvl*(rt(k,i,j)-rl(k,i,j)) ) &
+                &     * (zm(k)-zm(km1)) * dn0(k)
+        enddo
+      end do
+    end do
+  end subroutine calcmse
 
 end module modcross
 

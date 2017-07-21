@@ -53,13 +53,13 @@ module grid
   logical           :: lmptend = .false.   ! Write out microphysical 3D fields.
   logical           :: lrad_ca = .false.   ! Perform clear air radiation calculations
   logical           :: lcouvreux = .false.  ! switch for 'radioactive' scalar
-  logical           :: lwaterbudget = .false.  ! switch for liquid water budget diagnostics
+  logical           :: mom3 = .false.      ! switch for three moment warm microphysics
   integer           :: ncvrx               ! Number of Couvreux scalar
-  integer           :: ncld               ! Number of Couvreux scalar
+  integer           :: ncld                ! Number of cloud water scalar
+  integer           :: nref                ! Number of reflectivity scalar
 
   integer           :: nfpt = 10           ! number of rayleigh friction points
   real              :: distim = 300.0      ! dissipation timescale
-  logical           :: lspongeinit = .true. ! Sponge layer acts on initial profiles
 
   character (len=7), allocatable, save :: sanal(:)
   character (len=80):: expnme = 'Default' ! Experiment name
@@ -68,6 +68,7 @@ module grid
 
   real, parameter   ::  rkalpha(3) = (/ 8./15., -17./60.,  3./4. /), &
                         rkbeta(3)  = (/    0.0,   5./12., -5./12./)
+  real    :: zi2_bar = 10.  ! ann kristin, for forcing
 
   integer           :: nz, nxyzp, nxyp, nstep
   real              :: dxi, dyi, dt, psrf
@@ -78,10 +79,14 @@ module grid
   ! 2D Arrays (surface fluxes)
   !
   real, dimension (:,:), allocatable :: albedo, a_ustar, a_tstar, a_rstar,    &
-       uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, trac_sfc, sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa, sflxu_toa_ca,sflxd_toa_ca,lflxu_toa_ca,lflxd_toa_ca, &
+       uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, trac_sfc, sflxu_toa,sflxd_toa, &
+       lflxu_toa,lflxd_toa, sflxu_toa_ca,sflxd_toa_ca,lflxu_toa_ca,lflxd_toa_ca, &
        cnd_acc, &  ! accumulated condensation  [kg/m2] (diagnostic for 2D output)
        cev_acc, &  ! accumulated evaporation of cloud water [kg/m2] (diagnostic for 2D output)
+       aut_acc, &  ! accumulated autoconversion             [kg/m2] (diagnostic for 2D output)
+       acc_acc, &  ! accumulated accretion                  [kg/m2] (diagnostic for 2D output)
        rev_acc, &  ! accumulated evaporation of rainwater   [kg/m2] (diagnostic for 2D output)
+       eps_max, &  ! column maximum dissipation rate (diagnostic for 2D output)
        obl         ! BvS : save obl for faster itertion
   integer, dimension(10) :: prc_lev = -1
   integer :: nv1, nv2, nsmp = 0
@@ -93,13 +98,13 @@ module grid
 
   !
   ! 3D Arrays
-  !irina
   real, dimension (:,:,:), allocatable ::                                     &
        a_theta, a_pexnr, press, vapor, a_rflx, a_sflx, liquid, rsi,           &
        a_scr1, a_scr2, a_scr3, a_scr4, a_scr5, a_scr6, a_scr7,                &
-       a_lflxu, a_lflxd, a_sflxu, a_sflxd,a_km, &
-       prc_c, prc_r, prc_i, prc_s, prc_g, prc_h , prc_acc,               &
-       a_lflxu_ca, a_lflxd_ca, a_sflxu_ca, a_sflxd_ca
+       a_lflxu, a_lflxd, a_sflxu, a_sflxd,a_km,                               &
+       prc_c, prc_r, prc_i, prc_s, prc_g, prc_h , prc_acc,                    &
+       a_lflxu_ca, a_lflxd_ca, a_sflxu_ca, a_sflxd_ca,                        &
+       ldnum, ld_qr, ld_nr, ld_zr, ldprc, ldeva, evap
 
   real, dimension (:,:), allocatable :: svctr
   real, dimension (:)  , allocatable :: ssclr
@@ -107,7 +112,11 @@ module grid
   ! Named pointers (to 3D arrays)
   !
   real, dimension (:,:,:), pointer :: a_up, a_ut, a_vp, a_vt, a_wp, a_wt,     &
-       a_sp, a_st, a_tp, a_tt, a_rp, a_rt, a_rpp, a_rpt, a_npp, a_npt,        &
+       a_sp, a_st, a_tp, a_tt, &
+       a_rp,     a_rt,      & ! total water
+       a_rpp,    a_rpt,     & ! rain mixing ratio
+       a_npp,    a_npt,     & ! rain nubmer concentration
+       a_zpp,    a_zpt,     & ! rain reflectivity
        a_ricep , a_ricet  , & ! ice mixing ratio
        a_nicep , a_nicet  , & ! ice number concentration
        a_rsnowp, a_rsnowt , & ! snow
@@ -115,7 +124,8 @@ module grid
        a_rgrp,   a_rgrt,    & ! graupel
        a_ngrp,   a_ngrt,    &
        a_rhailp, a_rhailt,  & ! hail
-       a_nhailp, a_nhailt, a_rct, a_cld, a_cvrxp, a_cvrxt
+       a_nhailp, a_nhailt,  &
+       a_rct, a_cld, a_cvrxp, a_cvrxt
  ! linda,b, output of tendencies
   real, dimension (:,:,:), allocatable :: &
         mp_qt, mp_qr, mp_qi, mp_qs, mp_qg, mp_qh, &
@@ -256,9 +266,9 @@ contains
     if (level   > 3) nscl = nscl+4  ! ni,qi,qs,qg
     if (level   > 4) nscl = nscl+4  ! ns,ng,qh,nh (for Axel's two-moment scheme)
 
-    if (lwaterbudget) then
-      nscl = nscl+1 ! additional cloud water a_cld in the tracer array
-      ncld = nscl
+    if (mom3) then
+      nscl = nscl+1 ! additional zp
+      nref = nscl
     end if
     if (lcouvreux) then
       nscl = nscl+1 ! Additional radioactive scalar
@@ -291,15 +301,21 @@ contains
       a_rpp => NULL()
       a_npp => NULL()
     end if
-    if (lwaterbudget) then
-      ! for liquid water budget and precipitation efficiency diagnostic
-      a_cld=>a_xp(:,:,:,ncld)
-      a_cld(:,:,:) = 0.
+!    if (lwaterbudget) then
+    if (level >= 3) then
       allocate (cnd_acc(nxp,nyp),cev_acc(nxp,nyp))
+      allocate (aut_acc(nxp,nyp),acc_acc(nxp,nyp))
+      allocate (eps_max(nxp,nyp))
       cnd_acc(:,:) = 0.   ! accumulated condensation                 [kg/m2]
       cev_acc(:,:) = 0.   ! accumulated evaporation of cloud water   [kg/m2]
+      aut_acc(:,:) = 0.   ! accumulated autoconversion               [kg/m2]
+      acc_acc(:,:) = 0.   ! accumulated accretion                    [kg/m2]
+      eps_max(:,:) = 0. 
+    end if
+    if (mom3) then ! three moment microphysic: reflectivity
+      a_zpp=>a_xp(:,:,:,nref)
     else
-      a_cld => NULL()
+      a_zpp=>NULL()
     end if
     ! ice microphysics
     if (level >= 4) then
@@ -333,6 +349,25 @@ contains
     else
       a_cvrxp => NULL()
     end if
+
+    !Axel: number of LDs per grid point
+!    if (lpartdrop) then
+      allocate(ldnum(nzp,nxp,nyp))
+      allocate(ld_nr(nzp,nxp,nyp))
+      allocate(ld_qr(nzp,nxp,nyp))
+      allocate(ld_zr(nzp,nxp,nyp))
+      allocate(ldprc(nzp,nxp,nyp))
+      allocate(ldeva(nzp,nxp,nyp))
+      allocate(evap(nzp,nxp,nyp))
+      ldnum = 0.
+      ld_nr = 0.
+      ld_qr = 0.
+      ld_zr = 0.
+      ldprc = 0.
+      ldeva = 0.
+      evap  = 0.
+      memsize = memsize + 7*nxyzp
+!    end if
 
     allocate (a_ustar(nxp,nyp),a_tstar(nxp,nyp))
     allocate (uw_sfc(nxp,nyp),vw_sfc(nxp,nyp),ww_sfc(nxp,nyp))
@@ -702,9 +737,7 @@ contains
     end do
     if(level>=3) then
       write(10) prc_acc, rev_acc
-    end if
-    if(lwaterbudget) then
-      write(10) cnd_acc, cev_acc
+      write(10) cnd_acc, cev_acc, aut_acc, acc_acc
     end if
     write(10) nv2, nsmp
     write(10) svctr
@@ -778,18 +811,26 @@ contains
        end if
        !End Malte
 
-       do n=1,nscl
-          call newvar(n)
-          if (n <= nsclx) read (10) a_sp
-       end do
+       if (.true.) then
+!       if (.not.mom3) then
+          do n=1,nscl
+             call newvar(n)
+             if (n <= nsclx) read (10) a_sp
+          end do
+       else        ! only for 3mom if a_zpp is not in history file
+          do n=1,nscl-1
+             call newvar(n)
+             if (n <= nsclx) read (10) a_sp
+          end do
+          call newvar(nref)
+          a_sp(:,:,:) = 0. 
+       end if
        do n=nscl+1,nsclx
           read (10)
        end do
       if(level>=3) then
         read(10) prc_acc, rev_acc
-      end if
-      if(lwaterbudget) then
-        read(10) cnd_acc, cev_acc
+        read(10) cnd_acc, cev_acc, aut_acc, acc_acc
       end if
       read(10) nv2, nsmp
       allocate (svctr(nzp,nv2))

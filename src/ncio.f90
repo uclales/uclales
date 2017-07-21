@@ -3,7 +3,7 @@
   use netcdf
   use grid
   use mpi_interface, only : appl_abort, myid, pecount, wrxid, wryid
-  use mcrp, only : cldw,rain,ice,snow,graupel,hail
+  use mcrp, only : cldw,rain,ice,snow,graupel,hail,lpartdrop
 
   implicit none
   private
@@ -260,7 +260,7 @@ contains
 
     use mpi_interface, only :myid
 
-    integer, parameter :: nnames = 46
+    integer, parameter :: nnames = 53
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,& !1
          'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,& !7 
@@ -269,7 +269,8 @@ contains
          'ngrp   ','rhail  ','nhail  ','rflx   ','lflxu  ','lflxd  '   ,& !25
          'shf    ','lhf    ','ustars ','a_tskin','a_qskin','tsoil  '   ,& !31
          'phiw   ','a_Qnet ','a_G0   ','mp_tlt ','mp_qt  ','mp_qr  '   ,& !37
-         'mp_qi  ','mp_qs  ','mp_qg  ','mp_qh  '/)  !43-46
+         'mp_qi  ','mp_qs  ','mp_qg  ','mp_qh  ','zr     ','ldnum  '   ,& !43-48
+         'ld_qr  ','ld_nr  ','ld_zr  ','ldprc  ','ldeva  '/)              !49
 
 
 
@@ -285,6 +286,8 @@ contains
     if (iradtyp > 1) nvar0 = nvar0+3
     if (isfctyp == 5) nvar0 = nvar0+9
     if (lmptend)      nvar0 = nvar0+7
+    if (mom3)        nvar0 = nvar0+1
+    if (lpartdrop)   nvar0 = nvar0+6
 
     allocate (sanal(nvar0))
     sanal(1:nbase) = sbase(1:nbase)
@@ -376,6 +379,24 @@ contains
        sanal(nvar0) = sbase(45)
        nvar0 = nvar0+1
        sanal(nvar0) = sbase(46)
+    end if
+    if (mom3) then
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(47)
+    end if
+    if (lpartdrop) then
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(48)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(49)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(50)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(51)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(52)
+       nvar0 = nvar0+1
+       sanal(nvar0) = sbase(53)
     end if
 
     nbeg = nvar0+1
@@ -557,7 +578,7 @@ contains
               start=ibegsfc, count=icntsfc)
        !print*,myid,sanal(nn+4),nn+9
        !if (iret.ne.nf90_noerr) print*,myid,nf90_strerror(iret),nn+9
-       nn = nn+9
+
     end if 
 
     
@@ -592,6 +613,41 @@ contains
               count=icnt)
       end if
 
+      if (mom3) then
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0,sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, a_zpp(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+       end if
+       
+      if (lpartdrop) then
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0,sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, ldnum(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0,sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, ld_qr(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0,sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, ld_nr(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0,sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, ld_zr(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0,sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, ldprc(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+         nn = nn+1
+         iret = nf90_inq_varid(ncid0,sanal(nn), VarID)
+         iret = nf90_put_var(ncid0, VarID, ldeva(:,i1:i2,j1:j2), start=ibeg, &
+              count=icnt)
+      end if
+
+
 !     if (nn /= nvar0) then
 !        if (myid == 0) print *, 'ABORTING:  Anal write error'
 !        call appl_abort(0)
@@ -618,6 +674,8 @@ contains
     character (len=*), intent (in) :: short_name
 
     integer :: scalar_number
+
+    !if (myid.eq.0) print *,' ncinfo: ',trim(short_name)
 
     select case (trim(short_name))
     case ('sxx')
@@ -746,6 +804,10 @@ contains
        if (itype==0) ncinfo = 'Rain-drop number mixing ratio'
        if (itype==1) ncinfo = '#/kg'
        if (itype==2) ncinfo = 'tttt'
+    case('zr')
+       if (itype==0) ncinfo = 'Rain water reflectivity'
+       if (itype==1) ncinfo = 'dBZ'
+       if (itype==2) ncinfo = 'tttt'
     case('cfl')
        if (itype==0) ncinfo = 'Courant number'
        if (itype==1) ncinfo = '-'
@@ -852,6 +914,18 @@ contains
        !if (itype==1) ncinfo = 'kg/m^2'
        !irina
        if (itype==1) ncinfo = 'g/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('rwp_ld')
+       if (itype==0) ncinfo = 'Rain-water path of LDs'
+       if (itype==1) ncinfo = 'g/m^2'
+       if (itype==2) ncinfo = 'time'
+    case('prcp_ld')
+       if (itype==0) ncinfo = 'Surface rain rate of LDs'
+       if (itype==1) ncinfo = 'kg/kg m/s'
+       if (itype==2) ncinfo = 'time'
+    case('nsum_ld')
+       if (itype==0) ncinfo = 'Conditionally sampled rain number mixing ratio of LDs'
+       if (itype==1) ncinfo = '# per liter'
        if (itype==2) ncinfo = 'time'
     case('prcp')
        if (itype==0) ncinfo = 'Surface precipitation rate'
@@ -1290,6 +1364,22 @@ contains
        if (itype==0) ncinfo = 'Rain water'
        if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
+    case('rr_ld')
+       if (itype==0) ncinfo = 'Rain water of LDs'
+       if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('nr_ld')
+       if (itype==0) ncinfo = 'Rain Number Concentration of LDs'
+       if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('zr_ld')
+       if (itype==0) ncinfo = 'Reflectivity of LDs'
+       if (itype==1) ncinfo = 'kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('prec_ld')
+       if (itype==0) ncinfo = 'Rain Precipitation Flux of LDs'
+       if (itype==1) ncinfo = 'kg/kg m/s'
+       if (itype==2) ncinfo = 'ttmt'
     case('i_nuc')
        if (itype==0) ncinfo = 'Ice nuclei Concentration'
        if (itype==1) ncinfo = 'dm^-3'
@@ -1314,6 +1404,34 @@ contains
        if (itype==0) ncinfo = 'hail mixing ratio'
        if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
+    case('ldnum')
+       if (itype==0) ncinfo = 'Number of Lagrangian particles'
+       if (itype==1) ncinfo = '#'
+       if (itype==2) ncinfo = 'ttmt'
+    case('ld_qr')
+       if (itype==0) ncinfo = 'rain of Lagrangian particles'
+       if (itype==1) ncinfo = 'kg/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('ld_nr')
+       if (itype==0) ncinfo = 'specific number of rain drops of LDs'
+       if (itype==1) ncinfo = '1/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('ld_zr')
+       if (itype==0) ncinfo = 'specific reflectivity of rain drops of LDs'
+       if (itype==1) ncinfo = 'kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('ldprc')
+       if (itype==0) ncinfo = 'rain rate of Lagrangian particles'
+       if (itype==1) ncinfo = 'kg/kg m/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('ldeva')
+       if (itype==0) ncinfo = 'evaporation rate of LDs'
+       if (itype==1) ncinfo = 'kg/kg 1/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('evap_ld')
+       if (itype==0) ncinfo = 'evaporation rate of LDs'
+       if (itype==1) ncinfo = 'kg/kg 1/s'
+       if (itype==2) ncinfo = 'tttt'
     case('prc_c')
        if (itype==0) ncinfo = 'Cloud water Precipitation Flux (positive downward)'
        !irina
@@ -1322,6 +1440,10 @@ contains
     case('prc_r')
        if (itype==0) ncinfo = 'Rain Precipitation Flux (positive downward)'
        !irina
+       if (itype==1) ncinfo = 'kg/kg m/s'
+       if (itype==2) ncinfo = 'ttmt'
+    case('prc_ld')
+       if (itype==0) ncinfo = 'Rain Precipitation Flux of LDs'
        if (itype==1) ncinfo = 'kg/kg m/s'
        if (itype==2) ncinfo = 'ttmt'
     case('prc_i')

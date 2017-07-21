@@ -144,22 +144,13 @@ contains
       read (ifinput,*)  lowheight , lowwflst,lowdthldt,lowdqtdt
       read (ifinput,*)  highheight , highwflst,highdthldt,highdqtdt
       do k=2,nzp
-	! Christopher: bug fix (analog in modnudge.f90)
-        !if (highheight<zt(k)) then
-        !  lowheight    = highheight
-        !  lowwflst     = highwflst
-        !  lowdthldt    = highdthldt
-        !  lowdqtdt     = highdqtdt
-        !  read (ifinput,*) highheight, highwflst, highdqtdt, highdthldt
-        !end if
-        do
-	  if (highheight>=zt(k)) exit
-          lowheight    = highheight
-          lowwflst     = highwflst
-          lowdthldt    = highdthldt
-          lowdqtdt     = highdqtdt
-          read (ifinput,*) highheight, highwflst, highdqtdt, highdthldt
-        end do
+        if (highheight<zt(k)) then
+          lowheight = highheight
+          lowwflst  = highwflst
+          lowdthldt = highdthldt
+          lowdqtdt  = highdqtdt
+          read (ifinput,*) highheight, highwflst, highdthldt, highdqtdt
+        end if
         fac            = (highheight-zt(k))/(highheight - lowheight)
         wflst(k,t)     = fac*lowwflst  + (1-fac)*highwflst
         dthldtlst(k,t) = fac*lowdthldt + (1-fac)*highdthldt

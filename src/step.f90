@@ -73,7 +73,7 @@ contains
     use thrm, only : thermo
     use modparticles, only : lpartic, exit_particles, lpartdump, exitparticledump, &
          lpartstat, exitparticlestat, write_particle_hist, particlestat, &
-	 balanced_particledump,frqpartdump, ldropstart
+         balanced_particledump,frqpartdump, ldropstart
 
 
     real, parameter    :: peak_cfl = 0.5, peak_peclet = 0.5
@@ -171,7 +171,7 @@ contains
                        istp, time, dt_prev, t2-t1
               else
                 print "('   Timestep # ',i6," //     &
-                       "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3'  WC Time left(sec) = ',f10.2)",     &
+                   "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3'  WC Time left(sec) = ',f10.2)",&
                        istp, time, dt_prev, t2-t1, wctime-t2+t0
               end if
           end if
@@ -296,7 +296,7 @@ contains
     use mpi_interface, only : myid, appl_abort
     use grid, only : level, dt, nstep, a_tt, a_up, a_vp, a_wp, dxi, dyi, dzi_t, &
          nxp, nyp, nzp, dn0,a_scr1, u0, v0, a_ut, a_vt, a_wt, zt, a_ricep, a_rct, a_rpt, &
-         lwaterbudget, a_xt2
+         a_xt2
     use stat, only : sflg, statistics
     use sgsm, only : diffuse
     !use sgsm_dyn, only : calc_cs
@@ -312,7 +312,7 @@ contains
     use centered, only:advection_scalars
     use modtimedep, only : timedep
     use modparticles, only : particles, lpartic, particlestat,lpartstat, &
-         deactivate_drops, activate_drops
+         deactivate_drops, activate_drops, lpartmass, grow_drops
 
 
     logical, parameter :: debug = .false.
@@ -321,6 +321,12 @@ contains
 
     xtime = time/86400. + strtim
     call timedep(time,timmax, sst)
+
+    ! for *_t runs
+    !if(lpartic .and. lpartdrop .and. lpartmass) call grow_drops
+    !if(lpartic .and. lpartdrop) call deactivate_drops(time)
+    !if(lpartic .and. lpartdrop) call activate_drops(time)
+    
     do nstep = 1,3
 
        ! Add additional criteria to ensure that some profile statistics that are
@@ -360,11 +366,7 @@ contains
        call ladvect
 
        if (level >= 1) then
-          if (lwaterbudget) then
-             call thermo(level,1)
-          else
-             call thermo(level)
-          end if
+          call thermo(level)
           call forcings(xtime,cntlat,sst,div,case_name,time)
           call micro(level,istp)
        end if
@@ -376,9 +378,10 @@ contains
        call update (nstep)
        call poisson
        call velset(nzp,nxp,nyp,a_up,a_vp,a_wp)
-
+       
     end do
 
+    if(lpartic .and. lpartdrop .and. lpartmass) call grow_drops
     if(lpartic .and. lpartdrop) call deactivate_drops(time+dt)
     if(lpartic .and. lpartdrop) call activate_drops(time+dt)
 
@@ -402,8 +405,9 @@ contains
                      a_ricet,a_nicet,a_rsnowt, a_rgrt,&
                      a_rhailt,a_nhailt,a_nsnowt, a_ngrt,&
                      a_xt1, a_xt2, nscl, nxyzp, level, &
-                     lwaterbudget, a_rct, ncld, &
-                     lcouvreux, a_cvrxt, ncvrx
+                     a_rct, ncld, &
+                     lcouvreux, a_cvrxt, ncvrx, &
+                     mom3, nref, a_zpt
     use util, only : azero
 
     integer, intent (in) :: nstep
@@ -421,7 +425,7 @@ contains
           a_rpt =>a_xt1(:,:,:,6)
           a_npt =>a_xt1(:,:,:,7)
        end if
-       if (lwaterbudget) a_rct =>a_xt1(:,:,:,ncld)
+       if (mom3)         a_zpt =>a_xt1(:,:,:,nref)
        if (lcouvreux)    a_cvrxt =>a_xt1(:,:,:,ncvrx)
        if (level >= 4) then
           a_ricet  =>a_xt1(:,:,:, 8)
@@ -447,7 +451,7 @@ contains
           a_rpt =>a_xt2(:,:,:,6)
           a_npt =>a_xt2(:,:,:,7)
        end if
-       if (lwaterbudget) a_rct =>a_xt2(:,:,:,ncld)
+       if (mom3)         a_zpt =>a_xt2(:,:,:,nref)
        if (lcouvreux)    a_cvrxt =>a_xt2(:,:,:,ncvrx)
        if (level >= 4) then
           a_ricet  =>a_xt2(:,:,:, 8)
@@ -474,7 +478,7 @@ contains
 !irina
     use grid, only : a_xp, a_xt1, a_xt2, a_up, a_vp, a_wp, a_sp, dzi_t, dt,  &
          nscl, nxp, nyp, nzp, newvar,level, a_rpp,a_ricep,a_nicep,a_rsnowp,a_rgrp,a_npp,rkalpha,rkbeta, &
-         a_nsnowp,a_ngrp,a_rhailp,a_nhailp,a_rp,liquid
+         a_nsnowp,a_ngrp,a_rhailp,a_nhailp,a_rp,liquid, a_zpp, mom3
     use util, only : sclrset,velset
 
     integer, intent (in) :: nstep
@@ -508,6 +512,12 @@ contains
        end where
        where (liquid < 0.)
           liquid=0.
+       end where
+    end if
+    if (mom3) then
+       a_zpp(1,:,:) = 0.
+       where (a_zpp < 0.)
+          a_zpp=0.
        end where
     end if
     if (level >= 4) then
@@ -687,24 +697,21 @@ contains
     gover2  = 0.5*g
 
     do j=3,n3-2
-      do i=3,n2-2
-        if(level == 0) then
-          do k=1,n1
-            scr(k,i,j)=gover2*(th(k,i,j)/th00-1.)
-          end do
-        else if(level == 1) then
-          do k=1,n1
-            scr(k,i,j)=gover2*((th(k,i,j)*(1.+ep2*rv(k,i,j))-th00)/th00)
-          end do
-        else
-          do k=1,n1
-            scr(k,i,j)=gover2*((th(k,i,j)*(1.+ep2*rv(k,i,j))-th00)/th00-(rl(k,i,j)))
-          end do
-        end if
+       do i=3,n2-2
+          if (level >= 2) then
+             do k=1,n1
+                scr(k,i,j)=gover2*((th(k,i,j)*(1.+ep2*rv(k,i,j))-th00)       &
+                     /th00-(rl(k,i,j)))
+             end do
+          else
+             do k=1,n1
+                scr(k,i,j)=gover2*(th(k,i,j)/th00-1.)
+             end do
+          end if
 
-        do k=2,n1-2
-          wt(k,i,j)=wt(k,i,j)+scr(k,i,j)+scr(k+1,i,j)
-        end do
+          do k=2,n1-2
+             wt(k,i,j)=wt(k,i,j)+scr(k,i,j)+scr(k+1,i,j)
+          end do
        end do
     end do
 
@@ -750,61 +757,22 @@ contains
   subroutine sponge
 
     use grid, only : u0, v0, a_up, a_vp, a_wp, a_tp, a_ut, a_vt, a_wt, a_tt,&
-         nfpt, spngt, spngm, nzp, nxp, nyp, th0, th00, lspongeinit
-    use mpi_interface, only : double_array_par_sum,nxpg,nypg
+         nfpt, spngt, spngm, nzp, nxp, nyp, th0, th00
 
     integer :: i, j, k, kk
-    real :: tbarg(nfpt),tbarl(nfpt),ubarg(nfpt),ubarl(nfpt),vbarg(nfpt),vbarl(nfpt)
-    real :: ngrid  
 
     if (maxval(spngt) > epsilon(1.) .and. nfpt > 1) then
-
-       if(lspongeinit) then ! BvS: nudge sponge layer back to initial profile (default)
-         do j=3,nyp-2
-            do i=3,nxp-2
-               do k=nzp-nfpt,nzp-1
-                  kk = k+1-(nzp-nfpt)
-                  a_tt(k,i,j)=a_tt(k,i,j)-spngt(kk)*(a_tp(k,i,j)-th0(k)+th00)
-                  a_ut(k,i,j)=a_ut(k,i,j)-spngt(kk)*(a_up(k,i,j)-u0(k))
-                  a_vt(k,i,j)=a_vt(k,i,j)-spngt(kk)*(a_vp(k,i,j)-v0(k))
-                  a_wt(k,i,j)=a_wt(k,i,j)-spngm(kk)*(a_wp(k,i,j))
-               end do
-            end do
-         end do
-
-       else                 ! BvS: nudge sponge layer to bulk value
-
-         do k = nzp-nfpt,nzp-1
-           kk        = k+1-(nzp-nfpt)
-           tbarl(kk) = sum(a_tp(k,3:nxp-2,3:nyp-2)) 
-           ubarl(kk) = sum(a_up(k,3:nxp-2,3:nyp-2))
-           vbarl(kk) = sum(a_vp(k,3:nxp-2,3:nyp-2))
-         end do
-
-         call double_array_par_sum(tbarl,tbarg,nfpt)
-         call double_array_par_sum(ubarl,ubarg,nfpt)
-         call double_array_par_sum(vbarl,vbarg,nfpt)
-
-         ngrid = (nxpg-4)*(nypg-4)
-         do k = 1,nfpt
-           tbarg(k) = tbarg(k) / ngrid 
-           ubarg(k) = ubarg(k) / ngrid
-           vbarg(k) = vbarg(k) / ngrid
-         end do
-
-         do j=3,nyp-2
-            do i=3,nxp-2
-               do k=nzp-nfpt,nzp-1
-                  kk = k+1-(nzp-nfpt)
-                  a_tt(k,i,j)=a_tt(k,i,j)-spngt(kk)*(a_tp(k,i,j)-tbarg(kk))
-                  a_ut(k,i,j)=a_ut(k,i,j)-spngt(kk)*(a_up(k,i,j)-ubarg(kk))
-                  a_vt(k,i,j)=a_vt(k,i,j)-spngt(kk)*(a_vp(k,i,j)-vbarg(kk))
-                  a_wt(k,i,j)=a_wt(k,i,j)-spngm(kk)*(a_wp(k,i,j))
-               end do
-            end do
-         end do
-       end if
-
+       do j=3,nyp-2
+          do i=3,nxp-2
+             do k=nzp-nfpt,nzp-1
+                kk = k+1-(nzp-nfpt)
+                a_tt(k,i,j)=a_tt(k,i,j)-spngt(kk)*(a_tp(k,i,j)-th0(k)+th00)
+                a_ut(k,i,j)=a_ut(k,i,j)-spngt(kk)*(a_up(k,i,j)-u0(k))
+                a_vt(k,i,j)=a_vt(k,i,j)-spngt(kk)*(a_vp(k,i,j)-v0(k))
+                a_wt(k,i,j)=a_wt(k,i,j)-spngm(kk)*(a_wp(k,i,j))
+             end do
+          end do
+       end do
     end if
 
   end subroutine sponge

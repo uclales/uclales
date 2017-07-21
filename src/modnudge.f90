@@ -66,7 +66,8 @@ contains
     real :: highheight,highqtnudge,highthlnudge,highunudge,highvnudge,highwnudge,hightnudge
     real :: lowheight,lowqtnudge,lowthlnudge,lowunudge,lowvnudge,lowwnudge,lowtnudge
     real :: fac
-    allocate(tnudge(nzp,ntnudge),unudge(nzp,ntnudge),vnudge(nzp,ntnudge),wnudge(nzp,ntnudge),thlnudge(nzp,ntnudge),qtnudge(nzp,ntnudge))
+    allocate(tnudge(nzp,ntnudge),unudge(nzp,ntnudge),vnudge(nzp,ntnudge))
+    allocate(wnudge(nzp,ntnudge),thlnudge(nzp,ntnudge),qtnudge(nzp,ntnudge))
     allocate(timenudge(0:ntnudge), height(nzp))
     tnudge = 0
     unudge=0
@@ -95,19 +96,7 @@ contains
         read (ifinput,*)  lowheight , lowtnudge ,  lowunudge , lowvnudge , lowwnudge , lowthlnudge, lowqtnudge
         read (ifinput,*)  highheight , hightnudge ,  highunudge , highvnudge , highwnudge , highthlnudge, highqtnudge
         do  k=2,nzp-1
-	  ! Christopher: bug fix (analog in modtimedep.f90)
-          !if (highheight<zt(k)) then
-          !  lowheight = highheight
-          !  lowtnudge = hightnudge
-          !  lowunudge = highunudge
-          !  lowvnudge = highvnudge
-          !  lowwnudge = highwnudge
-          !  lowthlnudge= highthlnudge
-          !  lowqtnudge=highqtnudge
-          !  read (ifinput,*)  highheight , hightnudge ,  highunudge , highvnudge , highwnudge , highthlnudge, highqtnudge
-          !end if
-          do
-	    if (highheight>=zt(k)) exit
+          if (highheight<zt(k)) then
             lowheight = highheight
             lowtnudge = hightnudge
             lowunudge = highunudge
@@ -116,7 +105,7 @@ contains
             lowthlnudge= highthlnudge
             lowqtnudge=highqtnudge
             read (ifinput,*)  highheight , hightnudge ,  highunudge , highvnudge , highwnudge , highthlnudge, highqtnudge
-          end do
+          end if
           fac = (highheight-zt(k))/(highheight - lowheight)
           tnudge(k,t) = fac*lowtnudge + (1-fac)*hightnudge
           unudge(k,t) = fac*lowunudge + (1-fac)*highunudge
@@ -172,25 +161,28 @@ contains
     implicit none
     real, intent (in) :: timein
     integer k,t,i,j
-    real :: dtm,dtp,currtnudge, nudgefac
+    real :: dtm,dtp,currtnudge, nudgefac, time
     real, dimension(nzp) :: uav, vav, tav, qav
+
+    time = timein * 86400.
 
     if (firsttime) then
       firsttime = .false.
-      call initnudge(timein)
+      call initnudge(time)
     end if
     if (.not.(lnudge)) return
+!     if (rk3step/=3) return
 
     t=1
-    do while(timein>timenudge(t))
+    do while(time>timenudge(t))
       t=t+1
     end do
-    if (timein/=timenudge(1)) then
+    if (time/=timenudge(1)) then
       t=t-1
     end if
 
-    dtm = ( timein-timenudge(t) ) / ( timenudge(t+1)-timenudge(t) )
-    dtp = ( timenudge(t+1)-timein)/ ( timenudge(t+1)-timenudge(t) )
+    dtm = ( time-timenudge(t) ) / ( timenudge(t+1)-timenudge(t) )
+    dtp = ( timenudge(t+1)-time)/ ( timenudge(t+1)-timenudge(t) )
 
     call get_avg3(nzp, nxp, nyp,a_up,uav)
     call get_avg3(nzp, nxp, nyp,a_vp,vav)

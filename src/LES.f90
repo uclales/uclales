@@ -25,6 +25,7 @@
 ! \todo Nicer version of accumelated precip
 program ucla_les
 
+  use mpi_interface, only : myid, appl_abort
   implicit none
 
   real :: t1, t2
@@ -33,8 +34,11 @@ program ucla_les
   call driver
   call cpu_time(t2)
 
-  print "(/,' ',49('-')/,' ',A16,F10.1,' s')", '  Execution time: ', t2-t1
-  stop ' ..... Normal termination'
+  if (myid == 0) then
+    print "(/,' ',49('-')/,' ',A16,F10.1,' s')", '  Execution time: ', t2-t1
+    print *, ' ..... Normal termination'
+  end if
+  stop
 
 contains
 
@@ -88,19 +92,21 @@ contains
     use forc, only : lstendflg, sfc_albedo
     use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
-         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, lspongeinit, runtype,             &
-         CCN, lwaterbudget, lcouvreux, prc_lev, isfctyp, sfc_albedo, lrad_ca
+         filprf, expnme, iradtyp, igrdtyp, nfpt, distim, runtype,             &
+         CCN, lcouvreux, prc_lev, isfctyp, sfc_albedo, lrad_ca, &
+         mom3
     use init, only : us, vs, ts, rts, ps, hs, ipsflg, itsflg,irsflg, iseed, hfilin,   &
          zrand,lhomrestart,mag_pert_q,mag_pert_t
     use stat, only : ssam_intvl, savg_intvl
     use mpi_interface, only : myid, appl_abort
-    use radiation, only : u0, fixed_sun, rad_eff_radius, radMcICA
+    use radiation, only : u0, fixed_sun, rad_eff_radius
     use modnudge, only : lnudge,tnudgefac, qfloor, zfloor, znudgemin, znudgeplus, &
          lnudge_bound
     use modtimedep, only : ltimedep
-    use mcrp, only : microseq,lrandommicro,timenuc,nin_set,cloud_type, lpartdrop
+    use mcrp, only : cloud_type, lpartdrop, iturbkern
     use modparticles, only : lpartic, lpartsgs, lrandsurf, lpartstat, lpartdump, &
-         lpartdumpui, lpartdumpth, lpartdumpmr, frqpartdump, ldropstart
+         lpartdumpui, lpartdumpth, lpartdumpmr, frqpartdump, ldropstart,lpartdumpp, &
+	 lpartdumptau
 
     implicit none
 
@@ -112,8 +118,8 @@ contains
          ssam_intvl,                         & ! integral accumulate/ts print frequency
          corflg , cntlat ,                   & ! coriolis flag
          nfpt   , distim ,                   & ! rayleigh friction points, dissipation time
-         lspongeinit     , & ! Sponge back to initial profile or bulk values
          level  , CCN    ,                   & ! Microphysical model Number of CCN per kg of air
+         iturbkern,                          & ! turbulence kernel in microphysics
          iseed  , zrand  ,                   & ! random seed
          mag_pert_q , mag_pert_t ,            & ! Magnitude of pertubations
          nxp    , nyp    , nzp   ,           & ! number of x, y, z points
@@ -140,17 +146,16 @@ contains
          lnudge, tnudgefac, ltimedep, qfloor, zfloor,znudgemin, znudgeplus,  &             !thijs: Nudging
          lnudge_bound, &               ! LINDA, relaxation boundaries
          rh_srf, drag, &
-         SolarConstant,u0,fixed_sun, rad_eff_radius, radMcICA, & ! SolarConstant (In case of prescribed TOA radiation
-         lrandommicro, microseq,timenuc ,nin_set,cloud_type, &  !thijs: sequence of variables for microphysics
-         lwaterbudget, &                 ! axel: flag for liquid water budget diagnostics (only level=3)
-         lcouvreux , tau , &                    ! The Couvreux 'radioactive' scalar
+         SolarConstant,u0,fixed_sun, rad_eff_radius, & ! SolarConstant (In case of prescribed TOA radiation
+         cloud_type,                         & ! variables for microphysics
+         lcouvreux , tau , &                   ! The Couvreux 'radioactive' scalar
          lrad_ca, &                        ! Clear air radiation statistics
          deflate_level , lhomflx,lhomrestart, &                         !Compression of the crosssections
          clouddiff, &
          lpartic,lpartsgs,lrandsurf,lpartstat,lpartdump, &           ! Particles
          lpartdumpui,lpartdumpth,lpartdumpmr,frqpartdump,&           ! Particles
-         lpartdrop, ldropstart                                       ! Particles
-
+         lpartdrop, ldropstart, lpartdumpp, lpartdumptau, &          ! Particles
+         mom3                                   ! three moment mcrp
 
     deflev = deflate_level
     ps       = 0.
@@ -207,17 +212,21 @@ contains
           call appl_abort(0)
        endif
 
-
+    end if
+    if (myid == 0) then
+      write (*,'(a,e12.1)') '  CCN       = ',CCN
+      write (*,'(a,i4)')    '  iturbkern = ',iturbkern
+      write (*,'(a,l4)')    '  mom3      = ',mom3     
     end if
 
 600 format(//' ',49('-')/,' ',/,'  Initial Experiment: ',A50 &
-         /,'  Final Time:         ',F7.1,' s'              )
+         /,'  Final Time:         ',F10.1,' s'              )
 601 format(//' ',49('-')/,' ',/,'  Restart Experiment: ',A50 &
          /,'  Restart File: ',A30,                           &
          /,'  Final Time: ',F10.1,' s'              )
 602 format('  Output File Stem:   ',A50                      &
-         /,'  History Frequency:  ',F7.1,                    &
-         /,'  Analysis Frequency: ',F7.1)
+         /,'  History Frequency:  ',F10.1,                    &
+         /,'  Analysis Frequency: ',F10.1)
 
     return
   end subroutine define_parm

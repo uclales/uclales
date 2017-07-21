@@ -21,8 +21,10 @@ module radiation
 
   use defs, only       : cp, rcp, cpr, rowt, roice, p00, pi, nv1, nv, SolarConstant
   use fuliou, only     : rad, minSolarZenithCosForVis
+  use mpi_interface, only : myid
+  use util, only       : get_avg3
   implicit none
- character (len=10), parameter :: background = 'backrad_in'
+  character (len=10), parameter :: background = 'backrad_in'
  ! character (len=19), parameter :: background = 'datafiles/s11.lay'
  ! character (len=19), parameter :: background = 'datafiles/astx.lay'
  !  character (len=19), parameter :: background = 'datafiles/dsrt.lay'
@@ -34,9 +36,12 @@ module radiation
   integer :: k,i,j, npts
   real    :: ee, u0, day, time, alat, zz
   logical :: fixed_sun = .false.
-  logical :: radMcICA = .true.
+  logical :: radMcICA = .true.       ! McSI or full radiation (roughly a factor 10 in computing time for RICO)
+  logical :: lhomrad = .false.       ! homogenize total radiative flux after radiation calculation
+  logical :: lhomradinput = .false.  ! homogenize input profiles for radiation
 !   real    :: radius = 1.03
   real    :: rad_eff_radius = 1.
+
   contains
 
     subroutine d4stream(n1, n2, n3, alat, time, sknt, sfc_albedo, CCN, dn0, &
@@ -51,12 +56,14 @@ module radiation
       real, dimension (n1,n2,n3), intent (inout)        :: tt, rflx, sflx, lflxu, lflxd, sflxu, sflxd
       real, dimension (n2,n3), intent (out),optional    :: albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa
 
-      integer :: kk
-      real    :: xfact, prw, pri, p0(n1), exner(n1), pres(n1)
+      integer :: kk,ntop,ktop
+      real    :: xfact, prw, pri, p0(n1), exner(n1), pres(n1), weight
+      real    :: rflxavg(n1), pavg(n1), thavg(n1), rvavg(n1)
 
       if (first_time) then
-         p0(n1) = (p00*(pi0(n1)/cp)**cpr) / 100.
-         p0(n1-1) = (p00*(pi0(n1-1)/cp)**cpr) / 100.
+         p0(:) = (p00*(pi0(:)/cp)**cpr) / 100.
+         !p0(n1) = (p00*(pi0(n1)/cp)**cpr) / 100.
+         !p0(n1-1) = (p00*(pi0(n1-1)/cp)**cpr) / 100.
          call setup(background,n1,npts,nv1,nv,p0,pi0)
          first_time = .False.
          if (allocated(pre))   pre(:) = 0.
@@ -77,8 +84,12 @@ module radiation
       if (.not. fixed_sun) then
         u0 = zenith(alat,time)
       end if
-    !cgils
 
+      if (lhomradinput) then
+        call get_avg3(n1,n2,n3,pip,pavg)
+        call get_avg3(n1,n2,n3,th,thavg)
+        call get_avg3(n1,n2,n3,rv,rvavg)
+      end if
       !
       ! call the radiation
       !
@@ -87,20 +98,29 @@ module radiation
       do j=3,n3-2
          do i=3,n2-2
             do k=1,n1
-               exner(k)= (pi0(k)+pi1(k)+pip(k,i,j))/cp
+               if (lhomradinput) then
+                 exner(k)= (pi0(k)+pi1(k)+pavg(k))/cp
+               else
+                 exner(k)= (pi0(k)+pi1(k)+pip(k,i,j))/cp
+               end if
                pres(k) = p00 * (exner(k))**cpr
             end do
             pp(nv1) = 0.5*(pres(1)+pres(2)) / 100.
             do k=2,n1
                kk = nv-(k-2)
-               !irina
-               pt(kk) = th(k,i,j)*exner(k)
-               !old
-             !  pt(kk) = tk(k,i,j)
-               ph(kk) = max(0.,rv(k,i,j))
-               plwc(kk) = 1000.*dn0(k)*max(0.,rc(k,i,j))
+               if (lhomradinput) then
+                 pt(kk) = thavg(k)*exner(k)
+                 ph(kk) = max(0.,rvavg(k))
+                 plwc(kk) = 1000.*dn0(k)*max(0.,rc(k,i,j))
+                 !plwc(kk) = 0.0
+               else
+                 pt(kk) = th(k,i,j)*exner(k)
+                 ph(kk) = max(0.,rv(k,i,j))
+                 plwc(kk) = 1000.*dn0(k)*max(0.,rc(k,i,j))
+                 !plwc(kk) = 0.0
+               end if
                pre(kk)  = rad_eff_radius*1.e6*(plwc(kk)/(1000.*prw*CCN*dn0(k)))**(1./3.)
-               pre(kk)=min(max(pre(kk),4.18),31.23)
+               pre(kk)  = min(max(pre(kk),4.18),31.23)
                if (plwc(kk).le.0.) pre(kk) = 0.
                if (present(rr)) then
                  prwc(kk) = 1000.*dn0(k)*rr(k,i,j)
@@ -128,14 +148,6 @@ module radiation
             end do
             pp(nv-n1+2) = pres(n1)/100. - 0.5*(pres(n1-1)-pres(n1)) / 100.
 
-            !print *, "pp",pp(:)
-            !print *, "pt",pt(:)
-            !print *, "ph",ph(:)
-            !print *, "po",po(:)
-            !print *, "plwc",plwc(:)
-            !print *, "pre",pre(:)
-            !print *, "u0",u0
-
             if (present(ice).and.present(grp)) then
                call rad( sfc_albedo, u0, SolarConstant, sknt, ee, pp, pt, ph, po,&
                     fds, fus, fdir, fuir, plwc=plwc, pre=pre, piwc=piwc, pde=pde, pgwc=pgwc, useMcICA=radMcICA)
@@ -147,17 +159,14 @@ module radiation
             do k=1,n1
                kk = nv1 - (k-1)
                sflx(k,i,j) = fus(kk)  - fds(kk)
-               !irina
                sflxu(k,i,j)=fus(kk)
                sflxd(k,i,j)=fds(kk)
                lflxu(k,i,j)=fuir(kk)
                lflxd(k,i,j)=fdir(kk)
                !
                rflx(k,i,j) = sflx(k,i,j) + fuir(kk) - fdir(kk)
-               !irina
-             !  print *,k, fuir(kk),fdir(kk),sflx(k,i,j), rflx(k,i,j)
             end do
-
+ 
             if (present(albedo)) then
               if (u0 > minSolarZenithCosForVis) then
                 albedo(i,j) = fus(1)/fds(1)
@@ -186,12 +195,39 @@ module radiation
             if (present(lflxd_toa)) then
               lflxd_toa(i,j) = fdir(1)
             end if
-            do k=2,n1-3
-               xfact  = dzi_m(k)/(cp*dn0(k)*exner(k))
-               tt(k,i,j) = tt(k,i,j) - (rflx(k,i,j) - rflx(k-1,i,j))*xfact
-            end do
+            if (.not.lhomrad) then 
+              ntop = n1-int(1000*dzi_m(n1-5))
+              do k=2,ntop
+                 xfact  = dzi_m(k)/(cp*dn0(k)*exner(k))
+                 tt(k,i,j) = tt(k,i,j) - (rflx(k,i,j) - rflx(k-1,i,j))*xfact
+              end do
+              ! blending to RICO cooling for upper boundary condition, has to be consistent with forc.f90 (RICO assumes 2.5 total cooling)
+              do k=ntop+1,n1-3
+                 weight = real(k-ntop-1.0)/real(n1-3.0-ntop-1.0)
+                 xfact  = dzi_m(k)/(cp*dn0(k)*exner(k))
+                 !tt(k,i,j) = tt(k,i,j) - (1.0-weight)*(rflx(ntop,i,j) - rflx(ntop-1,i,j))*xfact - weight*2.5/86400.  ! zero advective cooling in forc.f9
+                 tt(k,i,j) = tt(k,i,j) - (1.0-weight)*(rflx(ntop,i,j) - rflx(ntop-1,i,j))*xfact - weight*2.0/86400. ! first set of 'irad' simulations 
+              end do                                                                                                 ! which have 0.5 advective cooling
+            end if
          end do
       end do
+      if (lhomrad) then
+        call get_avg3(n1,n2,n3,rflx,rflxavg)
+        ntop = n1-int(1000*dzi_m(n1-5))
+        do j=3,n3-2
+           do i=3,n2-2
+              do k=2,ntop
+                 xfact  = dzi_m(k)/(cp*dn0(k)*exner(k))
+                 tt(k,i,j) = tt(k,i,j) - (rflxavg(k) - rflxavg(k-1))*xfact
+              end do
+              do k=ntop+1,n1-3
+                 weight = real(k-ntop-1.0)/real(n1-3.0-ntop-1.0)
+                 xfact  = dzi_m(k)/(cp*dn0(k)*exner(k))
+                 tt(k,i,j) = tt(k,i,j) - (1.0-weight)*(rflxavg(k) - rflxavg(k-1))*xfact - weight*2.0/86400.
+              end do
+           end do
+         end do
+      end if
 
     end subroutine d4stream
 
@@ -240,19 +276,29 @@ module radiation
 
     real, allocatable  :: sp(:), st(:), sh(:), so(:), sl(:)
 
-    integer :: k, ns, norig, index
+    integer :: k, kk, ns, norig, index
     logical :: blend
     real    :: pa, pb, ptop, ptest, test, dp1, dp2, dp3, Tsurf, pp2
+    logical :: debug = .false.
 
     open ( unit = 08, file = background, status = 'old' )
-    print *, 'Reading Background Sounding: ',background
+    if (myid == 0) print *, 'Reading Background Sounding: ',background
     read (08,*) Tsurf, ns
     allocate ( sp(ns), st(ns), sh(ns), so(ns), sl(ns))
     do k=1,ns
        read ( 08, *) sp(k), st(k), sh(k), so(k), sl(k)
     enddo
     close (08)
-
+    if (myid == 0 .and. debug) then
+      write (*,*) 'Background profiles:'
+      do k=1,ns
+        write(*,'(i6,5e15.5)') k, sp(k), st(k), sh(k), so(k), sl(k)
+      enddo
+      write (*,*) 'Input profile:'
+      do k=1,n1
+        write(*,'(i6,5e15.5)') k, zp(k)
+      enddo
+    end if
     !
     ! identify what part, if any, of background sounding to use
     !
@@ -268,6 +314,10 @@ module radiation
        end do
        k=k-1           ! identify first level above top of input
        blend = .True.
+       if (myid == 0 .and. debug) then
+         write (*,*) '  ptop = ',ptop
+         write (*,*) '  k    = ',k
+       end if
     else
        blend = .False.
     end if
@@ -276,7 +326,7 @@ module radiation
     ! specified based on the specified background climatology, here the
     ! pressure levels for this part of the sounding are determined
     !
-    if (blend) then
+    if (blend .and. .false.) then
        dp1 = pb-pa
        dp2 = ptop - pb
        dp3 = zp(n1-1) - zp(n1)
@@ -291,15 +341,25 @@ module radiation
           npts  = npts + 1
        end do
        nv1 = npts + n1
+    elseif (blend) then
+       npts  = k+1
+       norig = k
+       nv1 = npts + n1
     else
        nv1 = n1
     end if
     nv = nv1-1
+    if (myid == 0) then
+      write (*,*) '  npts  = ',npts
+      write (*,*) '  norig = ',norig
+      write (*,*) '  nv1   = ',nv1
+      write (*,*) '  nv    = ',nv 
+    end if
     !
     ! allocate the arrays for the sounding data to be used in the radiation
-    ! profile and then fill them first with the sounding data, by afill, then
+    ! profile and then fill them first with the sounding data, by a fill, then
     ! by interpolating the background profile at pressures less than the
-    ! pressure at the top fo the sounding
+    ! pressure at the top of the sounding
     !
     allocate (pp(nv1),fds(nv1),fus(nv1),fdir(nv1),fuir(nv1))
     allocate (pt(nv),ph(nv),po(nv),pre(nv),pde(nv),plwc(nv),prwc(nv),piwc(nv),pgwc(nv))
@@ -310,27 +370,35 @@ module radiation
        ph(1:norig) = sh(1:norig)
        po(1:norig) = so(1:norig)
 
-       do k=norig+1,npts
-          pp(k) = (ptop + pp(k-1))*0.5
+       !if (myid == 0) write (*,'(2a5,4a15)') 'k','kk','zp(kk)','pp(k)','sp(index)','sp(index+1)'
+       kk = n1
+       do k=norig+1,nv
+          !pp(k) = (ptop + pp(k-1))*0.5
+          pp(k) = zp(kk)
           index = getindex(sp,ns,pp(k))
           pt(k) =  intrpl(sp(index),st(index),sp(index+1),st(index+1),pp(k))
           ph(k) =  intrpl(sp(index),sh(index),sp(index+1),sh(index+1),pp(k))
           po(k) =  intrpl(sp(index),so(index),sp(index+1),so(index+1),pp(k))
+          !if (myid == 0) write (*,'(2i5,4e15.5)') k,kk,pp(k),sp(index),sp(index+1),po(k)
+          kk = kk - 1
        end do
-      ! !
-      ! ! set the ozone constant below the reference profile
-      ! !
-      ! do k=npts+1,nv
-      !    po(k) =  po(npts)
-      ! end do
 
-      ! interpolate ozone profile
-       do k=npts+1,nv
-            pp2 = (p00*(pi0(nv-k+2)/cp)**cpr) / 100.
-            index  = getindex(sp,ns,pp2)
-            po(k) =  intrpl(sp(index),so(index),sp(index+1),so(index+1),pp2)
+       ! interpolate profiles
+!       do k=norig+1,nv
+!          pp2 = (p00*(pi0(nv-k+2)/cp)**cpr) / 100.
+!          index  = getindex(sp,ns,pp2)
+!          pt(k) =  intrpl(sp(index),st(index),sp(index+1),st(index+1),pp2)
+!          ph(k) =  intrpl(sp(index),sh(index),sp(index+1),sh(index+1),pp2)
+!          po(k) =  intrpl(sp(index),so(index),sp(index+1),so(index+1),pp2)
+          !if (myid == 0) write (*,'(i5,4e15.5)') k,pp2,sp(index),sp(index+1),po(k)
+!       end do
+       if (myid == 0) then
+         write (*,*) 'Profiles after blending'   
+         write (*,'(a5,4a15)') 'k','pp','pt','ph','po'
+         do k=1,nv
+           write (*,'(i5,4e15.5)') k,pp(k),pt(k),ph(k),po(k)
          end do
-
+       end if
     end if
   
   end subroutine setup
@@ -390,6 +458,11 @@ module radiation
 
     day    = floor(time)
     lamda  = alat*pi/180.
+
+    ! fixed sun
+    zenith = lamda
+    return
+
     d      = 2.*pi*int(time)/365.
     sig    = d + pi/180.*(279.9340 + 1.914827*sin(d) - 0.7952*cos(d) &
          &                      + 0.019938*sin(2.*d) - 0.00162*cos(2.*d))

@@ -21,16 +21,16 @@ module stat
 
   use mpi_interface, only : myid
   use ncio, only : open_nc, define_nc
-  use grid, only : level, isfctyp, svctr, ssclr, nv1, nv2, nsmp
+  use grid, only : level, isfctyp, svctr, ssclr, nv1, nv2, nsmp, zi2_bar, &
+                   ld_qr, ld_nr, ld_zr, ldprc, ldeva, evap
   use util, only : get_avg, get_cor, get_avg3, get_cor3, get_var3, get_csum
+  use mcrp, only : lpartdrop
 !irina
 !  use step, only: case_name
   implicit none
   private
 
-!irina
-  ! axel, me too!
-  integer, parameter :: nvar1 = 68, nvar2 = 118 ! number of time series and profiles
+  integer, parameter :: nvar1 = 71, nvar2 = 123 ! number of time series and profiles
   integer, save      :: nrec1, nrec2, ncid1, ncid2
   real, save         :: fsttm, lsttm
 
@@ -39,7 +39,6 @@ module stat
   real               :: ssam_intvl = 30.   ! statistical sampling interval
   real               :: savg_intvl = 1800. ! statistical averaging interval
 
-!irina
   character (len=7), save :: s1(nvar1)=(/                           &
        'time   ','cfl    ','maxdiv ','zi1_bar','zi2_bar','zi3_bar', & ! 1
        'vtke   ','sfcbflx','wmax   ','tsrf   ','ustar  ','shf_bar', & ! 7
@@ -52,7 +51,7 @@ module stat
        'ra     ','rsurf  ','rsveg  ','rssoil ','tskinav','qskinav', & !49
        'obl    ','cliq   ','a_Wl   ','lflxutc','sflxutc','tsair  ', & !55
        'sflxds ','sflxus ','lflxds ','lflxus ','sflxdsc','sflxusc', & !61
-       'lflxdsc','lflxusc'/),                                       & !67
+       'lflxdsc','lflxusc','rwp_ld ','prcp_ld','nsum_ld'/),         & !67
        s2(nvar2)=(/                                                 &
        'time   ','zt     ','zm     ','dn0    ','u0     ','v0     ', & ! 1
        'fsttm  ','lsttm  ','nsmp   ','u      ','v      ','t      ', & ! 7
@@ -73,7 +72,8 @@ module stat
        'cdsed  ','i_nuc  ','ice    ','n_ice  ','snow   ','graupel', & !97
        'rsup   ','prc_c  ','prc_i  ','prc_s  ','prc_g  ','prc_h  ', & !103
        'hail   ','qt_th  ','s_1    ','s_2    ','s_3    ','RH     ', & !109
-       'lwuca  ','lwdca  ','swuca  ','swdca  '/)                      !115
+       'lwuca  ','lwdca  ','swuca  ','swdca  ','rr_ld  ','prc_ld ', & !115
+       'nr_ld  ','zr_ld  ','evap_ld'/)                                !121
 
   real, save, allocatable   :: tke_sgs(:), tke_res(:), tke0(:), wtv_sgs(:),  &
        wtv_res(:), wrl_sgs(:), thvar(:)
@@ -222,12 +222,15 @@ contains
     if (debug) WRITE (0,*) 'statistics: micro2 ok    myid=',myid
 
     if (level >=3) call accum_lvl3(nzp, nxp, nyp, dn0, zm, liquid, a_rpp,    &
-         a_npp, prc_r, CCN)
+         a_npp, evap, prc_r, CCN)
     if (debug) WRITE (0,*) 'statistics: micro3 ok    myid=',myid
+
+    if (lpartdrop) call accum_partdrop(nzp, nxp, nyp, dn0, zm, ld_qr, ld_nr, ld_zr, ldprc, ldeva)
 
     if (level ==4) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp,a_nicep,prc_i,prc_s,prc_g)
 
-    if (level ==5) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp,a_nicep,prc_i,prc_s,prc_g,a_rhailp,prc_h)
+    if (level ==5) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp, &
+                                                                  a_nicep,prc_i,prc_s,prc_g,a_rhailp,prc_h)
 
     if (debug) WRITE (0,*) 'statistics: micro ok    myid=',myid
 
@@ -268,6 +271,7 @@ contains
     ssclr(1) = time
     ssclr(4) = get_zi(n1, n2, n3, 2, th, dzi_m, zt, 1.)   ! maximum gradient
     ssclr(5) = get_zi(n1, n2, n3, 3, th, thvar, zt, 1.) ! maximum variance
+    zi2_bar = ssclr(5)  !remember ssclr(5) for forcing
     !
     ! buoyancy flux statistics
     !
@@ -429,7 +433,10 @@ contains
   ! SUBROUTINE ACCUM_STAT: Accumulates various statistics over an
   ! averaging period for radiation variables
   !
-  subroutine accum_rad(n1,n2,n3,rflx,sflx,alb,lflxu,lflxd,sflxu,sflxd,lflxu_ca,lflxd_ca,sflxu_ca,sflxd_ca,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa,sflxu_toa_ca,sflxd_toa_ca,lflxu_toa_ca,lflxd_toa_ca,dn0,dzt,pi0,pi1,sst,time_in,vapor,radtyp,a_pexnr,a_theta,CCN,cntlat)
+  subroutine accum_rad(n1,n2,n3,rflx,sflx,alb,lflxu,lflxd,sflxu,sflxd,lflxu_ca,       &
+                       lflxd_ca,sflxu_ca,sflxd_ca,sflxu_toa,sflxd_toa,lflxu_toa,      &
+                       lflxd_toa,sflxu_toa_ca,sflxd_toa_ca,lflxu_toa_ca,lflxd_toa_ca, &
+                       dn0,dzt,pi0,pi1,sst,time_in,vapor,radtyp,a_pexnr,a_theta,CCN,cntlat)
     use radiation, only : d4stream
     integer, intent (in) :: n1,n2,n3
     real, intent (in)    :: rflx(n1,n2,n3)
@@ -439,7 +446,8 @@ contains
                                    lflxd_ca(n1,n2,n3),sflxu_ca(n1,n2,n3),sflxd_ca(n1,n2,n3) ,&
                                    sflxu_toa(n2,n3),sflxd_toa(n2,n3),lflxu_toa(n2,n3),lflxd_toa(n2,n3),&
                                    sflxu_toa_ca(n2,n3),sflxd_toa_ca(n2,n3),lflxu_toa_ca(n2,n3),lflxd_toa_ca(n2,n3),&
-                                   dn0(n1),dzt(n1),pi0(n1),pi1(n1),a_pexnr(n1,n2,n3),a_theta(n1,n2,n3),CCN,cntlat,sst,time_in,vapor(n1,n2,n3)
+                                   dn0(n1),dzt(n1),pi0(n1),pi1(n1),a_pexnr(n1,n2,n3),a_theta(n1,n2,n3),CCN, &
+                                   cntlat,sst,time_in,vapor(n1,n2,n3)
    integer, optional,intent(in) :: radtyp
 
     integer :: k
@@ -768,7 +776,7 @@ contains
   ! SUBROUTINE ACCUM_LVL3: Accumulates specialized statistics that depend
   ! on level 3 variables.
   !
-  subroutine accum_lvl3(n1, n2, n3, dn0, zm, rc, rr, nr, rrate, CCN)
+  subroutine accum_lvl3(n1, n2, n3, dn0, zm, rc, rr, nr, ev, rrate, CCN)
 
     use grid, only : a_pexnr,pi0,pi1
     use defs, only : alvl,cp
@@ -776,7 +784,7 @@ contains
     integer, intent (in) :: n1,n2,n3
     real, intent (in)                      :: CCN
     real, intent (in), dimension(n1)       :: zm, dn0
-    real, intent (in), dimension(n1,n2,n3) :: rc, rr, nr, rrate
+    real, intent (in), dimension(n1,n2,n3) :: rc, rr, nr, ev, rrate
 
     integer                :: k, i, j, km1
     real                   :: nrsum, nrcnt, rrsum, rrcnt, xrain, xaqua,convliq
@@ -813,13 +821,16 @@ contains
           svctr(k,85)=svctr(k,85)+get_csum(n1,n2,n3,k,nr*dn0(k)/1000.,scr1) ! Nr in dm^-3 (1/liter)
        end if
     end do
+
     !
     ! conditionally average precip fluxes
     !
     ssclr(24) = 0.
     unit = 1./real((n2-4)*(n3-4))
     call get_avg3(n1,n2,n3,rrate,a1)
-    svctr(:,87)=svctr(:,87) + a1
+    svctr(:,87)=svctr(:,87) + a1            ! prc_r
+    call get_avg3(n1,n2,n3,ev,a1)
+    svctr(:,88)=svctr(:,88) + a1            ! evap
 
     do k=2,n1-2
        rrsum = 0.
@@ -836,10 +847,10 @@ contains
              end if
           end do
        end do
-       svctr(k-1,89)=svctr(k-1,89)+get_avg(1,n2,n3,1,scr1)
+       svctr(k-1,89)=svctr(k-1,89)+get_avg(1,n2,n3,1,scr1)              ! frc_prc
        if (aflg) then
-          if (k == 2 ) ssclr(24) = rrcnt
-          svctr(k-1,90)=svctr(k-1,90)+get_csum(n1,n2,n3,k,rrate,scr1)
+          if (k == 2 ) ssclr(24) = rrcnt                                ! pfrac
+          svctr(k-1,90)=svctr(k-1,90)+get_csum(n1,n2,n3,k,rrate,scr1)   ! prc_prc
        end if
     end do
     !
@@ -854,7 +865,7 @@ contains
              if (rrate(2,i,j) > rmin .and. rrate(2,i,j) <= rmax) rrcnt=rrcnt+1.
           end do
        end do
-       if (rrcnt > 0.) svctr(k,92)=svctr(k,92)+rrcnt
+       if (rrcnt > 0.) svctr(k,92)=svctr(k,92)+rrcnt           ! hst_srf
     end do
     !
     ! water paths
@@ -866,24 +877,96 @@ contains
           do k=1,n1
              km1=max(1,k-1)
              xrain = max(0.,rr(k,i,j))
-             !irina
-             !xaqua = max(0.,rc(k,i,j))
-             !old
-             xaqua = max(xrain,rc(k,i,j))
+             xaqua = max(0.,rc(k,i,j))
+             !old! xaqua = max(xrain,rc(k,i,j))
              scr1(i,j)=scr1(i,j)+xaqua*dn0(k)*(zm(k)-zm(km1))*1000.
              scr2(i,j)=scr2(i,j)+xrain*dn0(k)*(zm(k)-zm(km1))*1000.
           enddo
        end do
     end do
-    ssclr(15) = get_avg(1,n2,n3,1,scr1)
-    ssclr(16) = get_cor(1,n2,n3,1,scr1,scr1)
-    ssclr(22) = get_avg(1,n2,n3,1,scr2)
-    ssclr(23) = get_avg(1,n2,n3,1,rrate(2,:,:))
-    ssclr(25) = CCN*1.e-6 ! approximately per cc (but actually #/kg * 10^-6)
-    ssclr(26) = nrsum ! Nr in dm^-3 (1/liter)
-    ssclr(27) = nrcnt
+    ssclr(15) = get_avg(1,n2,n3,1,scr1)           ! lwp_bar (now cloud water path)
+    ssclr(16) = get_cor(1,n2,n3,1,scr1,scr1)      ! lwp_var
+    ssclr(22) = get_avg(1,n2,n3,1,scr2)           ! rwp_bar
+    ssclr(23) = get_avg(1,n2,n3,1,rrate(2,:,:))   ! prcp
+    ssclr(25) = CCN*1.e-6                         ! approximately per cc (but actually #/kg * 10^-6)
+    ssclr(26) = nrsum                             ! Nr in dm^-3 (1/liter)
+    ssclr(27) = nrcnt                             ! nrcnt
 
   end subroutine accum_lvl3
+  !---------------------------------------------------------------------
+  ! SUBROUTINE ACCUM_PARTDROP: specialized statistics of LD particles
+  !
+  subroutine accum_partdrop(n1, n2, n3, dn0, zm, rr, nr, zr, rrate, evap)
+
+    use grid, only : a_pexnr,pi0,pi1
+    use defs, only : alvl,cp
+
+    integer, intent (in) :: n1,n2,n3
+    real, intent (in), dimension(n1)       :: zm, dn0
+    real, intent (in), dimension(n1,n2,n3) :: rr, nr, zr, rrate, evap
+
+    integer                :: k, i, j, km1
+    real                   :: nrsum, nrcnt, rrsum, rrcnt, xrain, xaqua,convliq
+    real                   :: unit
+    real                   :: rmax, rmin
+    real, dimension(n1)    :: a1
+    real, dimension(n2,n3) :: scr1,scr2
+    logical                :: aflg
+
+    nrsum = 0.
+    do k=1,n1-1
+       aflg = .false.
+       do j=3,n3-2
+          do i=3,n2-2
+             if (rr(k,i,j) > 0.001e-3) then
+                aflg = .true.
+                nrsum = nrsum + (nr(k,i,j)*dn0(k)/1000.)  ! Nr in dm^-3 (1/liter)
+             end if
+          end do
+       end do
+       if (aflg) then
+          svctr(k,121)=svctr(k,85)+get_csum(n1,n2,n3,k,nr*dn0(k)/1000.,scr1) ! nr_ld in ps-file
+       end if
+    end do
+    ssclr(71) = nrsum                            ! nsum_ld in ts-file                   
+
+    !
+    ! simply average rain and rain rate for ps-file
+    !
+
+    call get_avg3(n1,n2,n3,rr,a1)
+    do k=1,n1-1
+       svctr(k,119)=svctr(k,119) + a1(k)*1000.   ! rr_ld in ps-file
+    end do
+
+    call get_avg3(n1,n2,n3,zr,a1)
+    svctr(:,122)=svctr(:,121) + a1   ! zr_ld in ps-file
+
+    call get_avg3(n1,n2,n3,rrate,a1)
+    svctr(:,120)=svctr(:,120) + a1   ! prc_ld in ps-file
+
+    call get_avg3(n1,n2,n3,rrate,a1)
+    svctr(:,123)=svctr(:,122) + a1   ! evap_ld in ps-file
+
+    ! rain rate for ts-file
+    ssclr(70) = get_avg(1,n2,n3,1,rrate(3,:,:))  ! prcp_ld in ts-file
+
+    !
+    ! water paths
+    !
+    do j=3,n3-2
+       do i=3,n2-2
+          scr2(i,j) = 0.
+          do k=1,n1
+             km1=max(1,k-1)
+             xrain = max(0.,rr(k,i,j))
+             scr2(i,j)=scr2(i,j)+xrain*dn0(k)*(zm(k)-zm(km1))*1000.
+          enddo
+       end do
+    end do
+    ssclr(69) = get_avg(1,n2,n3,1,scr2) ! rwp_ld in ts-file
+
+  end subroutine accum_partdrop
   !
   !---------------------------------------------------------------------
   ! SUBROUTINE ACCUM_LVL4: Accumulates specialized statistics that depend
@@ -1494,14 +1577,13 @@ contains
     case("prc")
        select case (nfld)
        case (1)
-          nn = 87
+          nn = 87   ! rain rate
        case (2)
-          nn = 88
+          nn = 88   ! evap
        case (3)
-          nn = 63
-       !irina
+          nn = 63   ! sed_lw
        case (5)
-          nn = 97  !cloud droplet sed flux
+          nn = 97   ! cdsed (cloud droplet sed flux)
        case default
           nn = 0
        end select
