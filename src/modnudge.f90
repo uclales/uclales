@@ -95,7 +95,19 @@ contains
         read (ifinput,*)  lowheight , lowtnudge ,  lowunudge , lowvnudge , lowwnudge , lowthlnudge, lowqtnudge
         read (ifinput,*)  highheight , hightnudge ,  highunudge , highvnudge , highwnudge , highthlnudge, highqtnudge
         do  k=2,nzp-1
-          if (highheight<zt(k)) then
+	  ! Christopher: bug fix (analog in modtimedep.f90)
+          !if (highheight<zt(k)) then
+          !  lowheight = highheight
+          !  lowtnudge = hightnudge
+          !  lowunudge = highunudge
+          !  lowvnudge = highvnudge
+          !  lowwnudge = highwnudge
+          !  lowthlnudge= highthlnudge
+          !  lowqtnudge=highqtnudge
+          !  read (ifinput,*)  highheight , hightnudge ,  highunudge , highvnudge , highwnudge , highthlnudge, highqtnudge
+          !end if
+          do
+	    if (highheight>=zt(k)) exit
             lowheight = highheight
             lowtnudge = hightnudge
             lowunudge = highunudge
@@ -104,7 +116,7 @@ contains
             lowthlnudge= highthlnudge
             lowqtnudge=highqtnudge
             read (ifinput,*)  highheight , hightnudge ,  highunudge , highvnudge , highwnudge , highthlnudge, highqtnudge
-          end if
+          end do
           fac = (highheight-zt(k))/(highheight - lowheight)
           tnudge(k,t) = fac*lowtnudge + (1-fac)*hightnudge
           unudge(k,t) = fac*lowunudge + (1-fac)*highunudge
