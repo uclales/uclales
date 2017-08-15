@@ -21,6 +21,7 @@ module sgsm
 
   use stat, only : sflg, updtst, acc_tend, sgsflxs, sgs_vel
   use util, only : tridiff
+  use vdf, only : ledmf
   implicit none
 !
 ! setting the prandtl number to a value less than zero enforces an exponential
@@ -137,9 +138,10 @@ contains
     end if
 
     !
-    ! Diffuse scalars
+    ! Diffuse scalars (see define_vars in grid.f90: 1-u, 2-v, 3-w, 4-thl, 5-qt, 6-etc (dept on level)
     !
-
+    
+    if (.not.ledmf) then   !thl,qt now done in vdfmain
     do n=4,nscl
        call newvar(n,istep=nstep)
        call azero(nxyp,sxy1)
@@ -167,6 +169,7 @@ contains
        call cyclics(nzp,nxp,nyp,a_st,req)
        call cyclicc(nzp,nxp,nyp,a_st,req)
     enddo
+    endif
 
   end subroutine diffuse
   !
@@ -258,7 +261,7 @@ contains
     use stat, only          : tke_sgs
     use util, only          : get_avg3, get_cor3, calclevel
     use mpi_interface, only : cyclics, cyclicc
-    use grid, only          : liquid
+    use grid, only          : liquid, kh_les
 
     implicit none
 
@@ -373,6 +376,9 @@ contains
        call updtst(n1,'sgs',-4,sz2,1)  ! eddy diffusivity
     end if
 
+    do k=2,n1-2  !to give kh to edmfn
+      kh_les(k,:,:) = kh(k,:,:) /((dn0(k)+dn0(k+1))/2.)
+    end do
   end subroutine smagor
   !
   ! ----------------------------------------------------------------------

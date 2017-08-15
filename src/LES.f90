@@ -86,7 +86,7 @@ contains
     use ncio, only : deflev => deflate_level
     use modcross, only : lcross, lxy,lxz,lyz,xcross,ycross,zcross, crossvars
     use forc, only : lstendflg, sfc_albedo
-    use grid, only : deltaz, deltay, deltax, nzp, nyp, nxp, nxpart,           &
+    use grid, only : deltaz, deltay, deltax, edmfnfilter, nzp, nyp, nxp, nxpart,           &
          dtlong, dzrat,dzmax, th00, umean, vmean, naddsc, level,              &
          filprf, expnme, iradtyp, igrdtyp, nfpt, distim, lspongeinit, runtype,             &
          CCN, lwaterbudget, lcouvreux, prc_lev, isfctyp, sfc_albedo, lrad_ca
@@ -99,7 +99,7 @@ contains
          lnudge_bound
     use modtimedep, only : ltimedep
     use mcrp, only : microseq,lrandommicro,timenuc,nin_set,cloud_type, lpartdrop
-    use vdf, only : ledmfdiag, leddiag
+    use vdf, only : ledmf
     use modparticles, only : lpartic, lpartsgs, lrandsurf, lpartstat, lpartdump, &
          lpartdumpui, lpartdumpth, lpartdumpmr, frqpartdump, ldropstart
     implicit none
@@ -118,6 +118,7 @@ contains
          mag_pert_q , mag_pert_t ,            & ! Magnitude of pertubations
          nxp    , nyp    , nzp   ,           & ! number of x, y, z points
          deltax , deltay , deltaz ,          & ! delta x, y, z (meters)
+         edmfnfilter,                        & ! Maren: zr_filter for edmfn
          dzrat  , dzmax  , igrdtyp,          & ! stretched grid parameters
          timmax , dtlong , istpfl , timrsm, wctime, & ! timestep control
          runtype, hfilin , filprf ,          & ! type of run (INITIAL or HISTORY)
@@ -146,7 +147,7 @@ contains
          lcouvreux , tau , &                    ! The Couvreux 'radioactive' scalar
          lrad_ca, &                        ! Clear air radiation statistics
          lcouvreux , tau ,&                    ! The Couvreux 'radioactive' scalar
-         ledmfdiag, leddiag, &
+         ledmf, &
          deflate_level , lhomflx,lhomrestart, &                         !Compression of the crosssections
          clouddiff, &
          lpartic,lpartsgs,lrandsurf,lpartstat,lpartdump, &           ! Particles

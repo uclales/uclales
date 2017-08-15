@@ -10,7 +10,7 @@
 
   public :: open_nc, define_nc, init_anal, close_anal, write_anal, deflate_level
 
-  integer, private, save  :: nrec0, nvar0, nbase=15
+  integer, private, save  :: nrec0, nvar0, nbase=20
   integer, save           :: ncid0,ncid_s, ncid_cross, deflate_level
   integer, save           :: crossx, crossy, crossz
   character (len=7), dimension(30) :: crossnames
@@ -261,16 +261,16 @@ contains
 
     use mpi_interface, only :myid
 
-    integer, parameter :: nnames = 46
+    integer, parameter :: nnames = 42!56
     character (len=7), save :: sbase(nnames) =  (/ &
          'time   ','zt     ','zm     ','xt     ','xm     ','yt     '   ,& !1
-         'ym     ','u0     ','v0     ','dn0    ','u      ','v      '   ,& !7 
-         'w      ','t      ','p      ','q      ','l      ','r      '   ,& !13
-         'n      ','rice   ','nice   ','rsnow  ','rgrp   ','nsnow  '   ,& !19
-         'ngrp   ','rhail  ','nhail  ','rflx   ','lflxu  ','lflxd  '   ,& !25
-         'shf    ','lhf    ','ustars ','a_tskin','a_qskin','tsoil  '   ,& !31
-         'phiw   ','a_Qnet ','a_G0   ','mp_tlt ','mp_qt  ','mp_qr  '   ,& !37
-         'mp_qi  ','mp_qs  ','mp_qg  ','mp_qh  '/)  !43-46
+         'ym     ','u0     ','v0     ','dn0    ','edmf_w ','w      '   ,& !7
+         'wqt    ','wthl   ','w_up1  ','w_up2  ','w_up3  ','w_up4  '   ,& !13
+         'w_up5  ','w_up6  ','w_up7  ','w_up8  ','w_up9  ','w_up10 '   ,& !19
+         'lflxu  ','lflxd  '   ,& !25
+         'shf    ','lhf    ','ustars ','a_tskin','a_qskin','tsoil  '   ,& !
+         'phiw   ','a_Qnet ','a_G0   ','mp_tlt ','mp_qt  ','mp_qr  '   ,& !
+         'mp_qi  ','mp_qs  ','mp_qg  ','mp_qh  '/)  !
 
 
 
@@ -385,6 +385,7 @@ contains
        write(v_snm(2:3),'(i2.2)') nvar0-nbeg
        sanal(nvar0) = v_snm
     end do
+print*, nrec0
     nvar0=nend
     fname =  trim(filprf)
     if(myid == 0) print                                                  &
@@ -453,79 +454,112 @@ contains
        iret = nf90_inq_varid(ncid0, sanal(10), VarID)
        iret = nf90_put_var(ncid0, VarID, dn0, start = (/nrec0/))
     end if
+ !   iret = nf90_inq_varid(ncid0, sanal(11), VarID)
+ !   iret = nf90_put_var(ncid0, VarID, a_up(:,i1:i2,j1:j2), start=ibeg,    &
+ !        count=icnt)
     iret = nf90_inq_varid(ncid0, sanal(11), VarID)
-    iret = nf90_put_var(ncid0, VarID, a_up(:,i1:i2,j1:j2), start=ibeg,    &
+    iret = nf90_put_var(ncid0, VarID, pextrap(:,i1:i2,j1:j2,3), start=ibeg,    &
          count=icnt)
     iret = nf90_inq_varid(ncid0, sanal(12), VarID)
-    iret = nf90_put_var(ncid0, VarID, a_vp(:,i1:i2,j1:j2), start=ibeg,    &
-         count=icnt)
-    iret = nf90_inq_varid(ncid0, sanal(13), VarID)
     iret = nf90_put_var(ncid0, VarID, a_wp(:,i1:i2,j1:j2), start=ibeg,    &
          count=icnt)
+    iret = nf90_inq_varid(ncid0, sanal(13), VarID)
+    iret = nf90_put_var(ncid0, VarID, pextrap(:,i1:i2,j1:j2,1), start=ibeg, &
+         count=icnt)
     iret = nf90_inq_varid(ncid0, sanal(14), VarID)
-    iret = nf90_put_var(ncid0, VarID, a_tp(:,i1:i2,j1:j2)+th00, start=ibeg, &
+    iret = nf90_put_var(ncid0, VarID, pextrap(:,i1:i2,j1:j2,2), start=ibeg, &
          count=icnt)
+
     iret = nf90_inq_varid(ncid0, sanal(15), VarID)
-    iret = nf90_put_var(ncid0, VarID, press(:,i1:i2,j1:j2), start=ibeg, &
+    iret = nf90_put_var(ncid0, VarID, pextrap(:,i1:i2,j1:j2,4), start=ibeg, &
          count=icnt)
-    if (level > 0) then
-       iret = nf90_inq_varid(ncid0, sanal(16), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_rp(:,i1:i2,j1:j2), start=ibeg, &
-           count=icnt)
-    end if 
-    if (level >= 2)  then
-       iret = nf90_inq_varid(ncid0, sanal(17), VarID)
-       iret = nf90_put_var(ncid0, VarID, liquid(:,i1:i2,j1:j2), start=ibeg, &
-            count=icnt)
-    end if
+   iret = nf90_inq_varid(ncid0, sanal(16), VarID)
+   iret = nf90_put_var(ncid0, VarID, pextrap(:,i1:i2,j1:j2,5), start=ibeg, &
+         count=icnt)
+   iret = nf90_inq_varid(ncid0, sanal(17), VarID)
+   iret = nf90_put_var(ncid0, VarID, pextrap(:,i1:i2,j1:j2,6), start=ibeg, &
+         count=icnt)
+   iret = nf90_inq_varid(ncid0, sanal(18), VarID)
+   iret = nf90_put_var(ncid0, VarID, pextrap(:,i1:i2,j1:j2,7), start=ibeg, &
+         count=icnt)
+   iret = nf90_inq_varid(ncid0, sanal(19), VarID)
+   iret = nf90_put_var(ncid0, VarID, pextrap(:,i1:i2,j1:j2,8), start=ibeg, &
+         count=icnt)
+   iret = nf90_inq_varid(ncid0, sanal(20), VarID)
+   iret = nf90_put_var(ncid0, VarID, pextrap(:,i1:i2,j1:j2,9), start=ibeg, &
+         count=icnt)
+   iret = nf90_inq_varid(ncid0, sanal(21), VarID)
+   iret = nf90_put_var(ncid0, VarID, pextrap(:,i1:i2,j1:j2,10), start=ibeg, &
+         count=icnt)
+   iret = nf90_inq_varid(ncid0, sanal(22), VarID)
+   iret = nf90_put_var(ncid0, VarID, pextrap(:,i1:i2,j1:j2,11), start=ibeg, &
+         count=icnt)
+   iret = nf90_inq_varid(ncid0, sanal(23), VarID)
+   iret = nf90_put_var(ncid0, VarID, pextrap(:,i1:i2,j1:j2,12), start=ibeg, &
+         count=icnt)
+   iret = nf90_inq_varid(ncid0, sanal(24), VarID)
+   iret = nf90_put_var(ncid0, VarID, pextrap(:,i1:i2,j1:j2,13), start=ibeg, &
+        count=icnt)
+
+
+!    if (level > 0) then
+!       iret = nf90_inq_varid(ncid0, sanal(26), VarID)
+!       iret = nf90_put_var(ncid0, VarID, a_rp(:,i1:i2,j1:j2), start=ibeg, &
+!           count=icnt)
+!    end if 
+!    if (level >= 2)  then
+!       iret = nf90_inq_varid(ncid0, sanal(27), VarID)
+!       iret = nf90_put_var(ncid0, VarID, liquid(:,i1:i2,j1:j2), start=ibeg, &
+!            count=icnt)
+!    end if
     nn = nbase+2
 
     if (level >=3) then
-      do n = nbase+2, 18
+      do n = nbase+2, 28
         nn = nn+1
         call newvar(nn-12)
-        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
-        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
-               count=icnt)
+ !       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+ !       iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
+ !              count=icnt)
          !if (myid==0) print*,"sanal(nn):",sanal(nn),nn
        end do
     endif  
 
     if (level >=4) then
-      do n = 20, 23
+      do n = 30, 33
         nn = nn+1
         call newvar(nn-12)
-        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
-        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
-               count=icnt)
+!        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+!        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
+!               count=icnt)
         !if (myid==0) print*,"sanal(nn):",sanal(nn),nn
       end do
     endif  
 
     if (level >=5) then
-      do n = 24, 27
+      do n = 34, 37
         nn = nn+1
         call newvar(nn-12)
-        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
-        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
-             count=icnt)
+!        iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+!        iret = nf90_put_var(ncid0,VarID,a_sp(:,i1:i2,j1:j2), start=ibeg,   &
+!             count=icnt)
         !if (myid==0) print*,"sanal(nn):",sanal(nn),nn
       end do
     endif  
 
     if (iradtyp > 1)  then
        nn = nn+1
-       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
-            count=icnt)  
+!       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+!       iret = nf90_put_var(ncid0, VarID, a_rflx(:,i1:i2,j1:j2), start=ibeg, &
+!            count=icnt)  
        nn = nn+1
-       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_lflxu(:,i1:i2,j1:j2), start=ibeg, &
-            count=icnt)
+!       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+!       iret = nf90_put_var(ncid0, VarID, a_lflxu(:,i1:i2,j1:j2), start=ibeg, &
+!            count=icnt)
        nn = nn+1
-       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
-       iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
-            count=icnt)
+!       iret = nf90_inq_varid(ncid0, sanal(nn), VarID)
+!       iret = nf90_put_var(ncid0, VarID, a_lflxd(:,i1:i2,j1:j2), start=ibeg, &
+!            count=icnt)
     end if
     !Malte: Land Surface Output for isfctyp=5
     if (isfctyp == 5) then 
@@ -1451,6 +1485,7 @@ contains
        if (itype==0) ncinfo = 'Third moment of s (extended liquid water specific humidity)'
        if (itype==1) ncinfo = ''
        if (itype==2) ncinfo = 'tttt'
+!
     case('up1zlcl')    
        if (itype==0) ncinfo = 'EDMF test updraft LCL'
        if (itype==1) ncinfo = 'm'
@@ -1475,6 +1510,7 @@ contains
        if (itype==0) ncinfo = 'EDMF moist updraft termination height'
        if (itype==1) ncinfo = 'm'
        if (itype==2) ncinfo = 'time'
+!
     case('up1a')    
        if (itype==0) ncinfo = 'EDMF test updraft area fraction'
        if (itype==1) ncinfo = '%'
@@ -1547,14 +1583,133 @@ contains
        if (itype==0) ncinfo = 'EDMF moist updraft qt excess'
        if (itype==1) ncinfo = 'g/kg'
        if (itype==2) ncinfo = 'tttt'
-    case('edmf_ws')
-       if (itype==0) ncinfo = 'EDMF vertical velocity variance'
+!
+    case('edmf_w')    
+       if (itype==0) ncinfo = 'EDMF w'
        if (itype==1) ncinfo = 'm/s'
        if (itype==2) ncinfo = 'tttt'
-    case('edmf_mf')    
-       if (itype==0) ncinfo = 'EDMF Mass flux'
+    case('wqt')    
+       if (itype==0) ncinfo = 'EDMF wqt'
+       if (itype==1) ncinfo = 'W/m2'
+       if (itype==2) ncinfo = 'tttt'
+    case('wthl')    
+       if (itype==0) ncinfo = 'EDMF wthl'
+       if (itype==1) ncinfo = 'W/m2'
+       if (itype==2) ncinfo = 'tttt'
+    case('acld')    
+       if (itype==0) ncinfo = 'EDMF cloud fraction'
+       if (itype==1) ncinfo = '%'
+       if (itype==2) ncinfo = 'tttt'
+    case('qlcld')    
+       if (itype==0) ncinfo = 'EDMF condensate'
+       if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('aup_all')    
+       if (itype==0) ncinfo = 'EDMF updraft fraction'
+       if (itype==1) ncinfo = '0-1'
+       if (itype==2) ncinfo = 'tttt'
+    case('aup_cld')    
+       if (itype==0) ncinfo = 'EDMF updraft fraction - cloudy part'
+       if (itype==1) ncinfo = '0-1'
+       if (itype==2) ncinfo = 'tttt'
+    case('Mup_cld')    
+       if (itype==0) ncinfo = 'EDMF updraft mass flux - cloudy part'
        if (itype==1) ncinfo = 'm/s'
        if (itype==2) ncinfo = 'tttt'
+    case('cup_cld')    
+       if (itype==0) ncinfo = 'EDMF updraft condensate - cloudy part'
+       if (itype==1) ncinfo = 'g/kg'
+       if (itype==2) ncinfo = 'tttt'
+    case('w_up1')    
+       if (itype==0) ncinfo = 'EDMF w updraft 1'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('w_up2')
+       if (itype==0) ncinfo = 'EDMF w updraft 2'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('w_up3')
+       if (itype==0) ncinfo = 'EDMF w updraft 3'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('w_up4')
+       if (itype==0) ncinfo = 'EDMF w updraft 4'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('w_up5')
+       if (itype==0) ncinfo = 'EDMF w updraft 5'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('w_up6')
+       if (itype==0) ncinfo = 'EDMF w updraft 6'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('w_up7')
+       if (itype==0) ncinfo = 'EDMF w updraft 7'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('w_up8')
+       if (itype==0) ncinfo = 'EDMF w updraft 8'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('w_up9')
+       if (itype==0) ncinfo = 'EDMF w updraft 9'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('w_up10')
+       if (itype==0) ncinfo = 'EDMF w updraft 10'
+       if (itype==1) ncinfo = 'm/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('aup_1')
+       if (itype==0) ncinfo = 'EDMF updraft 1 fraction'
+       if (itype==1) ncinfo = '0-1'
+       if (itype==2) ncinfo = 'tttt'
+    case('aup_2')
+       if (itype==0) ncinfo = 'EDMF updraft 2 fraction'
+       if (itype==1) ncinfo = '0-1'
+       if (itype==2) ncinfo = 'tttt'
+    case('aup_3')
+       if (itype==0) ncinfo = 'EDMF updraft 3 fraction'
+       if (itype==1) ncinfo = '0-1'
+       if (itype==2) ncinfo = 'tttt'
+    case('aup_4')
+       if (itype==0) ncinfo = 'EDMF updraft 4 fraction'
+       if (itype==1) ncinfo = '0-1'
+       if (itype==2) ncinfo = 'tttt'
+    case('aup_5')
+       if (itype==0) ncinfo = 'EDMF updraft 5 fraction'
+       if (itype==1) ncinfo = '0-1'
+       if (itype==2) ncinfo = 'tttt'
+    case('aup_6')
+       if (itype==0) ncinfo = 'EDMF updraft 6 fraction'
+       if (itype==1) ncinfo = '0-1'
+       if (itype==2) ncinfo = 'tttt'
+    case('aup_7')
+       if (itype==0) ncinfo = 'EDMF updraft 7 fraction'
+       if (itype==1) ncinfo = '0-1'
+       if (itype==2) ncinfo = 'tttt'
+    case('aup_8')
+       if (itype==0) ncinfo = 'EDMF updraft 8 fraction'
+       if (itype==1) ncinfo = '0-1'
+       if (itype==2) ncinfo = 'tttt'
+    case('aup_9')
+       if (itype==0) ncinfo = 'EDMF updraft 9 fraction'
+       if (itype==1) ncinfo = '0-1'
+       if (itype==2) ncinfo = 'tttt'
+    case('aup_10')
+       if (itype==0) ncinfo = 'EDMF updraft 10 fraction'
+       if (itype==1) ncinfo = '0-1'
+       if (itype==2) ncinfo = 'tttt'
+    case('K_EDMF')
+       if (itype==0) ncinfo = 'EDMF K'
+       if (itype==1) ncinfo = 'm2/s'
+       if (itype==2) ncinfo = 'tttt'
+    case('dqtdz_e')
+       if (itype==0) ncinfo = 'EDMF dqtdz'
+       if (itype==1) ncinfo = 'kg/kg m'
+       if (itype==2) ncinfo = 'tttt'
+
+!
     case('Qnet')    
        if (itype==0) ncinfo = 'Qnet'
        if (itype==1) ncinfo = 'w/m^2'

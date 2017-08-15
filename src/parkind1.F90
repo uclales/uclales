@@ -40,8 +40,9 @@ end module yos_cst
 module yomct0
   use parkind1, only : jprb
 implicit none
-  logical, parameter :: lscmec = .true., lsfcflx = .true.
-  real(kind=jprb)    :: rextshf = 1, rextlhf = 1
+  logical, parameter :: lsfcflx     = .true.  !switch for using prescribed sfc fluxes (only option so far: should be .true.)
+  logical, parameter :: lsfcflx_les = .true.  !switch for using LES fluxes (.false. : use constant namelist fluxes)
+  real(kind=jprb)    :: rextshf = 1, rextlhf = 1, rextmomf = 1
 end module yomct0
 
 module yomjfh
@@ -66,18 +67,35 @@ end module yoecumf
 
 module garbage
   use parkind1, only : jprb, jpim
-  use yoethf, only : r2es, r3ies, r3les, r4ies, r4les, rtt, ralsdcp, ralvdcp, r5alscp, r5alvcp, rtice, rtwat, rtwat_rtice_r
+  use yoethf, only : r2es, r3ies, r3les, r4ies, r4les, r5ies, r5les, rtt, ralsdcp, ralvdcp, r5alscp, r5alvcp, rtice, rtwat, rtwat_rtice_r
   implicit none
 contains
-!   real(kind=jprb) function foedelta (ptare)
-!   real(kind=jprb) :: ptare
-!       foedelta = max (0.0_jprb,sign(1.0_jprb,ptare-rtt))
-!  end function foedelta
-  real(kind=jprb) function foealfa (ptare)
+
+real(kind=jprb) function foedelta (ptare)
+real(kind=jprb) :: ptare
+  foedelta = max (0.0_jprb,sign(1.0_jprb,ptare-rtt))
+end function foedelta
+
+real(kind=jprb) function foeew (ptare)
+real(kind=jprb) :: ptare
+  foeew = r2es*exp (&
+    & (r3les*foedelta(ptare)+r3ies*(1.0_jprb-foedelta(ptare)))*(ptare-rtt) &
+    & / (ptare-(r4les*foedelta(ptare)+r4ies*(1.0_jprb-foedelta(ptare)))))
+end function foeew
+
+real(kind=jprb) function foedesu (ptare)
+real(kind=jprb) :: ptare
+  foedesu = &
+    & (foedelta(ptare)*r5les+(1.0_jprb-foedelta(ptare))*r5ies)&
+    & / (ptare-(r4les*foedelta(ptare)+r4ies*(1.0_jprb-foedelta(ptare))))**2
+end function foedesu
+
+real(kind=jprb) function foealfa (ptare)
   real(kind=jprb) :: ptare
 foealfa = min(1.0_jprb,((max(rtice,min(rtwat,ptare))-rtice)&
  &*rtwat_rtice_r)**2) 
- end function foealfa
+end function foealfa
+
 !   real(kind=jprb) function foedem (ptare)
 !   real(kind=jprb) :: ptare
 !       foedem = foealfa(ptare)*r5alvcp*(1.0_jprb/(ptare-r4les)**2)+&
@@ -287,19 +305,19 @@ logical :: firsttime = .true.
 integer(kind=jpim), parameter :: jpritbl=101
 real(kind=jprb) :: ritbl(jpritbl)
 real(kind=jprb) :: aritbl(jpritbl)
-! real(kind=jprb) :: rchba
-! real(kind=jprb) :: rchbb
-! real(kind=jprb) :: rchbc
-! real(kind=jprb) :: rchbd
-! real(kind=jprb) :: rchb23a
-! real(kind=jprb) :: rchbbcd
-! real(kind=jprb) :: rchbcd
+real(kind=jprb) :: rchba
+real(kind=jprb) :: rchbb
+real(kind=jprb) :: rchbc
+real(kind=jprb) :: rchbd
+real(kind=jprb) :: rchb23a
+real(kind=jprb) :: rchbbcd
+real(kind=jprb) :: rchbcd
 real(kind=jprb) :: rcheta
 real(kind=jprb) :: rchetb
-! real(kind=jprb) :: rchetc
-! real(kind=jprb) :: rchbhdl
+!real(kind=jprb) :: rchetc
+real(kind=jprb) :: rchbhdl
 real(kind=jprb) :: rcdhalf
-! real(kind=jprb) :: rcdhpi2
+real(kind=jprb) :: rcdhpi2
 real(kind=jprb) :: rimax
 real(kind=jprb) :: dritbl
 real(kind=jprb) :: dri26
@@ -414,22 +432,22 @@ contains
   rcheta=5._jprb
   rchetb=4._jprb
 !   rchetc=8._jprb
-!   rchbhdl = 5._jprb
+   rchbhdl = 5._jprb
 ! 
 !   !     1.21 constants for holtslag and debruin functions (stable psi)
 ! 
-!   rchba   = 1._jprb
-!   rchbb   = 2.0_jprb/3._jprb
-!   rchbc   = 5._jprb
-!   rchbd   = 0.35_jprb
-!   rchb23a = (2.0_jprb/3._jprb)*rchba
-!   rchbbcd = rchbb*rchbc/rchbd
-!   rchbcd  = rchbc/rchbd
+   rchba   = 1._jprb
+   rchbb   = 2.0_jprb/3._jprb
+   rchbc   = 5._jprb
+   rchbd   = 0.35_jprb
+   rchb23a = (2.0_jprb/3._jprb)*rchba
+   rchbbcd = rchbb*rchbc/rchbd
+   rchbcd  = rchbc/rchbd
 ! 
 !   !     1.3 constants for dyer and hicks expressions (unstable)
 ! 
   rcdhalf = 16._jprb
-!   rcdhpi2 = 2.0_jprb*atan(1.0_jprb)
+  rcdhpi2 = 2.0_jprb*atan(1.0_jprb)
 ! 
 !   *    3. loop over table index
 !          ---- ---- ----- -----
@@ -495,24 +513,50 @@ contains
 
   real function phihs(peta)
     real(kind=jprb) :: peta
-    phihs=(1.0_jprb+rchetb*peta)**2
+    phihs = (1.0_jprb+rchetb*peta)**2
   end function phihs
   
   real function phims(peta)
     real(kind=jprb) :: peta
-    phims=1.0_jprb+rcheta*peta
+    phims = 1.0_jprb+rcheta*peta
   end function phims
   
+  real function psihs(peta)
+    real(kind=jprb) :: peta
+    psihs = -rchbb*(peta-rchbcd)*exp  (-rchbd*peta)&
+              &-(1.0_jprb+rchb23a*peta)*sqrt(1.0_jprb+rchb23a*peta)-rchbbcd+1.0_jprb
+  end function psihs
+
+  real function psims(peta)
+    real(kind=jprb) :: peta
+    psims = -rchbb*(peta-rchbcd)*exp  (-rchbd*peta)&
+               &-rchba*peta - rchbbcd
+  end function psims
+
   real function phihu(peta)
     real(kind=jprb) :: peta
-    phihu= 1.0_jprb/     sqrt(1.0_jprb-rcdhalf*peta)
+    phihu = 1.0_jprb/     sqrt(1.0_jprb-rcdhalf*peta)
   end function phihu
   
   real function phimu(peta)
     real(kind=jprb) :: peta
-  phimu= 1.0_jprb/sqrt(sqrt(1.0_jprb-rcdhalf*peta))
+    phimu = 1.0_jprb/sqrt(sqrt(1.0_jprb-rcdhalf*peta))
   end function phimu
-  
+
+  real function psihu(peta)
+    real(kind=jprb) :: peta
+    psihu = 2.0_jprb*log((1.0_jprb+     sqrt(1.0_jprb-rcdhalf*peta))*0.5_jprb )
+  end function psihu
+
+  real function psimu(peta)
+    real(kind=jprb) :: peta
+    psimu =  log((1.0_jprb+sqrt(sqrt(1.0_jprb-rcdhalf*peta)))**2 &
+                  &*(1.0_jprb+     sqrt(1.0_jprb-rcdhalf*peta) ) *0.125_jprb )&
+                  &-2.0_jprb*atan(sqrt(sqrt(1.0_jprb-rcdhalf*peta)))&
+                  &+ rcdhpi2
+  end function psimu
+
+
 end module yoevdfs
 module yoevdf
 
@@ -528,9 +572,7 @@ save
 
 ! integer(kind=jpim) ,parameter :: nvtypes
 real(kind=jprb) ,parameter :: rlam =150._jprb
-real(kind=jprb) ,parameter :: rkap=0.4_jprb
 real(kind=jprb) ,parameter :: rvdifts=1.5_jprb
-real(kind=jprb) ,parameter :: repdu2=(0.1_jprb)**2
 ! real(kind=jprb) ,parameter :: rentr=0.20_jprb
 ! real(kind=jprb) ,parameter :: rpar=2._jprb
 ! real(kind=jprb) ,parameter :: rpar1=0.6_jprb
@@ -624,17 +666,127 @@ end module yoephli
 module yoephy
   use parkind1, only : jprb
 implicit none
-  logical, parameter :: leocwa = .false., leocco = .false., lvdftrac = .false.
+  logical :: lvdftrac = .false.
 end module yoephy
+
 module yos_exc
- 
+!     ------------------------------------------------------------------
+!*    ** *YOS_EXC* CONTAINS CONSTANTS NEEDED BY *V....*
+!     ------------------------------------------------------------------
+
 use parkind1  ,only : jpim     ,jprb
-
 implicit none
-
 save
+!-- IFS switches used in surface energy balance solver: see suvexc_mod.F90, yos_exc.F90, vdfdifh.F90, surfseb.F90 --
+logical :: lelwdd   = .true.    ! TRUE when longwave downward derivative is used for skin temperature
+logical :: leocwa   = .false.   ! TRUE if WARM OCEAN LAYER PARAMETRIZATION active
+logical :: leocsa   = .false.   ! TRUE if SALINTY EFFECT ON SATURATION AT OCEAN SURFACE active
+logical :: leocco   = .false.   ! TRUE if COOL OCEAN SKIN PARAMETRIZATION active
+real(kind=jprb) ,parameter :: repdu2 = (0.1_jprb)**2    ! MINIMUM VELOCITY DIFFERENCE IN RI-NUMBER
+real(kind=jprb), parameter :: repust = 0.0001_jprb      ! minimum friction velocity (security parameter)
+real(kind=jprb) ,parameter :: rkap   = 0.4_jprb         ! VONKARMAN CONSTANT
+REAL(KIND=JPRB), parameter :: rz0ice = 0.001_JPRB       ! ROUGHNESS OVER SEA ICE
+real(kind=jprb) ,parameter :: rparzi = 1000._JPRB       ! ENTRAINMENT PARAMETRIZATION
 
-real(kind=jprb), parameter :: repust =0.0001_jprb   ! minimum friction velocity (security parameter)
+!*     *YOS_EXC* CONTAINS CONSTANTS NEEDED BY *V....*
+!     FOR THE COMPUTATION OF SURFACE DIFFUSION EXCHANGE COEFFICIENTS
+
+!     A.C.M. BELJAARS      E.C.M.W.F.    14/12/89
+!     OBUKHOV-L UPDATE     ACMB          26/03/90.
+!     surf externalisation P. Viterbo    09/06/2005
 
 end module yos_exc
+
+module yos_veg
+!     ------------------------------------------------------------------
+!*    ** *yos_veg* contains IFS surface tile system info
+!         defined in yos_veg.F90 and set in susveg_mod.F90
+!         - tile number, types and properties
+!     ------------------------------------------------------------------
+
+use parkind1  ,only : jpim     ,jprb
+implicit none
+save
+
+integer(kind=jpim), parameter :: ntilesifs = 8    !number of tiles in IFS system
+integer(kind=jpim), parameter :: nvtypesifs=20    !number of veg types in IFS system
+
+real(kind=jprb), dimension(ntilesifs) :: &
+ & rvlamsk , &   ! Unstable SKIN LAYER CONDUCT. FOR EACH TILE
+ & rvlamsks, &   ! Stable SKIN LAYER CONDUCT. FOR EACH TILE
+ & rvtrsr        ! TRANSMISSION OF NET SOLAR RAD. THROUGH VEG.
+
+real(kind=jprb), dimension(0:nvtypesifs) :: &
+ & rvz0m         ! Roughness length for momentum (Mahfouf et al. 1995)
+
+contains
+
+subroutine susveg
+!     ------------------------------------------------------------------
+!*    ** subroutine *susveg* initializes module *yos_veg*
+!       IFS tile and veg properties, defined in yos_veg.F90 and set in susveg_mod.F90
+!     ------------------------------------------------------------------
+
+use parkind1  ,only : jpim     ,jprb
+
+real(kind=jprb) ::  zsnow    = 7._jprb
+real(kind=jprb) ::  rlhaero  = 15._jprb    ! Unstable Aerodyn. lambda between high canopy and surface
+real(kind=jprb) ::  rlhaeros = 10._jprb    ! Stable Aerodyn. lambda between high canopy and surface
+real(kind=jprb) ::  zlarge   = 1.e10_jprb
+
+rvlamsk(1)=zlarge                     !  water
+rvlamsk(2)=58._jprb                   !  sea ice
+rvlamsk(3)=10._jprb                   !  wet skin
+rvlamsk(4)=10._jprb                   !  low veg. (aerodyn.+rad.+soil)
+rvlamsk(5)=zsnow                      !  snow
+rvlamsk(6)=rlhaero+5._jprb            !  high veg. (aerodyn.+rad.)
+rvlamsk(7)=rlhaero+5._jprb            !  snow under veg (aerodyn.+rad.)
+rvlamsk(8)=15._jprb                   !  bare soil
+
+rvlamsks(1)=zlarge                     !  water
+rvlamsks(2)=58._jprb                   !  sea ice
+rvlamsks(3)=10._jprb                   !  wet skin
+rvlamsks(4)=10._jprb                   !  low veg. (aerodyn.+rad.+soil)
+rvlamsks(5)=zsnow                      !  snow
+rvlamsks(6)=rlhaeros+5._jprb           !  high veg. (aerodyn.+rad.)
+rvlamsks(7)=rlhaeros+5._jprb           !  snow under veg (aerodyn.+rad.+snow
+rvlamsks(8)=15._jprb                   !  bare soil
+
+rvtrsr(1)=0.00_jprb     ! ocean (ssr transmission does not apply)
+rvtrsr(2)=0.00_jprb     ! ice   (ssr transmission does not apply)
+rvtrsr(3)=0.05_jprb     ! wet skin (this is a compromise)
+rvtrsr(4)=0.05_jprb     ! low vegetation
+rvtrsr(5)=0.00_jprb     ! snow on vegetation (ssr transmission does not apply)
+rvtrsr(6)=0.03_jprb     ! high veg.
+rvtrsr(7)=0.03_jprb     ! snow under veg.
+rvtrsr(8)=0.00_jprb     ! bare soil (ssr transmission does not apply)
+
+! Roughness length for momentum (Mahfouf et al. 1995)
+
+RVZ0M(1)=0.15_JPRB     ! Crops, Mixed Farming
+RVZ0M(2)=0.02_JPRB     ! Short Grass
+RVZ0M(3)=2.00_JPRB     ! Evergreen Needleleaf Trees
+RVZ0M(4)=2.00_JPRB     ! Deciduous Needleleaf Trees
+RVZ0M(5)=2.00_JPRB     ! Deciduous Broadleaf Trees
+RVZ0M(6)=4.00_JPRB     ! Evergreen Broadleaf Trees
+RVZ0M(7)=0.10_JPRB     ! Tall Grass
+RVZ0M(8)=0.013_JPRB    ! Desert                    # Masson et al.
+RVZ0M(9)=0.05_JPRB     ! Tundra
+RVZ0M(10)=0.15_JPRB    ! Irrigated Crops           # Crops type 1
+RVZ0M(11)=0.05_JPRB    ! Semidesert 
+RVZ0M(12)=0.0013_JPRB  ! Ice Caps and Glaciers     # Mason et al. 
+RVZ0M(13)=0.05_JPRB    ! Bogs and Marshes
+RVZ0M(14)=0.0001_JPRB  ! Inland Water              # Not used but needs value here
+RVZ0M(15)=0.0001_JPRB  ! Ocean                     # Not used but needs value here
+RVZ0M(16)=0.10_JPRB    ! Evergreen Shrubs
+RVZ0M(17)=0.10_JPRB    ! Deciduous Shrubs
+RVZ0M(18)=2.00_JPRB    ! Mixed Forest/woodland
+RVZ0M(19)=0.50_JPRB    ! Interrupted Forest        # New value invented here
+RVZ0M(20)=0.02_JPRB    ! Water and Land Mixtures   # Not used but needs value here
+RVZ0M(0)=RVZ0M(8)      !                           # Bare soil value
+
+end subroutine susveg
+
+end module yos_veg
+
 

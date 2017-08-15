@@ -23,6 +23,7 @@ module grid
 !  use ncio, only : open_nc, define_nc
 !irina
 !  use step, only : case_name
+
   implicit none
   !
   integer           :: nxp = 132           ! number of x points
@@ -34,6 +35,7 @@ module grid
   real              :: deltax = 35.        ! dx for basic grid
   real              :: deltay = 35.        ! dy for basic grid
   real              :: deltaz = 17.5       ! dz for basic grid
+  real              :: edmfnfilter = 100.  ! for zr_filter
   real              :: dzrat  = 1.0        ! grid stretching ratio
   real              :: dzmax  = 1200.      ! height to start grid-stretching
   real              :: dtlong = 10.0       ! long timestep
@@ -151,8 +153,11 @@ module grid
   !
   integer :: nscl = 4
 
-  !Maren, output of edmf cross sections
+  !Maren, output of edmf cross sections and 3d-data
   real, dimension (:,:,:), allocatable :: pextrac
+  real, dimension (:,:,:,:), allocatable :: pextrap
+  !Maren, scale-adaptive ED
+  real, dimension (:,:,:), allocatable :: kh_les
   !
 contains
   !
@@ -442,9 +447,12 @@ contains
             memsize*1.e-6*kind(0.0)
     end if
 
-  !output of edmf cross sections
-  allocate (pextrac(nxp,nyp,15))
+  !Maren: output of edmf cross sections and 3d-data
+  allocate (pextrac(nxp,nyp,15),pextrap(nzp,nxp,nyp,13))
   pextrac = 0.
+  pextrap = 0.
+  allocate (kh_les(nzp,nxp,nyp))
+  kh_les = 0.
 
   end subroutine define_vars
   !
@@ -849,5 +857,4 @@ contains
   end subroutine newvar
 
 end module grid
-
 

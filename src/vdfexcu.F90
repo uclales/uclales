@@ -1,4 +1,4 @@
-subroutine vdfexcu(pnog   , kidia  , kfdia  , klon   , klev   , kdraft , ptmst  , pz0mm  , &
+subroutine vdfexcu(kidia  , kfdia  , klon   , klev   , kdraft , ptmst  , pz0mm  , &
                   &phrlw  , phrsw  , &
                   &pum1   , pvm1   , ptm1   , pqm1   , plm1   , pim1   , &
                   &paphm1 , papm1  , pgeom1 , pgeoh  , pcptgz , &
@@ -7,8 +7,8 @@ subroutine vdfexcu(pnog   , kidia  , kfdia  , klon   , klev   , kdraft , ptmst  
  !
                   &pkmfl  , pkhfl  , pkqfl  , &
                   &pcfm   , pcfh   , ptauxcg, ptauycg, &
-                  &pricui , pmcu   , pdthv  , pmflx  , kvartop, &
-                  &pzinv  , khpbl  , pkh    , pzcldbase , pzcldtop     , kpbltype)
+                  &pmflx  , kvartop, &
+                  &pzinv  , khpbl  , pkh    , pzcldbase , pzcldtop     , kpbltype, pk_les)
 !     ------------------------------------------------------------------
 
 !**   *vdfexcu* - determines the exchange coefficients between the
@@ -57,7 +57,7 @@ subroutine vdfexcu(pnog   , kidia  , kfdia  , klon   , klev   , kdraft , ptmst  
 !     *pkmfl*        kinematic momentum flux                [#]
 !     *pkhfl*        kinematic heat flux                    [#]
 !     *pkqfl*        kinematic moisture flux                [#]
-!     *pzinv*        inversion height                   [m]
+!     *pzinv*        inversion height              	    [m]
 !     *pkh*          turb. diff. coeff. for heat above surf. lay.  (m2/s)
 
 !     output parameters (real):
@@ -78,27 +78,30 @@ subroutine vdfexcu(pnog   , kidia  , kfdia  , klon   , klev   , kdraft , ptmst  
 !     see documentation
 
 !     ------------------------------------------------------------------
+
 use parkind1  ,only : jpim     ,jprb
 ! ! use yomhook   ,only : lhook,   dr_hook
 
-use yos_cst   , only : rg       ,rd       ,rcpd     ,retv     ,ratm
+use yos_cst  , only : rg        ,rd       ,rcpd     ,retv     ,ratm
 use yoethf   , only : rvtmp2
-use yoevdf   , only : rlam     ,rkap     ,rvdifts  ,repdu2   ,lldiag   
+use yoevdf   , only : rlam      ,rvdifts  ,lldiag   
 use yoevdfs, only : dritbl, dri26, jpritbl, rimax, phims, phihs, phimu, phihu, ritbl, aritbl
 ! use yoevdfs  , only : jpritbl  ,ritbl    ,aritbl   ,rchba    ,&
 !                     & rchbb    ,rchbd    ,rchb23a  ,rchbbcd  ,rchbcd   ,&
 !                     & rcheta   ,rchetb   ,rcdhalf  ,rcdhpi2  ,rimax    ,&
 !                     & dritbl   ,dri26  ,phims, phihs, phimu, phihu
-use yoephli  , only : rlpmixl  ,rlpbeta
+use yoephli  , only : rlpmixl   ,rlpbeta
 use yomjfh   , only : n_vmass
-use yos_exc, only : repust
+use yos_exc  , only : rkap      , repust  , repdu2   
+use grid     , only : kh_les, deltax, nxp, nyp, nzp, a_theta, dzi_m, zt
+use stat     , only : get_zi
 
 implicit none
 
 
 !*         0.1    global variables
 
-integer(kind=jpim),intent(in)    :: klon , pnog
+integer(kind=jpim),intent(in)    :: klon 
 integer(kind=jpim),intent(in)    :: klev 
 integer(kind=jpim),intent(in)    :: kidia 
 integer(kind=jpim),intent(in)    :: kfdia 
@@ -131,14 +134,11 @@ real(kind=jprb)   ,intent(out)   :: pkh(klon,klev)
 real(kind=jprb)   ,intent(in)    :: pzcldbase(klon)
 real(kind=jprb)   ,intent(in)    :: pzcldtop(klon)
 integer(kind=jpim),intent(in)    :: kpbltype(klon) 
-real(kind=jprb)   ,intent(in)    :: pricui(klon) 
-real(kind=jprb)   ,intent(in)    :: pdthv(klon) 
-real(kind=jprb)   ,intent(in)    :: pmcu(klon) 
 real(kind=jprb)   ,intent(inout) :: pmflx(klon,0:klev,kdraft) 
 integer(kind=jpim),intent(in)    :: kvartop(klon)
 !          diagnostic output
 integer(kind=jpim),intent(in)     :: kfldx2, klevx, kfldx
-real(kind=jprb)   ,intent(inout)  :: pextr2(pnog,kfldx2), pextra(pnog,klevx,kfldx)
+real(kind=jprb)   ,intent(inout)  :: pextr2(klon,kfldx2), pextra(klon,klevx,kfldx), pk_les(klon,klevx)
 
 !*         0.2    local variables
 
@@ -156,11 +156,9 @@ real(kind=jprb) ::    zentrsfc, zentrrad, zentrtop, &
                     & zlim, zlim2, zphikh, zphikm, zscf, &
                     & zx2, zz, zwtventr, zkh, zcfhnew, &
                     & zml, zbase, zvsc, zkcld, &
-                    & zkfacedmf, ztaux, ztauy
+                    & zkfacedmf, ztaux, ztauy, zkmax
 
-real(kind=jprb) ::    zzh, zifltgm, zifltgh, zifmom, zifmoh, zbm, zbh, zcm, zch, zdudz
-                    
-logical ::         llricu
+real(kind=jprb) ::    zzh, zifltgm, zifltgh, zifmom, zifmoh, zbm, zbh, zcm, zch, zdudz, zsh, w1d, beta, zturb
                     
 real(kind=jprb) :: zdradflx(klon), zradkbase(klon), zradkdepth(klon), &
                  & zradkfac(klon)
@@ -198,8 +196,7 @@ zcd       = 1.0_jprb
 zcb       = 5.0_jprb
 zeps      = 1.e-10_jprb
 
-llricu = .true.   ! switch for top-entrainment efficiency closure using ri^cu at cumulus pbl top
-!llricu = .false.  
+beta      = 0.15_jprb
 
 !zkfacedmf = 1.0_jprb
 zkfacedmf = 0.8_jprb     !aup = 5%   !cy32r3
@@ -415,6 +412,7 @@ endif
         zphih(jl) = phihu(zeta)
       endif
     enddo
+
 !   if(n_vmass <= 0) then ! vector mass taken out because completely changed code
 
     do jl=kidia,kfdia
@@ -473,14 +471,16 @@ endif
         zbh     = rkap * zzh * sqrt(zifltgh) 
         zcm     = 150.0_jprb * sqrt(zifmom )
         zch     = 150.0_jprb * sqrt(zifmoh )
+        zsh     = 1._jprb - (1._jprb/((300._jprb*0.011)**2))    !take into account grid length MB, here 100 is deltaX
 
         pcfm(jl,jk) = zcfnc1 * zdudz * (zbm*zcm/(zbm+zcm))**2
         pcfh(jl,jk) = zcfnc1 * zdudz * (zbh*zch/(zbh+zch))**2
       else                            ! statically unstable
         pcfm(jl,jk) = zcfnc1 * zdudz * 150.0_jprb**2 * zifmom
         pcfh(jl,jk) = zcfnc1 * zdudz * 150.0_jprb**2 * zifmoh
-       
       endif
+       ! combination of Smagorinsky and EDMFn K
+       pcfh(jl,jk)  = min(pcfh(jl,jk) , pk_les(jl,jk)*zcfnc1)   !cy32r3
 !-----------------------------
 
 
@@ -490,7 +490,15 @@ endif
       !  pcfm(jl,jk) = 0._jprb
       !endif
 
-      
+      !------------------------------------------------------------------
+      !
+      !   K limiter
+      !
+      !------------------------------------------------------------------
+      zkmax = 1._JPRB * zcfnc1
+
+  !    pcfh(jl,jk)  = min(  pcfh(jl,jk), zkmax )
+  !    pcfm(jl,jk)  = min(  pcfm(jl,jk), zkmax ) 
       
       !------------------------------------------------------------------
       !
@@ -518,6 +526,11 @@ endif
         pcfh(jl,jk)  = zkfacedmf * zcfnc1 * rkap / zphikh * zust(jl) * zz * (1.0_jprb-zdh)**2
         pcfm(jl,jk)  = zkfacedmf * zcfnc1 * rkap / zphikm * zust(jl) * zz * (1.0_jprb-zdh)**2
 
+        ! MB: pragmatic blending from boutle 14: K=W(1D) K(EDMFn) + (1-W(1D)) K(LES)
+        zturb = get_zi(nzp, nxp, nyp, 2, a_theta, dzi_m, zt, 1.)   ! maximum gradient
+        w1d = 1._jprb - tanh (beta * zturb/deltax) * max(0._jprb , 1._jprb - (deltax / (4._jprb*zturb)))
+        pcfh(jl,jk)  = w1d * pcfh(jl,jk)  + (1._jprb-w1d) * pk_les(jl,jk)*zcfnc1
+
         ptauxcg(jl,jk)=zdh*(1._jprb-zdh)**2*ztauxcg(jl)
         ptauycg(jl,jk)=zdh*(1._jprb-zdh)**2*ztauycg(jl)
 
@@ -528,7 +541,7 @@ endif
       !------------------------------------------------------------------
       !
       !   3.1   internal k mode in cumulus cloud layer
-      !         ------------------------------
+      !         --------------------------------------
       !
       
       if ( kpbltype(jl) == 3 .or. kpbltype(jl) == 4) then   
@@ -538,8 +551,10 @@ endif
             !  k diffusion within cumulus layer
             !pcfh(jl,jk)  = pcfh(jl,jk)          !testing: ri diffusion 
             !pcfm(jl,jk)  = pcfm(jl,jk)
+            
             pcfh(jl,jk)  = pcfh(jl,khpbl(jl))   !cy32r3
             pcfm(jl,jk)  = pcfm(jl,khpbl(jl))
+            
           else
             !  reset k 
             pcfh(jl,jk)  = 0._jprb 
@@ -593,29 +608,10 @@ endif
       !         this is important for representing the intermediate regime (stcu->cu transitions)    -rn
       !
 
-      if ( llricu .and. jk == kvartop(jl) .and. kpbltype(jl) == 3) then 
+!      if ( llricu .and. jk == kvartop(jl) .and. kpbltype(jl) == 3) then 
 
-        !entrainment efficiency - after wyant et al. (jas, 1997)
-        !zwecutop(jl) = pmcu(jl) * zentrtop * pricui(jl)
-        zwecutop(jl) = 2._jprb * pmcu(jl) * zentrtop * pricui(jl)
-        zwecutop(jl) = max(0.0_jprb,zwecutop(jl))
-          
-        !  translation into k [m2/s] at this level: k = entrainment velocity * mixing-length (dz)
-        zkh = zwecutop(jl)                                !top-entrainment by overshooting surface-driven thermals
-        zkh = zkh + zentrrad * zdradflx(jl) / zdtv(jl )   !add cloud top cooling driven entrainment
-        zkh = zkh * zmgeom(jl) * zrg
-        
-        zkh     = max(0.0_jprb,zkh)
-        zcfhnew = zcfnc1 * zkh
-            
-        pcfh(jl,jk) = zcfhnew
-        pcfm(jl,jk) = zcfhnew * 0.75_jprb
-            
-        !  reset any updraft m
-        pmflx(jl,jk,2) = 0._jprb
-        pmflx(jl,jk,3) = 0._jprb
 
-      endif
+!      endif
 
 
 
@@ -656,7 +652,6 @@ endif
 
         !zdtv(jl) = 1.0_jprb
         !zdtv(jl) = 10.*zdtv(jl)
-        !zdtv(jl) = 2._jprb * pdthv(jl)
 
         zkh     = zwtventr * zmgeom(jl) / ( rg * zdtv(jl) )
 
@@ -684,12 +679,14 @@ endif
 
       pkh(jl,jk) = pcfh(jl,jk) / zcfnc1
 
-
+!pcfh = 0._jprb
       !rn output
       if (lldiag) then
 !        pextr2(jl,19) = zwecutop(jl)           !top entrainment rate
 !        pextr2(jl,20) = zentrtop * pricui(jl)  !entrainment efficiency
         pextra(jl,jk,3) = pcfh(jl,jk)   / zcfnc1   !k [m2/s]
+        pextra(jl,jk,151) = kvartop(jl)   !k [m2/s]
+        pextra(jl,jk,152) = KPBLTYPE(jl)   !k [m2/s]
       endif  
       
     enddo
@@ -697,6 +694,7 @@ endif
 !***
   enddo !jk
 !***
+
 
 ! if (lhook) call dr_hook('vdfexcu',1,zhook_handle)
 end subroutine vdfexcu

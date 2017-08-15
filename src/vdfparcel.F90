@@ -1,12 +1,12 @@
 !options xopt(hsfun)
-subroutine vdfparcel (kidia   , kfdia   , klon    , klev    , kdraft  , &
+subroutine vdfparcel (kidia   , kfdia   , klon    , klev    , kdraft  , kentrain, &
                     & pgeoh   , pgeom1  , paphm1  , &
-                    & pum1    , pvm1    , pqtm1   , pslgm1  , ptven   , &
+                    & pum1    , pvm1    , pwm1    , pqtm1   , pslgm1  , ptven   , &
                     & puuh    , pvuh    , pslguh  , pqtuh   , pwu2h   , pqcuh  , pbuof , & 
                     & pquh    , ptuh    , peps    , pfacexc , &
                     & pzplcl  , kplcl   , pzptop  , kptop   , kplzb   , &
                     & kd      , pupgenl , pupgenn , &
-                    & ptaueps , pw2thresh, lddone , kpbltype)  
+                    & ptaueps , pw2thresh, lddone )  
 !     ------------------------------------------------------------------
 
 !**   *vdfparcel* - vertical integration for parcel ascent
@@ -45,12 +45,6 @@ subroutine vdfparcel (kidia   , kfdia   , klon    , klev    , kdraft  , &
 !                    3: rising dry thermals which become cloudy
 !                    (4: downdrafts .. to be done)
 !     *kd*           draft index
-!     *kpbltype*    -1: not defined yet
-!                    0: stable pbl
-!                    1: dry convective pbl (no cloud below parcel top)
-!                    2: stratocumulus
-!                    3: shallow cumulus
-!                    4: deep cumulus
 
 
 
@@ -61,6 +55,7 @@ subroutine vdfparcel (kidia   , kfdia   , klon    , klev    , kdraft  , &
 !     *paphm1*       pressure at half level at t-1                pa
 !     *pum1*         x-velocity component at t-1                  m/s
 !     *pvm1*         y-velocity component at t-1                  m/s
+!     *pwm1*         w-velocity component at t-1                  m/s
 !     *pqtm1*        mean specific total water at full level      kg/kg
 !     *pslgm1*       mean liquid static energy at full level      m2/s2
 !     *ptven*        environmental virtual temperature            k
@@ -113,7 +108,7 @@ use parkind1  ,only : jpim     , jprb
 use yoethf   , only : r2es     , r3les    , r3ies    , &
                      &r4les    , r4ies    , r5les    , r5ies     , rvtmp2  , & 
                      &ralvdcp  , ralsdcp  , &
-         &rtwat    , rtice    , rticecu  , r5alvcp   , r5alscp , & 
+		     &rtwat    , rtice    , rticecu  , r5alvcp   , r5alscp , & 
                      &rtwat_rtice_r       , rtwat_rticecu_r
                      
 use yos_cst   , only : rg  , rlstt , rcpd , rlvtt , retv ,rtt         
@@ -134,12 +129,13 @@ integer(kind=jpim),intent(in)    :: kd
 integer(kind=jpim),intent(inout) :: kplcl(klon,kdraft)
 integer(kind=jpim),intent(inout) :: kptop(klon,kdraft)
 integer(kind=jpim),intent(inout) :: kplzb(klon,kdraft)
-integer(kind=jpim),intent(in)    :: kpbltype(klon)
+integer(kind=jpim),intent(in)    :: kentrain
 real(kind=jprb)   ,intent(in)    :: pgeoh(klon,0:klev) 
 real(kind=jprb)   ,intent(in)    :: pgeom1(klon,klev) 
 real(kind=jprb)   ,intent(in)    :: paphm1(klon,0:klev) 
 real(kind=jprb)   ,intent(in)    :: pum1(klon,klev) 
 real(kind=jprb)   ,intent(in)    :: pvm1(klon,klev) 
+real(kind=jprb)   ,intent(in)    :: pwm1(klon,klev) 
 real(kind=jprb)   ,intent(in)    :: pqtm1 (klon,klev)
 real(kind=jprb)   ,intent(in)    :: pslgm1(klon,klev)
 real(kind=jprb)   ,intent(in)    :: ptven(klon,klev)
@@ -155,7 +151,7 @@ real(kind=jprb)   ,intent(inout)   :: peps(klon,0:klev,kdraft)
 real(kind=jprb)   ,intent(in)      :: pfacexc(klon,kdraft)
 real(kind=jprb)   ,intent(inout)   :: pzptop(klon,kdraft) 
 real(kind=jprb)   ,intent(inout)   :: pzplcl(klon,kdraft) 
-real(kind=jprb)   ,intent(in)      :: ptaueps
+real(kind=jprb)   ,intent(in)      :: ptaueps(klon) 
 real(kind=jprb)   ,intent(in)      :: pw2thresh
 logical           ,intent(inout)   :: lddone(klon,kdraft) 
 real(kind=jprb)   ,intent(inout)   :: pbuof(klon,klev,kdraft) 
@@ -168,14 +164,14 @@ logical ::            lldoit(klon), llcloud(klon), llprec
 
 real(kind=jprb) ::    zrg   , zdz   , ztvuf , zquf    , zqcuf   , zmu, zb, &
                     & zqluf , zqiuf , zqtuf , ztuf  , zslguf  , &
-        & zmix  (klon,0:klev), zmixw (klon,0:klev) !,zbuof(klon,klev)
+		    & zmix  (klon,0:klev), zmixw (klon,0:klev) !,zbuof(klon,klev)
 
 real(kind=jprb) ::    zwuh  (klon,0:klev)   , zquh  (klon,0:klev)    , zph  (klon), &
                     & zttemp(klon,klev)     , zqtemp(klon,klev)      
 		    
 real(kind=jprb) ::    zalfaw  , zfacw   , zfaci   , zfac    , ztemp ,&
                     & zesdp   , zcor    , zdqsdtemp(klon)   , zqs(klon,0:klev), &
-                    & zpgenup , zwuhtemp(klon), ztaueps(klon), zcepsz(klon)
+                    & zpgenup , zwuhtemp(klon), zcepsz(klon)
 
 integer(kind=jpim) :: is, jk, jl, jkmax, jkmin
 
@@ -232,7 +228,6 @@ zlcrit = 0.001_jprb     !cy32r3
     pbuof (jl,klev,kd) = 0.0_jprb
     zlclfac(jl)        = 0.0_jprb
     kplzb(jl,kd)       = klev-1
-    ztaueps(jl)        = ptaueps
     
     !  1/z scaling factor in eps
     zcepsz(jl) = 0._jprb
@@ -258,6 +253,7 @@ zlcrit = 0.001_jprb     !cy32r3
 !                 -----------------------------------------------
   
   do jk=jkmax,jkmin,-1
+  
     is=0
     do jl=kidia,kfdia
       if (.not.lddone(jl,kd)) then
@@ -266,9 +262,17 @@ zlcrit = 0.001_jprb     !cy32r3
 
 !*         3.1  updraft entrainment
         
-        zwuh(jl,jk+1) = sqrt( max( pwu2h(jl,jk+1,kd), 0.01_jprb) ) ! w,up > 0.1 m/s (safety)
-        peps(jl,jk+1,kd) = 1.0_jprb / ( zwuh(jl,jk+1) * ztaueps(jl) ) !& ! eps=1/(w,up*tau)
-     
+        select case (kentrain)
+        
+          case(0)
+            zwuh(jl,jk+1) = sqrt( max( pwu2h(jl,jk+1,kd), 0.01_jprb) ) ! w,up > 0.1 m/s (safety)
+            peps(jl,jk+1,kd) = 1.0_jprb / ( zwuh(jl,jk+1) * ptaueps(jl) ) !& ! eps=1/(w,up*tau)
+        
+          case(1)
+            peps(jl,jk+1,kd) = ptaueps(jl)
+          
+        end select 
+        
         !rn numerical entrainment limiter: maximally c_e/dz
         zdz           = (pgeoh(jl,jk) - pgeoh(jl,jk+1))*zrg
         peps(jl,jk+1,kd) = min( zepscflfac/zdz, peps(jl,jk+1,kd) )
@@ -403,6 +407,7 @@ zlcrit = 0.001_jprb     !cy32r3
         
         zlclfac(jl) = ( pgeoh(jl,jk) - pzplcl(jl,kd)*rg  ) / ( pgeoh(jl,jk) - pgeoh(jl,jk+1) )
         zlclfac(jl) = max(0._jprb, min(1._jprb, zlclfac(jl)) )
+
       endif
 
 
@@ -415,13 +420,13 @@ zlcrit = 0.001_jprb     !cy32r3
         zqtuf         = 0.5_jprb * ( pqtuh (jl,jk,kd) + pqtuh (jl,jk+1,kd) )
         zqcuf         = 0.5_jprb * ( pqcuh (jl,jk,kd) + pqcuh (jl,jk+1,kd) )
 	
-  ! at first full level above real cloud base, interpolate ql between 
-  ! height of real cloud base and the half level of kplcl
+	! at first full level above real cloud base, interpolate ql between 
+	! height of real cloud base and the half level of kplcl
         if ( jk == kplcl(jl,kd) ) then
           zqcuf = zqcuf * zlclfac(jl)
         endif
         
-  zquf          = zqtuf - zqcuf
+	zquf          = zqtuf - zqcuf
         ztuf          = ( zslguf - pgeom1(jl,jk+1) & ! preliminary estimate:
                     & + rlvtt * zqcuf ) / rcpd       ! all liquid 
         zalfaw        = foealfa( ztuf )
@@ -444,7 +449,9 @@ zlcrit = 0.001_jprb     !cy32r3
         ztemp         = pbuof(jl,jk+1,kd) / (zb*peps(jl,jk+1,kd))
 !        pwu2h(jl,jk,kd)  = ( pwu2h(jl,jk+1,kd) - ztemp ) * zmix(jl,jk+1)**2 + ztemp
         zmixw(jl,jk+1) = exp( - zdz * (zb*peps(jl,jk+1,kd)) / (1._jprb - 2._jprb*zmu) )
-        pwu2h(jl,jk,kd)  = ( pwu2h(jl,jk+1,kd) - ztemp ) * zmixw(jl,jk+1)**2 + ztemp
+!        pwu2h(jl,jk,kd)  = ( pwu2h(jl,jk+1,kd) - ztemp ) * zmixw(jl,jk+1)**2 + ztemp
+        !RN maintaining the gridbox-average vertical velocity:
+        pwu2h(jl,jk,kd)  = ( pwu2h(jl,jk+1,kd) - pwm1(jl,jk+1)**2 - ztemp ) * zmixw(jl,jk+1)**2 + ztemp + pwm1(jl,jk+1)**2
         
 
 !*         3.8  inversion height at w=0  (lin. interpolation in w^2)

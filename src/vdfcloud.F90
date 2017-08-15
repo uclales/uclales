@@ -1,11 +1,9 @@
 !OPTIONS XOPT(HSFUN)
 SUBROUTINE VDFCLOUD ( KIDIA    , KFDIA   , KLON    , KLEV     , KDRAFT   , &
                     & PAPM1    , PGEOM1  , PGEOH   , &
-                    & PQTM     , PSLGM   , &
-                    & PFRACB   , KVARTOP , &
-                    & PQTUP    , PSLGUP  , &
-                    & PQTTEST  , &
-                    & PSIGQT2  , PAWAKE , &
+                    & PQTM     , PSLGM   , KVARTOP , &
+                    & PAUP     , PQTUP   , PSLGUP  , PSIGQT2UP , &
+                    & PSIGQT2  , &
                     & PEXTR2   , KFLDX2  , PEXTRA  , KLEVX  , KFLDX , &
                     & PCLDFRAC , PQLAV   , PLDIFF)
 
@@ -35,6 +33,7 @@ SUBROUTINE VDFCLOUD ( KIDIA    , KFDIA   , KLON    , KLEV     , KDRAFT   , &
 !     *KLEV*         NUMBER OF LEVELS
 !     *KLON*         NUMBER OF GRID POINTS PER PACKET
 !     *KDRAFT*       NUMBER OF UPDRAFTS
+!     *KVARTOP*      TOP LEVEL OF PBL
 !
 !     INPUT PARAMETERS (REAL):
 !
@@ -43,10 +42,10 @@ SUBROUTINE VDFCLOUD ( KIDIA    , KFDIA   , KLON    , KLEV     , KDRAFT   , &
 !     *PGEOH*        GEOPOTENTIAL AT HALF LEVELS                      M2/S2
 !     *PQTM*         MEAN STATE TOTAL SPECIFIC HUMIDITY       (FL)    KG/KG
 !     *PSLGM*        MEAN STATE LIQUID STATIC ENERGY (SLG)    (FL)    M2/S2
-!     *PFRACB*       FRACTIONS OF UPDRAFTS                            0..1
+!     *PAUP*         FRACTION COVERED BY UPDRAFTS                     0..1
 !     *PQTUP*        MOIST UPDRAFT TOTAL SPECIFIC HUMIDITY    (FL)    KG/KG
 !     *PSLGUP*       MOIST UPDRAFT LIQUID STATIC ENERGY (SLG) (FL)    M2/S2
-!     *PQTTEST*      TEST PARCEL TOTAL SPECIFIC HUMIDITY      (FL)    KG/KG
+!     *PSIGQT2UP*    QT VARIANCE AMONG UPDRAFTS               (FL)    KG^2/KG^2
 !     *PSIGQT2*      GRIDBOX AVERAGE QT VARIANCE              (FL)    KG^2/KG^2
 !
 !     INPUT PARAMETERS (LOGICAL):
@@ -121,21 +120,18 @@ REAL(KIND=JPRB)   ,INTENT(IN)    :: PGEOH(KLON,0:KLEV)
 REAL(KIND=JPRB)   ,INTENT(IN)    :: PQTM(KLON,KLEV) 
 REAL(KIND=JPRB)   ,INTENT(IN)    :: PSLGM(KLON,KLEV)
  
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PFRACB(KLON,KDRAFT) 
 INTEGER(KIND=JPIM),INTENT(IN)    :: KVARTOP(KLON)
 
+REAL(KIND=JPRB)   ,INTENT(IN)    :: PAUP(KLON,KLEV) 
 REAL(KIND=JPRB)   ,INTENT(IN)    :: PQTUP(KLON,KLEV) 
 REAL(KIND=JPRB)   ,INTENT(IN)    :: PSLGUP(KLON,KLEV) 
-
-REAL(KIND=JPRB)   ,INTENT(IN)    :: PQTTEST(KLON,KLEV) 
+REAL(KIND=JPRB)   ,INTENT(IN)    :: PSIGQT2UP(KLON,KLEV) 
 
 REAL(KIND=JPRB)   ,INTENT(IN)    :: PSIGQT2(KLON,KLEV) 
 
 REAL(KIND=JPRB)   ,INTENT(OUT)   :: PCLDFRAC(KLON,KLEV)
 REAL(KIND=JPRB)   ,INTENT(OUT)   :: PQLAV(KLON,KLEV) 
 REAL(KIND=JPRB)   ,INTENT(INOUT) :: PLDIFF(KLON,KLEV) 
-
-REAL(KIND=JPRB)   ,INTENT(INOUT) :: PAWAKE(KLON,KLEV)
 
 !diagnostic output
 INTEGER(KIND=JPIM),INTENT(IN) :: KFLDX2, KLEVX, KFLDX
@@ -151,9 +147,10 @@ REAL(KIND=JPRB) ::    ZQBAR        , ZQMIN       , ZIQBAR(KLON)
 REAL(KIND=JPRB) ::    ZDUMMY, RCPDTMP, ZRG
 REAL(KIND=JPRB) ::    ZDZ, ZSGSEFOLD
      
-REAL(KIND=JPRB) ::    ZATEST(KLON) , ZAK(KLON)   , ZAUP(KLON)    , &
-                 &    ZQTK(KLON,KLEV)      , ZSLGK(KLON,KLEV)    , &
-                 &    ZSIGQT2UP(KLON,KLEV) , ZSIGQT2K(KLON,KLEV)
+REAL(KIND=JPRB) ::    ZAK(KLON,KLEV)      , &
+                 &    ZQTK(KLON,KLEV)     , &
+                 &    ZSLGK(KLON,KLEV)    , &
+                 &    ZSIGQT2K(KLON,KLEV)
 
      
 REAL(KIND=JPRB) ::    ZX1(IPDF,3)      , ZX0(IPDF,3)    , ZS1(3)           , ZS0(3) , &
@@ -168,9 +165,7 @@ REAL(KIND=JPRB) ::    ZX1(IPDF,3)      , ZX0(IPDF,3)    , ZS1(3)           , ZS0
 
 INTEGER(KIND=JPIM) :: JK, JL, JP
 
-LOGICAL ::            LLPBL(KLON,KLEV), LLSGSOVERLAP, LLCLOUDWAKE
-
-REAL(KIND=JPRB) ::    ZQLWAKEFAC
+LOGICAL ::            LLPBL(KLON,KLEV), LLSGSOVERLAP 
 
 REAL(KIND=JPRB) ::    ZHOOK_HANDLE
 
@@ -190,12 +185,6 @@ REAL(KIND=JPRB) ::    ZHOOK_HANDLE
 ! IF (LHOOK) CALL DR_HOOK('VDFCLOUD',0,ZHOOK_HANDLE)
 
 
-!-- Cloud wake parameterization --
-LLCLOUDWAKE = .TRUE.      !activation switch
-!LLCLOUDWAKE = .FALSE.
-!ZQLWAKEFAC = 0.1_JPRB    !proportionality factor with updraft PDF condensate
-ZQLWAKEFAC = 0._JPRB
-
 !-- SGS cloud overlap function --
 LLSGSOVERLAP = .TRUE.      !activation switch
 !LLSGSOVERLAP = .FALSE.
@@ -211,81 +200,73 @@ ZNORM  = 0._JPRB
 
 DO JK=1,KLEV
   DO JL=KIDIA,KFDIA
-    ZSIGQT2UP(JL,JK) = 0._JPRB
+    ZAK(JL,JK)       = 0._JPRB
     ZSIGQT2K(JL,JK)  = PSIGQT2(JL,JK)
   ENDDO
 ENDDO
       
 DO JK=1,KLEV
   DO JL=KIDIA,KFDIA
+!    LLPBL(JL,JK) = KVARTOP(JL)/=0 .AND. JK>=KVARTOP(JL) .AND. PAUP(JL,JK)>0._JPRB
     LLPBL(JL,JK) = KVARTOP(JL)/=0 .AND. JK>=KVARTOP(JL)
   ENDDO
 ENDDO
 
+IF (LLDIAG) THEN
+  DO JL=KIDIA,KFDIA
+    PEXTRA(JL,:,40:43+IPDF) = 0._JPRB
+  ENDDO
+ENDIF  
+    
 
 
-!     ------------------------------------------------------------------
+!     ---------------------------------------------------------------------------
 !
-!*         2.     CLOSURE OF PDF MOMENTS
-!                 ----------------------
+!*         2.     PDF MOMENTS OF NON-UPDRAFT (K) AREA: CALCULATE AS RESIDUALS
+!                 -----------------------------------------------------------
 !      
-      
-      
-DO JL=KIDIA,KFDIA
-
-  !----- fractions ---------
-  ZATEST(JL) = PFRACB(JL,1)
-  ZAUP(JL)   = PFRACB(JL,3)
-  ZAK(JL)    = 1._JPRB - ZAUP(JL)
-  
-  !----- determine scaling factor between updraft variance and the
-  !         difference in updraft qt excess of moist- and test updraft. -----
-  IF ( ZAUP(JL)==0._JPRB .OR. ZAUP(JL).LT.1.5_JPRB*ZATEST(JL) ) THEN
-    ZIQBAR(JL) = 0._JPRB  !change updraft pdf into a delta function
-  ELSE
-    ZFRC = ZATEST(JL)/ZAUP(JL)
-    CALL VDFPDFTABLE(ZFRC, ZQBAR, ZQMIN, ZDUMMY, 0)
-    ZIQBAR(JL) = 1._JPRB / ZQBAR    !iqbar=1/0.54 max, corresponding to ZATEST=1.5*ZAUP)
-  ENDIF  
-  
-ENDDO
       
       
 DO JK=1,KLEV
   DO JL=KIDIA,KFDIA
-
+  
   IF (LLPBL(JL,JK) ) THEN
-
-  !----- means ---------
-  ZQTK(JL,JK)  = ( PQTM(JL,JK)  - ZAUP(JL) * PQTUP(JL,JK)  ) / ZAK(JL)
-  ZSLGK(JL,JK) = ( PSLGM(JL,JK) - ZAUP(JL) * PSLGUP(JL,JK) ) / ZAK(JL)
+  
+  !----- fraction ---------
+  ZAK(JL,JK)    = 1._JPRB - PAUP(JL,JK)
+  
+  !----- mean ---------
+  ZQTK(JL,JK)  = ( PQTM(JL,JK)  - PAUP(JL,JK) * PQTUP(JL,JK)  ) / ZAK(JL,JK)
+  ZSLGK(JL,JK) = ( PSLGM(JL,JK) - PAUP(JL,JK) * PSLGUP(JL,JK) ) / ZAK(JL,JK)
         
-  !----- variances -----
-  ZSIGQT2UP(JL,JK) = (  ZIQBAR(JL) * MAX(0._JPRB,PQTTEST(JL,JK)-PQTUP(JL,JK))  )**2._JPRB
-      
+  !----- variance -----
   ZSIGQT2K(JL,JK) = -(ZQTK(JL,JK)**2._JPRB) +&
-                   & (               PQTM(JL,JK)**2._JPRB  + PSIGQT2(JL,JK)        &
-                   &   - ZAUP(JL) * (PQTUP(JL,JK)**2._JPRB + ZSIGQT2UP(JL,JK))   ) &
-                   & / ZAK(JL)
+                   &                   (PQTM(JL,JK) **2._JPRB + PSIGQT2  (JL,JK)      &
+                   &   - PAUP(JL,JK) * (PQTUP(JL,JK)**2._JPRB + PSIGQT2UP(JL,JK))   ) &
+                   & / ZAK(JL,JK)
                    
   ZSIGQT2K(JL,JK) = MAX(0._JPRB,ZSIGQT2K(JL,JK))        
   
         
 !  IF (LLDIAG) THEN
-!    PEXTRA(JL,JK,81) = 1000._JPRB*PQTTEST(JL,JK)
-!    PEXTRA(JL,JK,82) = 1000._JPRB*PQTUP(JL,JK)
-!    PEXTRA(JL,JK,83) = 1000._JPRB*( PQTTEST(JL,JK)-PQTUP(JL,JK) )
-!  
-!    PEXTRA(JL,JK,84) = 1000000._JPRB*ZSIGQT2UP(JL,JK)
-!    PEXTRA(JL,JK,85) = 1000000._JPRB*ZSIGQT2K(JL,JK)
-!    PEXTRA(JL,JK,86) = 1000000._JPRB*PSIGQT2(JL,JK)
-!  
-!    PEXTRA(JL,JK,86:92) = 0._JPRB      
-!    PEXTRA(JL,JK,79:80) = 0._JPRB      
-!  ENDIF
+    !PEXTRA(JL,JK,37) = PaUP(JL,JK)
+    !PEXTRA(JL,JK,38) = 1000._JPRB*PQTUP(JL,JK)
+    !PEXTRA(JL,JK,39) = 1000._JPRB*zQTk (JL,JK)
   
-  ENDIF
+    !PEXTRA(JL,JK,40) = 1000000._JPRB*PSIGQT2UP(JL,JK)
+    !PEXTRA(JL,JK,41) = 1000000._JPRB*ZSIGQT2K(JL,JK)
+    !PEXTRA(JL,JK,42) = 1000000._JPRB*PSIGQT2(JL,JK)
 
+!  ENDIF
+
+  !if (jl==kfdia) then
+  !  write(0,'(a,i3,8f15.7)') 'vdfcloud:',jk, PAUP(JL,JK), ZAK(JL,JK), &
+  !     1000._JPRB*PQTM(JL,JK), 1000._JPRB*ZQTK(JL,JK), 1000._JPRB*PQTUP(JL,JK), &
+  !     1000000._JPRB*PSIGQT2UP(JL,JK), 1000000._JPRB*ZSIGQT2K(JL,JK), 1000000._JPRB*PSIGQT2(JL,JK)
+  !endif
+
+  ENDIF
+  
   ENDDO
 ENDDO
        
@@ -334,10 +315,10 @@ DO JK=1,KLEV
   
   !RCPDTMP = RCPD*(1._JPRB+RVTMP2*PQTM(JL,JK))
    
-  ZAPDF      = (/ ZAUP(JL) , ZAK(JL) /)
-  !ZAPDF      = (/ ZAUP(JL) , MAX(0._JPRB,ZAK(JL)-PAWAKE(JL,JK)) /)
+  ZAPDF      = (/ PAUP(JL,JK) , ZAK(JL,JK) /)
+  !ZAPDF      = (/ PAUP(JL,JK) , MAX(0._JPRB,ZAK(JL,JK)) /)
   
-  ZSIGQT2PDF = (/ MAX( 1000000._JPRB*ZSIGQT2UP(JL,JK),0._JPRB ), &
+  ZSIGQT2PDF = (/ MAX( 1000000._JPRB*PSIGQT2UP(JL,JK),0._JPRB ), &
                 & MAX( 1000000._JPRB*ZSIGQT2K(JL,JK) ,0._JPRB )  /)
         
   !-- PDF 2: K on dry zero buoyancy line --
@@ -390,7 +371,11 @@ DO JK=1,KLEV
   CALL VDFTHERMO( ZS1(1), 0._JPRB, ZS1(2), ZDUMMY, PAPM1(JL,JK), PGEOM1(JL,JK) )
   CALL VDFTHERMO( ZS0(1), 0._JPRB, ZS0(2), ZDUMMY, PAPM1(JL,JK), PGEOM1(JL,JK) )
 
-
+  !if (jl==kfdia) then
+  !  write(0,'(a,i3,5f15.7)') 'vdfcloud:',jk, &
+  !     ZS0(1), ZS0(2), ZS1(1), ZS1(2), PSLGM(JL,JK)/RCPD 
+  !endif
+  
 
   DO JP=1,IPDF
     
@@ -520,11 +505,15 @@ DO JK=1,KLEV
 
     !output: contribution of each PDF to..
     IF (LLDIAG) THEN
-      PEXTRA(JL,JK,86+JP) = 100._JPRB*ZAPDF(JP)*ZCCPDF(JP)  !cloud fraction
-      PEXTRA(JL,JK,89+JP) = ZQLAVPDF(JP)               !liquid water
+      PEXTRA(JL,JK,41+JP) = 100._JPRB*ZAPDF(JP)*ZCCPDF(JP)  !cloud fraction
+      PEXTRA(JL,JK,43+JP) = ZQLAVPDF(JP)                    !cloud condensate
     ENDIF  
         
-    
+    !if (jl==kfdia) then
+    ! write(0,'(a,2i3,3f15.7)') 'vdfcloud:',jk, jp, &
+    !   100._JPRB*ZAPDF(JP), ZCCPDF(JP), 100._JPRB*ZAPDF(JP)*ZCCPDF(JP)
+    !endif
+   
   ENDDO !JP
 
   PQLAV(JL,JK) = MAX( 0._JPRB, PQLAV(JL,JK) / 1000._JPRB )    !from g/kg back to kg/kg
@@ -536,37 +525,13 @@ DO JK=1,KLEV
     
   !-----------------------------------------------------------------
   !   
-  !  3.6  Add cloud wake PDF
-  !
-  !-----------------------------------------------------------------
-  
-  IF (LLCLOUDWAKE) THEN
-  
-    !PCLDFRAC(JL,JK)  = MAX(0._JPRB, MIN( 1._JPRB,PCLDFRAC(JL,JK)+PAWAKE(JL,JK)) )
-    PAWAKE(JL,JK)    = MAX(0._JPRB, MIN( PAWAKE(JL,JK), 1._JPRB-PCLDFRAC(JL,JK) ) )
-    PCLDFRAC(JL,JK)  = PCLDFRAC(JL,JK)+PAWAKE(JL,JK)
-
-    PQLAV(JL,JK)     = PQLAV(JL,JK) + ( ZQLCCPDF(1) * 0.001_JPRB * ZQLWAKEFAC ) * PAWAKE(JL,JK)
-  
-!    IF (LLDIAG) THEN
-!      PEXTRA(JL,JK,89) = 100._JPRB * PAWAKE(JL,JK)
-!      PEXTRA(JL,JK,92) = ( ZQLCCPDF(1) * 0.5_JPRB ) * PAWAKE(JL,JK)
-!    ENDIF  
-  
-    PLDIFF(JL,JK) = PLDIFF(JL,JK) + ( ZQLCCPDF(1) * 0.001_JPRB * ZQLWAKEFAC ) * PAWAKE(JL,JK)
-  
-  ENDIF
-  
- 
-  
-  !-----------------------------------------------------------------
-  !   
   !  4.0  Subgrid-scale cloud overlap function
   !
   !-----------------------------------------------------------------
   
   IF (LLDIAG) THEN
-    PEXTRA(JL,JK,95) = PCLDFRAC(JL,JK)  !store cloud fraction before SGS overlap
+    PEXTRA(JL,JK,40) = PCLDFRAC(JL,JK)  !store cloud fraction before SGS overlap
+    PEXTRA(JL,JK,41) = PQLAV(JL,JK)    
   ENDIF  
     
   IF (LLSGSOVERLAP) THEN

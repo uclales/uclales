@@ -296,7 +296,8 @@ contains
     use mpi_interface, only : myid, appl_abort
     use grid, only : level, dt, nstep, a_tt, a_up, a_vp, a_wp, dxi, dyi, dzi_t, &
          nxp, nyp, nzp, dn0,a_scr1, u0, v0, a_ut, a_vt, a_wt, zt, a_ricep, a_rct, a_rpt, &
-         lwaterbudget, a_xt2
+         lwaterbudget, a_xt2, &
+         a_rt, a_tt, zt, zm, wt_sfc, wq_sfc
     use stat, only : sflg, statistics
     use sgsm, only : diffuse
     !use sgsm_dyn, only : calc_cs
@@ -310,7 +311,7 @@ contains
     use lsvar, only : varlscale
     use util, only : velset,get_avg
     use centered, only:advection_scalars
-    use vdf, only :vdfouter, ledmfdiag
+    use vdf, only :vdfouter, ledmf
     use modtimedep, only : timedep
     use modparticles, only : particles, lpartic, particlestat,lpartstat, &
          deactivate_drops, activate_drops
@@ -319,6 +320,7 @@ contains
     logical, parameter :: debug = .false.
     real :: xtime
     character (len=8) :: adv='monotone'
+    integer :: i,j,k
 
     xtime = time/86400. + strtim
     call timedep(time,timmax, sst)
@@ -343,12 +345,37 @@ contains
          call varlscale(time,case_name,sst,div,u0,v0)
        end if
 
+       !j=3
+       !i=3
+       !  write(0,'(a,f10.3,a,f10.3,a,f15.7,a,f15.7)' ) &
+       !     & 't_step before surface:   sfc: zt=',zt(k), ' zm=',zm(k), &
+       !     & ' wt_sfc=',wt_sfc(i,j),' wq_sfc=',wq_sfc(i,j)
+
        xtime = xtime - strtim
        call surface(sst,xtime)
        xtime = xtime + strtim
 
-       call diffuse(time)
+       call diffuse(time)   !for now do UCLA-LES diffusion still for momentum (not done yet by vdf) - see ledmf in diffuse (sgsm.f90)
 
+       !if (sflg) then
+       !j=3
+       !i=3
+       !do k=2,nzp-2
+       !  write(0,'(a,f10.3,a,f10.3,a,f15.7,a,f15.7)' ) &
+       !     & 't_step before vdfouter:   sfc: zt=',zt(k), ' zm=',zm(k), &
+       !     & ' a_tt=',3600.*a_tt(k,i,j),' a_rt=',3600.*1000.*a_rt(k,i,j)
+       !end do
+       !  write(0,'(a,f10.3,a,f10.3,a,f15.7,a,f15.7)' ) &
+       !     & 't_step after diffuse:   sfc: zt=',zt(k), ' zm=',zm(k), &
+       !     & ' wt_sfc=',wt_sfc(i,j),' wq_sfc=',wq_sfc(i,j)
+       !endif
+
+       if (ledmf) then
+         call vdfouter(sst,istp)
+       !else
+       !  call diffuse(time)   !future
+       endif
+ 
        if (adv=='monotone') then
           call fadvect
        elseif ((adv=='second').or.(adv=='third').or.(adv=='fourth')) then
@@ -359,6 +386,16 @@ contains
        endif
 
        call ladvect
+       
+       !if (sflg) then
+       !j=3
+       !i=3
+       !do k=2,nzp-2
+       !  write(0,'(a,f10.3,a,f10.3,a,f15.7,a,f15.7)' ) &
+       !     & 't_step after advect:   sfc: zt=',zt(k), ' zm=',zm(k), &
+       !     & ' a_tt=',3600.*a_tt(k,i,j),' a_rt=',3600.*1000.*a_rt(k,i,j)
+       !end do
+       !endif
 
        if (level >= 1) then
           if (lwaterbudget) then
@@ -389,7 +426,6 @@ contains
        if (debug) WRITE (0,*) 't_step statflg statistics, myid=',myid
        call statistics (time+dt)
        if(lpartic .and. lpartstat) call particlestat(.false.,time+dt)
-       if (ledmfdiag) call vdfouter(dt)
        sflg = .False.
     end if
 

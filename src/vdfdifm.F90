@@ -1,8 +1,10 @@
 SUBROUTINE VDFDIFM(&
  & KIDIA  , KFDIA  , KLON   , KLEV   , KDRAFT , KTOP  , &
- & PTMST  , PUM1   , PVM1   , PAPHM1 , PCFM   , PMFLX , PUUH  , PVUH  , &
+ & PTMST  , pextmomf, ldsfcflx,&
+ & PUM1   , PVM1   , PAPHM1 , PCFM   , PMFLX , PUUH  , PVUH  , &
  & PTODC  , PSOTEU , PSOTEV , PSOC   , &
- & PVOM   , PVOL   , PUCURR , PVCURR , PUDIF  , PVDIF , PTAUX , PTAUY)  
+ & PVOM   , PVOL   , PUCURR , PVCURR , PUDIF  , PVDIF , PTAUX , PTAUY , &
+ & LDMULTISOLV)  
 !     ------------------------------------------------------------------
 
 !**   *VDFDIFM* - DOES THE IMPLICIT CALCULATION FOR DIFFUSION OF MOMENTUM
@@ -60,6 +62,11 @@ SUBROUTINE VDFDIFM(&
 !     *PTAUX*        SURFACE STRESS X-COMPONENT
 !     *PTAUY*        SURFACE STRESS Y-COMPONENT
 
+!     additional parameters for flux boundary condtion (in scm model):
+
+!     *ldsfcflx*     if .true. flux boundary condtion is used 
+!     *pextmomf*      specified momentum flux (m2/s2)
+
 !     METHOD
 !     ------
 
@@ -85,6 +92,8 @@ INTEGER(KIND=JPIM),INTENT(IN)    :: KIDIA
 INTEGER(KIND=JPIM),INTENT(IN)    :: KFDIA 
 INTEGER(KIND=JPIM),INTENT(IN)    :: KTOP 
 REAL(KIND=JPRB)   ,INTENT(IN)    :: PTMST 
+real(kind=jprb)   ,intent(in)    :: pextmomf(klon) 
+logical           ,intent(in)    :: ldsfcflx
 REAL(KIND=JPRB)   ,INTENT(IN)    :: PUM1(KLON,KLEV) 
 REAL(KIND=JPRB)   ,INTENT(IN)    :: PVM1(KLON,KLEV) 
 REAL(KIND=JPRB)   ,INTENT(IN)    :: PAPHM1(KLON,0:KLEV) 
@@ -104,6 +113,7 @@ REAL(KIND=JPRB)   ,INTENT(OUT)   :: PUDIF(KLON,KLEV)
 REAL(KIND=JPRB)   ,INTENT(OUT)   :: PVDIF(KLON,KLEV) 
 REAL(KIND=JPRB)   ,INTENT(OUT)   :: PTAUX(KLON) 
 REAL(KIND=JPRB)   ,INTENT(OUT)   :: PTAUY(KLON) 
+LOGICAL           ,INTENT(IN)    :: LDMULTISOLV
 
 !*         0.2    LOCAL VARIABLES
 
@@ -113,7 +123,7 @@ REAL(KIND=JPRB) ::    ZAA(KLON,KLEV) , ZBB(KLON,KLEV)  , ZCC(KLON,KLEV)  ,&
                     & Z1DP(KLON,KLEV), Z1BET(KLON)     ,&
                     & ZBUL(KLON)     , ZBVL(KLON)
 
-INTEGER(KIND=JPIM) :: JK, JL, JD
+INTEGER(KIND=JPIM) :: JK, JL, JD, JD0, JD1
 
 REAL(KIND=JPRB) ::    ZDISC, ZDISCI, ZFAC, ZQDP, ZTPFAC2, ZHUCURR, ZCOEF2, ZCOEF3, Z1DCOEF, ZAUVL
 REAL(KIND=JPRB) ::    ZHOOK_HANDLE
@@ -134,7 +144,16 @@ DO JK=0,KLEV
     ZMV  (JL,JK) = 0.0_JPRB
   ENDDO
 ENDDO
-DO JD=2,KDRAFT  !don't include updraft #1 (test parcel)
+
+IF (LDMULTISOLV) THEN
+  JD0 = 2      !multiple resolved updrafts
+  JD1 = KDRAFT
+ELSE
+  JD0 = 1      !only updraft #1 (bulk)
+  JD1 = 1
+ENDIF
+  
+DO JD=JD0,JD1
   DO JK=KTOP,KLEV-1
     DO JL=KIDIA,KFDIA
       ZMFLX(JL,JK) = ZMFLX(JL,JK) + PMFLX(JL,JK,JD)
@@ -182,8 +201,8 @@ ENDDO
 DO JK=KTOP+1,KLEV-1
   DO JL=KIDIA,KFDIA
     ZUYY(JL,JK) = ZTPFAC2 * PUM1(JL,JK) & 
-     & + PTMST * (PVOM(JL,JK)+PSOTEU(JL,JK)) !&
-!      & + ZTPFAC2 * (ZMU(JL,JK)-ZMU(JL,JK-1)) * Z1DP(JL,JK)
+     & + PTMST * (PVOM(JL,JK)+PSOTEU(JL,JK)) &
+     & + ZTPFAC2 * (ZMU(JL,JK)-ZMU(JL,JK-1)) * Z1DP(JL,JK)
     ZVYY(JL,JK) = ZTPFAC2 * PVM1(JL,JK) &
      & + PTMST * (PVOL(JL,JK)+PSOTEV(JL,JK)) &
      & + ZTPFAC2 * (ZMV(JL,JK)-ZMV(JL,JK-1)) * Z1DP(JL,JK)
@@ -239,6 +258,12 @@ ZCOEF2=1.0_JPRB/RVDIFTS
 ZCOEF3=RG*PTMST*RVDIFTS
 
 DO JL=KIDIA,KFDIA
+
+  !if (jl.eq.kidia) then
+  !write(0,'(a,f15.7)') &
+  !  & 'vdfdifm: C_m at klev: pcfm=',PCFM(JL,KLEV)
+  !endif
+
   ZGAM(JL,KLEV)=ZCC(JL,KLEV-1)*Z1BET(JL)
   Z1BET(JL)=1.0_JPRB/(ZBB(JL,KLEV)-ZAA(JL,KLEV)*ZGAM(JL,KLEV))
 
@@ -255,6 +280,7 @@ DO JL=KIDIA,KFDIA
   PUDIF(JL,KLEV)=(PTAUX(JL)*ZAUVL+ZBUL(JL))*ZCOEF2
   PVDIF(JL,KLEV)=(PTAUY(JL)*ZAUVL+ZBVL(JL))*ZCOEF2
 ENDDO
+
 !*         1.6     BACK-SUBSTITUTION.
 
 DO JK=KLEV-1,KTOP,-1

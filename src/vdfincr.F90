@@ -194,7 +194,7 @@ do jk=1,klev
 !   compute total tendencies (dynamics + vertical diffusion + so) 
     zdudt          = ( pudif(jl,jk) - ztpfac2 * pum1(jl,jk) ) * zcons1
     zdvdt          = ( pvdif(jl,jk) - ztpfac2 * pvm1(jl,jk) ) * zcons1
-   
+     
     zdp            = paphm1(jl,jk)-paphm1(jl,jk-1)
     zgdph          = -zdp*zrg
 
@@ -213,19 +213,19 @@ do jk=1,klev
     ztesov=pvdif(jl,jk)*zhu3
     zsou(jl)=zsou(jl)+zgdph*ztesou
     zsov(jl)=zsov(jl)+zgdph*ztesov
-   
+    
 !   velocity before vdf 
     zu1=pum1(jl,jk)+pvom(jl,jk)*ptmst
     zv1=pvm1(jl,jk)+pvol(jl,jk)*ptmst
 !   velocity after vdf 
     zu2=pum1(jl,jk)+(zdudt-psoteu(jl,jk)-ztesou)*ptmst
     zv2=pvm1(jl,jk)+(zdvdt-psotev(jl,jk)-ztesov)*ptmst
-
 !   velocity after so 
     zu3=pum1(jl,jk)+zdudt*ptmst   
     zv3=pvm1(jl,jk)+zdvdt*ptmst   
     zvdfdis=0.5_jprb*(zu1-zu2)*(zu1+zu2) + 0.5_jprb*(zv1-zv2)*(zv1+zv2)
     zsodis =0.5_jprb*(zu2-zu3)*(zu2+zu3) + 0.5_jprb*(zv1-zv2)*(zv1+zv2)
+
 
 !   integrate vdf-tendencies (including tofd) to find vdf-stress profile
     pstrtu(jl,jk)  = (zdudt-pvom(jl,jk)-psoteu(jl,jk)-ztesou)*zgdph+pstrtu(jl,jk-1)

@@ -7,7 +7,8 @@ subroutine vdfdifh(&
  & ptdif  , pqdif  , pcptsti, pqsti  , pcairti, pcsatti, &
  & pdqsti , ptskti , ptskrad, ptsm1m , ptsnow , ptice  , psst, &
  & ptsktip1, pslge , pte    , pqte, &
- & pjq    ,pssh    ,pslh    , pstr   ,pg0)  
+ & pjq    ,pssh    ,pslh    , pstr   ,pg0, &
+ & ldmultisolv)  
 !     ------------------------------------------------------------------
 
 !**   *vdfdifh* - does the implicit calculation for diffusion of s. l.
@@ -120,9 +121,9 @@ subroutine vdfdifh(&
 use parkind1  ,only : jpim     ,jprb
 ! use yomhook   ,only : lhook    ,dr_hook
 use yoevdf   , only : rvdifts
-use yos_cst   , only : rcpd     ,rg     ,rlstt  ,rlvtt
+use yos_cst  , only : rcpd     ,rg     ,rlstt  ,rlvtt
 use yoethf   , only : rvtmp2
-use yoephy   , only : leocwa   ,leocco
+use yos_exc  , only : leocwa   ,leocco
 
 implicit none
 ! 
@@ -143,9 +144,20 @@ integer(kind=jpim),intent(in)    :: ktop
 real(kind=jprb)   ,intent(in)    :: ptmst 
 real(kind=jprb)   ,intent(in)    :: pextshf(klon) 
 real(kind=jprb)   ,intent(in)    :: pextlhf(klon) 
-logical           ,intent(in)    :: ldsfcflx 
+logical           ,intent(in)    :: ldsfcflx
+
+!-- tiles, input --
 real(kind=jprb)   ,intent(in)    :: pfrti(klon,ktiles) 
 real(kind=jprb)   ,intent(in)    :: pssrflti(klon,ktiles) 
+real(kind=jprb)   ,intent(in)    :: pcfhti(klon,ktiles) 
+real(kind=jprb)   ,intent(in)    :: pcfqti(klon,ktiles) 
+real(kind=jprb)   ,intent(in)    :: pcptsti(klon,ktiles) 
+real(kind=jprb)   ,intent(in)    :: pqsti(klon,ktiles) 
+real(kind=jprb)   ,intent(in)    :: pcairti(klon,ktiles) 
+real(kind=jprb)   ,intent(in)    :: pcsatti(klon,ktiles) 
+real(kind=jprb)   ,intent(in)    :: pdqsti(klon,ktiles) 
+real(kind=jprb)   ,intent(in)    :: ptskti(klon,ktiles) 
+
 real(kind=jprb)   ,intent(in)    :: pslrfl(klon) 
 real(kind=jprb)   ,intent(in)    :: pemis(klon) 
 real(kind=jprb)   ,intent(in)    :: pevapsnw(klon) 
@@ -155,33 +167,33 @@ real(kind=jprb)   ,intent(in)    :: pqm1(klon,klev)
 real(kind=jprb)   ,intent(in)    :: pqtm1(klon,klev) 
 real(kind=jprb)   ,intent(in)    :: paphm1(klon,0:klev) 
 real(kind=jprb)   ,intent(in)    :: pcfh(klon,klev) 
-real(kind=jprb)   ,intent(in)    :: pcfhti(klon,ktiles) 
-real(kind=jprb)   ,intent(in)    :: pcfqti(klon,ktiles) 
 real(kind=jprb)   ,intent(in)    :: pmflx(klon,0:klev,kdraft) 
 real(kind=jprb)   ,intent(in)    :: psluh(klon,0:klev,kdraft) 
 real(kind=jprb)   ,intent(in)    :: pqtuh(klon,0:klev,kdraft) 
-real(kind=jprb)   ,intent(out)   :: ptdif(klon,klev) 
-real(kind=jprb)   ,intent(out)   :: pqdif(klon,klev) 
-real(kind=jprb)   ,intent(in)    :: pcptsti(klon,ktiles) 
-real(kind=jprb)   ,intent(in)    :: pqsti(klon,ktiles) 
-real(kind=jprb)   ,intent(in)    :: pcairti(klon,ktiles) 
-real(kind=jprb)   ,intent(in)    :: pcsatti(klon,ktiles) 
-real(kind=jprb)   ,intent(in)    :: pdqsti(klon,ktiles) 
-real(kind=jprb)   ,intent(in)    :: ptskti(klon,ktiles) 
+
 real(kind=jprb)   ,intent(in)    :: ptskrad(klon) 
 real(kind=jprb)   ,intent(in)    :: ptsm1m(klon) 
 real(kind=jprb)   ,intent(in)    :: ptsnow(klon) 
 real(kind=jprb)   ,intent(in)    :: ptice(klon) 
 real(kind=jprb)   ,intent(in)    :: psst(klon) 
-real(kind=jprb)   ,intent(out)   :: ptsktip1(klon,ktiles)  
+  
 real(kind=jprb)   ,intent(in)    :: pslge(klon,klev) 
 real(kind=jprb)   ,intent(in)    :: pte(klon,klev) 
 real(kind=jprb)   ,intent(in)    :: pqte(klon,klev) 
+
+!-- non-tiles, output --
+real(kind=jprb)   ,intent(out)   :: ptdif(klon,klev) 
+real(kind=jprb)   ,intent(out)   :: pqdif(klon,klev) 
+
+!-- tiles, output --
+real(kind=jprb)   ,intent(out)   :: ptsktip1(klon,ktiles)
 real(kind=jprb)   ,intent(out)   :: pjq(klon,ktiles) 
 real(kind=jprb)   ,intent(out)   :: pssh(klon,ktiles) 
 real(kind=jprb)   ,intent(out)   :: pslh(klon,ktiles) 
 real(kind=jprb)   ,intent(out)   :: pstr(klon,ktiles) 
 real(kind=jprb)   ,intent(out)   :: pg0(klon,ktiles) 
+
+logical           ,intent(in)    :: ldmultisolv
 
 !*         0.2    local variables
 
@@ -195,7 +207,7 @@ real(kind=jprb) ::    ztsrf(klon,ktiles)  ,zrhochu(klon,ktiles)  ,&
                     & zrhocqu(klon,ktiles),zjs(klon,ktiles)      ,&
                     & zssk(klon,ktiles)   ,ztsk(klon,ktiles)  
 
-integer(kind=jpim) :: jk, jl, jt, jd
+integer(kind=jpim) :: jk, jl, jt, jd, jd0, jd1
 
 real(kind=jprb) ::    zqdp, zqsp1, ztpfac2, ztpfac3,&
                     & zcsnq, zcsns, zcoef1,zcoef2
@@ -225,7 +237,16 @@ ztpfac3=1-ztpfac2
       zmqt (jl,jk) = 0.0_jprb
     enddo
   enddo
-  do jd=2,kdraft  !don't include updraft #1 (test parcel)
+  
+  if (ldmultisolv) then
+    jd0 = 2      !multiple resolved updrafts
+    jd1 = kdraft
+  else
+    jd0 = 1      !only updraft #1 (bulk)
+    jd1 = 1
+  endif
+  
+  do jd=jd0,jd1
     do jk=ktop,klev-1
       do jl=kidia,kfdia
         zmflx(jl,jk) = zmflx(jl,jk) + pmflx(jl,jk,jd)
@@ -264,6 +285,7 @@ enddo
     zcc(jl,ktop) =         (-pcfh(jl,ktop)+0.5_jprb*zmflx(jl,ktop))*z1dp(jl,ktop)
     zbb(jl,ktop) =1.0_jprb+( pcfh(jl,ktop)+0.5_jprb*zmflx(jl,ktop))*z1dp(jl,ktop)
   enddo
+
 
 !*         1.1    setting of right hand sides.
 
@@ -345,35 +367,54 @@ do jl=kidia,kfdia
   zasl(jl)=-rg*ptmst*zqdp*rvdifts*z1bet(jl)
   zaql(jl)=zasl(jl)
 enddo
-! 
-! !*         1.6    prepare array's for call to surface energy
-! !                 balance routine
-! 
-! if (leocwa .or. leocco) then
-!   ztsrf(kidia:kfdia,1)=ptskti(kidia:kfdia,1)
-! else
-! ztsrf(kidia:kfdia,1)=psst(kidia:kfdia)
-! endif
-! ztsrf(kidia:kfdia,2)=ptice(kidia:kfdia)
-! ztsrf(kidia:kfdia,3)=ptsm1m(kidia:kfdia)
-! ztsrf(kidia:kfdia,4)=ptsm1m(kidia:kfdia)
-! ztsrf(kidia:kfdia,5)=ptsnow(kidia:kfdia)
-! ztsrf(kidia:kfdia,6)=ptsm1m(kidia:kfdia)
-! ztsrf(kidia:kfdia,7)=ptsnow(kidia:kfdia)
-! ztsrf(kidia:kfdia,8)=ptsm1m(kidia:kfdia)
+ 
+!*         1.6    prepare array's for call to surface energy
+!                 balance routine
+ 
+if (leocwa .or. leocco) then
+  ztsrf(kidia:kfdia,1)=ptskti(kidia:kfdia,1)
+else
+  ztsrf(kidia:kfdia,1)=psst(kidia:kfdia)
+endif
+ztsrf(kidia:kfdia,2)=ptice(kidia:kfdia)
+ztsrf(kidia:kfdia,3)=ptsm1m(kidia:kfdia)
+ztsrf(kidia:kfdia,4)=ptsm1m(kidia:kfdia)
+ztsrf(kidia:kfdia,5)=ptsnow(kidia:kfdia)
+ztsrf(kidia:kfdia,6)=ptsm1m(kidia:kfdia)
+ztsrf(kidia:kfdia,7)=ptsnow(kidia:kfdia)
+ztsrf(kidia:kfdia,8)=ptsm1m(kidia:kfdia)
 
 zcoef1=1.0_jprb/(rg*rvdifts*ptmst)
 do jt=1,ktiles
   do jl=kidia,kfdia
     zrhochu(jl,jt)=pcfhti(jl,jt)*zcoef1
     zrhocqu(jl,jt)=pcfqti(jl,jt)*zcoef1
+
+    !if (pfrti(jl,jt).gt.0._jprb) then
+    !if (jl.eq.kidia) then
+    !write(0,'(a,i3,a,f10.3,a,f10.3,a,f10.3,a,f10.3,a,f10.3,a,f10.3,a,f10.3,a,f10.3,a,f10.3,a,f10.3,a,f10.3)') &
+    !  & 'vdfdifh: tile props before call to vdfsurfseb: jt=',jt, &
+    !  & ' pcptsti=',pcptsti(jl,jt), &
+    !  & ' ptskti=',ptskti(jl,jt), &
+    !  & ' pqsti=',pqsti(jl,jt), &
+    !  & ' pdqsti=',pdqsti(jl,jt), &
+    !  & ' zrhochu=',zrhochu(jl,jt), &
+    !  & ' zrhocqu=',zrhocqu(jl,jt), &
+    !  & ' pcairti=',pcairti(jl,jt), &
+    !  & ' pcsatti=',pcsatti(jl,jt), &
+    !  & ' pssrflti=',pssrflti(jl,jt), &
+    !  & ' pfrti=',pfrti(jl,jt), &
+    !  & ' ztsrf=',ztsrf(jl,jt)
+    !endif
+    !endif
+
   enddo
 enddo
 ! 
 ! !*         1.7    call to surface energy balance routine
 ! !                 remember: output is extrapolated in time
 
-! call surfseb   (kidia=kidia,kfdia=kfdia,klon=klon,ktiles=ktiles,&
+! call vdfsurfseb   (kidia=kidia,kfdia=kfdia,klon=klon,ktiles=ktiles,&
 !  & psskm1m=pcptsti,ptskm1m=ptskti,pqskm1m=pqsti,&
 !  & pdqsdt=pdqsti,prhochu=zrhochu,prhocqu=zrhocqu,&
 !  & palphal=pcairti,palphas=pcsatti,&
@@ -393,6 +434,8 @@ enddo
 ! !*         1.7b   flux boundary condition for 1d model (fluxes in w/m2)
 ! !                 (over-write output of surfseb)
 
+!write(0,*) 'vdfdifh:',ldsfcflx
+
 if (ldsfcflx) then
   do jt=1,ktiles
     do jl=kidia,kfdia
@@ -409,7 +452,7 @@ if (ldsfcflx) then
     enddo
   enddo
   do jl=kidia,kfdia
-    zsl(jl)=zjs(jl,1)*zasl(jl)+zbsl(jl)
+    zsl(jl)=zjs(jl,1)*zasl(jl)+zbsl(jl)   !apparently tile 1 is used for prescribed fluxes!
     zql(jl)=pjq(jl,1)*zaql(jl)+zbql(jl)
   enddo
 endif
@@ -417,9 +460,21 @@ endif
 !*         1.7c   compute parameters at new time level 
 
 do jt=1,ktiles
+
   do jl=kidia,kfdia
     ptsktip1(jl,jt)=ztpfac2*ztsk(jl,jt)+ztpfac3*ptskti(jl,jt)
     zqsp1=pqsti(jl,jt)+pdqsti(jl,jt)*(ztsk(jl,jt)-ptskti(jl,jt))
+
+    !if (pfrti(jl,jt).gt.0._jprb) then
+    !if (jl.eq.kidia) then
+    !write(0,'(a,i3,a,f10.3,a,f10.3,a,f10.3,a,f10.3,a,f10.3,a,f10.3,a,f10.3)') &
+    !  & 'vdfdifh: sfc en budg: jt=',jt, &
+    !  & ' pfrti=',pfrti(jl,jt),' pssh=',pssh(jl,jt),' pslh=',pslh(jl,jt), &
+    !  & ' pslrfl=',pslrfl(jl)+pssrflti(jl,jt),' pg0=',pg0(jl,jt), &
+    !  & ' izrhochu=',1.0_jprb/zrhochu(jl,jt), ' zjs=',zjs(jl,jt)
+    !endif     
+    !endif
+
   enddo
 enddo
 
