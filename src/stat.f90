@@ -429,7 +429,9 @@ contains
   ! SUBROUTINE ACCUM_STAT: Accumulates various statistics over an
   ! averaging period for radiation variables
   !
-  subroutine accum_rad(n1,n2,n3,rflx,sflx,alb,lflxu,lflxd,sflxu,sflxd,lflxu_ca,lflxd_ca,sflxu_ca,sflxd_ca,sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa,sflxu_toa_ca,sflxd_toa_ca,lflxu_toa_ca,lflxd_toa_ca,dn0,dzt,pi0,pi1,sst,time_in,vapor,radtyp,a_pexnr,a_theta,CCN,cntlat)
+  subroutine accum_rad(n1,n2,n3,rflx,sflx,alb,lflxu,lflxd,sflxu,sflxd,lflxu_ca,lflxd_ca,sflxu_ca,sflxd_ca,sflxu_toa,&
+        sflxd_toa,lflxu_toa,lflxd_toa,sflxu_toa_ca,sflxd_toa_ca,lflxu_toa_ca,lflxd_toa_ca,dn0,dzt,pi0,pi1,sst,time_in,&
+        vapor,radtyp,a_pexnr,a_theta,CCN,cntlat)
     use radiation, only : d4stream
     integer, intent (in) :: n1,n2,n3
     real, intent (in)    :: rflx(n1,n2,n3)

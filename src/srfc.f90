@@ -687,7 +687,11 @@ contains
              Lstart  = L - 0.001*L
              Lend    = L + 0.001*L
 
-             fxdif   = ( (- zt(2) / Lstart * (log(zt(2) / z0h(i,j)) - psih(zt(2) / Lstart) + psih(z0h(i,j) / Lstart)) / (log(zt(2) / z0m(i,j)) - psim(zt(2) / Lstart) + psim(z0m(i,j) / Lstart)) ** 2.) - (-zt(2) / Lend * (log(zt(2) / z0h(i,j)) - psih(zt(2) / Lend) + psih(z0h(i,j) / Lend)) / (log(zt(2) / z0m(i,j)) - psim(zt(2) / Lend) + psim(z0m(i,j) / Lend)) ** 2.) ) / (Lstart - Lend)
+             fxdif   = (  (- zt(2) / Lstart * (log(zt(2) / z0h(i,j)) - psih(zt(2) / Lstart) + psih(z0h(i,j) / Lstart)) &
+                          / (log(zt(2) / z0m(i,j)) - psim(zt(2) / Lstart) + psim(z0m(i,j) / Lstart)) ** 2.) &
+                        - (-zt(2) / Lend * (log(zt(2) / z0h(i,j)) - psih(zt(2) / Lend) + psih(z0h(i,j) / Lend)) &
+                          / (log(zt(2) / z0m(i,j)) - psim(zt(2) / Lend) + psim(z0m(i,j) / Lend)) ** 2.) ) &
+                       / (Lstart - Lend)
 
              L       = L - fx / fxdif
 
@@ -730,7 +734,11 @@ contains
          fx      = Rib - zt(2) / L * (log(zt(2) / z0hav) - psih(zt(2) / L) + psih(z0hav / L)) / (log(zt(2) / z0mav) - psim(zt(2) / L) + psim(z0mav / L)) ** 2.
          Lstart  = L - 0.001*L
          Lend    = L + 0.001*L
-         fxdif   = ( (- zt(2) / Lstart * (log(zt(2) / z0hav) - psih(zt(2) / Lstart) + psih(z0hav / Lstart)) / (log(zt(2) / z0mav) - psim(zt(2) / Lstart) + psim(z0mav / Lstart)) ** 2.) - (-zt(2) / Lend * (log(zt(2) / z0hav) - psih(zt(2) / Lend) + psih(z0hav / Lend)) / (log(zt(2) / z0mav) - psim(zt(2) / Lend) + psim(z0mav / Lend)) ** 2.) ) / (Lstart - Lend)
+         fxdif   = (   (- zt(2) / Lstart * (log(zt(2) / z0hav) - psih(zt(2) / Lstart) + psih(z0hav / Lstart)) &
+                       / (log(zt(2) / z0mav) - psim(zt(2) / Lstart) + psim(z0mav / Lstart)) ** 2.) &
+                     - (-zt(2) / Lend * (log(zt(2) / z0hav) - psih(zt(2) / Lend) + psih(z0hav / Lend)) &
+                       / (log(zt(2) / z0mav) - psim(zt(2) / Lend) + psim(z0mav / Lend)) ** 2.) &
+                   ) / (Lstart - Lend)
          L       = L - fx / fxdif
          if(Rib * L < 0. .or. abs(L) == 1e5) then
             if(Rib > 0) L = 0.01
@@ -1074,16 +1082,33 @@ contains
           a_tsoil(k,i,j) = tsoilm(k,i,j) + rk3coef / pCs(k,i,j) * ( lambdah(k,i,j) * (a_tsoil(k+1,i,j) - a_tsoil(k,i,j)) / dzsoilh(k) - lambdah(k-1,i,j) * (a_tsoil(k,i,j) - a_tsoil(k-1,i,j)) / dzsoilh(k-1) ) / dzsoil(k)
         end do
 
-        a_tsoil(ksoilmax,i,j) = tsoilm(ksoilmax,i,j) + rk3coef / pCs(ksoilmax,i,j) * ( lambda(ksoilmax,i,j) * (tsoildeep(i,j) - a_tsoil(ksoilmax,i,j)) / dzsoil(ksoilmax) - lambdah(ksoilmax-1,i,j) * (a_tsoil(ksoilmax,i,j) - a_tsoil(ksoilmax-1,i,j)) / dzsoil(ksoilmax-1) ) / dzsoil(ksoilmax)
+        a_tsoil(ksoilmax,i,j) = tsoilm(ksoilmax,i,j) &
+           + rk3coef / pCs(ksoilmax,i,j) * ( &
+               lambda(ksoilmax,i,j) * (tsoildeep(i,j) &
+               - a_tsoil(ksoilmax,i,j)) / dzsoil(ksoilmax) &
+               - lambdah(ksoilmax-1,i,j) * (a_tsoil(ksoilmax,i,j) - a_tsoil(ksoilmax-1,i,j)) / dzsoil(ksoilmax-1) &
+             ) / dzsoil(ksoilmax)
 
         !" Solve the diffusion equation for the moisture transport (closed bottom for now)
         a_phiw(1,i,j) = phiwm(1,i,j) + rk3coef * ( lambdash(1,i,j) * (a_phiw(2,i,j) - a_phiw(1,i,j)) / dzsoilh(1) - gammash(1,i,j) - (phifrac(1,i,j) * LEveg + LEsoil) / (rowt*alvl)) / dzsoil(1)
 
         do k = 2, ksoilmax-1
-          a_phiw(k,i,j) = phiwm(k,i,j) + rk3coef * ( lambdash(k,i,j) * (a_phiw(k+1,i,j) - a_phiw(k,i,j)) / dzsoilh(k) - gammash(k,i,j) - lambdash(k-1,i,j) * (a_phiw(k,i,j) - a_phiw(k-1,i,j)) / dzsoilh(k-1) + gammash(k-1,i,j) - (phifrac(k,i,j) * LEveg) / (rowt*alvl)) / dzsoil(k)
+          a_phiw(k,i,j) = phiwm(k,i,j) &
+             + rk3coef * ( &
+               lambdash(k,i,j) * (a_phiw(k+1,i,j) - a_phiw(k,i,j)) / dzsoilh(k) &
+               - gammash(k,i,j) &
+               - lambdash(k-1,i,j) * (a_phiw(k,i,j) - a_phiw(k-1,i,j)) / dzsoilh(k-1) &
+               + gammash(k-1,i,j) &
+               - (phifrac(k,i,j) * LEveg) / (rowt*alvl) &
+             ) / dzsoil(k)
         end do
 
-        a_phiw(ksoilmax,i,j) = phiwm(ksoilmax,i,j) + rk3coef * (- lambdash(ksoilmax-1,i,j) * (a_phiw(ksoilmax,i,j) - a_phiw(ksoilmax-1,i,j)) / dzsoil(ksoilmax-1) + gammash(ksoilmax-1,i,j) - (phifrac(ksoilmax,i,j) * LEveg) / (rowt*alvl) ) / dzsoil(ksoilmax)
+        a_phiw(ksoilmax,i,j) = phiwm(ksoilmax,i,j) &
+           + rk3coef * ( &
+             - lambdash(ksoilmax-1,i,j) * (a_phiw(ksoilmax,i,j) - a_phiw(ksoilmax-1,i,j)) / dzsoil(ksoilmax-1) &
+             + gammash(ksoilmax-1,i,j) &
+             - (phifrac(ksoilmax,i,j) * LEveg) / (rowt*alvl) &
+           ) / dzsoil(ksoilmax)
 
       end do
     end do
