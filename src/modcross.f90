@@ -20,7 +20,7 @@ module modcross
 implicit none
 
   logical            :: lcross = .false., ldocross, lxy = .false., lxz = .false., lyz = .false.
-  real               :: dtcross = 60, xcross = 0., ycross = 0., zcross(10) = 0.
+  real               :: xcross = 0., ycross = 0., zcross(10) = 0.
   integer            :: icross,jcross,kcross(10) = 0, nkcross
   real               :: threstracer = 2
   real               :: thres_rw    = 1.e-8
