@@ -628,7 +628,7 @@ contains
        if (itype==2) ncinfo = 'tttt'
     case('time')
        if (itype==0) ncinfo = 'Time'
-       if (itype==1) ncinfo = 'seconds since 2000-00-00 0000'
+       if (itype==1) ncinfo = 'seconds since 2000-01-01 0000'
        if (itype==2) ncinfo = 'time'
     case('zt')
        if (itype==0) ncinfo = 'Vertical displacement of cell centers'
