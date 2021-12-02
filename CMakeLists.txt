@@ -16,7 +16,7 @@
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/config)
 
 INCLUDE(CMakeForceCompiler) #Necessary to change between MPI/parallel/profiler compilers, without having to do a make clean
-cmake_minimum_required (VERSION 2.8.1)
+cmake_minimum_required (VERSION 3.0.0)
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 
@@ -44,6 +44,7 @@ project (uclales Fortran)
 set (MPI TRUE CACHE BOOL "Choose to enable MPI or not.")
 if(MPI)
  MESSAGE(STATUS "MPI is Enabled.")
+ find_package(MPI REQUIRED)
  FILE(GLOB mpifile "${CMAKE_CURRENT_SOURCE_DIR}/src/mpi/mpi_interface.f90")
 else()
   MESSAGE(STATUS "MPI is Disabled.")
@@ -69,19 +70,6 @@ else()
 endif()
 
 
-set(INCLUDE_DIRS ${NETCDF_INCLUDE_DIR})
+set(INCLUDE_DIRS ${NETCDF_INCLUDE_DIR} ${MPI_Fortran_INCLUDE_DIRS})
 
 add_subdirectory(src)
-
-
-#####################
-# DOCUMENTATION
-#####################
-add_custom_target(todo ALL)
-ADD_CUSTOM_COMMAND(TARGET todo POST_BUILD
-                  COMMAND echo "UCLALES TODO LIST" > TODO
-                  COMMAND date  >> TODO
-                  COMMAND grep -Rin \\todo  src | sed 's/!.*TODO//I' >>  TODO
-                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-                  )
-
