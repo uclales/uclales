@@ -40,7 +40,8 @@ module radiation
   contains
 
     subroutine d4stream(n1, n2, n3, alat, time, sknt, sfc_albedo, CCN, dn0, &
-         pi0, pi1, dzi_m, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,sflxd, albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa, rr,ice,nice,grp)
+         pi0, pi1, dzi_m, pip, th, rv, rc, tt, rflx, sflx,lflxu, lflxd,sflxu,&
+         sflxd, albedo, lflxu_toa, lflxd_toa, sflxu_toa, sflxd_toa, rr,ice,nice,grp)
 
 
       integer, intent (in) :: n1, n2, n3

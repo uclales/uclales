@@ -507,7 +507,8 @@ contains
     TYPE (particle_record), POINTER:: particle
 
     zbottom      = floor(particle%z + 0.5)
-    deltaz       = ((zm(floor(particle%z)) + (particle%z - floor(particle%z)) / dzi_t(floor(particle%z))) - zt(zbottom)) * dzi_m(zbottom)
+    deltaz       = ((zm(floor(particle%z)) + (particle%z - floor(particle%z)) / dzi_t(floor(particle%z))) &
+                    - zt(zbottom)) * dzi_m(zbottom)
     if(lfsloc) then
       fsl        = i3d(particle%x,particle%y,particle%z,fs_local)
     else
@@ -712,7 +713,8 @@ contains
       allocate(buffrecv(sum(recvcount)))
 
       ! Send all particles to all procs
-      call mpi_allgatherv(buffsend,nlocal*nrpartvar,mpi_double_precision,buffrecv,recvcount,displacements,mpi_double_precision,mpi_comm_world,ierror)
+      call mpi_allgatherv(buffsend,nlocal*nrpartvar,mpi_double_precision,buffrecv,recvcount,displacements,&
+                          mpi_double_precision,mpi_comm_world,ierror)
 
       ! Loop through particles, check if on this proc
       xsizelocal = nxg / nxprocs
@@ -1091,9 +1093,12 @@ contains
 
     particle%zprev = particle%z
 
-    particle%x     = particle%x + rka(nstep) * (particle%ures + particle%usgs) * dt + rkb(nstep) * (particle%ures_prev + particle%usgs_prev) * dt
-    particle%y     = particle%y + rka(nstep) * (particle%vres + particle%vsgs) * dt + rkb(nstep) * (particle%vres_prev + particle%vsgs_prev) * dt
-    particle%z     = particle%z + rka(nstep) * (particle%wres + particle%wsgs) * dt + rkb(nstep) * (particle%wres_prev + particle%wsgs_prev) * dt
+    particle%x     = particle%x + rka(nstep) * (particle%ures + particle%usgs) * dt &
+                     + rkb(nstep) * (particle%ures_prev + particle%usgs_prev) * dt
+    particle%y     = particle%y + rka(nstep) * (particle%vres + particle%vsgs) * dt &
+                     + rkb(nstep) * (particle%vres_prev + particle%vsgs_prev) * dt
+    particle%z     = particle%z + rka(nstep) * (particle%wres + particle%wsgs) * dt &
+                     + rkb(nstep) * (particle%wres_prev + particle%wsgs_prev) * dt
 
     particle%ures_prev = particle%ures
     particle%vres_prev = particle%vres
@@ -1122,7 +1127,9 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine partcomm
-    use mpi_interface, only : wrxid, wryid, ranktable, nxg, nyg, xcomm, ycomm, ierror, mpi_status_size, mpi_integer, mpi_double_precision, mpi_comm_world, nyprocs, nxprocs,myid
+    use mpi_interface, only : wrxid, wryid, ranktable, nxg, nyg, xcomm, ycomm, ierror, &
+                              mpi_status_size, mpi_integer, mpi_double_precision, &
+                              mpi_comm_world, nyprocs, nxprocs,myid
     use modnetcdf, only : fillvalue_double
     implicit none
 
@@ -1788,7 +1795,8 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine balanced_particledump(time)
-    use mpi_interface, only : mpi_comm_world, myid, mpi_integer, mpi_double_precision, ierror, nxprocs, nyprocs, mpi_status_size, wrxid, wryid, nxg, nyg, mpi_sum
+    use mpi_interface, only : mpi_comm_world, myid, mpi_integer, mpi_double_precision, ierror, &
+                              nxprocs, nyprocs, mpi_status_size, wrxid, wryid, nxg, nyg, mpi_sum
     use grid,          only : tname, deltax, deltay, dzi_t, zm, umean, vmean,level
     use modnetcdf,     only : writevar_nc, fillvalue_double !, nchandle_error
     use netcdf,        only : nf90_sync !,nf90_inq_dimid, nf90_inquire_dimension, nf90_noerr,
@@ -1943,7 +1951,8 @@ contains
           else
             end = sendbase(p+1)-1
           end if
-          call mpi_isend(sendbuff(start:end),tosend(p)*nvar,mpi_double_precision,p,(myid+1)*(p+nprocs),mpi_comm_world,req(isr),ierror)
+          call mpi_isend(sendbuff(start:end),tosend(p)*nvar,mpi_double_precision,p,(myid+1)*(p+nprocs),&
+                         mpi_comm_world,req(isr),ierror)
           isr = isr + 1
         end if
         if(toreceive(p) .gt. 0) then
@@ -1953,7 +1962,8 @@ contains
           else
             end = receivebase(p+1)-1
           end if
-          call mpi_irecv(recvbuff(start:end),toreceive(p)*nvar,mpi_double_precision,p,(p+1)*(myid+nprocs),mpi_comm_world,req(isr),ierror)
+          call mpi_irecv(recvbuff(start:end),toreceive(p)*nvar,mpi_double_precision,p,(p+1)*(myid+nprocs),&
+                         mpi_comm_world,req(isr),ierror)
           isr = isr + 1
         end if
       end do
@@ -2215,7 +2225,8 @@ contains
       allocate(buffrecv(sum(recvcount)))
 
       ! Send all unique-nd-cominations to all procs
-      call mpi_allgatherv(ndel_n,ndel,mpi_double_precision,buffrecv,recvcount,displacements,mpi_double_precision,mpi_comm_world,ierror)
+      call mpi_allgatherv(ndel_n,ndel,mpi_double_precision,buffrecv,recvcount,displacements,&
+                          mpi_double_precision,mpi_comm_world,ierror)
     end if
 
     i = 1
@@ -2496,7 +2507,8 @@ contains
   !--------------------------------------------------------------------------
   !
   subroutine init_particles(hot,hfilin)
-    use mpi_interface, only : wrxid, wryid, nxg, nyg, myid, nxprocs, nyprocs, appl_abort, ierror,mpi_double_precision,mpi_comm_world,mpi_min
+    use mpi_interface, only : wrxid, wryid, nxg, nyg, myid, nxprocs, nyprocs, &
+                              appl_abort, ierror,mpi_double_precision,mpi_comm_world,mpi_min
     use grid, only : zm, deltax, deltay, zt,dzi_t, nzp, nxp, nyp
     use grid, only : a_up, a_vp, a_wp
     use modnetcdf, only : fillvalue_double
@@ -2647,7 +2659,8 @@ contains
       do n = 1, np
       !if (mod(n,10000000)==0) print *,n
         read(ifinput,*) tstart, xstart, ystart, zstart
-        if(xstart < 0. .or. xstart > nxg*deltax .or. ystart < 0. .or. ystart > nyg*deltay .or. zstart < 0. .or. zstart > zm(nzp-1)) then
+        if(xstart < 0. .or. xstart > nxg*deltax .or. ystart < 0. .or. ystart > nyg*deltay &
+           .or. zstart < 0. .or. zstart > zm(nzp-1)) then
           if (myid == 0) then
             print *, '  ABORTING: particle initialized outsize domain'
             write (*,*) 'X,Y,Z = ', xstart,ystart,zstart
@@ -2939,11 +2952,14 @@ contains
     end if
     if(lpartdumpth) then
       call addvar_nc(ncpartid,'t','liquid water potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-      if(level > 0) call addvar_nc(ncpartid,'tv','virtual potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      if(level > 0) call addvar_nc(ncpartid,'tv','virtual potential temperature','K',dimname,&
+                                   dimlongname,dimunit,dimsize,dimvalues,precis)
     end if
     if(lpartdumpmr) then
-      if(level > 0) call addvar_nc(ncpartid,'rt','total water mixing ratio','kg/kg',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
-      if(level > 1) call addvar_nc(ncpartid,'rl','liquid water mixing ratio','kg/kg',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
+      if(level > 0) call addvar_nc(ncpartid,'rt','total water mixing ratio','kg/kg',dimname,&
+                                   dimlongname,dimunit,dimsize,dimvalues,precis)
+      if(level > 1) call addvar_nc(ncpartid,'rl','liquid water mixing ratio','kg/kg',dimname,&
+                                   dimlongname,dimunit,dimsize,dimvalues,precis)
     end if
     if(lpartdrop.and.lpartmass) then
       call addvar_nc(ncpartid,'m','drop mass','kg',dimname,dimlongname,dimunit,dimsize,dimvalues,precis)
@@ -2988,12 +3004,18 @@ contains
     if(myid == 0) then
       call open_nc(trim(filprf)//'.particlestat.nc', ncpartstatid, ncpartstatrec, time, .false.)
       call addvar_nc(ncpartstatid,'np','Number of particles','-',dimname,dimlongname,dimunit,dimsize,dimvalues)
-      call addvar_nc(ncpartstatid,'u','resolved u-velocity of particle','m s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
-      call addvar_nc(ncpartstatid,'v','resolved v-velocity of particle','m s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
-      call addvar_nc(ncpartstatid,'w','resolved w-velocity of particle','m s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
-      call addvar_nc(ncpartstatid,'u_2','resolved u-velocity variance of particle','m2 s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
-      call addvar_nc(ncpartstatid,'v_2','resolved v-velocity variance of particle','m2 s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
-      call addvar_nc(ncpartstatid,'w_2','resolved w-velocity variance of particle','m2 s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'u','resolved u-velocity of particle','m s-1',dimname,&
+                     dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'v','resolved v-velocity of particle','m s-1',dimname,&
+                     dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'w','resolved w-velocity of particle','m s-1',dimname,&
+                     dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'u_2','resolved u-velocity variance of particle','m2 s-1',&
+                     dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'v_2','resolved v-velocity variance of particle','m2 s-1',&
+                     dimname,dimlongname,dimunit,dimsize,dimvalues)
+      call addvar_nc(ncpartstatid,'w_2','resolved w-velocity variance of particle','m2 s-1',&
+                     dimname,dimlongname,dimunit,dimsize,dimvalues)
       call addvar_nc(ncpartstatid,'tke','resolved TKE of particle','m s-1',dimname,dimlongname,dimunit,dimsize,dimvalues)
       call addvar_nc(ncpartstatid,'t','liquid water potential temperature','K',dimname,dimlongname,dimunit,dimsize,dimvalues)
       if(level > 0) then

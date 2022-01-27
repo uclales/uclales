@@ -2589,6 +2589,19 @@ CONTAINS
 
   END FUNCTION double_global_maxval
 
+  FUNCTION real_global_maxval(feld)
+    use mpi_interface,  only : myid, real_scalar_par_max
+    IMPLICIT NONE
+
+    real, DIMENSION(:,:,:),INTENT(in):: feld
+    real :: loc_max, real_global_maxval
+
+    loc_max = MAXVAL(feld)
+
+    call real_scalar_par_max(loc_max,real_global_maxval)
+
+  END FUNCTION real_global_maxval
+
   FUNCTION double_global_sumval(feld)
     use mpi_interface,  only : myid, double_scalar_par_sum
     IMPLICIT NONE

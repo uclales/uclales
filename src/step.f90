@@ -64,7 +64,7 @@ contains
   !
   subroutine stepper
 
-    use mpi_interface, only : myid, broadcast_dbl, double_scalar_par_max,mpi_get_time
+    use mpi_interface, only : myid, broadcast_dbl, real_scalar_par_max,mpi_get_time
     use grid, only : dt, dtlong, zt, zm, nzp, dn0, u0, v0, level, &
          write_hist
     use ncio, only : write_anal, close_anal
@@ -103,10 +103,10 @@ contains
        time = time + dt
 
        call cfl(cflmax)
-       call double_scalar_par_max(cflmax,gcflmax)
+       call real_scalar_par_max(cflmax,gcflmax)
        cflmax = gcflmax
        call peclet(pecletmax)
-       call double_scalar_par_max(pecletmax,gpecletmax)
+       call real_scalar_par_max(pecletmax,gpecletmax)
        pecletmax = gpecletmax
        dt_prev = dt
        dt = min(dtlong,dt*peak_cfl/(cflmax+epsilon(1.)))
@@ -171,7 +171,8 @@ contains
                        istp, time, dt_prev, t2-t1
               else
                 print "('   Timestep # ',i6," //     &
-                       "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3'  WC Time left(sec) = ',f10.2)",     &
+                       "'   Model time(sec)=',f12.2,3x,'dt(sec)=',f8.4,'   CPU time(sec)=',f8.3'  "&
+                       "WC Time left(sec) = ',f10.2)",     &
                        istp, time, dt_prev, t2-t1, wctime-t2+t0
               end if
           end if
@@ -751,7 +752,7 @@ contains
 
     use grid, only : u0, v0, a_up, a_vp, a_wp, a_tp, a_ut, a_vt, a_wt, a_tt,&
          nfpt, spngt, spngm, nzp, nxp, nyp, th0, th00, lspongeinit
-    use mpi_interface, only : double_array_par_sum,nxpg,nypg
+    use mpi_interface, only : real_array_par_sum,nxpg,nypg
 
     integer :: i, j, k, kk
     real :: tbarg(nfpt),tbarl(nfpt),ubarg(nfpt),ubarl(nfpt),vbarg(nfpt),vbarl(nfpt)
@@ -781,9 +782,9 @@ contains
            vbarl(kk) = sum(a_vp(k,3:nxp-2,3:nyp-2))
          end do
 
-         call double_array_par_sum(tbarl,tbarg,nfpt)
-         call double_array_par_sum(ubarl,ubarg,nfpt)
-         call double_array_par_sum(vbarl,vbarg,nfpt)
+         call real_array_par_sum(tbarl,tbarg,nfpt)
+         call real_array_par_sum(ubarl,ubarg,nfpt)
+         call real_array_par_sum(vbarl,vbarg,nfpt)
 
          ngrid = (nxpg-4)*(nypg-4)
          do k = 1,nfpt

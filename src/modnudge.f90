@@ -66,7 +66,8 @@ contains
     real :: highheight,highqtnudge,highthlnudge,highunudge,highvnudge,highwnudge,hightnudge
     real :: lowheight,lowqtnudge,lowthlnudge,lowunudge,lowvnudge,lowwnudge,lowtnudge
     real :: fac
-    allocate(tnudge(nzp,ntnudge),unudge(nzp,ntnudge),vnudge(nzp,ntnudge),wnudge(nzp,ntnudge),thlnudge(nzp,ntnudge),qtnudge(nzp,ntnudge))
+    allocate(tnudge(nzp,ntnudge),unudge(nzp,ntnudge),vnudge(nzp,ntnudge),wnudge(nzp,ntnudge))
+    allocate(thlnudge(nzp,ntnudge),qtnudge(nzp,ntnudge))
     allocate(timenudge(0:ntnudge), height(nzp))
     tnudge = 0
     unudge=0

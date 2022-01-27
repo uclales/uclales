@@ -611,16 +611,13 @@ contains
   !---------------------------------------------------------------------------
   ! get maximum across processors
   !
-  subroutine real_scalar_par_max(rxl,xxg)
+  subroutine real_scalar_par_max(rxl,rxg)
 
     real, intent(in) :: rxl
-    real(kind=8), intent(out) :: xxg
-    real(kind=8) :: xxl
+    real, intent(out) :: rxg
     integer:: mpiop,ierror
 
-    xxl = rxl
-
-    call mpi_allreduce(xxl,xxg,1,MPI_DOUBLE_PRECISION, MPI_MAX, &
+    call mpi_allreduce(rxl,rxg,1,MPI_REAL, MPI_MAX, &
          MPI_COMM_WORLD, ierror)
 
   end subroutine real_scalar_par_max
@@ -636,6 +633,17 @@ contains
          MPI_COMM_WORLD, ierror)
 
   end subroutine double_scalar_par_max
+
+  subroutine real_scalar_par_min(rxl,rxg)
+
+    real, intent(out) :: rxg
+    real, intent(in) :: rxl
+    integer:: mpiop,ierror
+
+    call mpi_allreduce(rxl,rxg,1,MPI_REAL, MPI_MIN, &
+         MPI_COMM_WORLD, ierror)
+
+  end subroutine real_scalar_par_min
 
   subroutine double_scalar_par_min(xxl,xxg)
 
@@ -673,6 +681,17 @@ contains
          MPI_COMM_WORLD, ierror)
 
   end subroutine double_array_par_sum
+
+  subroutine real_array_par_sum(xxl,xxg,n)
+    integer, intent(in)::n
+    real, intent(out) :: xxg(n)
+    real, intent(in) :: xxl(n)
+    integer:: mpiop,ierror
+
+    call mpi_allreduce(xxl,xxg,n,MPI_REAL, MPI_SUM, &
+         MPI_COMM_WORLD, ierror)
+  end subroutine real_array_par_sum
+
   subroutine broadcast(val, procsend)
    integer, intent(in) :: procsend
    real(kind=8), intent(inout) :: val

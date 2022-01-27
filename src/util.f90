@@ -142,14 +142,14 @@ contains
   !
   subroutine get_avg3(n1,n2,n3,a,avg)
 
-    use mpi_interface, only : nypg,nxpg,double_array_par_sum
+    use mpi_interface, only : nypg,nxpg,real_array_par_sum
 
     integer,intent(in) :: n1,n2,n3
     real,intent(in) :: a(n1,n2,n3)
     real,intent(out) :: avg(n1)
 
     integer      :: k,i,j
-    real(kind=8) :: lavg(n1),gavg(n1),x
+    real :: lavg(n1),gavg(n1),x
 
     x = 1./(real(nypg-4)*real(nxpg-4))
     gavg(:) = 0.
@@ -161,7 +161,7 @@ contains
        end do
     end do
     lavg = gavg
-    call double_array_par_sum(lavg,gavg,n1)
+    call real_array_par_sum(lavg,gavg,n1)
     avg(:) = real(gavg(:) * x)
 
   end subroutine get_avg3
@@ -266,7 +266,7 @@ contains
   subroutine get_var3(n1,n2,n3,a,b,avg)
 
 
-    use mpi_interface, only : nypg,nxpg,double_array_par_sum
+    use mpi_interface, only : nypg,nxpg,real_array_par_sum
 
     integer,intent(in) :: n1,n2,n3
     real,intent(in) :: a(n1,n2,n3)
@@ -274,7 +274,7 @@ contains
     real,intent(out) :: avg(n1)
 
     integer      :: k,i,j
-    real(kind=8) :: lavg(n1),gavg(n1),x
+    real :: lavg(n1),gavg(n1),x
 
     x = 1./(real(nypg-4)*real(nxpg-4))
     gavg(:) = 0.
@@ -286,7 +286,7 @@ contains
        end do
     end do
     lavg = gavg
-    call double_array_par_sum(lavg,gavg,n1)
+    call real_array_par_sum(lavg,gavg,n1)
     avg(:) = real(gavg(:) * x)
 
 
@@ -466,7 +466,7 @@ contains
      
   subroutine calclevel(varin,varout,location, threshold)
     use grid, only : nzp, nxp, nyp, zt
-    use mpi_interface, only : double_scalar_par_max, double_scalar_par_min
+    use mpi_interface, only : real_scalar_par_max, real_scalar_par_min
     real, intent(in), dimension(:,:,:) :: varin
     real, intent(in), optional :: threshold
     integer, intent(out) :: varout
@@ -497,7 +497,7 @@ contains
         end do
       end do
       rlocal = klocal
-      call double_scalar_par_max(rlocal,rglobal) 
+      call real_scalar_par_max(rlocal,rglobal) 
       varout = rglobal
     case ('base')
       klocal = nzp 
@@ -512,7 +512,7 @@ contains
         end do
       end do
       rlocal = klocal
-      call double_scalar_par_min(rlocal,rglobal) 
+      call real_scalar_par_min(rlocal,rglobal) 
       varout = rglobal
 
     end select

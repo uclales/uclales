@@ -333,4 +333,50 @@ contains
   end subroutine broadcast
 
 
+  !---------------------------------------------------------------------------
+  ! get maximum across processors (for real(4))
+  !
+  subroutine real_scalar_par_max(xxl,xxg)
+
+    real(kind=4), intent(out) :: xxg
+    real(kind=4), intent(in) :: xxl
+
+    xxg=xxl
+
+  end subroutine real_scalar_par_max
+  !
+  !---------------------------------------------------------------------------
+  ! get maximum across processors (for real(4))
+  !
+  subroutine real_scalar_par_min(xxl,xxg)
+
+    real(kind=4), intent(out) :: xxg
+    real(kind=4), intent(in) :: xxl
+
+    xxg=xxl
+
+  end subroutine real_scalar_par_min
+  !
+  !---------------------------------------------------------------------------
+  subroutine real_scalar_par_sum(xxl,xxg)
+
+    real(kind=4), intent(out) :: xxg
+    real(kind=4), intent(in) :: xxl
+
+    xxg=xxl
+
+  end subroutine real_scalar_par_sum
+  !
+  !---------------------------------------------------------------------------
+  subroutine real_array_par_sum(xxl,xxg,n)
+
+    integer, intent(in)::n
+    real(kind=4), intent(out) :: xxg(n)
+    real(kind=4), intent(in) :: xxl(n)
+
+    xxg=xxl
+
+  end subroutine real_array_par_sum
+
+
 end module mpi_interface

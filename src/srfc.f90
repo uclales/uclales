@@ -731,7 +731,8 @@ contains
        do while (.true.)
          iter    = iter + 1
          Lold    = L
-         fx      = Rib - zt(2) / L * (log(zt(2) / z0hav) - psih(zt(2) / L) + psih(z0hav / L)) / (log(zt(2) / z0mav) - psim(zt(2) / L) + psim(z0mav / L)) ** 2.
+         fx      = Rib - zt(2) / L * (log(zt(2) / z0hav) - psih(zt(2) / L) + psih(z0hav / L)) &
+                   / (log(zt(2) / z0mav) - psim(zt(2) / L) + psim(z0mav / L)) ** 2.
          Lstart  = L - 0.001*L
          Lend    = L + 0.001*L
          fxdif   = (   (- zt(2) / Lstart * (log(zt(2) / z0hav) - psih(zt(2) / Lstart) + psih(z0hav / Lstart)) &
@@ -1076,10 +1077,14 @@ contains
         lambdash(ksoilmax,i,j) = lambdas(ksoilmax,i,j)
 
         !" Solve the diffusion equation for the heat transport
-        a_tsoil(1,i,j) = tsoilm(1,i,j) + rk3coef * ( lambdah(1,i,j) * (a_tsoil(2,i,j) - a_tsoil(1,i,j)) / dzsoilh(1) + a_G0(i,j) ) / dzsoil(1) / pCs(1,i,j)
+        a_tsoil(1,i,j) = tsoilm(1,i,j) + rk3coef * &
+                         ( lambdah(1,i,j) * (a_tsoil(2,i,j) - a_tsoil(1,i,j)) / dzsoilh(1) + a_G0(i,j) ) / dzsoil(1) / pCs(1,i,j)
 
         do k = 2, ksoilmax-1
-          a_tsoil(k,i,j) = tsoilm(k,i,j) + rk3coef / pCs(k,i,j) * ( lambdah(k,i,j) * (a_tsoil(k+1,i,j) - a_tsoil(k,i,j)) / dzsoilh(k) - lambdah(k-1,i,j) * (a_tsoil(k,i,j) - a_tsoil(k-1,i,j)) / dzsoilh(k-1) ) / dzsoil(k)
+          a_tsoil(k,i,j) = tsoilm(k,i,j) + rk3coef / pCs(k,i,j) * &
+                           ( lambdah(k,i,j) * (a_tsoil(k+1,i,j) - a_tsoil(k,i,j)) &
+                              / dzsoilh(k) - lambdah(k-1,i,j) * (a_tsoil(k,i,j) - a_tsoil(k-1,i,j)) / dzsoilh(k-1) ) &
+                           / dzsoil(k)
         end do
 
         a_tsoil(ksoilmax,i,j) = tsoilm(ksoilmax,i,j) &
@@ -1090,7 +1095,11 @@ contains
              ) / dzsoil(ksoilmax)
 
         !" Solve the diffusion equation for the moisture transport (closed bottom for now)
-        a_phiw(1,i,j) = phiwm(1,i,j) + rk3coef * ( lambdash(1,i,j) * (a_phiw(2,i,j) - a_phiw(1,i,j)) / dzsoilh(1) - gammash(1,i,j) - (phifrac(1,i,j) * LEveg + LEsoil) / (rowt*alvl)) / dzsoil(1)
+        a_phiw(1,i,j) = phiwm(1,i,j) &
+           + rk3coef * ( &
+               lambdash(1,i,j) * (a_phiw(2,i,j) - a_phiw(1,i,j)) &
+               / dzsoilh(1) - gammash(1,i,j) - (phifrac(1,i,j) * LEveg + LEsoil) / (rowt*alvl)&
+            ) / dzsoil(1)
 
         do k = 2, ksoilmax-1
           a_phiw(k,i,j) = phiwm(k,i,j) &

@@ -225,9 +225,15 @@ contains
          a_npp, prc_r, CCN)
     if (debug) WRITE (0,*) 'statistics: micro3 ok    myid=',myid
 
-    if (level ==4) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp,a_nicep,prc_i,prc_s,prc_g)
+    if (level ==4) then
+       call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp, &
+                       a_nicep,prc_i,prc_s,prc_g)
+    end if
 
-    if (level ==5) call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp,a_nicep,prc_i,prc_s,prc_g,a_rhailp,prc_h)
+    if (level ==5) then
+       call accum_lvl4(nzp, nxp, nyp, dn0, zm, vapor, a_ricep, a_rsnowp, a_rgrp, &
+                       a_nicep,prc_i,prc_s,prc_g,a_rhailp,prc_h)
+    end if
 
     if (debug) WRITE (0,*) 'statistics: micro ok    myid=',myid
 
@@ -441,7 +447,8 @@ contains
                                    lflxd_ca(n1,n2,n3),sflxu_ca(n1,n2,n3),sflxd_ca(n1,n2,n3) ,&
                                    sflxu_toa(n2,n3),sflxd_toa(n2,n3),lflxu_toa(n2,n3),lflxd_toa(n2,n3),&
                                    sflxu_toa_ca(n2,n3),sflxd_toa_ca(n2,n3),lflxu_toa_ca(n2,n3),lflxd_toa_ca(n2,n3),&
-                                   dn0(n1),dzt(n1),pi0(n1),pi1(n1),a_pexnr(n1,n2,n3),a_theta(n1,n2,n3),CCN,cntlat,sst,time_in,vapor(n1,n2,n3)
+                                   dn0(n1),dzt(n1),pi0(n1),pi1(n1),a_pexnr(n1,n2,n3),a_theta(n1,n2,n3),CCN,cntlat, &
+                                   sst,time_in,vapor(n1,n2,n3)
    integer, optional,intent(in) :: radtyp
 
     integer :: k

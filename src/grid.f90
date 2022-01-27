@@ -78,7 +78,8 @@ module grid
   ! 2D Arrays (surface fluxes)
   !
   real, dimension (:,:), allocatable :: albedo, a_ustar, a_tstar, a_rstar,    &
-       uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, trac_sfc, sflxu_toa,sflxd_toa,lflxu_toa,lflxd_toa, sflxu_toa_ca,sflxd_toa_ca,lflxu_toa_ca,lflxd_toa_ca, &
+       uw_sfc, vw_sfc, ww_sfc, wt_sfc, wq_sfc, trac_sfc, sflxu_toa,sflxd_toa, &
+       lflxu_toa,lflxd_toa, sflxu_toa_ca,sflxd_toa_ca,lflxu_toa_ca,lflxd_toa_ca, &
        cnd_acc, &  ! accumulated condensation  [kg/m2] (diagnostic for 2D output)
        cev_acc, &  ! accumulated evaporation of cloud water [kg/m2] (diagnostic for 2D output)
        rev_acc, &  ! accumulated evaporation of rainwater   [kg/m2] (diagnostic for 2D output)

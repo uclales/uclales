@@ -428,7 +428,8 @@ contains
           dimname(2)            = yname
           dimlongname(2)        = ylongname
           do n = 1, nkcross
-            call addvar_nc(nccrossxyid, trim(name)//trim(hname(n)), 'xy crosssection of '//trim(longname)//' at '//trim(hlname(n)), &
+            call addvar_nc(nccrossxyid, trim(name)//trim(hname(n)), 'xy crosssection of ' &
+                           //trim(longname)//' at '//trim(hlname(n)), &
             unit, dimname, dimlongname, dimunit, dimsize, dimvalues)
           end do
           crossname(ncross) = name
@@ -524,7 +525,8 @@ contains
              p(k,i,j) = p00 * (exner)**cpr
              tk=a_theta(k,i,j)*exner
              tstar = 1./(1./(tk-55.)-log(a_rp(k,i,j)/rslf(p(k,i,j),tk))/2840.)+55.
-             th_e(k,i,j) = tk*(p00/p(k,i,j))**(0.2854*(1.-0.28*a_rp(k,i,j)))*exp(a_rp(k,i,j)*(1.+0.81*a_rp(k,i,j))*(3376./tstar-2.54))
+             th_e(k,i,j) = tk*(p00/p(k,i,j))**(0.2854*(1.-0.28*a_rp(k,i,j)))* &
+                           exp(a_rp(k,i,j)*(1.+0.81*a_rp(k,i,j))*(3376./tstar-2.54))
           end do
        end do
       end do
@@ -855,7 +857,7 @@ contains
   subroutine calcavg(varin, mask, varout)
     use modnetcdf, only : fillvalue_double
     use grid, only : nzp, nxp, nyp
-    use mpi_interface, only : double_array_par_sum
+    use mpi_interface, only : real_array_par_sum
     real, intent(in), dimension(:,:,:) :: varin, mask
     real, intent(out), dimension(:)  :: varout
     real, dimension(SIZE(varout))  :: varoutsum, lvaroutsum, gvaroutsum
@@ -881,9 +883,9 @@ contains
 
     n=size(varout)
     lvaroutsum=varoutsum
-    call double_array_par_sum(lvaroutsum,gvaroutsum,n)
+    call real_array_par_sum(lvaroutsum,gvaroutsum,n)
     lncl=ncl
-    call double_array_par_sum(lncl,gncl,n)
+    call real_array_par_sum(lncl,gncl,n)
 
     do k=1,nzp
        if (gncl(k) == 0. ) then
@@ -897,7 +899,7 @@ contains
   subroutine calcavgcld(varin, mask, varout)
     use modnetcdf, only : fillvalue_double
     use grid, only : nzp, nxp, nyp
-    use mpi_interface, only : double_array_par_sum
+    use mpi_interface, only : real_array_par_sum
     real, intent(in), dimension(:,:,:) :: varin, mask
     real, intent(out), dimension(:)  :: varout
     real, dimension(SIZE(varout))  :: varoutsum, lvaroutsum, gvaroutsum
@@ -922,9 +924,9 @@ contains
 
     n=size(varout)
     lvaroutsum=varoutsum
-    call double_array_par_sum(lvaroutsum,gvaroutsum,n)
+    call real_array_par_sum(lvaroutsum,gvaroutsum,n)
     lncl=ncl
-    call double_array_par_sum(lncl,gncl,n)
+    call real_array_par_sum(lncl,gncl,n)
 
     do k=1,nzp
        if (gncl(k) == 0. ) then

@@ -42,7 +42,7 @@ module mcrp
        prc_c, prc_r, prc_i, prc_s, prc_g, prc_h, & 
        lwaterbudget, prc_acc, rev_acc, a_rct, cnd_acc, cev_acc, a_cld,prc_lev, lmptend
 
-  USE parallele_umgebung, ONLY: isIO,double_global_maxval,global_maxval,global_minval,global_maxval_stdout,global_sumval_stdout
+  USE parallele_umgebung, ONLY: isIO,real_global_maxval,global_maxval,global_minval,global_maxval_stdout,global_sumval_stdout
   USE modcross, ONLY: calcintpath
 
   use thrm, only : thermo, fll_tkrs, esl, esi
@@ -228,14 +228,14 @@ contains
              else
                 rct_acc = rct_acc - sum(tmp)*dt
              end if
-             call double_scalar_par_sum(rct_acc,hlp7)
+             call real_scalar_par_sum(rct_acc,hlp7)
              call calcintpath(a_rpt,tmp)
              if (istep.le.1) then
                 rpt_acc = sum(tmp)*dt
              else
                 rpt_acc = rpt_acc + sum(tmp)*dt
              end if
-             call double_scalar_par_sum(rpt_acc,hlp8)
+             call real_scalar_par_sum(rpt_acc,hlp8)
              
              hsum = sum(cnd_acc) ; call double_scalar_par_sum(hsum,hlp1)
              hsum = sum(cev_acc) ; call double_scalar_par_sum(hsum,hlp2)
@@ -433,16 +433,19 @@ contains
              case(iriming_ice_cloud)
                 call resetvar(cldw,rc)
                 call resetvar(ice,rice,nice)
-                call ice_cloud_riming(n1,cldw,ice,rc,rice,nice,rgrp,tl,temp,d_coll_c,r_crit_c,d_crit_c,r_crit_ic,d_crit_ic,d_conv_ig,e_ic)
+                call ice_cloud_riming(n1,cldw,ice,rc,rice,nice,rgrp,tl,temp,d_coll_c,r_crit_c,d_crit_c,&
+                                      r_crit_ic,d_crit_ic,d_conv_ig,e_ic)
              case(iriming_snow_cloud)
                 call resetvar(snow,rsnow)
                 call resetvar(cldw,rc)
-                call ice_cloud_riming(n1,cldw,snow,rc,rsnow,nsnow,rgrp,tl,temp,d_coll_c,r_crit_c,d_crit_c,r_crit_sc,d_crit_sc,d_conv_sg,e_sc)
+                call ice_cloud_riming(n1,cldw,snow,rc,rsnow,nsnow,rgrp,tl,temp,d_coll_c,r_crit_c,d_crit_c,&
+                                      r_crit_sc,d_crit_sc,d_conv_sg,e_sc)
              case(iriming_grp_cloud)
                 call resetvar(graupel,rgrp)
                 call resetvar(cldw,rc)
                 r1 = 0.
-                call ice_cloud_riming(n1,cldw,graupel,rc,rgrp,ngrp,r1,tl,temp,d_coll_c,r_crit_c,d_crit_c,r_crit_gc,d_crit_gc,d_conv_sg,e_gc)
+                call ice_cloud_riming(n1,cldw,graupel,rc,rgrp,ngrp,r1,tl,temp,d_coll_c,r_crit_c,d_crit_c,&
+                                      r_crit_gc,d_crit_gc,d_conv_sg,e_gc)
                 rgrp = rgrp + r1
              case(iriming_ice_rain)
                 call resetvar(ice,rice,nice)
@@ -2983,16 +2986,16 @@ contains
     END IF
 
     IF (debug_maxval) THEN
-       wmax  = double_global_maxval(w(kts:kte,jts:jte,its:ite))
-       qvmax = double_global_maxval(qv(kts:kte,jts:jte,its:ite))
-       qcmax = double_global_maxval(qc(kts:kte,jts:jte,its:ite))
-       qrmax = double_global_maxval(qr(kts:kte,jts:jte,its:ite))
-       qimax = double_global_maxval(qi(kts:kte,jts:jte,its:ite))
-       qsmax = double_global_maxval(qs(kts:kte,jts:jte,its:ite))
-       qgmax = double_global_maxval(qg(kts:kte,jts:jte,its:ite))
-       qhmax = double_global_maxval(qh(kts:kte,jts:jte,its:ite))
-       nimax = double_global_maxval(qni(kts:kte,jts:jte,its:ite))
-       tmax  = double_global_maxval(tk(kts:kte,jts:jte,its:ite))
+       wmax  = real_global_maxval(w(kts:kte,jts:jte,its:ite))
+       qvmax = real_global_maxval(qv(kts:kte,jts:jte,its:ite))
+       qcmax = real_global_maxval(qc(kts:kte,jts:jte,its:ite))
+       qrmax = real_global_maxval(qr(kts:kte,jts:jte,its:ite))
+       qimax = real_global_maxval(qi(kts:kte,jts:jte,its:ite))
+       qsmax = real_global_maxval(qs(kts:kte,jts:jte,its:ite))
+       qgmax = real_global_maxval(qg(kts:kte,jts:jte,its:ite))
+       qhmax = real_global_maxval(qh(kts:kte,jts:jte,its:ite))
+       nimax = real_global_maxval(qni(kts:kte,jts:jte,its:ite))
+       tmax  = real_global_maxval(tk(kts:kte,jts:jte,its:ite))
        IF (isIO()) THEN
           WRITE (*,*) "mcrph_sb: output before microphysics"
           WRITE(*,'(10x,a)') 'Maximum Values:'
@@ -3019,7 +3022,7 @@ contains
           DO kk = kts, kte
              ! supersaturation w.r.t. ice
              hlp           = p00 * ((pi0(kk)+pi1(kk)+exner(kk,jj,ii))/cp)**cpr
-             ssi(kk,jj,ii) = qv(kk,jj,ii)/rsif(hlp,tk(kk,jj,ii)) - 1.0
+             ssi(kk,jj,ii) = qv(kk,jj,ii)/rsif(real(hlp),tk(kk,jj,ii)) - 1.0
 
 !             ssi(kk,jj,ii) =  R_d & 
 !                  & * dn0(kk) * qv(kk,jj,ii) &
@@ -3570,16 +3573,16 @@ contains
     END DO
 
     IF (debug_maxval) THEN
-       wmax  = double_global_maxval(w)
-       qvmax = double_global_maxval(qv)
-       qcmax = double_global_maxval(qc)
-       qrmax = double_global_maxval(qr)
-       qimax = double_global_maxval(qi)
-       qsmax = double_global_maxval(qs)
-       qgmax = double_global_maxval(qg)
-       qhmax = double_global_maxval(qh)
-       nimax = double_global_maxval(qni)
-       tmax  = double_global_maxval(tk)
+       wmax  = real_global_maxval(w)
+       qvmax = real_global_maxval(qv)
+       qcmax = real_global_maxval(qc)
+       qrmax = real_global_maxval(qr)
+       qimax = real_global_maxval(qi)
+       qsmax = real_global_maxval(qs)
+       qgmax = real_global_maxval(qg)
+       qhmax = real_global_maxval(qh)
+       nimax = real_global_maxval(qni)
+       tmax  = real_global_maxval(tk)
        IF (isIO()) THEN
           WRITE (*,*) "mcrph_sb: output after microphysics and sedimentation"
           WRITE(*,'(10x,a)') 'Maximum Values:'
